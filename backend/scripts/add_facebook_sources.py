@@ -75,7 +75,7 @@ FACEBOOK_SOURCES = [
 # Wspólna konfiguracja Apify dla wszystkich źródeł FB
 APIFY_CONFIG_TEMPLATE = {
     "scraper_class": "ApifyFacebookScraper",
-    "actor_id": "apify/facebook-posts-scraper",
+    "actor_id": "apify~facebook-posts-scraper",  # Uwaga: ~ nie /
     "results_limit": 20,
     "caption_text": False,
     "apify_api_key": None,  # Będzie uzupełnione z .env lub ręcznie

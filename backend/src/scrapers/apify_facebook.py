@@ -62,7 +62,8 @@ class ApifyFacebookScraper(BaseScraper):
         self.facebook_page_url = self.config.get('facebook_page_url')
         self.results_limit = self.config.get('results_limit', 20)
         self.caption_text = self.config.get('caption_text', False)
-        self.actor_id = self.config.get('actor_id', 'apify/facebook-posts-scraper')
+        # UWAGA: Apify API wymaga ~ zamiast / w nazwie actora
+        self.actor_id = self.config.get('actor_id', 'apify~facebook-posts-scraper')
 
         if not self.apify_api_key:
             raise ValueError("Missing 'apify_api_key' in scraper config")
@@ -212,9 +213,14 @@ class ApifyFacebookScraper(BaseScraper):
                     timestamp = post.get('timestamp') or post.get('time') or post.get('createdTime')
                     if timestamp:
                         try:
-                            published_at = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                            # Apify zwraca Unix timestamp (integer)
+                            if isinstance(timestamp, (int, float)):
+                                published_at = datetime.fromtimestamp(timestamp)
+                            # Lub ISO string
+                            elif isinstance(timestamp, str):
+                                published_at = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                         except Exception as e:
-                            self.logger.warning(f"Nieprawidłowy timestamp: {timestamp}")
+                            self.logger.warning(f"Nieprawidłowy timestamp: {timestamp} ({type(timestamp)})")
 
                     # Dodatkowe metadata jako content
                     likes = post.get('likes', 0)

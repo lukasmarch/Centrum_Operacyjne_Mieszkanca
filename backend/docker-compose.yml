@@ -17,5 +17,11 @@ services:
     ports:
       - "6379:6379"
 
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+
 volumes:
   postgres_data:
