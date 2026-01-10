@@ -1,0 +1,70 @@
+
+import React from 'react';
+import { RoadStatus, TrafficStatus } from '../types';
+
+interface TrafficItemProps {
+  road: RoadStatus;
+  isLast?: boolean;
+}
+
+const TrafficItem: React.FC<TrafficItemProps> = ({ road, isLast }) => {
+  const getStatusColor = (status: TrafficStatus) => {
+    switch (status) {
+      case TrafficStatus.FLUID: return 'text-emerald-400';
+      case TrafficStatus.DIFFICULTIES: return 'text-orange-400';
+      case TrafficStatus.JAM: return 'text-rose-400';
+      default: return 'text-slate-400';
+    }
+  };
+
+  const getStatusIndicator = (status: TrafficStatus) => {
+    switch (status) {
+      case TrafficStatus.FLUID: return 'bg-emerald-500';
+      case TrafficStatus.DIFFICULTIES: return 'bg-orange-500';
+      case TrafficStatus.JAM: return 'bg-rose-500';
+      default: return 'bg-slate-500';
+    }
+  };
+
+  return (
+    <div className={`py-6 ${!isLast ? 'border-b border-slate-800/40' : ''}`}>
+      <div className="flex flex-col gap-3">
+        {/* Header: Route and Time */}
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <div className={`w-1.5 h-10 rounded-full ${getStatusIndicator(road.status)} shadow-[0_0_12px_rgba(0,0,0,0.2)]`}></div>
+            <div>
+              <h3 className="text-white font-bold text-lg tracking-tight">{road.name}</h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`text-[11px] font-black uppercase tracking-wider ${getStatusColor(road.status)}`}>
+                  {road.status}
+                </span>
+                {road.delayMinutes > 0 && (
+                  <span className="text-[10px] text-rose-400/80 font-bold bg-rose-500/5 px-2 rounded-md border border-rose-500/10">
+                    +{road.delayMinutes}m opóźnienia
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-right">
+            <div className="text-2xl font-black text-white leading-none">{road.travelTime}</div>
+            <div className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Aktualny czas</div>
+          </div>
+        </div>
+        
+        {/* Detailed Description */}
+        {road.description && (
+          <div className="bg-[#1e293b]/30 rounded-2xl p-4 border border-white/[0.03] backdrop-blur-sm">
+            <p className="text-slate-300 text-sm leading-relaxed">
+              <span className="text-blue-400/80 mr-1">●</span> {road.description}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TrafficItem;

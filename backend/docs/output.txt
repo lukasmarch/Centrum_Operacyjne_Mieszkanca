@@ -1,0 +1,81 @@
+============================================================
+TEST: AI Processing Pipeline
+============================================================
+
+Found 21 unprocessed articles
+
+------------------------------------------------------------
+[TEST 1] Article Processing - Kategoryzacja
+------------------------------------------------------------
+2026-01-10 18:12:54,960 - ArticleProcessor - INFO - Found 5 articles to process
+2026-01-10 18:12:54,960 - ArticleProcessor - INFO - Processing article 21: Podsumowanie drogowe minionego weekendu...
+2026-01-10 18:13:00,623 - ArticleProcessor - INFO - ✓ Processed article 21: Transport (confidence: 0.90)
+2026-01-10 18:13:00,623 - ArticleProcessor - INFO - Processing article 20: Dyżury aptek w powiecie nowomiejskim w październik...
+2026-01-10 18:13:05,080 - ArticleProcessor - INFO - ✓ Processed article 20: Zdrowie (confidence: 0.90)
+2026-01-10 18:13:05,081 - ArticleProcessor - INFO - Processing article 19: Akcja „Trzeźwość” – wyniki kontroli na drogach...
+2026-01-10 18:13:09,272 - ArticleProcessor - INFO - ✓ Processed article 19: Transport (confidence: 0.90)
+2026-01-10 18:13:09,273 - ArticleProcessor - INFO - Processing article 18: Największa zjeżdżalnia wodna w Polsce! Powstanie w...
+2026-01-10 18:13:16,203 - ArticleProcessor - INFO - ✓ Processed article 18: Rekreacja (confidence: 0.90)
+2026-01-10 18:13:16,203 - ArticleProcessor - INFO - Processing article 17: Szczutowo (powiat sierpecki) – nie do zatrzymania!...
+2026-01-10 18:13:19,819 - ArticleProcessor - INFO - ✓ Processed article 17: Kultura (confidence: 0.90)
+2026-01-10 18:13:19,819 - ArticleProcessor - INFO - Processed 5/5 articles successfully
+
+✓ Processed: 5 articles
+
+============================================================
+RESULTS - Przetwórzone artykuły:
+============================================================
+
+[1] ID: 31
+    Title: Torebki zamszowe – elegancja, która nigdy nie wychodzi z mody...
+    Category: Biznes
+    Tags: torebki, zamszowe, moda, elegancja, rynek
+    Locations: None
+    Summary: Artykuł porusza temat torebek zamszowych jako elementu mody, który nigdy nie traci na znaczeniu. Podkreśla ich elegancję oraz wpływ na rynek modowy. W...
+
+[2] ID: 30
+    Title: Minimalistyczna torebka wizytowa – must have w szafie kobiety ceniącej elegancję...
+    Category: Biznes
+    Tags: torebka, elegancja, minimalizm, moda, kobiety
+    Locations: None
+    Summary: Minimalistyczna torebka wizytowa jest niezbędnym elementem w szafie kobiety, która ceni sobie elegancję. Artykuł podkreśla, jak taka torebka może uzup...
+
+[3] ID: 29
+    Title: Nieregularne Lustra: Jak Wybrać Idealny Kształt?...
+    Category: Nieruchomości
+    Tags: lustra, kształt, wnętrza, dekoracja, design
+    Locations: None
+    Summary: Artykuł porusza temat wyboru idealnego kształtu nieregularnych luster do wnętrz. Wskazuje na różne aspekty designu, które wpływają na estetykę i funkc...
+
+[4] ID: 28
+    Title: Brodnica na Nowo: Kto Wybuduje Nowe Drogi i Kanalizację Deszczową?...
+    Category: Transport
+    Tags: drogi, kanalizacja, remonty, Brodnica
+    Locations: Brodnica
+    Summary: W artykule omawiano plany budowy nowych dróg oraz kanalizacji deszczowej w Brodnicy. Wskazano na znaczenie tych inwestycji dla poprawy infrastruktury ...
+
+[5] ID: 27
+    Title: 63 km/h ponad limit. Młody kierowca stracił prawo jazdy?...
+    Category: Transport
+    Tags: przekroczenie prędkości, prawo jazdy, kierowca
+    Locations: None
+    Summary: Młody kierowca został zarejestrowany na przekroczeniu dozwolonej prędkości o 63 km/h. Zdarzenie to rodzi pytania o utratę prawa jazdy przez młodego uc...
+
+------------------------------------------------------------
+[TEST 2] Event Extraction
+------------------------------------------------------------
+2026-01-10 18:13:19,837 - EventExtractor - INFO - Checking 1 articles for events...
+2026-01-10 18:13:19,837 - EventExtractor - INFO - Checking article 17 for events...
+2026-01-10 18:13:20,628 - EventExtractor - INFO - Extracted 0 events from 1 articles
+
+✓ Extracted: 0 events
+
+============================================================
+STATISTICS
+============================================================
+Total articles: 31
+Processed articles: 15 (48.4%)
+Total events: 0
+============================================================
+
+✓ Test completed successfully!

@@ -1,0 +1,7 @@
+{
+  "name": "Traffic Status Widget - Działdowo",
+  "description": "Real-time traffic monitor for Działdowo and surrounding areas using Gemini with Google Maps grounding.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

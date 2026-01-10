@@ -1,0 +1,18 @@
+from .base import BaseScraper
+from .klikajinfo import KlikajInfoScraper
+from .gmina_rybno import GminaRybnoScraper
+from .mojedzialdowo import MojeDzialdowoScraper
+from .apify_facebook import ApifyFacebookScraper
+from .registry import SCRAPER_REGISTRY, get_scraper, register_scraper, list_scrapers
+
+__all__ = [
+    "BaseScraper",
+    "KlikajInfoScraper",
+    "GminaRybnoScraper",
+    "MojeDzialdowoScraper",
+    "ApifyFacebookScraper",
+    "SCRAPER_REGISTRY",
+    "get_scraper",
+    "register_scraper",
+    "list_scrapers",
+]

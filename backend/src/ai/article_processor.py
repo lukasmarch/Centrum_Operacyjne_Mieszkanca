@@ -1,0 +1,134 @@
+"""
+Article Processor - Kategoryzacja artykułów przez AI
+
+Używa Pydantic AI do automatycznej kategoryzacji artykułów do 8 modułów tematycznych,
+ekstrakcji tagów, lokalizacji i generowania podsumowań.
+"""
+from pydantic_ai import Agent
+from sqlmodel import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.ai.models import ArticleCategory
+from src.ai.prompts import CATEGORIZATION_PROMPT
+from src.database.schema import Article
+from src.utils.logger import setup_logger
+from src.config import settings
+
+logger = setup_logger("ArticleProcessor")
+
+
+class ArticleProcessor:
+    """Serwis do przetwarzania artykułów przez AI"""
+
+    def __init__(self):
+        # Utwórz agenta w __init__ (nie na poziomie modułu)
+        # żeby OPENAI_API_KEY był już załadowany z .env
+        import os
+        
+        # Ustaw OPENAI_API_KEY jako zmienną środowiskową dla Pydantic AI
+        os.environ['OPENAI_API_KEY'] = settings.OPENAI_API_KEY
+        
+        self.agent = Agent(
+            'openai:gpt-4o-mini',
+            output_type=ArticleCategory,
+            system_prompt=CATEGORIZATION_PROMPT
+        )
+        self.logger = logger
+
+    async def process_article(
+        self,
+        article: Article,
+        session: AsyncSession
+    ) -> Article:
+        """
+        Przetwórz pojedynczy artykuł przez AI
+
+        Args:
+            article: Artykuł do przetworzenia (z processed=False)
+            session: Async database session
+
+        Returns:
+            Przetworzony artykuł z category, tags, summary, etc.
+
+        Raises:
+            Exception: Jeśli przetwarzanie nie powiedzie się
+        """
+
+        # Przygotuj treść do analizy
+        content = f"Title: {article.title}\n\n{article.content or ''}"
+
+        try:
+            # Wywołaj AI agent
+            self.logger.info(f"Processing article {article.id}: {article.title[:50]}...")
+            result = await self.agent.run(content)
+            category_data = result.output
+
+            # Aktualizuj artykuł z wynikami AI
+            article.category = category_data.primary_category
+            article.tags = category_data.tags
+            article.location_mentioned = category_data.locations_mentioned
+            article.summary = category_data.summary
+            article.processed = True
+
+            # Zapisz do bazy
+            session.add(article)
+            await session.commit()
+            await session.refresh(article)
+
+            self.logger.info(
+                f"✓ Processed article {article.id}: "
+                f"{category_data.primary_category} "
+                f"(confidence: {category_data.confidence:.2f})"
+            )
+
+            return article
+
+        except Exception as e:
+            self.logger.error(f"✗ Error processing article {article.id}: {e}")
+            await session.rollback()
+            raise
+
+    async def process_batch(
+        self,
+        session: AsyncSession,
+        batch_size: int = 10
+    ) -> int:
+        """
+        Przetwórz batch nieprzetworzonych artykułów
+
+        Args:
+            session: Async database session
+            batch_size: Liczba artykułów do przetworzenia w jednym batch
+
+        Returns:
+            Liczba pomyślnie przetworzonych artykułów
+        """
+
+        # Znajdź nieprzetwórzone artykuły
+        result = await session.execute(
+            select(Article)
+            .where(Article.processed == False)
+            .order_by(Article.scraped_at.desc())
+            .limit(batch_size)
+        )
+        articles = result.scalars().all()
+
+        if not articles:
+            self.logger.info("No articles to process")
+            return 0
+
+        self.logger.info(f"Found {len(articles)} articles to process")
+
+        # Przetwórz każdy artykuł
+        processed_count = 0
+        for article in articles:
+            try:
+                await self.process_article(article, session)
+                processed_count += 1
+            except Exception as e:
+                self.logger.error(f"Batch processing failed for article {article.id}: {e}")
+                # Kontynuuj dla pozostałych artykułów
+                continue
+
+        self.logger.info(f"Processed {processed_count}/{len(articles)} articles successfully")
+        return processed_count
