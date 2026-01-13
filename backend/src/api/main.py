@@ -3,10 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from src.database import get_session, Source, Article, Weather
+from src.database import get_session, Source, Article, Weather, DailySummary
 from src.models import ArticleOutput
 from src.integrations.weather import WeatherService
 from src.scheduler.scheduler import start_scheduler
+from datetime import datetime
 
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
 
@@ -94,4 +95,69 @@ async def update_weather(session: AsyncSession = Depends(get_session)):
         "message": "Weather updated successfully",
         "locations_updated": len(results),
         "data": results
+    }
+
+@app.get("/api/summary/daily")
+async def get_latest_daily_summary(session: AsyncSession = Depends(get_session)):
+    """Get the most recent daily summary"""
+    result = await session.execute(
+        select(DailySummary)
+        .order_by(DailySummary.date.desc())
+        .limit(1)
+    )
+    summary = result.scalar_one_or_none()
+
+    if not summary:
+        raise HTTPException(
+            status_code=404,
+            detail="No daily summary found. Summaries are generated daily at 6:00 AM."
+        )
+
+    return {
+        "id": summary.id,
+        "date": summary.date.strftime("%Y-%m-%d"),
+        "headline": summary.headline,
+        "content": summary.content,
+        "generated_at": summary.generated_at
+    }
+
+@app.get("/api/summary/daily/{date}")
+async def get_daily_summary_by_date(
+    date: str,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Get daily summary for a specific date
+
+    Args:
+        date: Date in format YYYY-MM-DD (e.g., "2026-01-10")
+    """
+    try:
+        # Parse date string
+        target_date = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid date format. Use YYYY-MM-DD (e.g., '2026-01-10')"
+        )
+
+    # Query for summary on that date
+    result = await session.execute(
+        select(DailySummary)
+        .where(DailySummary.date == target_date)
+    )
+    summary = result.scalar_one_or_none()
+
+    if not summary:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No daily summary found for date: {date}"
+        )
+
+    return {
+        "id": summary.id,
+        "date": summary.date.strftime("%Y-%m-%d"),
+        "headline": summary.headline,
+        "content": summary.content,
+        "generated_at": summary.generated_at
     }

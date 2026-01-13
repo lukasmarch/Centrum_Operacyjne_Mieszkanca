@@ -114,7 +114,7 @@ class GminaRybnoScraper(BaseScraper):
                             image_url = f"https://gminarybno.pl/{img_src}"
 
                 # External ID z URL - próbuj wyciągnąć ID
-                # Format: /aktualnosc/123/slug lub /aktualnosc-123-slug
+                # Format: /aktualnosc/[ID]/slug lub /aktualnosc-[ID]-slug
                 external_id = None
 
                 # Wariant 1: /aktualnosc/[ID]/slug
@@ -142,6 +142,15 @@ class GminaRybnoScraper(BaseScraper):
                     'image_url': image_url,
                     'external_id': external_id,
                 }
+                
+                # Deep Scraping: Fetch detail page to get content and date
+                try:
+                    self.logger.info(f"Fetching details for: {full_url}")
+                    detail_html = await self.fetch(full_url)
+                    detail_data = self._parse_detail(detail_html)
+                    article_data.update(detail_data)
+                except Exception as e:
+                    self.logger.error(f"Error fetching details for {full_url}: {e}")
 
                 articles.append(article_data)
                 self.logger.debug(f"Znaleziono artykuł: {title[:50]}...")
@@ -152,3 +161,56 @@ class GminaRybnoScraper(BaseScraper):
 
         self.logger.info(f"Znaleziono {len(articles)} artykułów na gminarybno.pl")
         return articles
+
+    def _parse_detail(self, html: str) -> Dict:
+        """Parse detail page for content and date"""
+        soup = BeautifulSoup(html, 'html.parser')
+        data = {}
+
+        # Content - usually in #main or .entry-content
+        content_div = soup.find('div', id='main') or soup.find('div', class_='entry-content')
+        if content_div:
+            # Remove scripts, styles, ads
+            for tag in content_div(['script', 'style', 'div.ads', 'div.social-links', 'div.box-footer']):
+                tag.decompose()
+            
+            text = content_div.get_text(separator='\n', strip=True)
+            if text:
+                data['content'] = text
+
+        # Date - try to find patterns
+        # 1. Look for specific date structures
+        date_elem = soup.find('span', class_='date') or soup.find('div', class_='date')
+        if date_elem:
+            date_str = date_elem.get_text(strip=True)
+            # Try parsing known formats
+            try:
+                # Example: 2024-05-12 or 12.05.2024
+                for fmt in ('%Y-%m-%d', '%d.%m.%Y'):
+                    try:
+                        data['published_at'] = datetime.strptime(date_str, fmt)
+                        break
+                    except ValueError:
+                        continue
+            except Exception:
+                pass
+        
+        # Fallback date search in text
+        if 'published_at' not in data:
+            # Search for YYYY-MM-DD or DD.MM.YYYY
+            text_content = soup.get_text()
+            date_match = re.search(r'(\d{4}-\d{2}-\d{2})|(\d{2}\.\d{2}\.\d{4})', text_content)
+            if date_match:
+                date_str = date_match.group(0)
+                try:
+                    # Try parsing known formats
+                    for fmt in ('%Y-%m-%d', '%d.%m.%Y'):
+                        try:
+                            data['published_at'] = datetime.strptime(date_str, fmt)
+                            break
+                        except ValueError:
+                            continue
+                except Exception:
+                    pass
+
+        return data

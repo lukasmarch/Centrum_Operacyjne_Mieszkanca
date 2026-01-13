@@ -1,6 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
+from datetime import datetime
 import httpx
 from bs4 import BeautifulSoup
 from sqlmodel import select
@@ -68,30 +69,53 @@ class BaseScraper(ABC):
         pass
 
     async def save_to_db(self, articles: List[Dict], session: AsyncSession) -> List[int]:
-        """Save articles to database"""
         saved_ids = []
 
         for article_data in articles:
             try:
-                existing = await session.execute(
-                    select(Article).where(Article.url == article_data['url'])
-                )
-                if existing.scalar_one_or_none():
-                    self.logger.info(f"Article already exists: {article_data['url']}")
-                    continue
+                # Check existence by URL OR external_id
+                query = select(Article).where(Article.url == article_data['url'])
+                
+                if article_data.get('external_id'):
+                    query = select(Article).where(
+                        (Article.url == article_data['url']) | 
+                        (Article.external_id == article_data['external_id'])
+                    )
 
-                article = Article(
-                    source_id=self.source_id,
-                    **article_data
-                )
-                session.add(article)
-                await session.commit()
-                await session.refresh(article)
-                saved_ids.append(article.id)
-                self.logger.info(f"Saved article: {article.title}")
+                existing = await session.execute(query)
+                # Use first() in case we match multiple (e.g. old url + new url separate entries? shouldn't happen if unique)
+                # specific to our logic, let's take one.
+                existing_article = existing.scalars().first()
+
+                if existing_article:
+                    self.logger.info(f"Updating article: {article_data['url']} (ID: {existing_article.id})")
+                    # Update fields
+                    for key, value in article_data.items():
+                        if value is not None:
+                            setattr(existing_article, key, value)
+                    
+                    # Update metadata
+                    existing_article.scraped_at = datetime.utcnow()
+                    # Optional: reset processed status if we want to re-process content with AI
+                    # existing_article.processed = False 
+                    
+                    session.add(existing_article)
+                    await session.commit()
+                    await session.refresh(existing_article)
+                    saved_ids.append(existing_article.id)
+                else:
+                    article = Article(
+                        source_id=self.source_id,
+                        **article_data
+                    )
+                    session.add(article)
+                    await session.commit()
+                    await session.refresh(article)
+                    saved_ids.append(article.id)
+                    self.logger.info(f"Saved new article: {article.title}")
 
             except Exception as e:
-                self.logger.error(f"Error saving article: {e}")
+                self.logger.error(f"Error saving article {article_data.get('url')}: {e}")
                 await session.rollback()
 
         return saved_ids

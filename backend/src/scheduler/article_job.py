@@ -31,37 +31,56 @@ async def update_articles_job():
     failed_sources = []
 
     async with async_session() as session:
-        # Fetch all active sources
+        # Fetch all active sources and convert to dicts to avoid session issues
         result = await session.execute(
             select(Source).where(Source.status == "active")
         )
-        sources = result.scalars().all()
+        sources_orm = result.scalars().all()
+
+        # Convert to list of dicts to avoid lazy loading issues
+        sources = [
+            {
+                "id": s.id,
+                "name": s.name,
+                "type": s.type,
+                "url": s.url,
+                "scraping_config": s.scraping_config
+            }
+            for s in sources_orm
+        ]
 
         logger.info(f"Found {len(sources)} active sources to scrape")
 
         for source in sources:
             total_sources += 1
+
+            # Extract source info from dict
+            source_name = source["name"]
+            source_id = source["id"]
+            source_type = source["type"]
+            source_url = source["url"]
+
             logger.info(f"\n{'─' * 60}")
-            logger.info(f"Processing source: {source.name} (ID: {source.id})")
-            logger.info(f"Type: {source.type} | URL: {source.url}")
+            logger.info(f"Processing source: {source_name} (ID: {source_id})")
+            logger.info(f"Type: {source_type} | URL: {source_url}")
 
             # Get scraper class from registry
-            scraper_class = get_scraper(source.name)
+            scraper_class = get_scraper(source_name)
             if not scraper_class:
-                logger.warning(f"No scraper registered for '{source.name}' - skipping")
-                failed_sources.append(f"{source.name} (no scraper)")
+                logger.warning(f"No scraper registered for '{source_name}' - skipping")
+                failed_sources.append(f"{source_name} (no scraper)")
                 continue
 
             # Initialize scraper with source config
-            config = source.scraping_config or {}
-            scraper = scraper_class(source_id=source.id, config=config)
+            config = source["scraping_config"] or {}
+            scraper = scraper_class(source_id=source_id, config=config)
 
             try:
                 # Get URL to scrape (from source.url or config)
-                scrape_url = source.url or config.get("base_url")
+                scrape_url = source_url or config.get("base_url")
                 if not scrape_url:
-                    logger.error(f"No URL configured for source {source.name}")
-                    failed_sources.append(f"{source.name} (no URL)")
+                    logger.error(f"No URL configured for source {source_name}")
+                    failed_sources.append(f"{source_name} (no URL)")
                     continue
 
                 logger.info(f"Scraping {scrape_url} with {scraper_class.__name__}...")
@@ -71,20 +90,20 @@ async def update_articles_job():
                     articles = await scraper.parse(html, scrape_url)
                     saved_ids = await scraper.save_to_db(articles, session)
 
-                logger.info(f"✓ {source.name}: {len(saved_ids)} new articles saved")
+                logger.info(f"✓ {source_name}: {len(saved_ids)} new articles saved")
                 total_saved += len(saved_ids)
 
                 # Update last_scraped timestamp
                 await session.execute(
                     update(Source)
-                    .where(Source.id == source.id)
+                    .where(Source.id == source_id)
                     .values(last_scraped=datetime.utcnow())
                 )
                 await session.commit()
 
             except Exception as e:
-                logger.error(f"✗ Failed to scrape {source.name}: {e}")
-                failed_sources.append(f"{source.name} ({str(e)[:50]})")
+                logger.error(f"✗ Failed to scrape {source_name}: {e}")
+                failed_sources.append(f"{source_name} ({str(e)[:50]})")
                 await session.rollback()
 
     await engine.dispose()

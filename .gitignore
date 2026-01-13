@@ -45,8 +45,6 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# User Specific Exclusions
-CLAUDE.md
-dzialowo-live-plan-biznesowy.md
-GammaVibe.md
-PLAN_PROJEKTU.md
+backend/notebooks/.ipynb_checkpoints/
+
+

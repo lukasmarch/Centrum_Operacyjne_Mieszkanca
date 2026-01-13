@@ -63,7 +63,7 @@ async def main():
         print("-"*60)
 
         processor = ArticleProcessor()
-        count = await processor.process_batch(session, batch_size=5)
+        count = await processor.process_batch(session, batch_size=5, days_back=30)
         print(f"\n✓ Processed: {count} articles")
 
         # Sprawdź wyniki

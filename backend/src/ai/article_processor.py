@@ -91,7 +91,8 @@ class ArticleProcessor:
     async def process_batch(
         self,
         session: AsyncSession,
-        batch_size: int = 10
+        batch_size: int = 10,
+        days_back: int = 2
     ) -> int:
         """
         Przetwórz batch nieprzetworzonych artykułów
@@ -99,16 +100,31 @@ class ArticleProcessor:
         Args:
             session: Async database session
             batch_size: Liczba artykułów do przetworzenia w jednym batch
+            days_back: Ile dni wstecz sprawdzać artykuły (domyślnie 2 = wczoraj + dziś)
 
         Returns:
             Liczba pomyślnie przetworzonych artykułów
         """
+        from datetime import datetime, timedelta
 
-        # Znajdź nieprzetwórzone artykuły
+        # Data graniczna (2 dni wstecz)
+        date_threshold = datetime.utcnow() - timedelta(days=days_back)
+
+        # Znajdź nieprzetwórzone artykuły z ostatnich 2 dni LUB bez daty
+        # (artykuły bez daty też przetwarzamy, bo mogą być świeże)
+        from sqlalchemy import or_
+
         result = await session.execute(
             select(Article)
             .where(Article.processed == False)
-            .order_by(Article.scraped_at.desc())
+            .where(
+                or_(
+                    Article.published_at >= date_threshold,  # Świeże (ostatnie 2 dni)
+                    Article.published_at.is_(None)  # Lub bez daty (przetwórz i tak)
+                )
+            )
+            .where(Article.content.isnot(None))  # Musi mieć content
+            .order_by(Article.published_at.desc().nulls_last())  # Najpierw z datą, potem NULL
             .limit(batch_size)
         )
         articles = result.scalars().all()

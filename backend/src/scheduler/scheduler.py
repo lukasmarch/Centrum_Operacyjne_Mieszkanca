@@ -4,11 +4,13 @@ Manages all periodic tasks
 """
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 import atexit
 
 from src.scheduler.weather_job import run_weather_job
 from src.scheduler.article_job import run_article_job
 from src.scheduler.ai_jobs import run_ai_job
+from src.scheduler.summary_job import run_summary_job
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
@@ -44,6 +46,15 @@ def start_scheduler():
         trigger=IntervalTrigger(minutes=30),
         id='ai_processing',
         name='AI article processing',
+        replace_existing=True
+    )
+
+    # Daily summary generation at 6:00 AM
+    scheduler.add_job(
+        func=run_summary_job,
+        trigger=CronTrigger(hour=6, minute=0),
+        id='daily_summary',
+        name='Generate daily summary',
         replace_existing=True
     )
 

@@ -14,40 +14,57 @@ class KlikajInfoScraper(BaseScraper):
         soup = BeautifulSoup(html, 'html.parser')
 
         # Znajdź wszystkie linki do artykułów
-        article_links = soup.find_all('a', href=re.compile(r'^/artykul/\d+,'))
-
+        # Szukamy linków typu /artykul/[id],[slug]
+        article_links = soup.find_all('a', href=re.compile(r'/artykul/\d+,'))
+        
         seen_urls = set()
 
         for link in article_links:
             try:
                 href = link.get('href')
-                if not href or href in seen_urls:
+                if not href:
                     continue
 
-                seen_urls.add(href)
-                full_url = f"https://klikajinfo.pl{href}"
+                # Normalizacja URL (dodanie https://www.klikajinfo.pl jeśli trzeba)
+                if href.startswith('http'):
+                    full_url = href
+                else:
+                    full_url = f"https://www.klikajinfo.pl{href}"
+                
+                if full_url in seen_urls:
+                    continue
+                seen_urls.add(full_url)
 
-                # Tytuł z atrybutu title lub z h3
+                # Tytuł
                 title = link.get('title')
                 if not title:
-                    title_elem = link.find(['h1', 'h2', 'h3'])
+                    title_elem = link.find(['h1', 'h2', 'h3', 'h4'])
                     if title_elem:
                         title = title_elem.get_text(strip=True)
-
+                
                 if not title:
+                    # Fallback
+                    title = link.get_text(strip=True)
+
+                if not title or len(title) < 5:
                     continue
 
                 # Obrazek
-                img = link.find('img')
                 image_url = None
+                img = link.find('img')
                 if img:
-                    image_url = img.get('src')
-                    if image_url and not image_url.startswith('http'):
-                        image_url = f"https://static2.klikajinfo.pl{image_url}"
+                    src = img.get('src') or img.get('data-src')
+                    if src:
+                        if src.startswith('http'):
+                            image_url = src
+                        else:
+                            image_url = f"https://static2.klikajinfo.pl{src}"
 
-                # External ID z URL
+                # External ID
                 external_id_match = re.search(r'/artykul/(\d+),', href)
                 external_id = external_id_match.group(1) if external_id_match else None
+                if not external_id:
+                     external_id = f"klikajinfo_{hash(full_url) & 0x7FFFFFFF}"
 
                 article_data = {
                     'title': title,
@@ -56,11 +73,79 @@ class KlikajInfoScraper(BaseScraper):
                     'external_id': external_id,
                 }
 
+                # Deep Scraping
+                try:
+                    self.logger.info(f"Fetching details for: {full_url}")
+                    # Use follow_redirects=True in fetch implicitly or handle here
+                    detail_html = await self.fetch(full_url)
+                    detail_data = self._parse_detail(detail_html)
+                    article_data.update(detail_data)
+                except Exception as e:
+                    self.logger.error(f"Error fetching details for {full_url}: {e}")
+
                 articles.append(article_data)
 
-            except (AttributeError, KeyError) as e:
+            except Exception as e:
                 self.logger.warning(f"Parse error dla linku: {e}")
                 continue
 
         self.logger.info(f"Znaleziono {len(articles)} artykułów")
         return articles
+
+    def _parse_detail(self, html: str) -> Dict:
+        soup = BeautifulSoup(html, 'html.parser')
+        data = {}
+
+        # Content - usually in .article-single or similar
+        # Based on CSS: .article-single .text-title implies existence of .article-single
+        content_div = soup.find('div', class_='article-single') or soup.find('div', class_='article-content')
+        
+        if content_div:
+            # Remove junk
+            for tag in content_div(['script', 'style', 'div.ads', 'div.social-share']):
+                tag.decompose()
+            
+            text = content_div.get_text(separator='\n', strip=True)
+            if text:
+                data['content'] = text
+        
+        # Date
+        # CSS mentions: .article-footer .article-date {display:none !important;} 
+        # This implies it exists in HTML but is hidden. Perfect for scraping!
+        date_elem = soup.find(class_='article-date')
+        if not date_elem:
+            # Try searching meta tags
+            meta_date = soup.find('meta', {'property': 'article:published_time'})
+            if meta_date:
+                # ISO format likely
+                try:
+                    data['published_at'] = datetime.fromisoformat(meta_date['content'].replace('Z', '+00:00'))
+                    return data # Done
+                except:
+                    pass
+
+        if date_elem:
+            date_text = date_elem.get_text(strip=True)
+            # Try parsing polish date formats e.g. "12 stycznia 2026" or "2026-01-12"
+            # For simplicity, look for patterns
+            import locale
+            # locale is tricky in containers, stick to regex/simple mapping
+            
+            # Map polish months
+            months = {
+                'stycznia': '01', 'lutego': '02', 'marca': '03', 'kwietnia': '04',
+                'maja': '05', 'czerwca': '06', 'lipca': '07', 'sierpnia': '08',
+                'września': '09', 'października': '10', 'listopada': '11', 'grudnia': '12'
+            }
+            
+            lower_text = date_text.lower()
+            for pol, num in months.items():
+                lower_text = lower_text.replace(pol, num)
+            
+            # Look for DD.MM.YYYY or DD MM YYYY
+            match = re.search(r'(\d{1,2})[\s\.]+(\d{2})[\s\.]+(\d{4})', lower_text)
+            if match:
+                day, month, year = match.groups()
+                data['published_at'] = datetime(int(year), int(month), int(day))
+
+        return data
