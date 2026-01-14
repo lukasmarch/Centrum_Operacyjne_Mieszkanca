@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from sqlmodel import SQLModel, Field, Column, JSON, ARRAY, String
+from sqlmodel import SQLModel, Field, Column, JSON, ARRAY, String, Index
 from sqlalchemy.dialects.postgresql import JSONB
 
 class Source(SQLModel, table=True):
@@ -36,6 +36,9 @@ class Article(SQLModel, table=True):
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"
+    __table_args__ = (
+        Index('idx_event_unique', 'title', 'event_date', 'location', unique=True),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str = Field(max_length=500)

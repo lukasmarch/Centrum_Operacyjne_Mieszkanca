@@ -18,7 +18,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 # Dodaj backend do path
-backend_dir = Path(__file__).parent.parent
+backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
 # Load environment variables

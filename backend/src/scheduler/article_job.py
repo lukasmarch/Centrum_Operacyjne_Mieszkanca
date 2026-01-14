@@ -3,7 +3,7 @@ Scheduled job for article updates
 Runs every 6 hours - scrapes all active sources
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, update
@@ -11,9 +11,47 @@ from sqlalchemy import select, update
 from src.config import settings
 from src.database.schema import Source
 from src.scrapers.registry import get_scraper, list_scrapers
+from src.scrapers.rss_scraper import RSSFeedScraper
 from src.utils.logger import setup_logger
 
 logger = setup_logger("ArticleScheduler")
+
+
+def filter_recent_articles(articles: list, days: int = 30) -> list:
+    """
+    Filter articles to only include recent ones (published within last N days)
+
+    Args:
+        articles: List of article dicts
+        days: Number of days to look back (default: 30)
+
+    Returns:
+        Filtered list of articles
+    """
+    if not articles:
+        return []
+
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    filtered = []
+
+    for article in articles:
+        published_at = article.get('published_at')
+
+        # Jeśli brak daty publikacji, przyjmij że jest świeży (może być nowy artykuł)
+        if published_at is None:
+            filtered.append(article)
+            continue
+
+        # Jeśli data publikacji jest w przedziale, dodaj
+        if published_at >= cutoff_date:
+            filtered.append(article)
+        else:
+            logger.debug(f"Skipping old article: {article.get('title', 'Unknown')} (published: {published_at.date()})")
+
+    if len(filtered) < len(articles):
+        logger.info(f"Filtered out {len(articles) - len(filtered)} old articles (older than {days} days)")
+
+    return filtered
 
 
 async def update_articles_job():
@@ -86,8 +124,17 @@ async def update_articles_job():
                 logger.info(f"Scraping {scrape_url} with {scraper_class.__name__}...")
 
                 async with scraper:
-                    html = await scraper.fetch(scrape_url)
-                    articles = await scraper.parse(html, scrape_url)
+                    # RSS scrapers use feedparser, not HTML parsing
+                    if isinstance(scraper, RSSFeedScraper):
+                        articles = await scraper.scrape_feed(scrape_url)
+                    else:
+                        # Standard HTML scrapers
+                        html = await scraper.fetch(scrape_url)
+                        articles = await scraper.parse(html, scrape_url)
+
+                    # Filter articles by date (only last 30 days)
+                    articles = filter_recent_articles(articles, days=30)
+
                     saved_ids = await scraper.save_to_db(articles, session)
 
                 logger.info(f"✓ {source_name}: {len(saved_ids)} new articles saved")

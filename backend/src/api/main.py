@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from src.database import get_session, Source, Article, Weather, DailySummary
+from src.database import get_session, Source, Article, Weather, DailySummary, Event
 from src.models import ArticleOutput
 from src.integrations.weather import WeatherService
 from src.scheduler.scheduler import start_scheduler
@@ -161,3 +161,29 @@ async def get_daily_summary_by_date(
         "content": summary.content,
         "generated_at": summary.generated_at
     }
+
+@app.get("/api/events")
+async def get_upcoming_events(
+    limit: int = 50,
+    session: AsyncSession = Depends(get_session)
+):
+    """Get upcoming events"""
+    now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    result = await session.execute(
+        select(Event)
+        .where(Event.event_date >= today_start)
+        .order_by(Event.event_date.asc())
+        .limit(limit)
+    )
+    events = result.scalars().all()
+    return events
+
+
+@app.get("/api/traffic")
+async def get_traffic():
+    """Get real-time traffic data using Gemini Grounding"""
+    from src.integrations.traffic_service import TrafficService
+    service = TrafficService()
+    return await service.get_traffic_data()

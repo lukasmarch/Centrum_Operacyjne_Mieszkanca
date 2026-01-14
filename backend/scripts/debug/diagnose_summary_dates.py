@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 
-backend_path = Path(__file__).parent.parent
+backend_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_path))
 
 from sqlalchemy import select

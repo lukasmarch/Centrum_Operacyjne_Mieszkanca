@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     OPENWEATHER_API_KEY: str
     APIFY_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
 
     SCRAPER_USER_AGENT: str = "Mozilla/5.0 (compatible; CentrumOperacyjneBot/1.0)"
     SCRAPER_TIMEOUT: int = 30

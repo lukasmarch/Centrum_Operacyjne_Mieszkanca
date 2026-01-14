@@ -10,6 +10,7 @@ from src.scrapers.klikajinfo import KlikajInfoScraper
 from src.scrapers.gmina_rybno import GminaRybnoScraper
 from src.scrapers.mojedzialdowo import MojeDzialdowoScraper
 from src.scrapers.apify_facebook import ApifyFacebookScraper
+from src.scrapers.rss_scraper import RSSFeedScraper
 from src.utils.logger import setup_logger
 
 logger = setup_logger("ScraperRegistry")
@@ -20,6 +21,7 @@ SCRAPER_REGISTRY: Dict[str, Type[BaseScraper]] = {
     "Gmina Rybno": GminaRybnoScraper,
     "Moje Działdowo": MojeDzialdowoScraper,
     "Facebook - Syla": ApifyFacebookScraper,
+    "Nasze Miasto Działdowo": RSSFeedScraper,
 }
 
 
@@ -30,6 +32,7 @@ def get_scraper(source_name: str) -> Optional[Type[BaseScraper]]:
     Obsługuje:
     - Dokładne dopasowanie nazwy (np. "Klikaj.info")
     - Pattern matching dla Facebook (wszystkie "Facebook - *" używają ApifyFacebookScraper)
+    - Pattern matching dla RSS (wszystkie "*RSS" używają RSSFeedScraper)
 
     Args:
         source_name: Nazwa źródła z tabeli sources (np. "Klikaj.info", "Facebook - Syla")
@@ -46,6 +49,10 @@ def get_scraper(source_name: str) -> Optional[Type[BaseScraper]]:
         if source_name.startswith("Facebook - "):
             scraper_class = ApifyFacebookScraper
             logger.debug(f"Matched Facebook pattern for: {source_name}")
+        # Wszystkie źródła RSS (kończące się na "RSS" lub zawierające "RSS")
+        elif "RSS" in source_name or source_name.endswith("(RSS)"):
+            scraper_class = RSSFeedScraper
+            logger.debug(f"Matched RSS pattern for: {source_name}")
         else:
             logger.warning(f"No scraper found for source: {source_name}")
             return None

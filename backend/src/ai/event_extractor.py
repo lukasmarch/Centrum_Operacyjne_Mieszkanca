@@ -71,17 +71,25 @@ URL: {article.url}
                 self.logger.debug(f"Article {article.id} is not an event")
                 return None
 
-            # Sprawdź duplikaty (ten sam tytuł + data)
+            # WALIDACJA: Wydarzenie musi mieć datę (event_date jest REQUIRED w bazie)
+            if not event_data.event_date:
+                self.logger.warning(
+                    f"Event '{event_data.title}' has no date - skipping (article {article.id})"
+                )
+                return None
+
+            # Sprawdź duplikaty (ten sam tytuł + data + lokalizacja)
             if event_data.event_date:
                 existing = await session.execute(
                     select(Event)
                     .where(
                         Event.title == event_data.title,
-                        Event.event_date == event_data.event_date
+                        Event.event_date == event_data.event_date,
+                        Event.location == event_data.location
                     )
                 )
                 if existing.scalar_one_or_none():
-                    self.logger.info(f"Event already exists: {event_data.title}")
+                    self.logger.info(f"Event already exists: {event_data.title} on {event_data.event_date} at {event_data.location}")
                     return None
 
             # Utwórz nowe wydarzenie

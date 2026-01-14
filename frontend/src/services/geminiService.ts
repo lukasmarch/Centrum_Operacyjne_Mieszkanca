@@ -1,123 +1,38 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { TrafficCondition, RoadStatus, GroundingSource } from "../../types";
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_API_KEY || '' });
+const API_BASE_URL = 'http://localhost:8000'; // Or use current origin if deployed
 
 export const fetchTrafficData = async (latitude?: number, longitude?: number): Promise<{ roads: RoadStatus[], sources: GroundingSource[] }> => {
     try {
-        const prompt = `
-      Jesteś dyspozytorem ruchu dla regionu Rybno (powiat działdowski). 
-      Twoim centrum jest miejscowość RYBNO. Sprawdź AKTUALNE (real-time) warunki drogowe i czasy przejazdu dla tras:
-      1. Rybno -> Działdowo (DW538)
-      2. Rybno -> Lubawa (DW538/DW541)
-      3. Rybno -> Iława (przez Hartowiec)
-      4. Rybno -> Olsztyn (najszybsza aktualna trasa)
-      
-      Zasady analizy:
-      - Podaj AKTUALNY CZAS PRZEJAZDU (TravelTime) w minutach.
-      - Opóźnienie (Delay) to różnica między czasem aktualnym a optymalnym.
-      - W opisie ('NOTE') bądź ekstremalnie precyzyjny: jeśli jest zima, sprawdź czy przyczyną jest śliska nawierzchnia, błoto pośniegowe czy praca pługów. Jeśli to korek w małym mieście, określ czy to zator przy przejeździe kolejowym czy wzmożony ruch lokalny.
-      - Opis musi być jednym, treściwym zdaniem, które wyjaśnia "dlaczego" (np. "Błoto pośniegowe na podjazdach pod wzniesienia spowalnia ruch ciężarowy").
-
-      Format odpowiedzi:
-      [ROUTE: Skąd-Dokąd | TIME: X min | STATUS: Status | DELAY: X min | NOTE: Opis przyczyny]
-    `;
-
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-exp",
-            contents: prompt,
-            config: {
-                tools: [{ googleSearch: {} }],
-                responseModalities: ["TEXT"],
-            },
-        });
-
-        // Note: Previously used googleMaps tool, but standard search might be safer if Maps tool isn't enabled/configured. 
-        // The original code used `googleMaps: {}`. I'll stick to `googleSearch` as it is more likely to be general purpose or revert to original if user has Maps access.
-        // Actually, let's stick to the original code's intent but use the correct tool name. 
-        // Original used: `tools: [{ googleMaps: {} }]` and `model: "gemini-3-pro-preview"`.
-        // "gemini-3-pro-preview" might not be available or valid for this user. "gemini-2.0-flash-exp" is safer for "grounding with gemini flash" request.
-        // The user requested "grounding with gemini flash".
-        // I will use `gemini-2.0-flash-exp` and `googleSearch` generic tool for grounding, or `googleMaps` if I am sure.
-        // Let's use `googleSearch` for broad grounding as safety.
-
-        // Actually, looking at the original file:
-        /*
-          model: "gemini-3-pro-preview",
-          contents: prompt,
-          config: {
-            tools: [{ googleMaps: {} }],
-        */
-        // I should probably respect the "gemini flash" request. 
-        // And `googleMaps` tool is specific. 
-        // I will use `gemini-2.0-flash-exp` and `googleSearch` for now as it's standard grounding.
-
-        const text = response.text || "";
-        const sources: GroundingSource[] = [];
-        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-        if (chunks) {
-            chunks.forEach((chunk: any) => {
-                if (chunk.web) {
-                    sources.push({
-                        title: chunk.web.title || "Źródło WWW",
-                        uri: chunk.web.uri
-                    });
-                }
-            });
+        const response = await fetch(`${API_BASE_URL}/api/traffic`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
         }
+        const data = await response.json();
+
+        // Map backend response status strings to TrafficCondition enum if needed
+        const roads = data.roads.map((r: any) => ({
+            ...r,
+            status: mapStatus(r.status)
+        }));
 
         return {
-            roads: parseGeminiResponse(text),
-            sources
+            roads: roads,
+            sources: data.sources
         };
     } catch (error) {
-        console.error("Error fetching traffic data:", error);
-        // Fallback data reflecting the new Rybno focus
-        return {
-            roads: [
-                { id: '1', name: 'Rybno -> Działdowo', status: TrafficCondition.DIFFICULTIES, delayMinutes: 5, travelTime: '28 min', description: 'Utrudnienia przy wjeździe do Działdowa przez oblodzoną nawierzchnię na DW538.' },
-                { id: '2', name: 'Rybno -> Lubawa', status: TrafficCondition.FLUID, delayMinutes: 0, travelTime: '22 min', description: 'Trasa czysta, nawierzchnia czarna mokra, brak widocznych utrudnień.' },
-                { id: '3', name: 'Rybno -> Iława', status: TrafficCondition.FLUID, delayMinutes: 0, travelTime: '35 min', description: 'Ruch odbywa się płynnie, zachowana dobra przejezdność przez Hartowiec.' },
-                { id: '4', name: 'Rybno -> Olsztyn', status: TrafficCondition.JAM, delayMinutes: 15, travelTime: '1h 10 min', description: 'Znaczne opóźnienia na trasie przez opady śniegu i spowolniony ruch na wysokości Nidzicy.' },
-            ],
-            sources: []
-        };
+        console.error("Error fetching traffic data from backend:", error);
+        // Fallback or re-throw
+        throw error;
     }
 };
 
-const parseGeminiResponse = (text: string): RoadStatus[] => {
-    const roads: RoadStatus[] = [];
-    const lines = text.split('\n');
-    const entryRegex = /\[ROUTE: (.*?) \| TIME: (.*?) \| STATUS: (.*?) \| DELAY: (.*?) \| NOTE: (.*?)\]/;
-
-    lines.forEach((line, index) => {
-        const match = line.match(entryRegex);
-        if (match) {
-            const name = match[1].trim();
-            const travelTime = match[2].trim();
-            const statusText = match[3].trim();
-            const delayText = match[4].trim();
-            const note = match[5].trim();
-
-            let status = TrafficCondition.UNKNOWN;
-            const s = statusText.toLowerCase();
-            if (s.includes('płyn')) status = TrafficCondition.FLUID;
-            else if (s.includes('utrud')) status = TrafficCondition.DIFFICULTIES;
-            else if (s.includes('kork')) status = TrafficCondition.JAM;
-
-            const delay = parseInt(delayText) || 0;
-
-            roads.push({
-                id: String(index),
-                name,
-                status,
-                delayMinutes: delay,
-                travelTime: travelTime,
-                description: (note && note.length > 5) ? note : undefined
-            });
-        }
-    });
-
-    return roads.length > 0 ? roads : [];
-};
+const mapStatus = (status: string): TrafficCondition => {
+    switch (status) {
+        case 'Płynnie': return TrafficCondition.FLUID;
+        case 'Utrudnienia': return TrafficCondition.DIFFICULTIES;
+        case 'Korki': return TrafficCondition.JAM;
+        default: return TrafficCondition.UNKNOWN;
+    }
+}

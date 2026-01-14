@@ -16,7 +16,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 # Dodaj backend do PYTHONPATH
-backend_path = Path(__file__).parent.parent
+backend_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_path))
 
 from sqlalchemy import select, func

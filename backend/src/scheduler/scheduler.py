@@ -25,34 +25,34 @@ def start_scheduler():
     # Weather update every 15 minutes
     scheduler.add_job(
         func=run_weather_job,
-        trigger=IntervalTrigger(minutes=15),
+        trigger=IntervalTrigger(hours=1),
         id='weather_update',
         name='Update weather data',
         replace_existing=True
     )
 
-    # Article update every 6 hours
+    # Article scraping twice daily: 6:00 AM and 12:00 PM
     scheduler.add_job(
         func=run_article_job,
-        trigger=IntervalTrigger(hours=6),
+        trigger=CronTrigger(hour='6,12', minute=0),
         id='article_update',
         name='Update articles',
         replace_existing=True
     )
 
-    # AI processing every 30 minutes
+    # AI processing every 1 hour
     scheduler.add_job(
         func=run_ai_job,
-        trigger=IntervalTrigger(minutes=30),
+        trigger=IntervalTrigger(hours=1),
         id='ai_processing',
         name='AI article processing',
         replace_existing=True
     )
 
-    # Daily summary generation at 6:00 AM
+    # Daily summary generation twice: 6:30 AM and 12:30 PM (after scraping)
     scheduler.add_job(
         func=run_summary_job,
-        trigger=CronTrigger(hour=6, minute=0),
+        trigger=CronTrigger(hour='6,12', minute=30),
         id='daily_summary',
         name='Generate daily summary',
         replace_existing=True

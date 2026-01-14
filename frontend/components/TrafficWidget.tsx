@@ -44,7 +44,8 @@ const TrafficWidget: React.FC = () => {
             );
         }
 
-        const interval = setInterval(() => loadTraffic(location?.lat, location?.lng), 180000);
+        // Refresh every 2 hours (7200000 ms) as requested to save quota
+        const interval = setInterval(() => loadTraffic(location?.lat, location?.lng), 7200000);
         return () => clearInterval(interval);
     }, [loadTraffic]);
 

@@ -54,14 +54,34 @@ class ArticleProcessor:
             Exception: Jeśli przetwarzanie nie powiedzie się
         """
 
-        # Przygotuj treść do analizy
-        content = f"Title: {article.title}\n\n{article.content or ''}"
+        # Przygotuj treść do analizy (użyj content lub summary)
+        text_content = article.content or article.summary or ""
+
+        # Walidacja - artykuł musi mieć jakąś treść
+        if not text_content.strip():
+            self.logger.warning(f"Article {article.id} has no content or summary - skipping")
+            return None
+
+        content = f"Title: {article.title}\n\n{text_content}"
 
         try:
-            # Wywołaj AI agent
+            # Wywołaj AI agent z retry logic
             self.logger.info(f"Processing article {article.id}: {article.title[:50]}...")
-            result = await self.agent.run(content)
-            category_data = result.output
+
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    result = await self.agent.run(content)
+                    category_data = result.output
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                        self.logger.warning(f"Retry {attempt + 1}/{max_retries} after {wait_time}s: {str(e)[:50]}")
+                        import asyncio
+                        await asyncio.sleep(wait_time)
+                    else:
+                        raise
 
             # Aktualizuj artykuł z wynikami AI
             article.category = category_data.primary_category

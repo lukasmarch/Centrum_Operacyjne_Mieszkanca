@@ -1,8 +1,8 @@
 # Status Projektu - Centrum Operacyjne Mieszkańca
 
 ## Obecny Etap
-**FAZA 3 UKOŃCZONA ✅ - Daily Summaries działa!**
-**GOTOWE DO: FAZA 4 (Frontend Integration)**
+**FAZA 4A UKOŃCZONA ✅ - RSS Feeds + AI Processing 100%!**
+**GOTOWE DO: Sprint 1 (Praca & Nieruchomości) LUB Sprint 3 (GUS Analytics)**
 
 ## Co zostało zrobione
 
@@ -169,7 +169,7 @@
 - Actor: apify~facebook-posts-scraper (UWAGA: ~ nie /)
 - Fix: Unix timestamp parsing (int -> datetime)
 
-### Faza 3 - Daily Summaries ✅ **NOWE!**
+### Faza 3 - Daily Summaries ✅
 **Zaimplementowano automatyczne dzienne podsumowania:**
 
 **1. SummaryGenerator** (`backend/src/ai/summary_generator.py`)
@@ -225,6 +225,22 @@
 
 ## Następne Kroki
 
+### ~~FAZA 4A: RSS Feeds + AI Improvements~~ ✅ UKOŃCZONA (2026-01-13)
+**ZROBIONE:**
+- [x] Uniwersalny RSSFeedScraper
+- [x] Znalezione działające RSS feeds (Radio 7, Gazeta Olsztyńska)
+- [x] Dodano 2 nowe źródła RSS do bazy
+- [x] Ulepszono AI prompt (priorytet: PILNE i PRAKTYCZNE)
+- [x] Przetworzono wszystkie artykuły (100%)
+- [x] Wygenerowano lepsze Daily Summary
+- [x] Raport porównawczy (DAILY_SUMMARY_COMPARISON.md)
+
+**Wynik:**
+- 10 źródeł w bazie (3 RSS, 4 HTML, 3 Facebook)
+- 174 artykuły (100% przetworzone)
+- Rozkład kategorii bardziej zbilansowany
+- Daily Summary z większą różnorodnością
+
 ### ~~FAZA 2: Rozbudowa Scraperów~~ ✅ UKOŃCZONA
 **ZROBIONE:**
 - [x] Scraper Registry Pattern (`backend/src/scrapers/registry.py`)
@@ -247,7 +263,71 @@
 
 **Wynik:** Automatyczne dzienne podsumowania AI + 2 endpointy
 
-### FAZA 4: Frontend Integration
+### FAZA 4A: RSS Feeds + Improved AI ✅ **NOWE! (2026-01-13)**
+**Dodano uniwersalny RSS scraper i ulepszono AI prompts:**
+
+**1. RSSFeedScraper** (`backend/src/scrapers/rss_scraper.py`)
+- Uniwersalny scraper dla RSS 2.0 i Atom
+- Automatyczna ekstrakcja: tytuł, URL, summary, autor, data, obrazy
+- Obsługa Cloudflare (custom User-Agent headers)
+- Integracja z registry pattern
+
+**2. Nowe źródła RSS działające:**
+- **Radio 7 Działdowo** (radio7.pl/rss) - 10 artykułów ✓ TESTED!
+- **Gazeta Olsztyńska** (gazetaolsztynska.pl/rss) - 40 artykułów (ready)
+- ⚠️ Nasze Miasto Działdowo - Cloudflare blocked
+
+**3. AI Prompt Engineering - IMPROVED!**
+- Zaktualizowano `DAILY_SUMMARY_PROMPT` w `backend/src/ai/prompts.py`
+- **Nowa priorytetyzacja:**
+  1. PILNE/WAŻNE (awarie, zagrożenia, zdrowie, transport, urząd)
+  2. PRZYDATNE (biznes, nieruchomości, edukacja)
+  3. NICE-TO-KNOW (kultura, rozrywka)
+- **Cel:** Daily Summary o PRAKTYCZNYCH sprawach, nie tylko festynach
+
+**4. AI Processing - 100% artykułów!**
+- Przetworzono wszystkie 89 nieprzetworzonych artykułów
+- **174/174 artykułów (100%)** skategoryzowanych
+- Czas przetwarzania: ~7 minut (GPT-4o-mini)
+- Script: `backend/scripts/process_all_articles.py`
+
+**5. Poprawa rozkładu kategorii:**
+- **Kultura:** 45.9% → 38.5% (spadek -7.4pp) ✓
+- **Transport:** 4.7% → 9.8% (wzrost +5.1pp) ✓
+- **Edukacja:** 11.8% → 14.9% (wzrost +3.1pp) ✓
+- **Zdrowie:** 4.7% → 6.3% (wzrost +1.6pp) ✓
+
+**6. Nowe Daily Summary (ID: 8):**
+- **8 artykułów** zamiast 3 (+167%)
+- **5 highlights** (różnorodne)
+- **3 kategorie** (Urząd, Zdrowie, Kultura)
+- Headline o czymś PILNYM (krwiodawstwo)
+- **Porównanie:** Zobacz `DAILY_SUMMARY_COMPARISON.md`
+
+**Test Results:**
+```
+✅ RSS Scraper działa (Radio 7: 10 artykułów w 30s)
+✅ AI Processing: 89 artykułów w 7 min
+✅ Daily Summary: lepsze niż wcześniej (więcej kategorii, różnorodność)
+✅ Prompt AI: priorytetyzuje PILNE nad kulturą
+```
+
+**Nowe pliki:**
+```
+backend/src/scrapers/rss_scraper.py
+backend/scripts/
+  ├── process_all_articles.py
+  ├── regenerate_daily_summary.py
+  ├── view_daily_summary.py
+  ├── find_rss_feeds.py
+  └── add_working_rss_sources.py
+DAILY_SUMMARY_COMPARISON.md  ← Raport porównawczy
+```
+
+**Dependencies:**
+- feedparser>=6.0.10 (added to requirements.txt)
+
+### FAZA 4B: Frontend Integration (TODO)
 - [ ] Podłączyć widget pogody do API
 - [ ] Lista artykułów z kategoryzacją
 - [ ] Filtrowanie po kategoriach
@@ -262,17 +342,18 @@ backend/
 ├── src/
 │   ├── ai/                    ← AI Processing
 │   │   ├── models.py          ← Pydantic response models
-│   │   ├── prompts.py         ← System prompts
+│   │   ├── prompts.py         ← System prompts (UPDATED!)
 │   │   ├── article_processor.py
 │   │   ├── event_extractor.py
-│   │   └── summary_generator.py ← (NOWE!)
-│   ├── scrapers/              ← 4 scrapery + registry
+│   │   └── summary_generator.py
+│   ├── scrapers/              ← 5 scraperów + registry
 │   │   ├── base.py            ← BaseScraper
-│   │   ├── registry.py        ← Scraper Registry (NOWE!)
+│   │   ├── registry.py        ← Scraper Registry
 │   │   ├── klikajinfo.py
-│   │   ├── gmina_rybno.py     ← (NOWE!)
-│   │   ├── mojedzialdowo.py   ← (NOWE!)
-│   │   └── apify_facebook.py  ← (NOWE!)
+│   │   ├── gmina_rybno.py
+│   │   ├── mojedzialdowo.py
+│   │   ├── apify_facebook.py
+│   │   └── rss_scraper.py     ← (NOWE!)
 │   ├── scheduler/
 │   │   ├── scheduler.py       ← APScheduler (4 jobs)
 │   │   ├── weather_job.py
@@ -284,7 +365,15 @@ backend/
 │   └── config.py             ← Pydantic v2 Settings
 ├── scripts/
 │   ├── test_ai_pipeline.py
-│   ├── test_daily_summary.py  ← (NOWE!)
+│   ├── test_daily_summary.py
+│   ├── process_all_articles.py
+│   ├── regenerate_daily_summary.py
+│   ├── view_daily_summary.py
+│   ├── find_rss_feeds.py
+│   ├── add_working_rss_sources.py
+│   ├── test_radio7_rss.py
+│   ├── add_event_unique_constraint.py     ← (2026-01-14)
+│   ├── remove_duplicate_events.py         ← (2026-01-14)
 │   ├── test_registry.py
 │   ├── test_article_job.py
 │   ├── test_new_scrapers.py
@@ -292,9 +381,10 @@ backend/
 │   ├── init_sources.py
 │   └── init_new_sources.py
 ├── docs/
-│   ├── APIFY_SETUP.md         ← (NOWE!)
-│   ├── NEW_SCRAPERS.md        ← (NOWE!)
-│   └── SCRAPERS_QUICKSTART.md ← (NOWE!)
+│   ├── APIFY_SETUP.md
+│   ├── NEW_SCRAPERS.md
+│   └── SCRAPERS_QUICKSTART.md
+├── SCRAPING_IMPROVEMENTS.md   ← (2026-01-14)
 ├── requirements.txt
 └── .env
 ```
@@ -418,17 +508,33 @@ INFO:     Application startup complete.
 
 ## Info
 - **Lokalizacja**: Powiat Działdowski (60k), start Rybno (2.5k)
-- **Stack**: Python/FastAPI + PostgreSQL + Pydantic AI + Apify + Next.js
+- **Stack**: Python/FastAPI + PostgreSQL + Pydantic AI + Apify + RSS + Next.js
 - **AI Models**: GPT-4o-mini (kategoryzacja), GPT-4o (wydarzenia + podsumowania)
-- **Scrapery**: 4 aktywne (Klikaj, Gmina Rybno, Moje Działdowo, Facebook/Apify)
-- **Źródła**: 7 total (3 HTML active, 3 Facebook active, 1 legacy)
-- **Artykuły**: ~81 w bazie (31 + 29 + 1 + 20 FB), 15 przetworzonych
-- **Daily Summaries**: 1 wygenerowane (automatycznie codziennie o 6:00)
+- **Scrapery**: 5 aktywne (Klikaj, Gmina Rybno, Moje Działdowo, Facebook/Apify, RSS)
+- **Źródła**: 10 total (3 HTML, 3 Facebook, 3 RSS, 1 legacy)
+- **Artykuły**: 174 w bazie (100% przetworzone przez AI!)
+- **Daily Summaries**: 8 wygenerowanych (automatycznie codziennie o 6:00)
 - **Scheduler Jobs**: 4 (weather 15min, articles 6h, AI 30min, summary 6:00)
 - **API Endpoints**: 8 (health, sources, articles, weather×3, summary×2)
-- **Koszty**: ~578 PLN/mies (infra 515 + AI 63 + Apify 0-200)
+- **Koszty**: ~580 PLN/mies (infra 515 + AI 65 + Apify 0-200)
 - **Cel**: Inteligentny agregator lokalnych wiadomości z AI
 
+## Rozkład Kategorii (174 artykuły)
+- Kultura: 67 (38.5%)
+- Urząd: 28 (16.1%)
+- Edukacja: 26 (14.9%)
+- Transport: 17 (9.8%)
+- Biznes: 12 (6.9%)
+- Zdrowie: 11 (6.3%)
+- Rekreacja: 10 (5.7%)
+- Nieruchomości: 3 (1.7%)
+
 ---
-**Ostatnia aktualizacja**: 2026-01-11 (FAZA 3 KOMPLETNA - Daily Summaries!)
-**Test pomyślny**: Daily Summary wygenerowane w 15s, 5 highlights, 5 kategorii, API działa ✓
+**Ostatnia aktualizacja**: 2026-01-14 (FAZA 4B - Scraping Improvements!)
+**Zmiany:**
+- ✅ Naprawiono RSS scrapery (Radio 7, Gazeta Olsztyńska działają)
+- ✅ Dodano filtrowanie starych artykułów (tylko ostatnie 30 dni)
+- ✅ Dodano unique constraints dla Event (zapobiega duplikatom)
+- ✅ Nowy harmonogram: scraping 2× dziennie (6:00, 12:00)
+- ✅ Summary 2× dziennie (6:30, 12:30) - świeże dane przez cały dzień
+- ✅ Oszczędność: $20/miesiąc na Apify (50% mniej wywołań)

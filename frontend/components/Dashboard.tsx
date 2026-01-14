@@ -1,18 +1,41 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import TrafficWidget from './TrafficWidget';
+import BusTrackerWidget from './BusTrackerWidget';
 import { MOCK_ARTICLES, MOCK_WEATHER, MOCK_TRAFFIC, MOCK_EVENTS } from '../constants';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { MOCK_GUS_DATA } from '../constants';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
 import { useWeather } from '../src/hooks/useWeather';
 import { useArticles } from '../src/hooks/useArticles';
+import { useDailySummary } from '../src/hooks/useDailySummary';
+import { AppSection } from '../types';
 
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ onNavigate }) => {
   const { weather, loading: weatherLoading, error: weatherError } = useWeather();
   const { articles, loading: articlesLoading, error: articlesError } = useArticles(3);
+  const { summary, loading: summaryLoading, error: summaryError, lastUpdated } = useDailySummary();
 
   const weatherData = weather || MOCK_WEATHER; // Fallback to mock
   const articlesData = articles || MOCK_ARTICLES; // Fallback to mock
+
+  // Format time ago
+  const formatTimeAgo = (date: Date | null) => {
+    if (!date) return 'niedawno';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return 'przed chwilą';
+    if (diffMins < 60) return `${diffMins} min temu`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h temu`;
+    return 'wczoraj';
+  };
+
+  const handleNavigate = (section: AppSection) => {
+    if (onNavigate) {
+      onNavigate(section);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -36,21 +59,53 @@ const Dashboard: React.FC = () => {
         <div className="relative z-10 max-w-2xl">
           <div className="flex items-center gap-2 mb-4">
             <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">🤖 Podsumowanie AI</span>
-            <span className="text-xs text-blue-100">Zaktualizowano 15 min temu</span>
+            {summaryLoading && <span className="text-xs text-blue-100 animate-pulse">Ładowanie...</span>}
+            {!summaryLoading && !summaryError && (
+              <span className="text-xs text-blue-100">Zaktualizowano {formatTimeAgo(lastUpdated)}</span>
+            )}
+            {summaryError && <span className="text-xs text-red-200">⚠️ {summaryError}</span>}
           </div>
-          <h3 className="text-2xl font-bold mb-4 italic">"Dzień mija pod znakiem inwestycji i przygotowań do sezonu letniego..."</h3>
-          <p className="text-blue-100 leading-relaxed">
-            Dziś głównym tematem jest remont drogi Rybno-Działdowo (opóźnienia ok. 10 min).
-            Jezioro Rybieńskie osiągnęło optymalną temperaturę do kąpieli (19.5°C).
-            Warto zwrócić uwagę na ogłoszony program Dni Działdowa - bilety wkrótce w sprzedaży.
-          </p>
-          <button className="mt-6 bg-white text-blue-700 px-6 py-2 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors">
-            Czytaj więcej szczegółów
-          </button>
+
+          {summaryLoading ? (
+            <div className="space-y-3 animate-pulse">
+              <div className="h-8 bg-white/20 rounded-lg w-3/4"></div>
+              <div className="h-4 bg-white/10 rounded w-full"></div>
+              <div className="h-4 bg-white/10 rounded w-5/6"></div>
+            </div>
+          ) : summary ? (
+            <>
+              <h3 className="text-2xl font-bold mb-4 italic">"{summary.headline}"</h3>
+              <div className="text-blue-100 leading-relaxed space-y-2">
+                {summary.highlights && summary.highlights.slice(0, 3).map((highlight, index) => (
+                  <p key={index}>• {highlight}</p>
+                ))}
+              </div>
+              <button
+                onClick={() => handleNavigate('news')}
+                className="mt-6 bg-white text-blue-700 px-6 py-2 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors"
+              >
+                Czytaj więcej szczegółów
+              </button>
+            </>
+          ) : (
+            <>
+              <h3 className="text-2xl font-bold mb-4 italic">"Dzień mija pod znakiem inwestycji i przygotowań do sezonu letniego..."</h3>
+              <p className="text-blue-100 leading-relaxed">
+                Dziś głównym tematem jest remont drogi Rybno-Działdowo (opóźnienia ok. 10 min).
+                Jezioro Rybieńskie osiągnęło optymalną temperaturę do kąpieli (19.5°C).
+                Warto zwrócić uwagę na ogłoszony program Dni Działdowa - bilety wkrótce w sprzedaży.
+              </p>
+              <button className="mt-6 bg-white text-blue-700 px-6 py-2 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors">
+                Czytaj więcej szczegółów
+              </button>
+            </>
+          )}
         </div>
         <div className="absolute right-[-10%] top-[-20%] w-64 h-64 bg-blue-400/20 rounded-full blur-3xl"></div>
         <div className="absolute right-[10%] bottom-[-20%] w-48 h-48 bg-indigo-400/20 rounded-full blur-3xl"></div>
       </section>
+
+
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -132,18 +187,8 @@ const Dashboard: React.FC = () => {
           <TrafficWidget />
 
           {/* GUS Snippet */}
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 overflow-hidden">
-            <h4 className="font-bold mb-2">Trend Demograficzny</h4>
-            <p className="text-xs text-slate-400 mb-4">Liczba mieszkańców powiatu</p>
-            <div className="h-32">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={MOCK_GUS_DATA}>
-                  <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} dot={false} />
-                  <Tooltip />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          {/* Bus Tracker Widget */}
+          <BusTrackerWidget />
         </div>
       </div>
     </div>

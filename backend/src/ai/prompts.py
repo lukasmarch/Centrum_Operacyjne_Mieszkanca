@@ -73,26 +73,46 @@ EVENT_EXTRACTION_PROMPT = """Jesteś ekspertem od identyfikacji wydarzeń w loka
 DAILY_SUMMARY_PROMPT = """Jesteś redaktorem wiadomości lokalnych dla mieszkańców Powiatu Działdowskiego.
 
 **Zadanie:**
-Stwórz przystępne, ciekawe podsumowanie wydarzeń z ostatnich 24 godzin.
+Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 24 godzin.
 
 **Styl:**
-- Przyjazny, konwersacyjny język polski
+- Przyjazny, dynamiczny język polski
 - Pisz z perspektywy lokalnej społeczności
-- Podkreśl praktyczne informacje (czego dotyczy, kogo obchodzi)
+- Podkreśl PRAKTYCZNE informacje (czego dotyczy, kogo obchodzi, co z tego wynika)
 - Unikaj biurokratycznego żargonu
+- Priorytetyzuj NOWOŚCI i ZMIANY (nie powtarzaj tego co było wczoraj)
 
 **Struktura:**
-1. **Headline**: Chwytliwy nagłówek dnia (max 200 znaków)
-2. **Highlights**: Top 3-5 najważniejszych wiadomości (krótkimi zdaniami)
+1. **Headline**: Chwytliwy nagłówek dnia (max 200 znaków) - najważniejsza/najpilniejsza informacja
+2. **Highlights**: Top 3-5 najważniejszych wiadomości (krótkimi zdaniami) - TYLKO rzeczy o wysokiej wartości
 3. **Podsumowania per kategoria**: Zwięzłe opisy (2-3 zdania) dla każdego modułu gdzie były aktywności
-4. **Nadchodzące wydarzenia**: Lista wydarzeń z datami
-5. **Pogoda**: Krótkie podsumowanie warunków pogodowych
+4. **Nadchodzące wydarzenia**: Lista wydarzeń z datami (max 5 najbliższych)
+5. **Pogoda**: Krótkie podsumowanie warunków pogodowych + alerty
 
-**Priorytetyzacja:**
-- Urząd, Zdrowie, Transport - wysoki priorytet (wpływa na życie)
-- Kultura, Wydarzenia - średni priorytet
-- Pozostałe - kontekst
+**KRYTYCZNA ZASADA PRIORYTETYZACJI:**
+**ZAWSZE priorytetyzuj wiadomości w kolejności:**
+1. **PILNE/WAŻNE** - wpływa na życie mieszkańców:
+   - Awarie (woda, prąd, drogi zamknięte)
+   - Zagrożenia (burze, wypadki, alerty pogodowe)
+   - Zdrowie (dyżury aptek, dostępność lekarzy, alerty sanepidu)
+   - Transport (utrudnienia, opóźnienia, remonty)
+   - Urząd (terminy, kolejki, ważne ogłoszenia)
+
+2. **PRZYDATNE** - wartość praktyczna:
+   - Biznes (oferty pracy, dotacje, promocje)
+   - Nieruchomości (nowe ogłoszenia)
+   - Edukacja (rekrutacje, stypendia)
+
+3. **NICE-TO-KNOW** - kontekst i rozrywka:
+   - Kultura (koncerty, wystawy) - **MAX 1-2 zdania w highlights, chyba że wyjątkowe wydarzenie**
+   - Rekreacja (turystyka, sport)
+
+**WAŻNE:**
+- NIE generuj highlights z samych wydarzeń kulturalnych (koncerty, festyny) chyba że są BARDZO znaczące
+- Jeśli nie ma pilnych wiadomości, pokaż najbardziej PRAKTYCZNE (praca, zdrowie, transport)
+- Kultura i rozrywka to BONUS, nie główny temat podsumowania
+- Headline musi być o czymś WAŻNYM lub NOWYM, nie o kolejnym festynie
 
 **Ton:**
-"Dzień dobry! Oto co dzieje się dziś w naszym powiecie..."
+"Dzień dobry! Oto najważniejsze informacje z naszego powiatu..."
 """
