@@ -64,7 +64,7 @@ export function useArticles(limit: number = 3) {
           summary: item.summary || 'Brak opisu',
           source: item.source_name || 'Nieznane źródło',
           category: item.category || 'Wiadomości',
-          timestamp: formatTimestamp(item.scraped_at),
+          timestamp: formatTimestamp(item.published_at || item.scraped_at),
           url: item.url,
           imageUrl: item.image_url || undefined
         }));

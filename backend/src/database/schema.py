@@ -2,6 +2,133 @@ from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Column, JSON, ARRAY, String, Index
 from sqlalchemy.dialects.postgresql import JSONB
+from enum import Enum
+
+
+# ======================
+# Enums for User System
+# ======================
+
+class UserTier(str, Enum):
+    FREE = "free"
+    PREMIUM = "premium"
+    BUSINESS = "business"
+
+
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+    PENDING = "pending"
+
+
+class NewsletterFrequency(str, Enum):
+    WEEKLY = "weekly"
+    DAILY = "daily"
+
+
+class NewsletterStatus(str, Enum):
+    ACTIVE = "active"
+    UNSUBSCRIBED = "unsubscribed"
+    BOUNCED = "bounced"
+
+
+# ======================
+# User System Tables (Sprint 1)
+# ======================
+
+class User(SQLModel, table=True):
+    """Użytkownicy systemu"""
+    __tablename__ = "users"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(max_length=255, unique=True, index=True)
+    password_hash: str = Field(max_length=255)
+    full_name: str = Field(max_length=100)
+    location: str = Field(max_length=100, default="Rybno")  # Domyślna miejscowość
+    tier: str = Field(default=UserTier.FREE.value, max_length=20)  # free, premium, business
+
+    # Preferences (JSONB) - kategorie, powiadomienia, etc.
+    preferences: Optional[dict] = Field(default_factory=dict, sa_column=Column(JSONB))
+
+    # Status flags
+    email_verified: bool = Field(default=False)
+    is_active: bool = Field(default=True)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_login: Optional[datetime] = None
+
+
+class Subscription(SQLModel, table=True):
+    """Subskrypcje Premium/Business"""
+    __tablename__ = "subscriptions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    tier: str = Field(max_length=20)  # premium, business
+    status: str = Field(default=SubscriptionStatus.ACTIVE.value, max_length=20)  # active, cancelled, expired
+
+    # Stripe integration (Sprint 4)
+    stripe_subscription_id: Optional[str] = Field(default=None, max_length=100)
+    stripe_customer_id: Optional[str] = Field(default=None, max_length=100)
+
+    # Dates
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+
+    # Metadata
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ======================
+# Newsletter Tables (Sprint 2)
+# ======================
+
+class NewsletterSubscriber(SQLModel, table=True):
+    """Subskrybenci newslettera"""
+    __tablename__ = "newsletter_subscribers"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(max_length=255, unique=True, index=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id")  # Może być NULL dla anonimowych
+    frequency: str = Field(default=NewsletterFrequency.WEEKLY.value, max_length=20)  # weekly, daily
+    status: str = Field(default=NewsletterStatus.ACTIVE.value, max_length=20)  # active, unsubscribed, bounced
+    location: str = Field(default="Rybno", max_length=100)  # Lokalizacja dla spersonalizowanej treści
+
+    # Confirmation
+    confirmation_token: Optional[str] = Field(default=None, max_length=100)
+    confirmed_at: Optional[datetime] = None
+
+    # Unsubscribe
+    unsubscribe_token: str = Field(max_length=100)  # Unique token for unsubscribe link
+    unsubscribed_at: Optional[datetime] = None
+
+    # Stats
+    emails_sent: int = Field(default=0)
+    emails_opened: int = Field(default=0)
+    last_sent_at: Optional[datetime] = None
+
+    # Metadata
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class NewsletterLog(SQLModel, table=True):
+    """Log wysłanych newsletterów"""
+    __tablename__ = "newsletter_logs"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    subscriber_id: int = Field(foreign_key="newsletter_subscribers.id", index=True)
+    newsletter_type: str = Field(max_length=20)  # weekly, daily
+    subject: str = Field(max_length=255)
+    sent_at: datetime = Field(default_factory=datetime.utcnow)
+    opened_at: Optional[datetime] = None
+    clicked_at: Optional[datetime] = None
+    status: str = Field(default="sent", max_length=20)  # sent, opened, bounced, failed
+
 
 class Source(SQLModel, table=True):
     __tablename__ = "sources"
@@ -112,3 +239,25 @@ class DailySummary(SQLModel, table=True):
     headline: str  # Główny nagłówek dnia
     content: dict = Field(sa_column=Column(JSONB))  # Pełne podsumowanie (DailySummary model)
     generated_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy wygenerowano
+
+
+class GUSStatistic(SQLModel, table=True):
+    """Statystyki GUS (Bank Danych Lokalnych) - Demografia i Rynek Pracy"""
+    __tablename__ = "gus_statistics"
+    __table_args__ = (
+        Index('idx_gus_category_year', 'category', 'year', unique=True),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    category: str = Field(max_length=50, index=True)  # "demographics" lub "employment"
+    year: int = Field(index=True)  # Rok danych (np. 2025)
+    data: dict = Field(sa_column=Column(JSONB))  # Wszystkie statystyki jako JSONB
+
+    # Metadata
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy pobrano z API
+    updated_at: datetime = Field(default_factory=datetime.utcnow)  # Ostatnia aktualizacja
+
+    # Opcjonalnie: Szybki dostęp do kluczowych metryk (denormalizacja)
+    # Demografia:
+    population_total: Optional[int] = None  # Ludność ogółem
+    unemployment_rate: Optional[float] = None  # Stopa bezrobocia (%)

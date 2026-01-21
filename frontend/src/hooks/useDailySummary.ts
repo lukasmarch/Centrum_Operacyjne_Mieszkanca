@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DailySummary } from '../../types';
+import { useDataCache } from '../context/DataCacheContext';
 
 // Backend API response
 interface DailySummaryApiResponse {
@@ -13,13 +14,23 @@ interface DailySummaryApiResponse {
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 
 export function useDailySummary() {
-    const [summary, setSummary] = useState<DailySummary | null>(null);
+    const { getSummary, setSummary } = useDataCache();
+    const [summary, setSummaryState] = useState<DailySummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     useEffect(() => {
         const fetchSummary = async () => {
+            // Check cache first
+            const cachedSummary = getSummary();
+            if (cachedSummary) {
+                setSummaryState(cachedSummary);
+                setLoading(false);
+                setError(null);
+                return;
+            }
+
             try {
                 setLoading(true);
                 const response = await fetch(`${API_URL}/api/summary/daily`);
@@ -31,12 +42,13 @@ export function useDailySummary() {
                 const data: DailySummaryApiResponse = await response.json();
 
                 // The content field contains the actual summary structure
-                setSummary(data.content);
+                setSummaryState(data.content);
+                setSummary(data.content); // Store in cache
                 setLastUpdated(new Date(data.generated_at));
                 setError(null);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Błąd pobierania podsumowania');
-                setSummary(null);
+                setSummaryState(null);
             } finally {
                 setLoading(false);
             }
@@ -44,11 +56,12 @@ export function useDailySummary() {
 
         fetchSummary();
 
-        // Refresh every 15 minutes
-        const interval = setInterval(fetchSummary, 15 * 60 * 1000);
+        // Refresh every 2 hours (cache duration)
+        const interval = setInterval(fetchSummary, 2 * 60 * 60 * 1000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [getSummary, setSummary]);
 
     return { summary, loading, error, lastUpdated };
 }
+

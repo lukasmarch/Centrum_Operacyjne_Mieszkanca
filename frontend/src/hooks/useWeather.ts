@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { WeatherData } from '../../types';
+import { useDataCache } from '../context/DataCacheContext';
 
 // Backend API response
 interface WeatherApiResponse {
@@ -13,15 +14,25 @@ interface WeatherApiResponse {
   fetched_at: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 
 export function useWeather(location: string = 'Rybno') {
-  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const { getWeather, setWeather } = useDataCache();
+  const [weather, setWeatherState] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchWeather = async () => {
+      // Check cache first
+      const cachedWeather = getWeather(location);
+      if (cachedWeather) {
+        setWeatherState(cachedWeather);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+
       try {
         setLoading(true);
         const response = await fetch(`${API_URL}/api/weather/${location}`);
@@ -43,11 +54,12 @@ export function useWeather(location: string = 'Rybno') {
           icon: data.icon
         };
 
-        setWeather(mappedWeather);
+        setWeatherState(mappedWeather);
+        setWeather(location, mappedWeather); // Store in cache
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Błąd pobierania pogody');
-        setWeather(null);
+        setWeatherState(null);
       } finally {
         setLoading(false);
       }
@@ -55,11 +67,12 @@ export function useWeather(location: string = 'Rybno') {
 
     fetchWeather();
 
-    // Refresh every 15 minutes
-    const interval = setInterval(fetchWeather, 15 * 60 * 1000);
+    // Refresh every 2 hours (cache duration)
+    const interval = setInterval(fetchWeather, 2 * 60 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [location]);
+  }, [location, getWeather, setWeather]);
 
   return { weather, loading, error };
 }
+

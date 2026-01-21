@@ -18,6 +18,18 @@ class Settings(BaseSettings):
     SCRAPER_RATE_LIMIT: float = 1.0
     SCRAPER_MAX_RETRIES: int = 3
 
+    # Auth settings (Sprint 1)
+    JWT_SECRET: str = "your-secret-key-min-32-chars-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Newsletter settings (Sprint 2)
+    RESEND_API_KEY: Optional[str] = None
+    NEWSLETTER_FROM_EMAIL: str = "newsletter@centrum-mieszkanca.pl"
+    NEWSLETTER_FROM_NAME: str = "Centrum Operacyjne Mieszkańca"
+    APP_URL: str = "http://localhost:3000"  # Frontend URL for links
+
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),

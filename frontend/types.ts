@@ -33,6 +33,9 @@ export interface Event {
   location: string;
   category: string;
   isPromoted?: boolean;
+  imageUrl?: string;
+  description?: string;
+  externalUrl?: string;
 }
 
 export interface GUSStat {
@@ -41,7 +44,7 @@ export interface GUSStat {
   label: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'premium';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'premium' | 'login' | 'register' | 'profile';
 
 // New Traffic Widget Types
 export enum TrafficCondition {
@@ -129,3 +132,85 @@ export interface DirectionStatus {
     from: string;
   };
 }
+
+// Cinema Repertoire Types
+export interface Movie {
+  title: string;
+  genre: string;
+  time: string[];
+  posterUrl: string;
+  rating: string;
+  link?: string;
+}
+
+export interface CinemaRepertoire {
+  cinemaName: string;
+  date: string;
+  movies: Movie[];
+}
+
+export enum CinemaLocation {
+  DZIALDOWO = 'Działdowo',
+  LUBAWA = 'Lubawa'
+}
+
+// Auth Types (Sprint 1)
+export type UserTier = 'free' | 'premium' | 'business';
+
+export interface User {
+  id: number;
+  email: string;
+  full_name: string;
+  location: string;
+  tier: UserTier;
+  email_verified: boolean;
+  preferences: Record<string, unknown> | null;
+  created_at: string;
+  last_login: string | null;
+}
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+}
+
+export interface AuthResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterData {
+  email: string;
+  password: string;
+  full_name: string;
+  location: string;
+}
+
+export interface UserUpdateData {
+  full_name?: string;
+  location?: string;
+  preferences?: {
+    categories?: string[];
+    notifications?: Record<string, boolean>;
+    newsletter_frequency?: 'none' | 'weekly' | 'daily';
+  };
+}
+
+export const AVAILABLE_LOCATIONS = [
+  'Rybno',
+  'Działdowo',
+  'Lubawa',
+  'Lidzbark',
+  'Iłowo-Osada',
+  'Płośnica',
+  'Kozłowo'
+] as const;
+
+export type AvailableLocation = typeof AVAILABLE_LOCATIONS[number];

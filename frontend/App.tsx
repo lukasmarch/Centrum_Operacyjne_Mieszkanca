@@ -4,11 +4,44 @@ import Dashboard from './components/Dashboard';
 import NewsFeed from './components/NewsFeed';
 import EventsFeed from './components/EventsFeed';
 import { AppSection } from './types';
+import { DataCacheProvider } from './src/context/DataCacheContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import LoginPage from './src/pages/LoginPage';
+import RegisterPage from './src/pages/RegisterPage';
+import ProfilePage from './src/pages/ProfilePage';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
     const [activeSection, setActiveSection] = useState<AppSection>('dashboard');
+    const { user, isAuthenticated, isLoading, logout } = useAuth();
+
+    const handleNavigate = (section: AppSection | 'logout') => {
+        if (section === 'logout') {
+            logout();
+            setActiveSection('dashboard');
+        } else {
+            setActiveSection(section);
+        }
+    };
 
     const renderContent = () => {
+        // Auth pages (don't require login)
+        if (activeSection === 'login') {
+            return <LoginPage onNavigate={(page) => setActiveSection(page === 'register' ? 'register' : 'dashboard')} />;
+        }
+        if (activeSection === 'register') {
+            return <RegisterPage onNavigate={(page) => setActiveSection(page === 'login' ? 'login' : 'dashboard')} />;
+        }
+
+        // Profile page (requires login)
+        if (activeSection === 'profile') {
+            if (!isAuthenticated) {
+                setActiveSection('login');
+                return null;
+            }
+            return <ProfilePage onNavigate={setActiveSection} />;
+        }
+
+        // Regular sections
         switch (activeSection) {
             case 'dashboard':
                 return <Dashboard onNavigate={setActiveSection} />;
@@ -55,7 +88,12 @@ const App: React.FC = () => {
                                     <li className="flex items-center gap-2">✅ Brak reklam</li>
                                     <li className="flex items-center gap-2">✅ Newsletter Codzienny</li>
                                 </ul>
-                                <button className="w-full mt-8 py-3 rounded-xl bg-white text-blue-600 font-bold shadow-lg shadow-blue-800/20">Wybierz Premium</button>
+                                <button
+                                    onClick={() => !isAuthenticated && setActiveSection('register')}
+                                    className="w-full mt-8 py-3 rounded-xl bg-white text-blue-600 font-bold shadow-lg shadow-blue-800/20 hover:bg-blue-50 transition-colors"
+                                >
+                                    {isAuthenticated ? 'Wybierz Premium' : 'Zarejestruj się'}
+                                </button>
                             </div>
                             {/* Business */}
                             <div className="bg-slate-900 p-8 rounded-3xl shadow-sm text-white flex flex-col">
@@ -84,9 +122,27 @@ const App: React.FC = () => {
         }
     };
 
+    // Loading state
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="text-center">
+                    <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-3xl text-white mx-auto mb-4 animate-pulse">
+                        D
+                    </div>
+                    <p className="text-slate-500">Ładowanie...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex min-h-screen">
-            <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+            <Sidebar
+                activeSection={activeSection}
+                onSectionChange={handleNavigate}
+                user={user}
+            />
 
             <main className="flex-1 md:ml-64 bg-slate-50 min-h-screen transition-all duration-300">
                 {/* Top Header */}
@@ -104,12 +160,45 @@ const App: React.FC = () => {
                             <span className="text-lg">🔔</span>
                             <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
                         </button>
-                        <div className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 pr-3 rounded-full transition-colors">
-                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-xs">MK</div>
-                            <span className="text-sm font-semibold hidden sm:block">Mieszkaniec</span>
-                        </div>
+
+                        {isAuthenticated && user ? (
+                            <button
+                                onClick={() => setActiveSection('profile')}
+                                className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 pr-3 rounded-full transition-colors"
+                            >
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-xs">
+                                    {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                </div>
+                                <span className="text-sm font-semibold hidden sm:block">{user.full_name.split(' ')[0]}</span>
+                                {user.tier === 'premium' && (
+                                    <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">PRO</span>
+                                )}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setActiveSection('login')}
+                                className="flex items-center gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full transition-colors"
+                            >
+                                <span className="text-sm font-semibold">Zaloguj się</span>
+                            </button>
+                        )}
                     </div>
                 </div>
+
+                {/* User location banner */}
+                {isAuthenticated && user && (
+                    <div className="bg-blue-50 border-b border-blue-100 px-8 py-2 flex items-center justify-between">
+                        <p className="text-sm text-blue-700">
+                            📍 Twoja lokalizacja: <strong>{user.location}</strong>
+                        </p>
+                        <button
+                            onClick={() => setActiveSection('profile')}
+                            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                            Zmień
+                        </button>
+                    </div>
+                )}
 
                 {/* Dynamic Content */}
                 <div className="max-w-7xl mx-auto p-4 md:p-8">
@@ -130,6 +219,16 @@ const App: React.FC = () => {
                 </footer>
             </main>
         </div>
+    );
+};
+
+const App: React.FC = () => {
+    return (
+        <AuthProvider>
+            <DataCacheProvider>
+                <AppContent />
+            </DataCacheProvider>
+        </AuthProvider>
     );
 };
 

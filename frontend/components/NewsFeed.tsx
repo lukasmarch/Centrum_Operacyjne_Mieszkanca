@@ -46,13 +46,13 @@ const NewsFeed: React.FC = () => {
             // API returns sorted by scraped_at desc. So just taking slice(0, 3) per category works.
 
             return uniqueCategories.flatMap(cat =>
-                articles.filter(a => a.category === cat).slice(0, 3)
+                articles.filter(a => a.category === cat).slice(0, 4)
             );
         }
 
         return articles
             .filter(a => a.category === activeCategory)
-            .slice(0, 3);
+            .slice(0, 4);
     }, [articles, activeCategory]);
 
     if (loading) return <div className="text-center p-8 text-slate-500 animate-pulse">Ładowanie wiadomości...</div>;

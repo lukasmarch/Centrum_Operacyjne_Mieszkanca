@@ -3,11 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from src.database import get_session, Source, Article, Weather, DailySummary, Event
+from src.database import get_session, Source, Article, Weather, DailySummary, Event, GUSStatistic
 from src.models import ArticleOutput
 from src.integrations.weather import WeatherService
 from src.scheduler.scheduler import start_scheduler
 from datetime import datetime
+from src.api.endpoints import cinema
+
+# Auth & Users (Sprint 1)
+from src.auth.routes import router as auth_router
+from src.users.routes import router as users_router
+
+# Newsletter (Sprint 2)
+from src.newsletter.routes import router as newsletter_router
 
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
 
@@ -19,6 +27,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(cinema.router, prefix="/api/cinema", tags=["cinema"])
+
+# Auth & Users routes (Sprint 1)
+app.include_router(auth_router)  # /api/auth/*
+app.include_router(users_router)  # /api/users/*
+
+# Newsletter routes (Sprint 2)
+app.include_router(newsletter_router)  # /api/newsletter/*
 
 @app.on_event("startup")
 async def startup_event():
@@ -41,10 +58,14 @@ async def get_articles(
     session: AsyncSession = Depends(get_session)
 ):
     # Join Article with Source to get source name
+    # Sort by published_at (with NULL values last), then scraped_at as fallback
     result = await session.execute(
         select(Article, Source.name)
         .join(Source, Article.source_id == Source.id)
-        .order_by(Article.scraped_at.desc())
+        .order_by(
+            Article.published_at.desc().nulls_last(),
+            Article.scraped_at.desc()
+        )
         .limit(limit)
     )
 
@@ -187,3 +208,182 @@ async def get_traffic():
     from src.integrations.traffic_service import TrafficService
     service = TrafficService()
     return await service.get_traffic_data()
+
+
+# ======================
+# GUS Statistics Endpoints
+# ======================
+
+@app.get("/api/stats/demographics")
+async def get_demographics_stats(
+    year: int = None,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Get demographic statistics for Powiat Działdowski
+
+    Args:
+        year: Specific year (optional, defaults to latest available)
+
+    Returns:
+        {
+            "total": int,              # Ludność ogółem
+            "working_age": int,        # W wieku produkcyjnym
+            "density": float,          # Gęstość (os/km²)
+            "growth": int,             # Przyrost naturalny
+            "year": int,               # Rok danych
+            "fetched_at": datetime,    # Kiedy pobrano z GUS
+            "updated_at": datetime     # Ostatnia aktualizacja
+        }
+    """
+    # Try to get from cache (database) first
+    query = select(GUSStatistic).where(GUSStatistic.category == "demographics")
+
+    if year:
+        query = query.where(GUSStatistic.year == year)
+    else:
+        query = query.order_by(GUSStatistic.year.desc())
+
+    result = await session.execute(query.limit(1))
+    stat = result.scalar_one_or_none()
+
+    if not stat:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No demographic statistics found{' for year ' + str(year) if year else ''}. Data is updated daily at 6:00 AM."
+        )
+
+    # Return data from JSONB + metadata
+    response = stat.data.copy()
+    response["fetched_at"] = stat.fetched_at
+    response["updated_at"] = stat.updated_at
+
+    return response
+
+
+@app.get("/api/stats/employment")
+async def get_employment_stats(
+    year: int = None,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Get employment/labor market statistics for Powiat Działdowski
+
+    Args:
+        year: Specific year (optional, defaults to latest available)
+
+    Returns:
+        {
+            "unemployment_rate": float,    # Stopa bezrobocia (%)
+            "unemployed_count": int,       # Liczba bezrobotnych
+            "employed_count": int,         # Liczba pracujących
+            "avg_salary": float,           # Średnie wynagrodzenie (PLN brutto)
+            "year": int,                   # Rok danych
+            "fetched_at": datetime,        # Kiedy pobrano z GUS
+            "updated_at": datetime         # Ostatnia aktualizacja
+        }
+    """
+    # Try to get from cache (database) first
+    query = select(GUSStatistic).where(GUSStatistic.category == "employment")
+
+    if year:
+        query = query.where(GUSStatistic.year == year)
+    else:
+        query = query.order_by(GUSStatistic.year.desc())
+
+    result = await session.execute(query.limit(1))
+    stat = result.scalar_one_or_none()
+
+    if not stat:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No employment statistics found{' for year ' + str(year) if year else ''}. Data is updated daily at 6:00 AM."
+        )
+
+    # Return data from JSONB + metadata
+    response = stat.data.copy()
+    response["fetched_at"] = stat.fetched_at
+    response["updated_at"] = stat.updated_at
+
+    return response
+
+
+@app.post("/api/stats/update")
+async def update_gus_statistics(session: AsyncSession = Depends(get_session)):
+    """
+    Manually trigger GUS statistics update
+
+    Fetches latest data from GUS API and updates database cache.
+    """
+    from src.integrations.gus_api import GUSDataService
+
+    service = GUSDataService()
+
+    try:
+        # Fetch latest data from GUS API
+        demographics = await service.get_population_stats()
+        employment = await service.get_employment_stats()
+
+        current_year = datetime.now().year
+
+        # Upsert demographics
+        result = await session.execute(
+            select(GUSStatistic)
+            .where(
+                GUSStatistic.category == "demographics",
+                GUSStatistic.year == demographics.get("year", current_year)
+            )
+        )
+        demo_stat = result.scalar_one_or_none()
+
+        if demo_stat:
+            demo_stat.data = demographics
+            demo_stat.updated_at = datetime.utcnow()
+            demo_stat.population_total = demographics.get("total")
+        else:
+            demo_stat = GUSStatistic(
+                category="demographics",
+                year=demographics.get("year", current_year),
+                data=demographics,
+                population_total=demographics.get("total")
+            )
+            session.add(demo_stat)
+
+        # Upsert employment
+        result = await session.execute(
+            select(GUSStatistic)
+            .where(
+                GUSStatistic.category == "employment",
+                GUSStatistic.year == employment.get("year", current_year)
+            )
+        )
+        emp_stat = result.scalar_one_or_none()
+
+        if emp_stat:
+            emp_stat.data = employment
+            emp_stat.updated_at = datetime.utcnow()
+            emp_stat.unemployment_rate = employment.get("unemployment_rate")
+        else:
+            emp_stat = GUSStatistic(
+                category="employment",
+                year=employment.get("year", current_year),
+                data=employment,
+                unemployment_rate=employment.get("unemployment_rate")
+            )
+            session.add(emp_stat)
+
+        await session.commit()
+        await session.refresh(demo_stat)
+        await session.refresh(emp_stat)
+
+        return {
+            "message": "GUS statistics updated successfully",
+            "demographics": demographics,
+            "employment": employment
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update GUS statistics: {str(e)}"
+        )

@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import TrafficWidget from './TrafficWidget';
+import { CinemaWidget } from './CinemaWidget';
 import BusTrackerWidget from './BusTrackerWidget';
 import { MOCK_ARTICLES, MOCK_WEATHER, MOCK_TRAFFIC, MOCK_EVENTS } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -8,15 +9,52 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useWeather } from '../src/hooks/useWeather';
 import { useArticles } from '../src/hooks/useArticles';
 import { useDailySummary } from '../src/hooks/useDailySummary';
+import { useEvents } from '../src/hooks/useEvents';
 import { AppSection } from '../types';
 
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ onNavigate }) => {
   const { weather, loading: weatherLoading, error: weatherError } = useWeather();
-  const { articles, loading: articlesLoading, error: articlesError } = useArticles(3);
+  const { articles, loading: articlesLoading, error: articlesError } = useArticles(10); // Fetch more for diversity
   const { summary, loading: summaryLoading, error: summaryError, lastUpdated } = useDailySummary();
+  const { events, loading: eventsLoading, error: eventsError } = useEvents(1);
 
   const weatherData = weather || MOCK_WEATHER; // Fallback to mock
-  const articlesData = articles || MOCK_ARTICLES; // Fallback to mock
+
+  // Select 2 articles with source diversity
+  const diverseArticles = (() => {
+    if (!articles || articles.length === 0) return MOCK_ARTICLES.slice(0, 2);
+
+    // Group by source
+    const bySource = new Map<string, typeof articles>();
+    articles.forEach(article => {
+      const source = article.source;
+      if (!bySource.has(source)) {
+        bySource.set(source, []);
+      }
+      bySource.get(source)!.push(article);
+    });
+
+    // Get top 1 from each source, then take first 2
+    const diverse: typeof articles = [];
+    for (const [, sourceArticles] of bySource) {
+      if (diverse.length >= 2) break;
+      diverse.push(sourceArticles[0]);
+    }
+
+    // If we don't have 2 yet, fill with remaining articles
+    if (diverse.length < 2) {
+      for (const article of articles) {
+        if (!diverse.includes(article)) {
+          diverse.push(article);
+          if (diverse.length >= 2) break;
+        }
+      }
+    }
+
+    return diverse;
+  })();
+
+  const upcomingEvent = events && events.length > 0 ? events[0] : null;
 
   // Format time ago
   const formatTimeAgo = (date: Date | null) => {
@@ -116,15 +154,36 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
             <div className="flex items-center gap-2">
               {articlesLoading && <span className="text-xs animate-spin">🔄</span>}
               {articlesError && <span className="text-xs text-red-500" title={articlesError}>⚠️</span>}
-              <button className="text-blue-600 text-sm font-semibold hover:underline">Wszystkie newsy →</button>
+              <button
+                onClick={() => handleNavigate('news')}
+                className="text-blue-600 text-sm font-semibold hover:underline"
+              >
+                Wszystkie newsy →
+              </button>
             </div>
           </div>
           <div className="space-y-4">
-            {articlesData.map(article => (
-              <div key={article.id} className="group bg-white rounded-2xl p-4 flex gap-4 border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer">
-                <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
-                  <img src={article.imageUrl} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                </div>
+            {/* 2 Latest Articles with Source Diversity */}
+            {diverseArticles.map(article => (
+              <a
+                key={article.id}
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-white rounded-2xl p-4 flex gap-4 border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer"
+              >
+                {article.imageUrl && (
+                  <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
+                    <img
+                      src={article.imageUrl}
+                      alt={article.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{article.source}</span>
@@ -133,8 +192,52 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
                   <h5 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">{article.title}</h5>
                   <p className="text-sm text-slate-500 line-clamp-2 mt-1">{article.summary}</p>
                 </div>
-              </div>
+              </a>
             ))}
+
+            {/* 1 Upcoming Event */}
+            {upcomingEvent && (
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 border border-purple-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-100 px-2 py-0.5 rounded">📅 Wydarzenie</span>
+                  <span className="text-xs text-purple-400">• {upcomingEvent.category}</span>
+                </div>
+
+                {upcomingEvent.imageUrl && (
+                  <div className="w-full h-32 rounded-xl overflow-hidden mb-3 bg-purple-100">
+                    <img
+                      src={upcomingEvent.imageUrl}
+                      alt={upcomingEvent.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+
+                <h5 className="font-bold text-slate-900 leading-snug mb-2">{upcomingEvent.title}</h5>
+
+                <div className="flex flex-col gap-1 text-sm text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>{new Date(upcomingEvent.date).toLocaleDateString('pl-PL', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>📍</span>
+                    <span>{upcomingEvent.location}</span>
+                  </div>
+                </div>
+
+                {upcomingEvent.description && (
+                  <p className="text-sm text-slate-500 line-clamp-2 mt-2">{upcomingEvent.description}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -185,6 +288,9 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
 
           {/* Traffic Widget */}
           <TrafficWidget />
+
+          {/* Cinema Widget */}
+          <CinemaWidget />
 
           {/* GUS Snippet */}
           {/* Bus Tracker Widget */}

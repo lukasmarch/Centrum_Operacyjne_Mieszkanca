@@ -4,6 +4,7 @@ import { useEvents } from '../src/hooks/useEvents';
 const EventsFeed: React.FC = () => {
     const { events, loading, error } = useEvents();
     const [activeCategory, setActiveCategory] = useState<string>('Wszystkie');
+    const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
     // Group events categories
     const categories = useMemo(() => {
@@ -32,18 +33,65 @@ const EventsFeed: React.FC = () => {
         return uniqueEvents;
     }, [events, activeCategory]);
 
+    // Generate Google Calendar URL
+    const generateGoogleCalendarUrl = (event: typeof events[0]) => {
+        const startDate = new Date(event.date);
+        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // +2 hours
+
+        const formatDate = (date: Date) => {
+            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const params = new URLSearchParams({
+            action: 'TEMPLATE',
+            text: event.title,
+            dates: `${formatDate(startDate)}/${formatDate(endDate)}`,
+            details: event.description || '',
+            location: event.location || ''
+        });
+
+        return `https://calendar.google.com/calendar/render?${params.toString()}`;
+    };
+
+    // Generate iCalendar file
+    const generateICalendar = (event: typeof events[0]) => {
+        const startDate = new Date(event.date);
+        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+
+        const formatDate = (date: Date) => {
+            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Centrum Operacyjne Mieszkańca//PL',
+            'BEGIN:VEVENT',
+            `UID:${event.id}@centrumoperacyjne.pl`,
+            `DTSTAMP:${formatDate(new Date())}`,
+            `DTSTART:${formatDate(startDate)}`,
+            `DTEND:${formatDate(endDate)}`,
+            `SUMMARY:${event.title}`,
+            `DESCRIPTION:${event.description || ''}`,
+            `LOCATION:${event.location || ''}`,
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].join('\r\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${event.title.replace(/[^a-z0-9]/gi, '_')}.ics`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     if (loading) return <div className="text-center p-8 text-slate-500 animate-pulse">Ładowanie wydarzeń...</div>;
     if (error) return <div className="text-center p-8 text-red-500">Błąd: {error}</div>;
     if (!events || events.length === 0) return <div className="text-center p-8 text-slate-500">Brak nadchodzących wydarzeń.</div>;
-
-    const categoryIcons: Record<string, string> = {
-        'Kultura': '🎭',
-        'Sport': '⚽',
-        'Urząd': '🏛️',
-        'Rozrywka': '🎉',
-        'Edukacja': '📚',
-        'Inne': '📅'
-    };
 
     return (
         <div className="space-y-6">
@@ -68,39 +116,110 @@ const EventsFeed: React.FC = () => {
             {/* Events List */}
             <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-100">
                 {filteredEvents.map((event) => (
-                    <div key={event.id} className="p-6 hover:bg-slate-50 transition-colors flex flex-col md:flex-row gap-6 group">
-                        {/* Date Badge */}
-                        <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-slate-100 rounded-2xl border border-slate-200 group-hover:border-purple-200 group-hover:bg-purple-50 transition-colors">
-                            <span className="text-xs font-bold text-slate-400 uppercase group-hover:text-purple-400">{new Date(event.date).toLocaleDateString('pl-PL', { month: 'short' })}</span>
-                            <span className="text-2xl font-black text-slate-700 group-hover:text-purple-600">{new Date(event.date).getDate()}</span>
-                        </div>
+                    <div key={event.id} className="p-6 hover:bg-slate-50 transition-colors group">
+                        <div className="flex flex-col md:flex-row gap-6">
+                            {/* Image Thumbnail */}
+                            {event.imageUrl && (
+                                <div className="flex-shrink-0 w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-100">
+                                    <img
+                                        src={event.imageUrl}
+                                        alt={event.title}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                    />
+                                </div>
+                            )}
 
-                        {/* Content */}
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-                                    {event.category}
-                                </span>
-                                {event.isPromoted && (
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
-                                        ⭐ Promowane
+                            {/* Date Badge (if no image) */}
+                            {!event.imageUrl && (
+                                <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-slate-100 rounded-2xl border border-slate-200 group-hover:border-purple-200 group-hover:bg-purple-50 transition-colors">
+                                    <span className="text-xs font-bold text-slate-400 uppercase group-hover:text-purple-400">{new Date(event.date).toLocaleDateString('pl-PL', { month: 'short' })}</span>
+                                    <span className="text-2xl font-black text-slate-700 group-hover:text-purple-600">{new Date(event.date).getDate()}</span>
+                                </div>
+                            )}
+
+                            {/* Content */}
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                                        {event.category}
                                     </span>
+                                    {event.isPromoted && (
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                                            ⭐ Promowane
+                                        </span>
+                                    )}
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-purple-600 transition-colors">
+                                    {event.title}
+                                </h3>
+                                <div className="flex flex-col gap-1 text-sm text-slate-500 mb-3">
+                                    <span className="flex items-center gap-1">
+                                        📅 {new Date(event.date).toLocaleDateString('pl-PL', {
+                                            day: 'numeric',
+                                            month: 'long',
+                                            year: 'numeric'
+                                        })}
+                                    </span>
+                                    <span className="flex items-center gap-1">📍 {event.location}</span>
+                                </div>
+                                {event.description && (
+                                    <p className="text-sm text-slate-600 line-clamp-2 mb-3">{event.description}</p>
                                 )}
                             </div>
-                            <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-purple-600 transition-colors">
-                                {event.title}
-                            </h3>
-                            <div className="flex items-center gap-4 text-sm text-slate-500">
-                                <span className="flex items-center gap-1">📍 {event.location}</span>
-                                {/* <span className="flex items-center gap-1">⏰ 18:00</span> */}
-                            </div>
-                        </div>
 
-                        {/* Action */}
-                        <div className="flex items-center">
-                            <button className="px-6 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all">
-                                Szczegóły
-                            </button>
+                            {/* Actions */}
+                            <div className="flex flex-col gap-2 items-start md:items-end">
+                                {/* External Link Button */}
+                                {event.externalUrl && (
+                                    <a
+                                        href={event.externalUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all"
+                                    >
+                                        Szczegóły
+                                    </a>
+                                )}
+
+                                {/* Calendar Export Dropdown */}
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setExpandedEventId(expandedEventId === event.id ? null : event.id)}
+                                        className="px-4 py-2 rounded-xl border border-purple-200 text-purple-600 font-bold text-sm hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all flex items-center gap-2"
+                                    >
+                                        📅 Zaplanuj
+                                        <span className="text-xs">{expandedEventId === event.id ? '▲' : '▼'}</span>
+                                    </button>
+
+                                    {expandedEventId === event.id && (
+                                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-10">
+                                            <button
+                                                onClick={() => {
+                                                    window.open(generateGoogleCalendarUrl(event), '_blank');
+                                                    setExpandedEventId(null);
+                                                }}
+                                                className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3"
+                                            >
+                                                <span className="text-lg">📆</span>
+                                                <span>Google Calendar</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    generateICalendar(event);
+                                                    setExpandedEventId(null);
+                                                }}
+                                                className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3 border-t border-slate-100"
+                                            >
+                                                <span className="text-lg">📥</span>
+                                                <span>Pobierz .ics (iCalendar)</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 ))}

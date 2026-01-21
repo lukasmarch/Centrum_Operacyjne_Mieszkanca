@@ -31,7 +31,10 @@ export function useEvents(limit: number = 50) {
                     date: item.event_date, // Keep as ISO string for proper parsing
                     location: item.location || 'Brak lokalizacji',
                     category: item.category || 'Inne',
-                    isPromoted: item.is_featured
+                    isPromoted: item.is_featured,
+                    imageUrl: item.image_url || undefined,
+                    description: item.short_description || item.description || undefined,
+                    externalUrl: item.external_url || undefined
                 }));
 
                 setEvents(mappedEvents);
