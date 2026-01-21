@@ -70,11 +70,22 @@ frontend/
 │   └── pages/    # Login, Profile
 ```
 
+## W trakcie (Current Work)
+**Branch:** `feature/frontent-witget-garbage`
+- [ ] Widget śmieciowy (garbage collection) - frontend
+
 ## TODO (Faza 5)
 - [ ] Widget pogody -> API
 - [ ] Filtrowanie artykułów po kategoriach
 - [ ] Panel administracyjny
 - [ ] Powiadomienia push
+
+## Git Branches
+```
+main                              # produkcja
+develop                           # integracja
+feature/frontent-witget-garbage   # aktywna praca
+```
 
 ## Info
 - **Lokalizacja:** Powiat Działdowski
