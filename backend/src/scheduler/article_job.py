@@ -132,8 +132,8 @@ async def update_articles_job():
                         html = await scraper.fetch(scrape_url)
                         articles = await scraper.parse(html, scrape_url)
 
-                    # Filter articles by date (only last 30 days)
-                    articles = filter_recent_articles(articles, days=30)
+                    # Filter articles by date (only last 2 days - job runs daily)
+                    articles = filter_recent_articles(articles, days=2)
 
                     saved_ids = await scraper.save_to_db(articles, session)
 

@@ -4,7 +4,7 @@ RSS Feed Scraper - Uniwersalny scraper dla kanałów RSS
 Obsługuje standardowe formaty RSS 2.0 i Atom.
 """
 import feedparser
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from src.scrapers.base import BaseScraper
 from src.database.schema import Source
@@ -130,6 +130,15 @@ class RSSFeedScraper(BaseScraper):
             summary = self._extract_summary(entry)
             author = entry.get('author', None)
             published_at = self._parse_date(entry)
+
+            # Early filtering: skip articles older than 2 days
+            # RSS feeds have dates available without deep scraping, so we can filter early
+            if published_at:
+                cutoff = datetime.utcnow() - timedelta(days=2)
+                if published_at < cutoff:
+                    self.logger.debug(f"Skipping old RSS entry: {title} (published: {published_at.date()})")
+                    return None
+
             image_url = self._extract_image(entry)
 
             # External ID z link (używamy URL jako unique identifier)

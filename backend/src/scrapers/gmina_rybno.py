@@ -31,8 +31,13 @@ class GminaRybnoScraper(BaseScraper):
             article_containers = [link.parent for link in article_links if link.parent]
 
         seen_urls = set()
+        max_articles = 50  # Limit to prevent excessive deep scraping
 
         for container in article_containers:
+            # Stop if we've reached the limit
+            if len(seen_urls) >= max_articles:
+                self.logger.info(f"Reached limit of {max_articles} articles, stopping")
+                break
             try:
                 # Znajdź link do artykułu
                 link = container.find('a', href=re.compile(r'/aktualnosc|/news|/wiadomosc'))

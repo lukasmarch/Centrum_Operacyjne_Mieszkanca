@@ -16,10 +16,15 @@ class KlikajInfoScraper(BaseScraper):
         # Znajdź wszystkie linki do artykułów
         # Szukamy linków typu /artykul/[id],[slug]
         article_links = soup.find_all('a', href=re.compile(r'/artykul/\d+,'))
-        
+
         seen_urls = set()
+        max_articles = 50  # Limit to prevent excessive deep scraping
 
         for link in article_links:
+            # Stop if we've reached the limit
+            if len(seen_urls) >= max_articles:
+                self.logger.info(f"Reached limit of {max_articles} articles, stopping")
+                break
             try:
                 href = link.get('href')
                 if not href:

@@ -19,11 +19,17 @@ class MojeDzialdowoScraper(BaseScraper):
 
         # Nowa struktura: ul.news-list > li > a
         news_lists = soup.find_all('ul', class_='news-list')
-        
+
         seen_urls = set()
+        max_articles = 50  # Limit to prevent excessive deep scraping
 
         for news_list in news_lists:
             for link in news_list.find_all('a'):
+                # Stop if we've reached the limit
+                if len(seen_urls) >= max_articles:
+                    self.logger.info(f"Reached limit of {max_articles} articles, stopping")
+                    break
+
                 try:
                     href = link.get('href')
                     if not href or href in seen_urls:
