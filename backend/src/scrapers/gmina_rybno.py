@@ -2,6 +2,7 @@ from typing import List, Dict
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
+import asyncio
 
 from src.scrapers.base import BaseScraper
 
@@ -18,7 +19,6 @@ class GminaRybnoScraper(BaseScraper):
         - Obrazek: <img> wewnątrz kontenera artykułu
         - URL: względny link typu /aktualnosc/[id]/[slug]
         """
-        articles = []
         soup = BeautifulSoup(html, 'html.parser')
 
         # Szukamy kontenerów z artykułami
@@ -32,7 +32,9 @@ class GminaRybnoScraper(BaseScraper):
 
         seen_urls = set()
         max_articles = 50  # Limit to prevent excessive deep scraping
+        basic_articles = []  # Collect basic data first
 
+        # Phase 1: Collect basic article data (fast)
         for container in article_containers:
             # Stop if we've reached the limit
             if len(seen_urls) >= max_articles:
@@ -141,28 +143,35 @@ class GminaRybnoScraper(BaseScraper):
                 if not external_id:
                     external_id = f"gminarybno_{hash(full_url) & 0x7FFFFFFF}"
 
-                article_data = {
+                basic_articles.append({
                     'title': title,
                     'url': full_url,
                     'image_url': image_url,
                     'external_id': external_id,
-                }
-                
-                # Deep Scraping: Fetch detail page to get content and date
-                try:
-                    self.logger.info(f"Fetching details for: {full_url}")
-                    detail_html = await self.fetch(full_url)
-                    detail_data = self._parse_detail(detail_html)
-                    article_data.update(detail_data)
-                except Exception as e:
-                    self.logger.error(f"Error fetching details for {full_url}: {e}")
-
-                articles.append(article_data)
+                })
                 self.logger.debug(f"Znaleziono artykuł: {title[:50]}...")
 
             except (AttributeError, KeyError, TypeError) as e:
                 self.logger.warning(f"Parse error dla kontenera: {e}")
                 continue
+
+        # Phase 2: Fetch details in parallel (fast with asyncio.gather)
+        self.logger.info(f"Fetching details for {len(basic_articles)} articles in parallel...")
+
+        async def fetch_article_details(article_data):
+            """Helper function to fetch and parse article details"""
+            try:
+                self.logger.info(f"Fetching details for: {article_data['url']}")
+                detail_html = await self.fetch(article_data['url'])
+                detail_data = self._parse_detail(detail_html)
+                article_data.update(detail_data)
+                return article_data
+            except Exception as e:
+                self.logger.error(f"Error fetching details for {article_data['url']}: {e}")
+                return article_data  # Return basic data even if detail fetch fails
+
+        # Use asyncio.gather to fetch all details in parallel
+        articles = await asyncio.gather(*[fetch_article_details(article) for article in basic_articles])
 
         self.logger.info(f"Znaleziono {len(articles)} artykułów na gminarybno.pl")
         return articles

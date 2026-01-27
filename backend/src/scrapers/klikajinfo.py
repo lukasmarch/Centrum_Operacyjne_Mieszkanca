@@ -2,6 +2,7 @@ from typing import List, Dict
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
+import asyncio
 
 from src.scrapers.base import BaseScraper
 
@@ -10,7 +11,6 @@ class KlikajInfoScraper(BaseScraper):
 
     async def parse(self, html: str, url: str) -> List[Dict]:
         """Parse HTML do artykułów"""
-        articles = []
         soup = BeautifulSoup(html, 'html.parser')
 
         # Znajdź wszystkie linki do artykułów
@@ -19,7 +19,9 @@ class KlikajInfoScraper(BaseScraper):
 
         seen_urls = set()
         max_articles = 50  # Limit to prevent excessive deep scraping
+        basic_articles = []  # Collect basic data first
 
+        # Phase 1: Collect basic article data (fast)
         for link in article_links:
             # Stop if we've reached the limit
             if len(seen_urls) >= max_articles:
@@ -35,7 +37,7 @@ class KlikajInfoScraper(BaseScraper):
                     full_url = href
                 else:
                     full_url = f"https://www.klikajinfo.pl{href}"
-                
+
                 if full_url in seen_urls:
                     continue
                 seen_urls.add(full_url)
@@ -46,7 +48,7 @@ class KlikajInfoScraper(BaseScraper):
                     title_elem = link.find(['h1', 'h2', 'h3', 'h4'])
                     if title_elem:
                         title = title_elem.get_text(strip=True)
-                
+
                 if not title:
                     # Fallback
                     title = link.get_text(strip=True)
@@ -71,28 +73,34 @@ class KlikajInfoScraper(BaseScraper):
                 if not external_id:
                      external_id = f"klikajinfo_{hash(full_url) & 0x7FFFFFFF}"
 
-                article_data = {
+                basic_articles.append({
                     'title': title,
                     'url': full_url,
                     'image_url': image_url,
                     'external_id': external_id,
-                }
-
-                # Deep Scraping
-                try:
-                    self.logger.info(f"Fetching details for: {full_url}")
-                    # Use follow_redirects=True in fetch implicitly or handle here
-                    detail_html = await self.fetch(full_url)
-                    detail_data = self._parse_detail(detail_html)
-                    article_data.update(detail_data)
-                except Exception as e:
-                    self.logger.error(f"Error fetching details for {full_url}: {e}")
-
-                articles.append(article_data)
+                })
 
             except Exception as e:
                 self.logger.warning(f"Parse error dla linku: {e}")
                 continue
+
+        # Phase 2: Fetch details in parallel (fast with asyncio.gather)
+        self.logger.info(f"Fetching details for {len(basic_articles)} articles in parallel...")
+
+        async def fetch_article_details(article_data):
+            """Helper function to fetch and parse article details"""
+            try:
+                self.logger.info(f"Fetching details for: {article_data['url']}")
+                detail_html = await self.fetch(article_data['url'])
+                detail_data = self._parse_detail(detail_html)
+                article_data.update(detail_data)
+                return article_data
+            except Exception as e:
+                self.logger.error(f"Error fetching details for {article_data['url']}: {e}")
+                return article_data  # Return basic data even if detail fetch fails
+
+        # Use asyncio.gather to fetch all details in parallel
+        articles = await asyncio.gather(*[fetch_article_details(article) for article in basic_articles])
 
         self.logger.info(f"Znaleziono {len(articles)} artykułów")
         return articles

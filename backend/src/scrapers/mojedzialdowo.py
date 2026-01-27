@@ -2,8 +2,7 @@ from datetime import datetime
 import re
 from typing import List, Dict
 from bs4 import BeautifulSoup
-from datetime import datetime
-import re
+import asyncio
 
 from src.scrapers.base import BaseScraper
 
@@ -14,7 +13,6 @@ class MojeDzialdowoScraper(BaseScraper):
         """
         Parse HTML z mojedzialdowo.pl do artykułów.
         """
-        articles = []
         soup = BeautifulSoup(html, 'html.parser')
 
         # Nowa struktura: ul.news-list > li > a
@@ -22,7 +20,9 @@ class MojeDzialdowoScraper(BaseScraper):
 
         seen_urls = set()
         max_articles = 50  # Limit to prevent excessive deep scraping
+        basic_articles = []  # Collect basic data first
 
+        # Phase 1: Collect basic article data (fast)
         for news_list in news_lists:
             for link in news_list.find_all('a'):
                 # Stop if we've reached the limit
@@ -46,7 +46,7 @@ class MojeDzialdowoScraper(BaseScraper):
                         full_url = f"https://mojedzialdowo.pl{href}"
                     else:
                         full_url = f"https://mojedzialdowo.pl/{href}"
-                    
+
                     if full_url in seen_urls:
                         continue
                     seen_urls.add(full_url)
@@ -64,26 +64,33 @@ class MojeDzialdowoScraper(BaseScraper):
                     else:
                         external_id = f"mojedzialdowo_{hash(full_url) & 0x7FFFFFFF}"
 
-                    article_data = {
+                    basic_articles.append({
                         'title': title,
                         'url': full_url,
                         'external_id': external_id,
-                    }
-
-                    # Deep Scraping
-                    try:
-                        self.logger.info(f"Fetching details for: {full_url}")
-                        detail_html = await self.fetch(full_url)
-                        detail_data = self._parse_detail(detail_html)
-                        article_data.update(detail_data)
-                    except Exception as e:
-                        self.logger.error(f"Error fetching details for {full_url}: {e}")
-
-                    articles.append(article_data)
+                    })
 
                 except Exception as e:
                     self.logger.warning(f"Error parsing link: {e}")
                     continue
+
+        # Phase 2: Fetch details in parallel (fast with asyncio.gather)
+        self.logger.info(f"Fetching details for {len(basic_articles)} articles in parallel...")
+
+        async def fetch_article_details(article_data):
+            """Helper function to fetch and parse article details"""
+            try:
+                self.logger.info(f"Fetching details for: {article_data['url']}")
+                detail_html = await self.fetch(article_data['url'])
+                detail_data = self._parse_detail(detail_html)
+                article_data.update(detail_data)
+                return article_data
+            except Exception as e:
+                self.logger.error(f"Error fetching details for {article_data['url']}: {e}")
+                return article_data  # Return basic data even if detail fetch fails
+
+        # Use asyncio.gather to fetch all details in parallel
+        articles = await asyncio.gather(*[fetch_article_details(article) for article in basic_articles])
 
         self.logger.info(f"Znaleziono {len(articles)} artykułów na mojedzialdowo.pl")
         return articles

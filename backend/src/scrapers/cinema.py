@@ -4,7 +4,7 @@ import json
 import os
 from datetime import datetime
 from typing import List, Optional, Dict
-import requests
+import httpx
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
 
@@ -35,19 +35,19 @@ class CinemaScraper:
         # Ensure cache directory exists
         os.makedirs(self.CACHE_DIR, exist_ok=True)
 
-    def fetch_repertoire(self, city: str, force_update: bool = False) -> CinemaRepertoire:
+    async def fetch_repertoire(self, city: str, force_update: bool = False) -> CinemaRepertoire:
         """
         Fetches cinema repertoire for a specific city.
         Dzialdowo -> Biletyna.pl
         Lubawa -> Kino.lubawa.pl
-        
+
         Args:
             city: City name
             force_update: If True, bypass cache and fetch fresh data
         """
         city_slug = self._normalize_city(city)
         logger.info(f"Fetching repertoire for {city_slug} (force_update={force_update})...")
-        
+
         # Try cache first
         if not force_update:
             cached_data = self._load_cache(city_slug)
@@ -57,14 +57,14 @@ class CinemaScraper:
 
         # Fetch fresh data
         if city_slug == 'Lubawa':
-            data = self._fetch_kino_lubawa_pl()
+            data = await self._fetch_kino_lubawa_pl()
         else:
-            data = self._fetch_biletyna_dzialdowo(city_slug)
-            
+            data = await self._fetch_biletyna_dzialdowo(city_slug)
+
         # Save to cache if valid movies found or empty (so we don't hammer on error, but maybe better not to cache empty?)
         if data and data.movies:
             self._save_cache(city_slug, data)
-            
+
         return data
 
     def _get_cache_path(self, city_slug: str) -> str:
@@ -97,89 +97,92 @@ class CinemaScraper:
         except Exception as e:
             logger.error(f"Failed to save cache for {city_slug}: {e}")
 
-    def _fetch_biletyna_dzialdowo(self, city_slug: str) -> CinemaRepertoire:
+    async def _fetch_biletyna_dzialdowo(self, city_slug: str) -> CinemaRepertoire:
         # Specific URL for Dzialdowo that works well
         url = f"{self.BASE_URL}/film/{city_slug}"
         try:
-            response = requests.get(url, headers=self.headers, timeout=15)
-            response.raise_for_status()
-            
-            movies = self._parse_biletyna_list(response.text, city_slug)
-            
-            return CinemaRepertoire(
-                cinemaName=f"Kino {city_slug}",
-                date=datetime.now().strftime('%d.%m.%Y'),
-                movies=movies
-            )
+            async with httpx.AsyncClient(headers=self.headers, timeout=15.0) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+
+                movies = await self._parse_biletyna_list(response.text, city_slug)
+
+                return CinemaRepertoire(
+                    cinemaName=f"Kino {city_slug}",
+                    date=datetime.now().strftime('%d.%m.%Y'),
+                    movies=movies
+                )
         except Exception as e:
             logger.error(f"Error fetching Dzialdowo: {e}")
             return CinemaRepertoire(cinemaName=f"Kino {city_slug} (Błąd)", date="", movies=[])
 
-    def _fetch_kino_lubawa_pl(self) -> CinemaRepertoire:
+    async def _fetch_kino_lubawa_pl(self) -> CinemaRepertoire:
         url = "https://kino.lubawa.pl/"
         try:
-            # Verify=False because of local cert issues often found on such sites
-            response = requests.get(url, headers=self.headers, timeout=15, verify=False)
-            response.encoding = 'utf-8' # Force UTF-8 as verified
-            
-            soup = BeautifulSoup(response.text, 'html.parser')
-            movies = []
-            
-            # Parsing strategy:
-            # Container class "inweek" contains h4 (Title) and h5 (Date/Time info)
-            
-            items = soup.select('.inweek')
-            logger.info(f"KinoLubawa: Found {len(items)} items")
-            
-            for item in items:
-                title_node = item.select_one('h4')
-                if not title_node: continue
-                
-                title = title_node.get_text(strip=True)
-                
-                info_node = item.select_one('h5')
-                info_text = info_node.get_text(separator=' ', strip=True) if info_node else ""
-                
-                # Extract time pattern: HH:MM
-                times_found = re.findall(r'(\d{2}:\d{2})', info_text)
-                times = sorted(list(set(times_found)))
-                
-                # Handling missing specific times or "Coming Soon"
-                if not times:
-                    times = ["Sprawdź godziny"]
-                    
-                # Store extra info in rating or similar if needed, 
-                # but currently UI only uses title, time, genre.
-                # info_text often has "od 16 stycznia", which is useful.
+            # verify=False because of local cert issues often found on such sites
+            async with httpx.AsyncClient(headers=self.headers, timeout=15.0, verify=False) as client:
+                response = await client.get(url)
+                # httpx automatically handles encoding, but we can force it if needed
+                response.encoding = 'utf-8'
 
-                # Image/Poster
-                poster_url = ""
-                img = item.select_one('img')
-                if img and img.get('src'):
-                    # relative path "../media/week/1.jpg"
-                    src = img['src']
-                    if src.startswith('..'):
-                         poster_url = f"https://kino.lubawa.pl/{src.replace('../', '')}"
-                    elif src.startswith('/'):
-                         poster_url = f"https://kino.lubawa.pl{src}"
-                    else:
-                         poster_url = f"https://kino.lubawa.pl/{src}"
+                soup = BeautifulSoup(response.text, 'html.parser')
+                movies = []
 
-                movies.append(Movie(
-                    title=title,
-                    genre="Kino", 
-                    time=times,
-                    posterUrl=poster_url,
-                    # We can put small info in rating field as hacked info display if needed
-                    rating=info_text[:30] + "..." if len(info_text) > 30 else info_text,
-                    link=url
-                ))
-            
-            return CinemaRepertoire(
-                cinemaName="Kino Pokój Lubawa",
-                date=datetime.now().strftime('%d.%m.%Y'),
-                movies=movies
-            )
+                # Parsing strategy:
+                # Container class "inweek" contains h4 (Title) and h5 (Date/Time info)
+
+                items = soup.select('.inweek')
+                logger.info(f"KinoLubawa: Found {len(items)} items")
+
+                for item in items:
+                    title_node = item.select_one('h4')
+                    if not title_node: continue
+
+                    title = title_node.get_text(strip=True)
+
+                    info_node = item.select_one('h5')
+                    info_text = info_node.get_text(separator=' ', strip=True) if info_node else ""
+
+                    # Extract time pattern: HH:MM
+                    times_found = re.findall(r'(\d{2}:\d{2})', info_text)
+                    times = sorted(list(set(times_found)))
+
+                    # Handling missing specific times or "Coming Soon"
+                    if not times:
+                        times = ["Sprawdź godziny"]
+
+                    # Store extra info in rating or similar if needed,
+                    # but currently UI only uses title, time, genre.
+                    # info_text often has "od 16 stycznia", which is useful.
+
+                    # Image/Poster
+                    poster_url = ""
+                    img = item.select_one('img')
+                    if img and img.get('src'):
+                        # relative path "../media/week/1.jpg"
+                        src = img['src']
+                        if src.startswith('..'):
+                             poster_url = f"https://kino.lubawa.pl/{src.replace('../', '')}"
+                        elif src.startswith('/'):
+                             poster_url = f"https://kino.lubawa.pl{src}"
+                        else:
+                             poster_url = f"https://kino.lubawa.pl/{src}"
+
+                    movies.append(Movie(
+                        title=title,
+                        genre="Kino",
+                        time=times,
+                        posterUrl=poster_url,
+                        # We can put small info in rating field as hacked info display if needed
+                        rating=info_text[:30] + "..." if len(info_text) > 30 else info_text,
+                        link=url
+                    ))
+
+                return CinemaRepertoire(
+                    cinemaName="Kino Pokój Lubawa",
+                    date=datetime.now().strftime('%d.%m.%Y'),
+                    movies=movies
+                )
 
         except Exception as e:
             logger.error(f"Error fetching Kino Lubawa: {e}")
@@ -193,18 +196,18 @@ class CinemaScraper:
         }
         return mapping.get(city, city)
 
-    def _parse_biletyna_list(self, html: str, city_slug: str) -> List[Movie]:
+    async def _parse_biletyna_list(self, html: str, city_slug: str) -> List[Movie]:
         # Copied from previous logic
         soup = BeautifulSoup(html, 'html.parser')
         movies = []
         today_date = datetime.now().strftime('%d.%m.%Y')
-        
+
         items = soup.select('.event-left-side')
         if not items:
             link_elements = soup.select('h3 a')[:30]
             items = []
             for link in link_elements:
-                items.append(link) 
+                items.append(link)
 
         for item in items:
             try:
@@ -217,19 +220,19 @@ class CinemaScraper:
 
                 if not title_elem:
                     continue
-                    
+
                 title = title_elem.get_text(strip=True)
                 href = title_elem.get('href')
-                
+
                 full_url = f"{self.BASE_URL}{href}" if href.startswith('/') else href
                 if city_slug not in full_url and '/kino/' not in full_url:
                      full_url = f"{full_url}/{city_slug}"
-                
+
                 if any(m.title == title for m in movies):
                     continue
 
-                details = self._fetch_movie_details(full_url, today_date)
-                
+                details = await self._fetch_movie_details(full_url, today_date)
+
                 if details and details['times']:
                     movies.append(Movie(
                         title=title,
