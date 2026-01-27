@@ -26,9 +26,9 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
 
   const weatherData = weather || MOCK_WEATHER; // Fallback to mock
 
-  // Select 2 articles with source diversity
+  // Select 3 articles with source diversity
   const diverseArticles = (() => {
-    if (!articles || articles.length === 0) return MOCK_ARTICLES.slice(0, 2);
+    if (!articles || articles.length === 0) return MOCK_ARTICLES.slice(0, 3);
 
     // Group by source
     const bySource = new Map<string, typeof articles>();
@@ -40,19 +40,19 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
       bySource.get(source)!.push(article);
     });
 
-    // Get top 1 from each source, then take first 2
+    // Get top 1 from each source, then take first 3
     const diverse: typeof articles = [];
     for (const [, sourceArticles] of bySource) {
-      if (diverse.length >= 2) break;
+      if (diverse.length >= 3) break;
       diverse.push(sourceArticles[0]);
     }
 
-    // If we don't have 2 yet, fill with remaining articles
-    if (diverse.length < 2) {
+    // If we don't have 3 yet, fill with remaining articles
+    if (diverse.length < 3) {
       for (const article of articles) {
         if (!diverse.includes(article)) {
           diverse.push(article);
-          if (diverse.length >= 2) break;
+          if (diverse.length >= 3) break;
         }
       }
     }
@@ -169,7 +169,7 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
             </div>
           </div>
           <div className="space-y-4">
-            {/* 2 Latest Articles with Source Diversity */}
+            {/* 3 Latest Articles with Source Diversity */}
             {diverseArticles.map(article => (
               <a
                 key={article.id}
