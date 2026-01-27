@@ -1,8 +1,10 @@
 
+
 import React, { useState } from 'react';
 import TrafficWidget from './TrafficWidget';
 import { CinemaWidget } from './CinemaWidget';
 import BusTrackerWidget from './BusTrackerWidget';
+import WasteWidget from './WasteWidget';
 import { MOCK_ARTICLES, MOCK_WEATHER, MOCK_TRAFFIC, MOCK_EVENTS } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -10,13 +12,17 @@ import { useWeather } from '../src/hooks/useWeather';
 import { useArticles } from '../src/hooks/useArticles';
 import { useDailySummary } from '../src/hooks/useDailySummary';
 import { useEvents } from '../src/hooks/useEvents';
+import { useWasteSchedule } from '../src/hooks/useWasteSchedule';
+import { useAuth } from '../src/context/AuthContext';
 import { AppSection } from '../types';
 
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ onNavigate }) => {
+  const { user, userLocation } = useAuth();
   const { weather, loading: weatherLoading, error: weatherError } = useWeather();
   const { articles, loading: articlesLoading, error: articlesError } = useArticles(10); // Fetch more for diversity
   const { summary, loading: summaryLoading, error: summaryError, lastUpdated } = useDailySummary();
   const { events, loading: eventsLoading, error: eventsError } = useEvents(1);
+  const wasteEvents = useWasteSchedule(userLocation);
 
   const weatherData = weather || MOCK_WEATHER; // Fallback to mock
 
@@ -285,6 +291,9 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
               </div>
             </div>
           </div>
+
+          {/* Waste Collection Widget - Only for logged-in users */}
+          {user && <WasteWidget events={wasteEvents} town={userLocation} />}
 
           {/* Traffic Widget */}
           <TrafficWidget />

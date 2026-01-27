@@ -1,0 +1,141 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║  BACKEND AUDIT SUMMARY - Centrum Operacyjne Mieszkańca           ║
+║  Data: 2026-01-27                                                 ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────┐
+│ SYSTEM STATUS: ✅ DZIAŁA POPRAWNIE (85/100)                      │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ KEY METRICS                                                      │
+├─────────────────────────────────────────────────────────────────┤
+│ ✅ API Response Time (p50):     1-13ms         [EXCELLENT]      │
+│ ✅ Database Queries:             < 15ms        [EXCELLENT]      │
+│ ✅ AI Monthly Cost:              $2.21 (~9PLN) [VERY LOW]       │
+│ ✅ Auth Flow:                    WORKS         [OK]             │
+│ ✅ Connection Leaks:             NONE          [OK]             │
+│ ⚠️  Redis Usage:                  0 hits       [UNUSED]         │
+│ ⚠️  Connection Pool:              5            [TOO SMALL]      │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ SCHEDULER JOBS PERFORMANCE (Total: 5m 37s)                      │
+├─────────────────────────────────────────────────────────────────┤
+│ Weather Update           0.9s    ✅ FAST                        │
+│ GUS Statistics           5.2s    ✅ OK                          │
+│ Cinema Repertoire        19.0s   ⚠️  SLOW (sync requests)       │
+│ AI Processing            2m 58s  ✅ OK (20 articles × 9s)       │
+│ Daily Summary            27.1s   ✅ OK                          │
+│ Article Scraping         1m 47s  ⚠️  SLOW (sequential)          │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ DATABASE STATS                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ Total Articles:          464                                    │
+│ Processed by AI:         402 (86.6%)                            │
+│ Unprocessed:             62 (13.4%)                             │
+│                                                                  │
+│ Top Categories:                                                  │
+│   Kultura:       156    Edukacja:     59    Urząd:       52    │
+│   Transport:     47     Rekreacja:    30    Zdrowie:     30    │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ CRITICAL PROBLEMS (5) - FIX ASAP 🔴                             │
+├─────────────────────────────────────────────────────────────────┤
+│ #1  Deep scraping bez paralelizacji                            │
+│     📍 mojedzialdowo.py:74-78, klikajinfo.py, gmina_rybno.py   │
+│     ⏱️  1.10s per article → 55s for 50 articles                 │
+│     💡 asyncio.gather() → reduce to ~10s                        │
+│                                                                  │
+│ #2  Cinema scraper synchroniczny                                │
+│     📍 cinema.py                                                 │
+│     ⏱️  19s (blokuje scheduler)                                 │
+│     💡 Zamień requests → httpx async → reduce to 5s             │
+│                                                                  │
+│ #8  Redis nieużywany                                            │
+│     📍 config.py                                                 │
+│     ⏱️  0 hits, 0 cache                                         │
+│     💡 Zaimplementuj cache dla articles/events/AI results       │
+│                                                                  │
+│ #9  Connection pool zbyt mały                                   │
+│     📍 database/connection.py:6-11                               │
+│     ⏱️  pool_size=5 (default)                                   │
+│     💡 Zwiększ do pool_size=20, max_overflow=10                 │
+│                                                                  │
+│ #4  Brak retry logic w scheduler                                │
+│     📍 scheduler/scheduler.py                                    │
+│     💡 Dodaj max_instances, misfire_grace_time, coalesce        │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ HIGH PRIORITY (4) 🟠                                            │
+├─────────────────────────────────────────────────────────────────┤
+│ #6  Brak timeout'u na AI calls (ai/article_processor.py)       │
+│ #7  No prompt limiting w summary (ai/summary_generator.py)     │
+│ #10 Frontend duplikacja requestów (Dashboard.tsx)              │
+│ #12 Prosty health check (brak DB/Redis status)                 │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ RECOMMENDED ACTIONS (Prioritized)                               │
+├─────────────────────────────────────────────────────────────────┤
+│ IMMEDIATE (Next 1-2 days):                                      │
+│   1. Parallelize deep scraping                [30 min]          │
+│      → Article scraping: 1m 47s → 40s                           │
+│                                                                  │
+│   2. Fix cinema scraper to async              [15 min]          │
+│      → Cinema job: 19s → 5s                                     │
+│                                                                  │
+│   3. Add DB indexes (published_at, processed) [5 min]           │
+│      → Query performance: +10-20%                               │
+│                                                                  │
+│ SHORT-TERM (Next week):                                         │
+│   4. Implement Redis caching                  [2-3 hours]       │
+│      → Reduce API load by 50%                                   │
+│                                                                  │
+│   5. Share engine + increase pool size        [1 hour]          │
+│      → DB connections: 40+ → 10                                 │
+│                                                                  │
+│   6. Add retry logic to scheduler             [30 min]          │
+│      → Job resilience                                           │
+│                                                                  │
+│ MEDIUM-TERM (Next 2 weeks):                                     │
+│   7. Add timeout to AI calls (60s)                              │
+│   8. Implement rate limiting middleware (slowapi)               │
+│   9. Enhance health check (DB + Redis status)                   │
+│   10. Fix frontend duplicate requests (cache context)           │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ COST ANALYSIS                                                    │
+├─────────────────────────────────────────────────────────────────┤
+│ Current Monthly Costs:                                          │
+│   AI (GPT-4o-mini + GPT-4o):     ~9 PLN      ✅ VERY LOW       │
+│   Infrastructure:                ~570 PLN                       │
+│   TOTAL:                         ~580 PLN                       │
+│                                                                  │
+│ Potential Savings (after optimizations):                        │
+│   Redis caching:                 -100 PLN (-30% API load)       │
+│   Scraper optimization:          -50 PLN (-50% exec time)       │
+│   ESTIMATED SAVINGS:             ~150 PLN/mies                  │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ FILES GENERATED                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ 📄 AUDIT_REPORT_2026-01-27.md     [Full detailed report]       │
+│ 📄 QUICK_SUMMARY.txt               [This file]                  │
+│ 📄 api_benchmark.sh                [API performance test]       │
+│ 📄 scheduler_audit.py              [Scheduler test]             │
+│ 📄 scraper_benchmark.py            [Scraper performance]        │
+│ 📄 db_benchmark.py                 [Database queries]           │
+│ 📄 connection_leak_test.py         [Connection leak test]       │
+│ 📄 scheduler_results.txt           [Full job execution log]     │
+└─────────────────────────────────────────────────────────────────┘
+
+Location: /private/tmp/claude/.../scratchpad/audit_results/
+
+Total audit time: ~2 hours

@@ -18,7 +18,7 @@ async def get_cinema_repertoire(location: str = Query(..., description="City nam
         
     try:
         # Use cache by default - only force_update during scheduled job (8 AM)
-        data = scraper.fetch_repertoire(normalized_location, force_update=False)
+        data = await scraper.fetch_repertoire(normalized_location, force_update=False)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

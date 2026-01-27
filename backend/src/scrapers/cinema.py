@@ -247,54 +247,55 @@ class CinemaScraper:
                 continue
         return movies
 
-    def _fetch_movie_details(self, url: str, target_date: str) -> Optional[Dict]:
+    async def _fetch_movie_details(self, url: str, target_date: str) -> Optional[Dict]:
         try:
             logger.debug(f"Fetching details from {url}")
-            response = requests.get(url, headers=self.headers, timeout=5)
-            if response.status_code != 200:
-                logger.warning(f"Status {response.status_code} for {url}")
-                return None
-                
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            poster_url = ""
-            og_image = soup.find('meta', property='og:image')
-            if og_image:
-                poster_url = og_image.get('content')
-            
-            genre = "Film" 
-            times = []
-            
-            today_formats = [ target_date, "Dzisiaj", "Dziś" ]
-            
-            date_blocks = soup.select('.event-date')
-            if not date_blocks:
-                 potential_spans = soup.select('.table-important-text')
-                 date_blocks = []
-                 for s in potential_spans:
-                     if s.parent: date_blocks.append(s.parent)
-                     else: date_blocks.append(s)
+            async with httpx.AsyncClient(headers=self.headers, timeout=5.0) as client:
+                response = await client.get(url)
+                if response.status_code != 200:
+                    logger.warning(f"Status {response.status_code} for {url}")
+                    return None
 
-            logger.debug(f"Found {len(date_blocks)} potential date blocks")
-            
-            for block in date_blocks:
-                date_text = block.get_text(separator=' ', strip=True)
-                if any(fmt in date_text for fmt in today_formats):
-                    found_times = re.findall(r'godz\.\s*(\d{2}:\d{2})', date_text)
-                    if not found_times:
-                        found_times = re.findall(r'(?<!\d)(\d{2}:\d{2})(?!\d)', date_text)
-                    if found_times:
-                        times.extend(found_times)
-            
-            times = sorted(list(set(times)))
-            
-            return {
-                'posterUrl': poster_url,
-                'genre': genre,
-                'times': times,
-                'rating': 'N/A'
-            }
-            
+                soup = BeautifulSoup(response.text, 'html.parser')
+
+                poster_url = ""
+                og_image = soup.find('meta', property='og:image')
+                if og_image:
+                    poster_url = og_image.get('content')
+
+                genre = "Film"
+                times = []
+
+                today_formats = [ target_date, "Dzisiaj", "Dziś" ]
+
+                date_blocks = soup.select('.event-date')
+                if not date_blocks:
+                     potential_spans = soup.select('.table-important-text')
+                     date_blocks = []
+                     for s in potential_spans:
+                         if s.parent: date_blocks.append(s.parent)
+                         else: date_blocks.append(s)
+
+                logger.debug(f"Found {len(date_blocks)} potential date blocks")
+
+                for block in date_blocks:
+                    date_text = block.get_text(separator=' ', strip=True)
+                    if any(fmt in date_text for fmt in today_formats):
+                        found_times = re.findall(r'godz\.\s*(\d{2}:\d{2})', date_text)
+                        if not found_times:
+                            found_times = re.findall(r'(?<!\d)(\d{2}:\d{2})(?!\d)', date_text)
+                        if found_times:
+                            times.extend(found_times)
+
+                times = sorted(list(set(times)))
+
+                return {
+                    'posterUrl': poster_url,
+                    'genre': genre,
+                    'times': times,
+                    'rating': 'N/A'
+                }
+
         except Exception as e:
             logger.error(f"Error fetching details for {url}: {e}")
             return None

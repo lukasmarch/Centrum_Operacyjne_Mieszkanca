@@ -1,4 +1,16 @@
 
+export interface WasteEvent {
+  type: string;
+  originalDateString: string;
+  daysRemaining: number;
+}
+
+export interface WasteSchedule {
+  [town: string]: {
+    [wasteType: string]: string;
+  };
+}
+
 export interface Article {
   id: string;
   title: string;
@@ -205,12 +217,33 @@ export interface UserUpdateData {
 
 export const AVAILABLE_LOCATIONS = [
   'Rybno',
+  'Prusy',
+  'Szczupliny',
+  'Nowa Wieś',
+  'Groszki',
+  'Naguszewo',
+  'Rumian',
+  'Truszczyny',
+  'Dębień',
+  'Hartowiec',
+  'Tuczki',
+  'Rybno R1',
+  'Rybno R2',
+  'Jeglia',
+  'Gralewo Stacja',
+  'Gronowo',
+  'Grądy',
+  'Wery',
+  'Kopaniarze',
+  'Grabacz',
+  'Koszelewki',
+  'Koszelewy',
+  'Żabiny',
+  'Rapaty',
+  'Domki letniskowe',
   'Działdowo',
   'Lubawa',
-  'Lidzbark',
-  'Iłowo-Osada',
-  'Płośnica',
-  'Kozłowo'
+  'Lidzbark'
 ] as const;
 
 export type AvailableLocation = typeof AVAILABLE_LOCATIONS[number];
