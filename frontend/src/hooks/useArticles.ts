@@ -40,7 +40,15 @@ function formatTimestamp(scrapedAt: string): string {
   }
 }
 
-export function useArticles(limit: number = 3) {
+interface UseArticlesOptions {
+  limit?: number;
+  perSource?: number;
+  days?: number;
+}
+
+export function useArticles(options: UseArticlesOptions = {}) {
+  const { limit = 50, perSource = 5, days = 2 } = options;
+
   const [articles, setArticles] = useState<Article[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +57,9 @@ export function useArticles(limit: number = 3) {
     const fetchArticles = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_URL}/api/articles?limit=${limit}`);
+        const response = await fetch(
+          `${API_URL}/api/articles?limit=${limit}&per_source=${perSource}&days=${days}`
+        );
 
         if (!response.ok) {
           throw new Error('Nie udało się pobrać artykułów');
@@ -85,7 +95,8 @@ export function useArticles(limit: number = 3) {
     const interval = setInterval(fetchArticles, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [limit]);
+  }, [limit, perSource, days]);
 
   return { articles, loading, error };
 }
+

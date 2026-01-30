@@ -55,13 +55,52 @@ async def get_sources(session: AsyncSession = Depends(get_session)):
 @app.get("/api/articles", response_model=list[ArticleOutput])
 async def get_articles(
     limit: int = 50,
+    per_source: int = 5,
+    days: int = 2,
     session: AsyncSession = Depends(get_session)
 ):
-    # Join Article with Source to get source name
-    # Sort by published_at (with NULL values last), then scraped_at as fallback
+    """
+    Get articles with filtering and grouping.
+    
+    Args:
+        limit: Maximum total articles to return (default: 50)
+        per_source: Maximum articles per source (default: 5)
+        days: Only return articles from the last N days (default: 2)
+    """
+    from datetime import timedelta
+    from sqlalchemy import func, or_
+    
+    # Calculate cutoff date (2 days ago)
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Use window function to rank articles per source
+    # ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY published_at DESC)
+    row_number = func.row_number().over(
+        partition_by=Article.source_id,
+        order_by=[
+            Article.published_at.desc().nulls_last(),
+            Article.scraped_at.desc()
+        ]
+    ).label('row_num')
+    
+    # Subquery with row numbers
+    subquery = (
+        select(Article.id, row_number)
+        .where(
+            or_(
+                Article.published_at >= cutoff_date,
+                Article.scraped_at >= cutoff_date
+            )
+        )
+        .subquery()
+    )
+    
+    # Main query - join with subquery to filter by row_num <= per_source
     result = await session.execute(
         select(Article, Source.name)
         .join(Source, Article.source_id == Source.id)
+        .join(subquery, Article.id == subquery.c.id)
+        .where(subquery.c.row_num <= per_source)
         .order_by(
             Article.published_at.desc().nulls_last(),
             Article.scraped_at.desc()

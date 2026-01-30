@@ -1,21 +1,27 @@
 #!/usr/bin/env python3
 """
-Helper do dodawania źródeł Facebook do bazy danych.
+Dodawanie źródeł Facebook/Apify do bazy danych.
 
-KONFIGURACJA:
-1. Załóż konto Apify: https://apify.com
-2. Pobierz API token: https://console.apify.com/account/integrations
-3. Dodaj do .env: APIFY_API_KEY=apify_api_***
-4. Uruchom: python scripts/add_facebook_sources.py
-
-UŻYCIE:
+Tryb 1 — dodaj ze listy predefiniowanych źródeł (hardcoded):
     cd backend
-    python scripts/add_facebook_sources.py
+    python scripts/setup/add_facebook_sources.py
+
+Tryb 2 — dodaj dowolne konto Facebook z linii komendowej:
+    python scripts/setup/add_facebook_sources.py --add "https://www.facebook.com/username" "Nazwa Źródła"
+
+Tryb 3 — wyświetl wszystkie źródła Facebook w bazie:
+    python scripts/setup/add_facebook_sources.py --list
+
+WYMOGI:
+    1. Konto Apify: https://apify.com
+    2. API token: https://console.apify.com/account/integrations
+    3. W .env: APIFY_API_KEY=apify_api_***
 """
 
 import asyncio
 import sys
 import os
+import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -23,8 +29,8 @@ from dotenv import load_dotenv
 backend_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
-# Load environment variables
-env_path = Path(__file__).parent.parent / ".env"
+# Load environment variables (backend/.env)
+env_path = backend_dir / ".env"
 load_dotenv(env_path)
 
 from sqlmodel import select
@@ -210,8 +216,132 @@ async def add_facebook_sources():
     await engine.dispose()
 
 
+async def add_single_source(url: str, name: str):
+    """Dodaj jedno źródło Facebook z argumentów linii komendowej."""
+
+    apify_api_key = os.getenv("APIFY_API_KEY")
+
+    if not apify_api_key:
+        logger.warning("⚠ APIFY_API_KEY nie znaleziony w .env — źródło będzie nieaktywne")
+        logger.warning("  Dodaj do .env: APIFY_API_KEY=twój_token")
+
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("DATABASE_URL not found in environment variables")
+
+    engine = create_async_engine(database_url, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    # Normalizuj URL (odcinaj trailing slash, upewnij się na facebook.com)
+    url = url.rstrip("/")
+    if not url.startswith("http"):
+        url = "https://www.facebook.com/" + url
+
+    # Generuj unikalną nazwę
+    source_name = f"Facebook - {name}"
+
+    config = APIFY_CONFIG_TEMPLATE.copy()
+    config["facebook_page_url"] = url
+    if apify_api_key:
+        config["apify_api_key"] = apify_api_key
+
+    status = "active" if apify_api_key else "inactive"
+
+    async with async_session() as session:
+        # Sprawdź czy istnieje
+        result = await session.execute(
+            select(Source).where(Source.name == source_name)
+        )
+        existing = result.scalar_one_or_none()
+
+        if existing:
+            existing.url = url
+            existing.scraping_config = config
+            existing.status = status
+            await session.commit()
+            logger.info(f"🔄 Zaktualizowano: {source_name}")
+        else:
+            source = Source(
+                name=source_name,
+                type="social_media",
+                url=url,
+                scraping_config=config,
+                status=status,
+            )
+            session.add(source)
+            await session.commit()
+            await session.refresh(source)
+            logger.info(f"✓ Dodano: {source_name} (ID: {source.id})")
+
+        logger.info(f"   URL: {url}")
+        logger.info(f"   Status: {status}")
+
+    await engine.dispose()
+
+
+async def list_sources():
+    """Wyświetl wszystkie źródła Facebook z bazy."""
+
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("DATABASE_URL not found in environment variables")
+
+    engine = create_async_engine(database_url, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(Source).where(Source.type == "social_media")
+        )
+        sources = result.scalars().all()
+
+    if not sources:
+        logger.info("Brak źródeł Facebook w bazie.")
+    else:
+        logger.info(f"\n{'=' * 60}")
+        logger.info(f"Źródła Facebook/Apify w bazie ({len(sources)}):")
+        logger.info(f"{'=' * 60}")
+        for s in sources:
+            has_key = "✓" if s.scraping_config and s.scraping_config.get("apify_api_key") else "✗"
+            logger.info(f"\n  [{s.id}] {s.name}")
+            logger.info(f"      URL:    {s.url}")
+            logger.info(f"      Status: {s.status}")
+            logger.info(f"      API key: {has_key}")
+
+    await engine.dispose()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Dodawanie źródeł Facebook/Apify do bazy danych"
+    )
+    parser.add_argument(
+        "--add", nargs=2, metavar=("URL", "NAZWA"),
+        help='Dodaj jedno źródło, np. --add "https://facebook.com/username" "Nazwa Strony"'
+    )
+    parser.add_argument(
+        "--list", action="store_true",
+        help="Wyświetl wszystkie źródła Facebook w bazie"
+    )
+    return parser.parse_args()
+
+
 async def main():
-    logger.info("Rozpoczynam dodawanie źródeł Facebook...\n")
+    args = parse_args()
+
+    if args.list:
+        await list_sources()
+        return
+
+    if args.add:
+        url, name = args.add
+        logger.info(f"Dodawanie źródła: {name} ({url})\n")
+        await add_single_source(url, name)
+        logger.info("\n✓ Zakończono!")
+        return
+
+    # Bez argumentów — dodaj predefiniowane
+    logger.info("Rozpoczynam dodawanie predefiniowanych źródeł Facebook...\n")
     await add_facebook_sources()
     logger.info("\n✓ Zakończono!")
 

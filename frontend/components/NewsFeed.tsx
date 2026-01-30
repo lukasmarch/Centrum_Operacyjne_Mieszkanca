@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useArticles } from '../src/hooks/useArticles';
 
 const NewsFeed: React.FC = () => {
-    const { articles, loading, error } = useArticles(50);
+    const { articles, loading, error } = useArticles({ limit: 50, perSource: 5, days: 2 });
     const [activeCategory, setActiveCategory] = useState<string>('Wszystkie');
 
     // Group articles categories
@@ -39,20 +39,20 @@ const NewsFeed: React.FC = () => {
             // This suggests a cleanup. 
 
             // Let's do this:
-            // For 'Wszystkie', get all unique categories, get top 3 for each, combine and sort by date.
+            // For 'Wszystkie', get all unique categories, get top 5 for each, combine and sort by date.
             const uniqueCategories = Array.from(new Set(articles.map(a => a.category).filter(Boolean)));
 
             // Since I don't have raw timestamp easily without changing useArticles, relying on index (assuming API returns sorted).
-            // API returns sorted by scraped_at desc. So just taking slice(0, 3) per category works.
+            // API returns sorted by scraped_at desc. So just taking slice(0, 5) per category works.
 
             return uniqueCategories.flatMap(cat =>
-                articles.filter(a => a.category === cat).slice(0, 4)
+                articles.filter(a => a.category === cat).slice(0, 5)
             );
         }
 
         return articles
             .filter(a => a.category === activeCategory)
-            .slice(0, 4);
+            .slice(0, 5);
     }, [articles, activeCategory]);
 
     if (loading) return <div className="text-center p-8 text-slate-500 animate-pulse">Ładowanie wiadomości...</div>;
