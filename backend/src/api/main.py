@@ -347,6 +347,247 @@ async def get_employment_stats(
     return response
 
 
+@app.get("/api/stats/business")
+async def get_business_stats(
+    year: int = None,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Get entrepreneurship/business statistics for Powiat Działdowski
+
+    Args:
+        year: Specific year (optional, defaults to latest available)
+
+    Returns:
+        {
+            "entities_regon_per_10k": float,     # Podmioty REGON na 10 tys. ludności
+            "new_entities_per_10k": float,       # Nowo zarejestrowane na 10 tys. ludności
+            "deregistered_per_10k": float,       # Wykreślone na 10 tys. ludności
+            "micro_enterprises_share": float,    # Udział mikroprzedsiębiorstw (%)
+            "deregistered_share": float,         # Udział wyrejestrowanych (%)
+            "new_to_deregistered_ratio": float,  # Stosunek nowych do wyrejestrowanych (%)
+            "entities_per_1k": float,            # Podmioty na 1000 ludności
+            "sme_per_10k": float,                # MŚP na 10 tys. mieszkańców
+            "large_entities_per_10k": float,     # Duże firmy (>49 osób) na 10 tys.
+            "year": int,
+            "fetched_at": datetime,
+            "updated_at": datetime
+        }
+    """
+    # Try to get from cache (database) first
+    query = select(GUSStatistic).where(GUSStatistic.category == "business")
+
+    if year:
+        query = query.where(GUSStatistic.year == year)
+    else:
+        query = query.order_by(GUSStatistic.year.desc())
+
+    result = await session.execute(query.limit(1))
+    stat = result.scalar_one_or_none()
+
+    if not stat:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No business statistics found{' for year ' + str(year) if year else ''}. Data is updated daily at 6:00 AM. Run POST /api/stats/update to fetch data."
+        )
+
+    # Return data from JSONB + metadata
+    response = stat.data.copy()
+    response["fetched_at"] = stat.fetched_at
+    response["updated_at"] = stat.updated_at
+
+    return response
+
+
+# ==================== NOWE ENDPOINTY DLA GMINY RYBNO (Z CACHE W BAZIE) ====================
+
+# Słownik zmiennych GUS
+GUS_VARIABLES = {
+    "60530": {"name": "Podmioty REGON na 10 tys. ludności", "key": "entities_regon_per_10k", "category": "business"},
+    "60529": {"name": "Nowe firmy na 10 tys. ludności", "key": "new_entities_per_10k", "category": "business"},
+    "60528": {"name": "Wykreślone firmy na 10 tys. ludności", "key": "deregistered_per_10k", "category": "business"},
+    "72305": {"name": "Ludność ogółem", "key": "population_total", "category": "demographics"},
+    "60270": {"name": "Stopa bezrobocia (%)", "key": "unemployment_rate", "category": "employment"},
+}
+
+
+@app.post("/api/stats/sync-gus")
+async def sync_gus_data(session: AsyncSession = Depends(get_session)):
+    """
+    Synchronizuj dane GUS z API do bazy danych.
+    Uruchom raz miesięcznie lub po pierwszym deploy.
+    Pobiera dane dla wszystkich gmin i zmiennych.
+    """
+    from src.integrations.gus_api import GUSDataService
+    from src.database.schema import GUSGminaStats
+    from datetime import datetime
+
+    service = GUSDataService()
+    synced = {"gminy": 0, "records": 0, "errors": []}
+
+    try:
+        for gmina_name, unit_id in service.GMINY.items():
+            for var_id, var_info in GUS_VARIABLES.items():
+                try:
+                    # Pobierz dane z GUS API (ostatnie 10 lat)
+                    data = await service.get_gmina_stats(unit_id, var_id, years_back=10)
+                    
+                    for val in data.get("values", []):
+                        if val["value"] is None:
+                            continue
+                            
+                        # Upsert do bazy
+                        result = await session.execute(
+                            select(GUSGminaStats).where(
+                                GUSGminaStats.unit_id == unit_id,
+                                GUSGminaStats.var_id == var_id,
+                                GUSGminaStats.year == val["year"]
+                            )
+                        )
+                        existing = result.scalar_one_or_none()
+                        
+                        if existing:
+                            existing.value = val["value"]
+                            existing.fetched_at = datetime.utcnow()
+                        else:
+                            session.add(GUSGminaStats(
+                                unit_id=unit_id,
+                                unit_name=gmina_name,
+                                var_id=var_id,
+                                var_name=var_info["name"],
+                                year=val["year"],
+                                value=val["value"],
+                                category=var_info["category"],
+                                fetched_at=datetime.utcnow()
+                            ))
+                        synced["records"] += 1
+                        
+                except Exception as e:
+                    synced["errors"].append(f"{gmina_name}/{var_id}: {str(e)}")
+            
+            synced["gminy"] += 1
+        
+        await session.commit()
+        return {
+            "message": f"Synced {synced['records']} records for {synced['gminy']} gminy",
+            "details": synced
+        }
+        
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(500, f"Sync failed: {str(e)}")
+
+
+@app.get("/api/stats/trend/{var_id}")
+async def get_historical_trend(
+    var_id: str,
+    years_back: int = 10,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Pobierz trend historyczny dla Gminy Rybno z bazy danych.
+    Dane cache'owane - brak wywołań do zewnętrznego API.
+    """
+    from src.database.schema import GUSGminaStats
+    from src.integrations.gus_api import GUSDataService
+    from sqlalchemy import func
+
+    unit_id = GUSDataService.UNIT_ID_RYBNO
+
+    # Znajdź dostępny zakres lat w cache
+    result = await session.execute(
+        select(func.max(GUSGminaStats.year))
+        .where(
+            GUSGminaStats.unit_id == unit_id,
+            GUSGminaStats.var_id == var_id
+        )
+    )
+    max_year = result.scalar()
+    
+    if not max_year:
+        raise HTTPException(404, f"Brak danych w cache dla Rybna, zmienna {var_id}. Uruchom POST /api/stats/sync-gus")
+
+    min_year = max_year - years_back
+
+    # Pobierz dane z cache
+    result = await session.execute(
+        select(GUSGminaStats)
+        .where(
+            GUSGminaStats.unit_id == unit_id,
+            GUSGminaStats.var_id == var_id,
+            GUSGminaStats.year >= min_year
+        )
+        .order_by(GUSGminaStats.year)
+    )
+    cached = result.scalars().all()
+
+    return {
+        "unit_id": unit_id,
+        "unit_name": "Rybno",
+        "var_id": var_id,
+        "source": "database",
+        "values": [{"year": r.year, "value": r.value} for r in cached]
+    }
+
+
+@app.get("/api/stats/comparison/{var_id}")
+async def get_comparative_stats(
+    var_id: str,
+    year: int = None,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Pobierz dane porównawcze dla wszystkich gmin z bazy danych.
+    Używa najnowszego dostępnego roku w cache (nie bieżącego roku).
+    """
+    from src.database.schema import GUSGminaStats
+    from sqlalchemy import func
+
+    # Jeśli nie podano roku, znajdź najnowszy dostępny w cache
+    if not year:
+        result = await session.execute(
+            select(func.max(GUSGminaStats.year))
+            .where(GUSGminaStats.var_id == var_id)
+        )
+        year = result.scalar()
+        
+        if not year:
+            raise HTTPException(404, f"Brak danych w cache dla zmiennej {var_id}. Uruchom POST /api/stats/sync-gus")
+
+    # Pobierz dane z cache
+    result = await session.execute(
+        select(GUSGminaStats)
+        .where(
+            GUSGminaStats.var_id == var_id,
+            GUSGminaStats.year == year
+        )
+    )
+    cached = result.scalars().all()
+
+    if not cached:
+        raise HTTPException(404, f"Brak danych dla roku {year}. Uruchom POST /api/stats/sync-gus")
+
+    return {
+        "var_id": var_id,
+        "year": year,
+        "source": "database",
+        "gminy": {r.unit_name: {"value": r.value, "year": r.year} for r in cached}
+    }
+
+
+@app.get("/api/stats/variables")
+async def get_available_variables():
+    """
+    Get list of available GUS variable IDs with descriptions
+    """
+    from src.integrations.gus_api import GUSDataService
+
+    return {
+        "variables": {info["key"]: {"id": var_id, "name": info["name"]} for var_id, info in GUS_VARIABLES.items()},
+        "gminy": GUSDataService.GMINY
+    }
+
+
 @app.post("/api/stats/update")
 async def update_gus_statistics(session: AsyncSession = Depends(get_session)):
     """
@@ -362,15 +603,17 @@ async def update_gus_statistics(session: AsyncSession = Depends(get_session)):
         # Fetch latest data from GUS API
         demographics = await service.get_population_stats()
         employment = await service.get_employment_stats()
+        business = await service.get_business_stats()
 
         current_year = datetime.now().year
 
         # Upsert demographics
+        demo_year = int(demographics.get("year") or current_year)
         result = await session.execute(
             select(GUSStatistic)
             .where(
                 GUSStatistic.category == "demographics",
-                GUSStatistic.year == demographics.get("year", current_year)
+                GUSStatistic.year == demo_year
             )
         )
         demo_stat = result.scalar_one_or_none()
@@ -382,18 +625,19 @@ async def update_gus_statistics(session: AsyncSession = Depends(get_session)):
         else:
             demo_stat = GUSStatistic(
                 category="demographics",
-                year=demographics.get("year", current_year),
+                year=demo_year,
                 data=demographics,
                 population_total=demographics.get("total")
             )
             session.add(demo_stat)
 
         # Upsert employment
+        emp_year = int(employment.get("year") or current_year)
         result = await session.execute(
             select(GUSStatistic)
             .where(
                 GUSStatistic.category == "employment",
-                GUSStatistic.year == employment.get("year", current_year)
+                GUSStatistic.year == emp_year
             )
         )
         emp_stat = result.scalar_one_or_none()
@@ -405,20 +649,44 @@ async def update_gus_statistics(session: AsyncSession = Depends(get_session)):
         else:
             emp_stat = GUSStatistic(
                 category="employment",
-                year=employment.get("year", current_year),
+                year=emp_year,
                 data=employment,
                 unemployment_rate=employment.get("unemployment_rate")
             )
             session.add(emp_stat)
 
+        # Upsert business
+        biz_year = int(business.get("year") or current_year)
+        result = await session.execute(
+            select(GUSStatistic)
+            .where(
+                GUSStatistic.category == "business",
+                GUSStatistic.year == biz_year
+            )
+        )
+        biz_stat = result.scalar_one_or_none()
+
+        if biz_stat:
+            biz_stat.data = business
+            biz_stat.updated_at = datetime.utcnow()
+        else:
+            biz_stat = GUSStatistic(
+                category="business",
+                year=biz_year,
+                data=business,
+            )
+            session.add(biz_stat)
+
         await session.commit()
         await session.refresh(demo_stat)
         await session.refresh(emp_stat)
+        await session.refresh(biz_stat)
 
         return {
             "message": "GUS statistics updated successfully",
             "demographics": demographics,
-            "employment": employment
+            "employment": employment,
+            "business": business
         }
 
     except Exception as e:
@@ -426,3 +694,4 @@ async def update_gus_statistics(session: AsyncSession = Depends(get_session)):
             status_code=500,
             detail=f"Failed to update GUS statistics: {str(e)}"
         )
+

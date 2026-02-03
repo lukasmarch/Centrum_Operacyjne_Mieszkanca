@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginPage from './src/pages/LoginPage';
 import RegisterPage from './src/pages/RegisterPage';
 import ProfilePage from './src/pages/ProfilePage';
+import GUSPage from './src/pages/GUSPage';
 
 const AppContent: React.FC = () => {
     const [activeSection, setActiveSection] = useState<AppSection>('dashboard');
@@ -50,12 +51,7 @@ const AppContent: React.FC = () => {
             case 'events':
                 return <EventsFeed />;
             case 'stats':
-                return (
-                    <div className="p-8 text-center bg-white rounded-3xl border border-dashed border-slate-200">
-                        <h3 className="text-xl font-bold mb-2">Dashboard GUS</h3>
-                        <p className="text-slate-500">Zaawansowane statystyki demograficzne i gospodarcze powiatu.</p>
-                    </div>
-                );
+                return <GUSPage />;
             case 'premium':
                 return (
                     <div className="max-w-4xl mx-auto py-12">

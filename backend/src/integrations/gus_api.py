@@ -19,8 +19,29 @@ class GUSDataService:
 
     BASE_URL = "https://bdl.stat.gov.pl/api/v1"
 
-    # Unit ID dla Powiatu Działdowskiego (kod TERYT: 2803)
-    UNIT_ID_DZIALDOWO = "042815403000"  # Zweryfikowane z API GUS (2026-01-14)
+    # ==================== UNIT IDs - GMINY W POWIECIE DZIAŁDOWSKIM ====================
+    # Główna jednostka: Gmina Rybno
+    UNIT_ID_RYBNO = "042815403062"        # Gmina Rybno (główna)
+    
+    # Pozostałe gminy do porównań
+    UNIT_ID_DZIALDOWO_M = "042815403011"  # Miasto Działdowo
+    UNIT_ID_DZIALDOWO_G = "042815403022"  # Gmina Działdowo (wiejska)
+    UNIT_ID_ILOWO = "042815403032"        # Gmina Iłowo-Osada
+    UNIT_ID_LIDZBARK = "042815403043"     # Gmina Lidzbark (miejsko-wiejska)
+    UNIT_ID_PLOSNICA = "042815403052"     # Gmina Płośnica
+    
+    # Powiat (dla agregacji)
+    UNIT_ID_POWIAT = "042815403000"       # Powiat Działdowski
+    
+    # Słownik wszystkich gmin do porównań
+    GMINY = {
+        "Rybno": "042815403062",
+        "Działdowo (miasto)": "042815403011",
+        "Działdowo (gmina)": "042815403022",
+        "Iłowo-Osada": "042815403032",
+        "Lidzbark": "042815403043",
+        "Płośnica": "042815403052",
+    }
 
     # Variable IDs - Zweryfikowane 2026-01-14 przez kompleksowy test API
     # Wszystkie zmienne poniżej mają dane dla Powiatu Działdowskiego (2024)
@@ -54,6 +75,18 @@ class GUSDataService:
 
         # ==================== TURYSTYKA ====================
         "accommodations_per_10000": "1539594", # Noclegi na 10000 ludności (5,028)
+
+        # ==================== PRZEDSIĘBIORCZOŚĆ ====================
+        # Zweryfikowane 2026-02-03 przez API GUS
+        "entities_regon_per_10k": "60530",        # Podmioty wpisane do REGON na 10 tys. ludności
+        "new_entities_per_10k": "60529",          # Jednostki nowo zarejestrowane REGON na 10 tys. ludności
+        "deregistered_per_10k": "60528",          # Jednostki wykreślone z REGON na 10 tys. ludności
+        "micro_enterprises_share": "1548709",     # Udział mikroprzedsiębiorstw (do 9 osób) %
+        "deregistered_share": "471845",           # Udział podmiotów wyrejestrowanych %
+        "new_to_deregistered_ratio": "1645253",   # Stosunek nowo zarejestrowanych do wyrejestrowanych %
+        "entities_per_1k": "458173",              # Podmioty wpisane do rejestru na 1000 ludności
+        "sme_per_10k": "1620132",                 # Podmioty MŚP (0-249 pracujących) na 10 tys. mieszkańców
+        "large_entities_per_10k": "634131",       # Podmioty o liczbie pracujących >49 na 10 tys. mieszkańców
     }
 
     def __init__(self, timeout: int = 30):
@@ -146,7 +179,7 @@ class GUSDataService:
         }
 
         try:
-            endpoint = f"/data/by-unit/{self.UNIT_ID_DZIALDOWO}"
+            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
 
             for stat_name, var_id in vars_to_fetch.items():
                 params = {"var-id": var_id}
@@ -218,7 +251,7 @@ class GUSDataService:
         }
 
         try:
-            endpoint = f"/data/by-unit/{self.UNIT_ID_DZIALDOWO}"
+            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
 
             for stat_name, var_id in vars_to_fetch.items():
                 params = {"var-id": var_id}
@@ -305,7 +338,7 @@ class GUSDataService:
             Dict z informacjami o jednostce
         """
         if not unit_id:
-            unit_id = self.UNIT_ID_DZIALDOWO
+            unit_id = self.UNIT_ID_RYBNO
 
         endpoint = f"/units/{unit_id}"
 
@@ -367,7 +400,7 @@ class GUSDataService:
         }
 
         try:
-            endpoint = f"/data/by-unit/{self.UNIT_ID_DZIALDOWO}"
+            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
 
             for stat_name, var_id in vars_to_fetch.items():
                 params = {"var-id": var_id}
@@ -442,7 +475,7 @@ class GUSDataService:
         }
 
         try:
-            endpoint = f"/data/by-unit/{self.UNIT_ID_DZIALDOWO}"
+            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
 
             for stat_name, var_id in vars_to_fetch.items():
                 params = {"var-id": var_id}
@@ -486,3 +519,218 @@ class GUSDataService:
     async def get_health_stats(self, year: Optional[int] = None) -> Dict[str, Any]:
         """Alias dla get_infrastructure_stats (kompatybilność wsteczna)"""
         return await self.get_infrastructure_stats(year)
+
+    async def get_business_stats(
+        self,
+        year: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Pobierz statystyki przedsiębiorczości dla Powiatu Działdowskiego
+
+        Args:
+            year: Rok danych (domyślnie: ostatni dostępny)
+
+        Returns:
+            Dict ze statystykami:
+            {
+                "entities_regon_per_10k": float,      # Podmioty REGON na 10 tys. ludności
+                "new_entities_per_10k": float,        # Nowo zarejestrowane na 10 tys. ludności
+                "deregistered_per_10k": float,        # Wykreślone na 10 tys. ludności
+                "micro_enterprises_share": float,     # Udział mikroprzedsiębiorstw (%)
+                "deregistered_share": float,          # Udział wyrejestrowanych (%)
+                "new_to_deregistered_ratio": float,   # Stosunek nowych do wyrejestrowanych (%)
+                "entities_per_1k": float,             # Podmioty na 1000 ludności
+                "sme_per_10k": float,                 # MŚP na 10 tys. mieszkańców
+                "large_entities_per_10k": float,      # Duże firmy (>49 osób) na 10 tys. mieszkańców
+                "year": int,
+                "updated_at": str
+            }
+        """
+        vars_to_fetch = {
+            "entities_regon_per_10k": self.VARS.get("entities_regon_per_10k"),
+            "new_entities_per_10k": self.VARS.get("new_entities_per_10k"),
+            "deregistered_per_10k": self.VARS.get("deregistered_per_10k"),
+            "micro_enterprises_share": self.VARS.get("micro_enterprises_share"),
+            "deregistered_share": self.VARS.get("deregistered_share"),
+            "new_to_deregistered_ratio": self.VARS.get("new_to_deregistered_ratio"),
+            "entities_per_1k": self.VARS.get("entities_per_1k"),
+            "sme_per_10k": self.VARS.get("sme_per_10k"),
+            "large_entities_per_10k": self.VARS.get("large_entities_per_10k"),
+        }
+
+        stats = {
+            "entities_regon_per_10k": None,
+            "new_entities_per_10k": None,
+            "deregistered_per_10k": None,
+            "micro_enterprises_share": None,
+            "deregistered_share": None,
+            "new_to_deregistered_ratio": None,
+            "entities_per_1k": None,
+            "sme_per_10k": None,
+            "large_entities_per_10k": None,
+            "year": None,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+
+        try:
+            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
+
+            for stat_name, var_id in vars_to_fetch.items():
+                if not var_id:
+                    continue
+
+                params = {"var-id": var_id}
+                if year:
+                    params["year"] = str(year)
+
+                try:
+                    response = await self._make_request(endpoint, params)
+                    results = response.get("results", [])
+
+                    if results:
+                        values = results[0].get("values", [])
+                        if values:
+                            latest = values[-1]
+                            value = latest.get("val")
+                            year_val = latest.get("year")
+
+                            stats[stat_name] = float(value) if value else None
+
+                            if stats["year"] is None:
+                                stats["year"] = year_val
+
+                except Exception as e:
+                    self.logger.warning(f"Failed to get {stat_name}: {e}")
+                    continue
+
+            self.logger.info(
+                f"Business stats: {stats['entities_regon_per_10k']} entities/10k, "
+                f"{stats['new_entities_per_10k']} new/10k, "
+                f"{stats['micro_enterprises_share']}% micro in {stats['year']}"
+            )
+            return stats
+
+        except Exception as e:
+            self.logger.error(f"Failed to get business stats: {e}")
+            raise
+
+    # ==================== NOWE METODY DLA GMINY RYBNO ====================
+
+    async def get_gmina_stats(
+        self,
+        unit_id: str,
+        var_id: str,
+        years_back: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Pobierz dane dla konkretnej gminy i wskaźnika
+
+        Args:
+            unit_id: ID jednostki GUS (np. "042815403062" dla Rybna)
+            var_id: ID zmiennej GUS (np. "60530" dla podmiotów REGON)
+            years_back: Ile lat wstecz pobierać (domyślnie 10)
+
+        Returns:
+            Dict z danymi historycznymi dla danej gminy
+        """
+        try:
+            endpoint = f"/data/by-unit/{unit_id}"
+            params = {"var-id": var_id}
+
+            response = await self._make_request(endpoint, params)
+            results = response.get("results", [])
+
+            if not results:
+                return {"unit_id": unit_id, "var_id": var_id, "values": []}
+
+            values = results[0].get("values", [])
+            
+            # Filtruj do ostatnich N lat
+            current_year = datetime.now().year
+            min_year = current_year - years_back
+            
+            filtered_values = [
+                {"year": int(v["year"]), "value": float(v["val"]) if v["val"] else None}
+                for v in values
+                if int(v["year"]) >= min_year
+            ]
+
+            return {
+                "unit_id": unit_id,
+                "unit_name": response.get("unitName", ""),
+                "var_id": var_id,
+                "values": filtered_values,
+                "fetched_at": datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to get gmina stats for {unit_id}, var {var_id}: {e}")
+            raise
+
+    async def get_comparative_stats(
+        self,
+        var_id: str,
+        year: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Pobierz dane porównawcze dla wszystkich gmin w powiecie
+
+        Args:
+            var_id: ID zmiennej GUS
+            year: Rok danych (domyślnie: ostatni dostępny)
+
+        Returns:
+            Dict z danymi dla wszystkich gmin
+        """
+        comparison = {
+            "var_id": var_id,
+            "year": year,
+            "gminy": {},
+            "fetched_at": datetime.utcnow().isoformat()
+        }
+
+        for gmina_name, unit_id in self.GMINY.items():
+            try:
+                endpoint = f"/data/by-unit/{unit_id}"
+                params = {"var-id": var_id}
+                if year:
+                    params["year"] = str(year)
+
+                response = await self._make_request(endpoint, params)
+                results = response.get("results", [])
+
+                if results:
+                    values = results[0].get("values", [])
+                    if values:
+                        # Weź ostatnią wartość
+                        latest = values[-1]
+                        comparison["gminy"][gmina_name] = {
+                            "value": float(latest["val"]) if latest["val"] else None,
+                            "year": int(latest["year"])
+                        }
+                        # Ustaw rok z pierwszej odpowiedzi
+                        if comparison["year"] is None:
+                            comparison["year"] = int(latest["year"])
+
+            except Exception as e:
+                self.logger.warning(f"Failed to get data for {gmina_name}: {e}")
+                comparison["gminy"][gmina_name] = {"value": None, "year": None}
+
+        return comparison
+
+    async def get_historical_trend(
+        self,
+        var_id: str,
+        years_back: int = 22
+    ) -> Dict[str, Any]:
+        """
+        Pobierz pełny trend historyczny dla Gminy Rybno
+
+        Args:
+            var_id: ID zmiennej GUS
+            years_back: Ile lat wstecz (domyślnie 22 - od 2002)
+
+        Returns:
+            Dict z danymi historycznymi
+        """
+        return await self.get_gmina_stats(self.UNIT_ID_RYBNO, var_id, years_back)
