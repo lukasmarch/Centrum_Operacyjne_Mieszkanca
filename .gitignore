@@ -45,6 +45,10 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-backend/notebooks/.ipynb_checkpoints/
+backend/notebooks/.ipynb_checkpoints
 stellar-oort
+temp_opady_widget
+
+# Logs (keep .gitkeep)
+backend/logs/*.log
 

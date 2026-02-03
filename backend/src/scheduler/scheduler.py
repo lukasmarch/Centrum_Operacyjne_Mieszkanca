@@ -5,6 +5,7 @@ Manages all periodic tasks
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
 import atexit
 
 from src.scheduler.weather_job import run_weather_job
@@ -22,10 +23,34 @@ logger = setup_logger("Scheduler")
 scheduler = BackgroundScheduler()
 
 
-def start_scheduler():
-    """Start all scheduled jobs"""
+def _job_executed_listener(event):
+    """Log successful job executions"""
+    logger.info(f"✓ Job '{event.job_id}' executed successfully")
 
-    # Weather update every 15 minutes
+
+def _job_error_listener(event):
+    """Log job errors with traceback"""
+    logger.error(f"✗ Job '{event.job_id}' raised exception: {event.exception}", exc_info=True)
+
+
+def _job_missed_listener(event):
+    """Log missed job executions"""
+    logger.warning(f"⚠ Job '{event.job_id}' missed its scheduled run time")
+
+
+def start_scheduler():
+    """
+    Start all scheduled jobs
+
+    DAILY PIPELINE (1x per day at 6:00 AM):
+    1. Article Scraping (6:00) - fetch new articles from sources
+    2. AI Processing (6:15) - categorize articles (processed=True)
+    3. Daily Summary (6:45) - generate summary for yesterday (requires processed articles)
+
+    This sequence ensures articles are scraped AND processed before summary generation.
+    """
+
+    # Weather update every hour
     scheduler.add_job(
         func=run_weather_job,
         trigger=IntervalTrigger(hours=1),
@@ -34,28 +59,31 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # Article scraping twice daily: 6:00 AM and 12:00 PM
+    # Article scraping once daily at 6:00 AM (STEP 1 of daily pipeline)
     scheduler.add_job(
         func=run_article_job,
-        trigger=CronTrigger(hour='6,12', minute=0),
+        trigger=CronTrigger(hour=6, minute=0),
         id='article_update',
         name='Update articles',
         replace_existing=True
     )
 
-    # AI processing every 1 hour
+    # AI processing once daily at 6:15 AM, right after scraping (STEP 2 of daily pipeline)
+    # Previously ran every hour (IntervalTrigger) which caused timing issues
     scheduler.add_job(
         func=run_ai_job,
-        trigger=IntervalTrigger(hours=1),
+        trigger=CronTrigger(hour=6, minute=15),
         id='ai_processing',
         name='AI article processing',
         replace_existing=True
     )
 
-    # Daily summary generation twice: 6:30 AM and 12:30 PM (after scraping)
+    # Daily summary generation once at 6:45 AM (STEP 3 of daily pipeline)
+    # Runs 30 minutes after AI processing to ensure articles are categorized
+    # Generates summary for YESTERDAY (full day of data)
     scheduler.add_job(
         func=run_summary_job,
-        trigger=CronTrigger(hour='6,12', minute=30),
+        trigger=CronTrigger(hour=6, minute=45),
         id='daily_summary',
         name='Generate daily summary',
         replace_existing=True
@@ -96,6 +124,11 @@ def start_scheduler():
         name='Send daily newsletter (Premium)',
         replace_existing=True
     )
+
+    # Add event listeners for job monitoring
+    scheduler.add_listener(_job_executed_listener, EVENT_JOB_EXECUTED)
+    scheduler.add_listener(_job_error_listener, EVENT_JOB_ERROR)
+    scheduler.add_listener(_job_missed_listener, EVENT_JOB_MISSED)
 
     logger.info("Scheduler started with jobs:")
     for job in scheduler.get_jobs():

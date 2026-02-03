@@ -25,7 +25,7 @@ async def run_daily_summary():
     4. Wygeneruj AI summary
     5. Zapisz do bazy
 
-    Uruchamiany przez scheduler codziennie o 6:00
+    Uruchamiany przez scheduler codziennie o 6:45 (po AI processing)
     """
     logger.info("="*60)
     logger.info("Starting daily summary generation...")
@@ -46,18 +46,33 @@ async def run_daily_summary():
             summary = await generator.generate_daily_summary(session)
 
             if summary:
-                logger.info(f"✓ Generated daily summary: {summary.headline}")
+                logger.info(f"✓ SUCCESS: Generated daily summary")
+                logger.info(f"  ID: {summary.id}")
+                logger.info(f"  Headline: {summary.headline}")
                 logger.info(f"  Date: {summary.date.date()}")
                 logger.info(f"  Generated at: {summary.generated_at}")
+                logger.info(f"  Articles count: {len(summary.headline.split())}")  # Approximate
             else:
-                logger.warning("No summary generated (may already exist or no data)")
+                logger.warning("⚠ SUMMARY IS NONE - Possible reasons:")
+                logger.warning("  1. Summary for this date already exists in database")
+                logger.warning("  2. No processed articles found for target date")
+                logger.warning("  3. Articles exist but are not categorized (processed=False)")
+                logger.warning("  → Check database: SELECT * FROM daily_summaries ORDER BY date DESC LIMIT 3")
+                logger.warning("  → Check articles: SELECT COUNT(*) FROM articles WHERE processed=True")
 
             logger.info("="*60)
-            logger.info("Daily summary job completed successfully")
+            logger.info("Daily summary job completed")
             logger.info("="*60)
+
+            return summary
 
         except Exception as e:
-            logger.error(f"✗ Daily summary job failed: {e}", exc_info=True)
+            logger.error("="*60)
+            logger.error(f"✗ CRITICAL ERROR in daily summary job")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: {str(e)}")
+            logger.error("="*60)
+            logger.error("Full traceback:", exc_info=True)
             raise
 
     await engine.dispose()

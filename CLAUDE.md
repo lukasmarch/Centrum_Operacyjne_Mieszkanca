@@ -9,8 +9,10 @@
 - FastAPI + PostgreSQL + Redis
 - 5 scraperów (HTML, RSS, Facebook/Apify)
 - AI pipeline (GPT-4o-mini kategoryzacja, GPT-4o podsumowania)
-- 10 źródeł danych, 174+ artykułów
-- APScheduler (6 jobów automatycznych)
+- 10 źródeł danych, 620+ artykułów (441 przetworzonych)
+- APScheduler (8 jobów, daily pipeline: 6:00→6:15→6:45)
+- File logging (`logs/scheduler.log`, rotacja 10MB)
+- Diagnostic tools (`scripts/diagnostics/`)
 - Autentykacja JWT
 - Newsletter (Resend)
 - Integracja GUS
@@ -59,8 +61,17 @@ backend/src/
 ├── api/          # FastAPI
 ├── auth/         # JWT auth
 ├── scrapers/     # 5 scraperów
-├── scheduler/    # 6 jobów
-└── newsletter/   # Email
+├── scheduler/    # 8 jobów (daily pipeline: 6:00→6:15→6:45)
+├── newsletter/   # Email
+└── utils/        # Logger (file + console)
+
+backend/scripts/
+├── diagnostics/  # check_scheduler_health.py, check_articles_for_summary.py
+├── production/   # regenerate_daily_summary.py, generate_daily_summary_test.py
+└── tests/        # test_full_pipeline.py
+
+backend/logs/
+└── scheduler.log # APScheduler logs (rotacja 10MB)
 
 frontend/
 ├── components/   # React components
@@ -69,6 +80,24 @@ frontend/
 │   ├── hooks/    # useArticles, useWeather
 │   └── pages/    # Login, Profile
 ```
+
+## Scheduler Timeline (Daily Pipeline)
+```
+6:00 AM → Article Scraping (scraping nowych artykułów)
+6:15 AM → AI Processing (kategoryzacja artykułów)
+6:45 AM → Daily Summary (generowanie podsumowania dla wczoraj)
+Co 1h   → Weather Update
+8:00 AM → Cinema Repertoire Update
+```
+
+## Ostatnio Ukończone (2026-02-02)
+✅ **Daily Summary Scheduler - Naprawa Timing Issue**
+- Problem: Summary nie generowało się (artykuły nieskategoryzowane)
+- Fix: Zmiana kolejności jobów (AI processing przed summary)
+- Nowy pipeline: 6:00 scraping → 6:15 AI → 6:45 summary (1x dziennie)
+- Dodano file logging (`logs/scheduler.log`)
+- Dodano diagnostic scripts (`scripts/diagnostics/`)
+- Branch: `develop`
 
 ## W trakcie (Current Work)
 **Branch:** `feature/frontent-witget-garbage`
@@ -97,4 +126,4 @@ feature/frontent-witget-garbage   # aktywna praca
 - `.git-rules.md` - zasady Git i workflow
 
 ---
-*Ostatnia aktualizacja: 2026-01-21*
+*Ostatnia aktualizacja: 2026-02-02*
