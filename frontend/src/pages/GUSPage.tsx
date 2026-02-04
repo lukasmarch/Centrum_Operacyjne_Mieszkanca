@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAuth } from '../context/AuthContext';
+import { getAccessToken } from '../services/authApi';
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 
@@ -70,8 +71,9 @@ const GUSPage: React.FC = () => {
         const loadVariables = async () => {
             try {
                 const headers: HeadersInit = {};
-                if (user?.token) {
-                    headers['Authorization'] = `Bearer ${user.token}`;
+                const token = getAccessToken();
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
                 }
 
                 const res = await fetch(`${API_BASE}/api/stats/variables/list`, { headers });
@@ -107,8 +109,9 @@ const GUSPage: React.FC = () => {
 
         try {
             const headers: HeadersInit = {};
-            if (user?.token) {
-                headers['Authorization'] = `Bearer ${user.token}`;
+            const token = getAccessToken();
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
             }
 
             // Try to get variable-specific data (new endpoint)
