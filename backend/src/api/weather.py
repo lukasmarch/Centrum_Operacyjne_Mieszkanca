@@ -112,6 +112,18 @@ async def get_air_quality_history(
     result = await session.execute(statement)
     return result.scalars().all()
 
+
+@router.post("/air-quality/update")
+async def update_air_quality_manual():
+    """Manually trigger air quality update from Airly API"""
+    from src.scheduler.air_quality_job import update_air_quality
+    
+    try:
+        await update_air_quality()
+        return {"message": "Air quality update triggered successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+
 # Legacy endpoint support (optional, can be removed if frontend strictly uses /current)
 @router.get("/{location}")
 async def get_weather_by_location(

@@ -112,6 +112,25 @@ async def get_premium_user(
     return current_user
 
 
+async def get_business_user(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """
+    Get current user and verify they have Business tier.
+
+    Use this dependency to protect business-only endpoints.
+
+    Raises:
+        HTTPException 403: If user doesn't have business access
+    """
+    if current_user.tier != UserTier.BUSINESS.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Business subscription required for this feature"
+        )
+    return current_user
+
+
 async def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     access_token: Optional[str] = Cookie(default=None),

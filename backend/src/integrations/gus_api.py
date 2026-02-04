@@ -48,6 +48,10 @@ class GUSDataService:
     VARS = {
         # ==================== DEMOGRAFIA ====================
         "population_total": "72305",          # Ludność ogółem (61,003 w 2024)
+        "population_male": "1645344",         # Ludność mężczyźni (tys.)
+        "population_female": "1645343",       # Ludność kobiety (tys.)
+        "population_density": "60559",        # Gęstość zaludnienia (os./km²)
+        "births_live": "59",                  # Urodzenia żywe
         "infant_mortality_rate": "60569",     # Zgony niemowląt na 1000 urodzeń żywych (4.9)
         "mortality_rate": "454134",           # Zgony ogółem na 1000 urodzeń żywych (156.3)
         "divorces": "1616553",                # Rozwody (109)
@@ -87,6 +91,11 @@ class GUSDataService:
         "entities_per_1k": "458173",              # Podmioty wpisane do rejestru na 1000 ludności
         "sme_per_10k": "1620132",                 # Podmioty MŚP (0-249 pracujących) na 10 tys. mieszkańców
         "large_entities_per_10k": "634131",       # Podmioty o liczbie pracujących >49 na 10 tys. mieszkańców
+        "natural_persons_business": "152710",     # Osoby fizyczne - działalność gospodarcza
+        "foreign_capital_companies": "1725014",   # Spółki z kapitałem zagranicznym/10k
+
+        # ==================== FINANSE ====================
+        "investment_expenditure": "76450",        # Wydatki inwestycyjne gmin (PLN)
     }
 
     def __init__(self, timeout: int = 30):
@@ -734,3 +743,91 @@ class GUSDataService:
             Dict z danymi historycznymi
         """
         return await self.get_gmina_stats(self.UNIT_ID_RYBNO, var_id, years_back)
+
+    async def get_single_variable(
+        self,
+        var_key: str,
+        year: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Pobierz pojedynczą zmienną dla Gminy Rybno (uniwersalna metoda)
+
+        Args:
+            var_key: Klucz zmiennej (np. "population_density", "unemployment_rate")
+            year: Rok danych (domyślnie: ostatni dostępny)
+
+        Returns:
+            Dict z danymi:
+            {
+                "var_key": str,              # Klucz zmiennej
+                "var_id": str,               # ID zmiennej GUS
+                "value": float | int | None, # Wartość
+                "year": int,                 # Rok danych
+                "unit_id": str,              # ID jednostki
+                "updated_at": str            # Kiedy pobrano (ISO)
+            }
+        """
+        var_id = self.VARS.get(var_key)
+        if not var_id:
+            raise ValueError(f"Unknown variable key: {var_key}")
+
+        try:
+            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
+            params = {"var-id": var_id}
+            if year:
+                params["year"] = str(year)
+
+            response = await self._make_request(endpoint, params)
+            results = response.get("results", [])
+
+            if not results:
+                return {
+                    "var_key": var_key,
+                    "var_id": var_id,
+                    "value": None,
+                    "year": year,
+                    "unit_id": self.UNIT_ID_RYBNO,
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+
+            values = results[0].get("values", [])
+            if not values:
+                return {
+                    "var_key": var_key,
+                    "var_id": var_id,
+                    "value": None,
+                    "year": year,
+                    "unit_id": self.UNIT_ID_RYBNO,
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+
+            latest = values[-1]
+            value_raw = latest.get("val")
+            year_val = latest.get("year")
+
+            # Konwersja wartości (int dla liczb całkowitych, float dla reszty)
+            value = None
+            if value_raw is not None:
+                try:
+                    # Jeśli wartość ma przecinek/kropkę - to float
+                    if "." in str(value_raw) or "," in str(value_raw):
+                        value = float(value_raw)
+                    else:
+                        value = int(value_raw)
+                except (ValueError, TypeError):
+                    value = float(value_raw)
+
+            self.logger.info(f"Variable {var_key} ({var_id}): {value} in {year_val}")
+
+            return {
+                "var_key": var_key,
+                "var_id": var_id,
+                "value": value,
+                "year": year_val,
+                "unit_id": self.UNIT_ID_RYBNO,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to get variable {var_key} ({var_id}): {e}")
+            raise

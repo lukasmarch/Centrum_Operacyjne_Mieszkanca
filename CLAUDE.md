@@ -51,6 +51,10 @@ docker-compose up -d
 - `GET /api/weather` - pogoda
 - `GET /api/summary/daily` - podsumowanie AI
 - `POST /api/auth/login` - logowanie
+- **GUS Stats (tier-based):**
+  - `GET /api/stats/variables/list` - zmienne dla tier
+  - `GET /api/stats/variable/{var_key}` - pojedyncza zmienna
+  - `GET /api/stats/multi-metric` - 2-5 zmiennych (Business)
 - Docs: http://localhost:8000/docs
 
 ## Struktura
@@ -90,14 +94,23 @@ Co 1h   → Weather Update
 8:00 AM → Cinema Repertoire Update
 ```
 
-## Ostatnio Ukończone (2026-02-02)
-✅ **Daily Summary Scheduler - Naprawa Timing Issue**
+## Ostatnio Ukończone (2026-02-04)
+✅ **Enhanced GUS Dashboard - Tier-based Access Control**
+- Rozszerzono z 6 do 36 zmiennych GUS
+- Tier system: Free (5) → Premium (21) → Business (36)
+- Nowe endpointy: `/api/stats/variables/list`, `/api/stats/variable/{var_key}`
+- Przebudowano GUSPage.tsx: kategorie (6), paywall, upsells
+- Dodano auth dependency: `get_business_user()`
+- Test: `backend/scripts/test_enhanced_gus.py`
+- Branch: `develop`
+- Docs: `ENHANCED_GUS_IMPLEMENTATION.md`
+
+✅ **Daily Summary Scheduler - Naprawa (2026-02-02)**
 - Problem: Summary nie generowało się (artykuły nieskategoryzowane)
 - Fix: Zmiana kolejności jobów (AI processing przed summary)
 - Nowy pipeline: 6:00 scraping → 6:15 AI → 6:45 summary (1x dziennie)
 - Dodano file logging (`logs/scheduler.log`)
 - Dodano diagnostic scripts (`scripts/diagnostics/`)
-- Branch: `develop`
 
 ## W trakcie (Current Work)
 **Branch:** `feature/frontent-witget-garbage`
@@ -126,4 +139,4 @@ feature/frontent-witget-garbage   # aktywna praca
 - `.git-rules.md` - zasady Git i workflow
 
 ---
-*Ostatnia aktualizacja: 2026-02-02*
+*Ostatnia aktualizacja: 2026-02-04*

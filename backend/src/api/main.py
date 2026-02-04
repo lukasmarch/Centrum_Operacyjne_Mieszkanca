@@ -19,6 +19,9 @@ from src.users.routes import router as users_router
 # Newsletter (Sprint 2)
 from src.newsletter.routes import router as newsletter_router
 
+# GUS Stats with tier-based access (Sprint 3)
+from src.api.endpoints.gus import router as gus_router
+
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
 
 # CORS for frontend
@@ -39,6 +42,9 @@ app.include_router(users_router)  # /api/users/*
 
 # Newsletter routes (Sprint 2)
 app.include_router(newsletter_router)  # /api/newsletter/*
+
+# GUS Stats routes (Sprint 3 - Enhanced GUS Dashboard)
+app.include_router(gus_router)  # /api/stats/*
 
 @app.on_event("startup")
 async def startup_event():

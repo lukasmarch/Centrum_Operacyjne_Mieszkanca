@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useAuth } from '../context/AuthContext';
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 
@@ -16,45 +17,118 @@ interface ComparisonData {
     gminy: Record<string, { value: number | null; year: number }>;
 }
 
-const VARIABLES = {
-    'entities_regon_per_10k': { id: '60530', name: 'Podmioty REGON na 10 tys. ludności', unit: '' },
-    'new_entities_per_10k': { id: '60529', name: 'Nowe firmy na 10 tys. ludności', unit: '' },
-    'deregistered_per_10k': { id: '60528', name: 'Wykreślone firmy na 10 tys. ludności', unit: '' },
-    'population_total': { id: '72305', name: 'Ludność ogółem', unit: 'os.' },
-    'births_live': { id: '59', name: 'Urodzenia żywe', unit: 'os.' },
-    'investment_expenditure': { id: '76450', name: 'Wydatki inwestycyjne gmin', unit: 'PLN' }
-};
+interface VariableMetadata {
+    name: string;
+    unit: string;
+    tier: 'free' | 'premium' | 'business';
+    category: string;
+    var_id: string;  // GUS API variable ID
+}
+
+interface VariablesResponse {
+    user_tier: string;
+    total_available: number;
+    variables: Record<string, VariableMetadata>;
+    by_category: Record<string, Array<{ key: string } & VariableMetadata>>;
+    tiers: Record<string, { count: number; price: string }>;
+}
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+const CATEGORY_ICONS: Record<string, string> = {
+    'demografia': '👥',
+    'rynek_pracy': '💼',
+    'przedsiebiorczosc': '🏢',
+    'transport': '🚗',
+    'infrastruktura': '🏗️',
+    'turystyka': '🏨'
+};
+
+const CATEGORY_NAMES: Record<string, string> = {
+    'demografia': 'Demografia',
+    'rynek_pracy': 'Rynek Pracy',
+    'przedsiebiorczosc': 'Przedsiębiorczość',
+    'transport': 'Transport',
+    'infrastruktura': 'Infrastruktura',
+    'turystyka': 'Turystyka'
+};
+
 const GUSPage: React.FC = () => {
+    const { user } = useAuth();
+    const [activeCategory, setActiveCategory] = useState<string>('przedsiebiorczosc');
     const [selectedVar, setSelectedVar] = useState('entities_regon_per_10k');
     const [trendData, setTrendData] = useState<TrendData | null>(null);
     const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
+    const [variablesData, setVariablesData] = useState<VariablesResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const userTier = user?.tier || 'free';
+
+    // Load available variables
+    useEffect(() => {
+        const loadVariables = async () => {
+            try {
+                const headers: HeadersInit = {};
+                if (user?.token) {
+                    headers['Authorization'] = `Bearer ${user.token}`;
+                }
+
+                const res = await fetch(`${API_BASE}/api/stats/variables/list`, { headers });
+                if (res.ok) {
+                    const data = await res.json();
+                    setVariablesData(data);
+                }
+            } catch (err) {
+                console.error('Failed to load variables:', err);
+            }
+        };
+
+        loadVariables();
+    }, [user]);
 
     const loadData = async (varKey: string) => {
         setLoading(true);
         setError(null);
-        const varId = VARIABLES[varKey as keyof typeof VARIABLES]?.id;
 
-        if (!varId) {
+        if (!variablesData?.variables[varKey]) {
             setError('Nieznana zmienna');
             setLoading(false);
             return;
         }
 
+        // Get var_id from metadata
+        const varId = variablesData.variables[varKey].var_id;
+        if (!varId) {
+            setError('Nieznana zmienna - brak var_id');
+            setLoading(false);
+            return;
+        }
+
         try {
-            // Fetch trend data for Rybno
-            const trendRes = await fetch(`${API_BASE}/api/stats/trend/${varId}?years_back=22`);
+            const headers: HeadersInit = {};
+            if (user?.token) {
+                headers['Authorization'] = `Bearer ${user.token}`;
+            }
+
+            // Try to get variable-specific data (new endpoint)
+            const varRes = await fetch(`${API_BASE}/api/stats/variable/${varKey}`, { headers });
+
+            if (varRes.status === 403) {
+                // User doesn't have access - show paywall
+                setError('premium_required');
+                setLoading(false);
+                return;
+            }
+
+            // Fallback to old endpoints for trend/comparison
+            const trendRes = await fetch(`${API_BASE}/api/stats/trend/${varId}?years_back=22`, { headers });
             if (trendRes.ok) {
                 const trend = await trendRes.json();
                 setTrendData(trend);
             }
 
-            // Fetch comparison data
-            const compRes = await fetch(`${API_BASE}/api/stats/comparison/${varId}`);
+            const compRes = await fetch(`${API_BASE}/api/stats/comparison/${varId}`, { headers });
             if (compRes.ok) {
                 const comp = await compRes.json();
                 setComparisonData(comp);
@@ -67,8 +141,10 @@ const GUSPage: React.FC = () => {
     };
 
     useEffect(() => {
-        loadData(selectedVar);
-    }, [selectedVar]);
+        if (variablesData) {
+            loadData(selectedVar);
+        }
+    }, [selectedVar, variablesData]);
 
     // Transform comparison data for bar chart
     const barChartData = comparisonData ? Object.entries(comparisonData.gminy).map(([name, data]: [string, { value: number | null; year: number }]) => ({
@@ -81,13 +157,19 @@ const GUSPage: React.FC = () => {
     const rybnoValue = comparisonData?.gminy['Rybno']?.value;
     const rybnoYear = comparisonData?.year;
 
+    // Get variables for current category
+    const categoryVariables = variablesData?.by_category?.[activeCategory] || [];
+
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header */}
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-slate-900">Dane GUS – Gmina Rybno</h2>
-                    <p className="text-slate-500">Statystyki z Banku Danych Lokalnych GUS. Aktualizowane raz w roku.</p>
+                    <p className="text-slate-500">
+                        Statystyki z Banku Danych Lokalnych GUS.
+                        {variablesData && ` Dostępnych: ${variablesData.total_available} wskaźników (${userTier})`}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2 bg-white p-2 px-4 rounded-2xl shadow-sm border border-slate-100">
                     <span className="text-2xl">📊</span>
@@ -98,24 +180,104 @@ const GUSPage: React.FC = () => {
                 </div>
             </header>
 
-            {/* Variable Selector */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                <h3 className="font-bold mb-4 text-slate-700">Wybierz wskaźnik</h3>
-                <div className="flex flex-wrap gap-2">
-                    {Object.entries(VARIABLES).map(([key, { name }]) => (
-                        <button
-                            key={key}
-                            onClick={() => setSelectedVar(key)}
-                            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${selectedVar === key
-                                ? 'bg-blue-600 text-white shadow-md'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            {/* Category Navigation */}
+            {variablesData && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <h3 className="font-bold mb-4 text-slate-700">Kategorie</h3>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                        {Object.keys(variablesData.by_category).map((category) => (
+                            <button
+                                key={category}
+                                onClick={() => {
+                                    setActiveCategory(category);
+                                    // Auto-select first variable in category
+                                    const firstVar = variablesData.by_category[category]?.[0]?.key;
+                                    if (firstVar) setSelectedVar(firstVar);
+                                }}
+                                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                                    activeCategory === category
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
-                        >
-                            {name}
-                        </button>
-                    ))}
+                            >
+                                {CATEGORY_ICONS[category]} {CATEGORY_NAMES[category] || category}
+                                <span className="ml-2 text-xs opacity-75">
+                                    ({variablesData.by_category[category].length})
+                                </span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* Variable Selector */}
+            {categoryVariables.length > 0 && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <h3 className="font-bold mb-4 text-slate-700">
+                        Wybierz wskaźnik – {CATEGORY_NAMES[activeCategory]}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {categoryVariables.map((variable) => (
+                            <button
+                                key={variable.key}
+                                onClick={() => setSelectedVar(variable.key)}
+                                className={`px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
+                                    selectedVar === variable.key
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                            >
+                                <div className="font-bold">{variable.name}</div>
+                                {variable.unit && (
+                                    <div className="text-xs opacity-75 mt-1">{variable.unit}</div>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Premium Upsell dla Free users */}
+            {userTier === 'free' && (
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-xl">
+                    <div className="flex items-start gap-4">
+                        <div className="text-4xl">🔓</div>
+                        <div className="flex-1">
+                            <h3 className="text-xl font-bold mb-2">Odblokuj 17+ wskaźników Premium</h3>
+                            <ul className="text-sm space-y-1 mb-4 opacity-90">
+                                <li>✓ Stopa bezrobocia i średnie wynagrodzenie</li>
+                                <li>✓ Analiza przedsiębiorczości (MŚP, duże firmy)</li>
+                                <li>✓ Transport i infrastruktura</li>
+                                <li>✓ Trendy historyczne 25 lat</li>
+                            </ul>
+                            <button className="bg-white text-blue-600 px-6 py-2 rounded-xl font-bold hover:shadow-lg transition-all">
+                                Przejdź na Premium (19 zł/mc) →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Business Upsell dla Premium users */}
+            {userTier === 'premium' && (
+                <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl">
+                    <div className="flex items-start gap-4">
+                        <div className="text-4xl">💎</div>
+                        <div className="flex-1">
+                            <h3 className="text-xl font-bold mb-2">Upgrade do Business</h3>
+                            <ul className="text-sm space-y-1 mb-4 opacity-90">
+                                <li>✓ Multi-metric comparison (2-5 wskaźników jednocześnie)</li>
+                                <li>✓ Eksport danych (Excel, CSV)</li>
+                                <li>✓ API access (1000 req/day)</li>
+                                <li>✓ Wszystkie 40+ wskaźników GUS</li>
+                            </ul>
+                            <button className="bg-white text-slate-900 px-6 py-2 rounded-xl font-bold hover:shadow-lg transition-all">
+                                Przejdź na Business (99 zł/mc) →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Loading / Error states */}
             {loading && (
@@ -125,7 +287,14 @@ const GUSPage: React.FC = () => {
                 </div>
             )}
 
-            {error && (
+            {error === 'premium_required' && (
+                <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200 text-amber-800">
+                    <p className="font-bold">🔒 Premium Feature</p>
+                    <p>Ten wskaźnik wymaga subskrypcji Premium lub Business.</p>
+                </div>
+            )}
+
+            {error && error !== 'premium_required' && (
                 <div className="bg-rose-50 rounded-2xl p-6 border border-rose-200 text-rose-700">
                     <p className="font-bold">⚠️ Błąd</p>
                     <p>{error}</p>
@@ -133,17 +302,17 @@ const GUSPage: React.FC = () => {
             )}
 
             {/* Main Stats Card */}
-            {!loading && !error && rybnoValue !== undefined && (
+            {!loading && !error && rybnoValue !== undefined && variablesData?.variables[selectedVar] && (
                 <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl p-8 text-white shadow-xl">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
                             <p className="text-emerald-100 text-sm font-medium uppercase tracking-wider">
-                                {VARIABLES[selectedVar as keyof typeof VARIABLES]?.name}
+                                {variablesData.variables[selectedVar].name}
                             </p>
                             <h3 className="text-5xl font-black mt-2">
                                 {rybnoValue?.toLocaleString('pl-PL')}
                                 <span className="text-2xl ml-2 font-normal text-emerald-100">
-                                    {VARIABLES[selectedVar as keyof typeof VARIABLES]?.unit}
+                                    {variablesData.variables[selectedVar].unit}
                                 </span>
                             </h3>
                             <p className="text-emerald-100 mt-2">Gmina Rybno, {rybnoYear}</p>
@@ -269,6 +438,36 @@ const GUSPage: React.FC = () => {
                                     ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Tier Info Footer */}
+            {variablesData && (
+                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                    <h3 className="font-bold mb-3 text-slate-700">📊 Plany subskrypcyjne</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className={`p-4 rounded-xl ${userTier === 'free' ? 'bg-white border-2 border-blue-500' : 'bg-white border border-slate-200'}`}>
+                            <div className="text-2xl mb-2">🆓</div>
+                            <div className="font-bold text-slate-900">Free</div>
+                            <div className="text-sm text-slate-500 mb-2">{variablesData.tiers.free.price}</div>
+                            <div className="text-2xl font-bold text-slate-900">{variablesData.tiers.free.count}</div>
+                            <div className="text-xs text-slate-500">wskaźników</div>
+                        </div>
+                        <div className={`p-4 rounded-xl ${userTier === 'premium' ? 'bg-white border-2 border-blue-500' : 'bg-white border border-slate-200'}`}>
+                            <div className="text-2xl mb-2">⭐</div>
+                            <div className="font-bold text-slate-900">Premium</div>
+                            <div className="text-sm text-slate-500 mb-2">{variablesData.tiers.premium.price}</div>
+                            <div className="text-2xl font-bold text-slate-900">{variablesData.tiers.premium.count}</div>
+                            <div className="text-xs text-slate-500">wskaźników</div>
+                        </div>
+                        <div className={`p-4 rounded-xl ${userTier === 'business' ? 'bg-white border-2 border-blue-500' : 'bg-white border border-slate-200'}`}>
+                            <div className="text-2xl mb-2">💎</div>
+                            <div className="font-bold text-slate-900">Business</div>
+                            <div className="text-sm text-slate-500 mb-2">{variablesData.tiers.business.price}</div>
+                            <div className="text-2xl font-bold text-slate-900">{variablesData.tiers.business.count}</div>
+                            <div className="text-xs text-slate-500">wskaźników + API</div>
+                        </div>
                     </div>
                 </div>
             )}

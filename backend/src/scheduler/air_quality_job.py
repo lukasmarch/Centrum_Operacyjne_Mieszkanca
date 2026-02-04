@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database.connection import engine
 from ..database.schema import AirQuality
 from ..integrations.airly import AirlyClient
+from ..config import settings
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ async def update_air_quality():
     """Fetches air quality data and saves to database."""
     logger.info("Starting AirQuality update job...")
     
-    api_key = os.getenv("AIRLY_API_KEY")
+    api_key = settings.AIRLY_API_KEY
     if not api_key or api_key == "your-airly-api-key-here":
         logger.warning("AIRLY_API_KEY not configured, skipping job.")
         return
