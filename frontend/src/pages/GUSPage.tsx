@@ -21,7 +21,8 @@ const VARIABLES = {
     'new_entities_per_10k': { id: '60529', name: 'Nowe firmy na 10 tys. ludności', unit: '' },
     'deregistered_per_10k': { id: '60528', name: 'Wykreślone firmy na 10 tys. ludności', unit: '' },
     'population_total': { id: '72305', name: 'Ludność ogółem', unit: 'os.' },
-    'unemployment_rate': { id: '60270', name: 'Stopa bezrobocia', unit: '%' },
+    'births_live': { id: '59', name: 'Urodzenia żywe', unit: 'os.' },
+    'investment_expenditure': { id: '76450', name: 'Wydatki inwestycyjne gmin', unit: 'PLN' }
 };
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];

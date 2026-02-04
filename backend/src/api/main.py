@@ -9,6 +9,8 @@ from src.integrations.weather import WeatherService
 from src.scheduler.scheduler import start_scheduler
 from datetime import datetime
 from src.api.endpoints import cinema
+from src.api.weather import router as weather_router
+
 
 # Auth & Users (Sprint 1)
 from src.auth.routes import router as auth_router
@@ -29,6 +31,7 @@ app.add_middleware(
 )
 
 app.include_router(cinema.router, prefix="/api/cinema", tags=["cinema"])
+app.include_router(weather_router)  # /api/weather/*
 
 # Auth & Users routes (Sprint 1)
 app.include_router(auth_router)  # /api/auth/*
@@ -117,45 +120,7 @@ async def get_articles(
 
     return articles
 
-@app.get("/api/weather")
-async def get_all_weather(session: AsyncSession = Depends(get_session)):
-    """Get current weather for all locations"""
-    result = await session.execute(
-        select(Weather)
-        .where(Weather.is_current == True)
-        .order_by(Weather.fetched_at.desc())
-    )
-    weather_data = result.scalars().all()
-    return {"weather": weather_data, "count": len(weather_data)}
 
-@app.get("/api/weather/{location}")
-async def get_weather_by_location(
-    location: str,
-    session: AsyncSession = Depends(get_session)
-):
-    """Get current weather for a specific location"""
-    weather_service = WeatherService()
-    weather = await weather_service.get_current_weather(session, location)
-
-    if not weather:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Weather data not found for location: {location}"
-        )
-
-    return weather
-
-@app.post("/api/weather/update")
-async def update_weather(session: AsyncSession = Depends(get_session)):
-    """Manually trigger weather update for all locations"""
-    weather_service = WeatherService()
-    results = await weather_service.update_all_locations(session)
-
-    return {
-        "message": "Weather updated successfully",
-        "locations_updated": len(results),
-        "data": results
-    }
 
 @app.get("/api/summary/daily")
 async def get_latest_daily_summary(session: AsyncSession = Depends(get_session)):
@@ -402,12 +367,14 @@ async def get_business_stats(
 # ==================== NOWE ENDPOINTY DLA GMINY RYBNO (Z CACHE W BAZIE) ====================
 
 # Słownik zmiennych GUS
+# Słownik zmiennych GUS
 GUS_VARIABLES = {
     "60530": {"name": "Podmioty REGON na 10 tys. ludności", "key": "entities_regon_per_10k", "category": "business"},
     "60529": {"name": "Nowe firmy na 10 tys. ludności", "key": "new_entities_per_10k", "category": "business"},
     "60528": {"name": "Wykreślone firmy na 10 tys. ludności", "key": "deregistered_per_10k", "category": "business"},
     "72305": {"name": "Ludność ogółem", "key": "population_total", "category": "demographics"},
-    "60270": {"name": "Stopa bezrobocia (%)", "key": "unemployment_rate", "category": "employment"},
+    "59":    {"name": "Urodzenia żywe", "key": "births_live", "category": "demographics"},
+    "76450": {"name": "Wydatki inwestycyjne gmin (zł)", "key": "investment_expenditure", "category": "finance"}
 }
 
 

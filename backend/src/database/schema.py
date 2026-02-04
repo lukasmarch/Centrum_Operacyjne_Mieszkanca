@@ -230,6 +230,28 @@ class Weather(SQLModel, table=True):
     fetched_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     is_current: bool = Field(default=True)  # flag for latest record
 
+class AirQuality(SQLModel, table=True):
+    """Jakość powietrza z Airly"""
+    __tablename__ = "air_quality"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    location: str = Field(max_length=100, index=True)  # "Rybno"
+    
+    # Indexes
+    pm25: float  # µg/m³
+    pm10: float  # µg/m³
+    caqi: float  # Airly CAQI index
+    caqi_level: str = Field(max_length=50) # VERY_LOW, LOW, etc.
+    
+    # Weather conditions from sensor
+    temperature: Optional[float] = None
+    humidity: Optional[float] = None
+    pressure: Optional[float] = None
+    
+    # Metadata
+    fetched_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    is_current: bool = Field(default=True)
+
 class DailySummary(SQLModel, table=True):
     """Dzienne podsumowania generowane przez AI"""
     __tablename__ = "daily_summaries"

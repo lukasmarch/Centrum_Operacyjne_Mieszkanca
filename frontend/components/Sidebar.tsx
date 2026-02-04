@@ -13,7 +13,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
     { id: 'dashboard', label: 'Panel Główny', icon: '🏠' },
     { id: 'news', label: 'Wiadomości', icon: '📰' },
     { id: 'events', label: 'Wydarzenia', icon: '📅' },
-    { id: 'weather', label: 'Pogoda i Jeziora', icon: '🌊' },
+    { id: 'weather', label: 'Pogoda i Powietrze', icon: '🌊' },
     { id: 'traffic', label: 'Ruch Drogowy', icon: '🚗' },
     { id: 'stats', label: 'Statystyki GUS', icon: '📊' },
     { id: 'premium', label: 'Strefa Premium', icon: '⭐' },
@@ -37,11 +37,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
           <button
             key={item.id}
             onClick={() => onSectionChange(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-              activeSection === item.id
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === item.id
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
+              }`}
           >
             <span className="text-xl">{item.icon}</span>
             <span className="font-medium">{item.label}</span>
@@ -56,11 +55,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
             {/* Profile button */}
             <button
               onClick={() => onSectionChange('profile')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                activeSection === 'profile'
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'profile'
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
+                }`}
             >
               <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center font-bold text-sm">
                 {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
@@ -87,22 +85,20 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
           <div className="space-y-2">
             <button
               onClick={() => onSectionChange('login')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                activeSection === 'login'
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'login'
                   ? 'bg-blue-600 text-white'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
+                }`}
             >
               <span className="text-xl">🔑</span>
               <span className="font-medium">Zaloguj się</span>
             </button>
             <button
               onClick={() => onSectionChange('register')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                activeSection === 'register'
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'register'
                   ? 'bg-blue-600 text-white'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
+                }`}
             >
               <span className="text-xl">✨</span>
               <span className="font-medium">Zarejestruj się</span>
@@ -115,8 +111,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
       <div className="mt-4 p-4 bg-slate-800/50 rounded-2xl border border-slate-700">
         <p className="text-xs text-slate-400 mb-2">Pobierz aplikację mobilną</p>
         <div className="flex gap-2">
-            <div className="w-full h-8 bg-slate-700 rounded flex items-center justify-center text-[10px]">App Store</div>
-            <div className="w-full h-8 bg-slate-700 rounded flex items-center justify-center text-[10px]">Google Play</div>
+          <div className="w-full h-8 bg-slate-700 rounded flex items-center justify-center text-[10px]">App Store</div>
+          <div className="w-full h-8 bg-slate-700 rounded flex items-center justify-center text-[10px]">Google Play</div>
         </div>
       </div>
     </aside>

@@ -10,6 +10,7 @@ import LoginPage from './src/pages/LoginPage';
 import RegisterPage from './src/pages/RegisterPage';
 import ProfilePage from './src/pages/ProfilePage';
 import GUSPage from './src/pages/GUSPage';
+import WeatherPage from './src/pages/WeatherPage';
 
 const AppContent: React.FC = () => {
     const [activeSection, setActiveSection] = useState<AppSection>('dashboard');
@@ -50,6 +51,8 @@ const AppContent: React.FC = () => {
                 return <NewsFeed />;
             case 'events':
                 return <EventsFeed />;
+            case 'weather':
+                return <WeatherPage />;
             case 'stats':
                 return <GUSPage />;
             case 'premium':
