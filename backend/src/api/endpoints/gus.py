@@ -313,3 +313,101 @@ async def get_categories(current_user: Optional[User] = Depends(get_optional_use
         "user_tier": user_tier,
         "categories": categories
     }
+
+
+@router.get("/trend/{var_id}")
+async def get_trend(
+    var_id: str,
+    years_back: int = 22,
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """
+    Get historical trend for a variable (Gmina Rybno)
+
+    Args:
+        var_id: GUS API variable ID (e.g., "60530")
+        years_back: Number of years to fetch (default: 22)
+
+    Returns:
+        Historical data with values per year
+
+    Note:
+        Access control is based on the variable being requested.
+        If user doesn't have access, returns 403.
+    """
+    # Find var_key from var_id
+    var_key = None
+    for key, vid in GUSDataService.VARS.items():
+        if vid == var_id:
+            var_key = key
+            break
+
+    if not var_key:
+        raise HTTPException(status_code=404, detail="Variable not found")
+
+    # Check access
+    if not check_variable_access(var_key, current_user):
+        metadata = VARIABLE_METADATA.get(var_key, {})
+        required_tier = metadata.get("tier", "premium")
+        raise HTTPException(
+            status_code=403,
+            detail=f"This variable requires {required_tier} subscription"
+        )
+
+    # Fetch trend data
+    service = GUSDataService()
+    try:
+        data = await service.get_historical_trend(var_id, years_back, var_key=var_key)
+        return data
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch trend data: {str(e)}")
+
+
+@router.get("/comparison/{var_id}")
+async def get_comparison(
+    var_id: str,
+    year: Optional[int] = None,
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """
+    Get comparative data for all gminy in powiat
+
+    Args:
+        var_id: GUS API variable ID (e.g., "60530")
+        year: Optional year (default: latest)
+
+    Returns:
+        Comparison data across all gminy in Powiat Działdowski
+
+    Note:
+        Access control is based on the variable being requested.
+        If user doesn't have access, returns 403.
+    """
+    # Find var_key from var_id
+    var_key = None
+    for key, vid in GUSDataService.VARS.items():
+        if vid == var_id:
+            var_key = key
+            break
+
+    if not var_key:
+        raise HTTPException(status_code=404, detail="Variable not found")
+
+    # Check access
+    if not check_variable_access(var_key, current_user):
+        metadata = VARIABLE_METADATA.get(var_key, {})
+        required_tier = metadata.get("tier", "premium")
+        raise HTTPException(
+            status_code=403,
+            detail=f"This variable requires {required_tier} subscription"
+        )
+
+    # Fetch comparison data
+    service = GUSDataService()
+    try:
+        data = await service.get_comparative_stats(var_id, year, var_key=var_key)
+        return data
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch comparison data: {str(e)}")

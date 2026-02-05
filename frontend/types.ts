@@ -44,7 +44,34 @@ export interface GUSStat {
   label: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'premium' | 'login' | 'register' | 'profile';
+export interface Business {
+  id: number;
+  ceidg_id: string;
+  nazwa: string;
+  nip: string;
+  regon?: string;
+  status: string;
+  wlasciciel_imie?: string;
+  wlasciciel_nazwisko?: string;
+  ulica?: string;
+  budynek?: string;
+  miasto: string;
+  kod_pocztowy: string;
+  gmina: string;
+  powiat: string;
+  ceidg_link?: string;
+  pkd_main?: string;
+  pkd_list?: Array<{ kod: string; nazwa: string }>;
+  branza?: string; // New mapped field
+  adres_korespondencyjny?: Record<string, any>;
+  spolki?: Array<Record<string, any>>;
+  obywatelstwa?: Array<Record<string, any>>;
+  email?: string;
+  www?: string;
+  telefon?: string;
+}
+
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'business' | 'premium' | 'login' | 'register' | 'profile';
 
 // New Traffic Widget Types
 export enum TrafficCondition {
@@ -214,3 +241,16 @@ export const AVAILABLE_LOCATIONS = [
 ] as const;
 
 export type AvailableLocation = typeof AVAILABLE_LOCATIONS[number];
+
+// Waste Widget Types
+export interface WasteEvent {
+  type: string;
+  originalDateString: string;
+  daysRemaining: number;
+}
+
+export interface WasteSchedule {
+  [town: string]: {
+    [wasteType: string]: string;
+  };
+}

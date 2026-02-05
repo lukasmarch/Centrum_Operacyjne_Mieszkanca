@@ -43,6 +43,15 @@ class GUSDataService:
         "Płośnica": "042815403052",
     }
 
+    # Zmienne dostępne TYLKO na poziomie powiatu (nie gminy)
+    # Transport i infrastruktura są agregowane na poziomie powiatu
+    POWIAT_LEVEL_VARS = [
+        "personal_cars", "vehicles_total", "vehicles_per_1000",
+        "buses", "trucks", "paved_roads_km", "improved_roads_km", "unpaved_roads_km",
+        "road_spending", "library_spending", "social_care_spending",
+        "accommodations_per_10000"
+    ]
+
     # Variable IDs - Zweryfikowane 2026-01-14 przez kompleksowy test API
     # Wszystkie zmienne poniżej mają dane dla Powiatu Działdowskiego (2024)
     VARS = {
@@ -105,6 +114,23 @@ class GUSDataService:
         """
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.logger = logger
+
+    def _get_unit_id_for_variable(self, var_key: str) -> str:
+        """
+        Określ właściwy unit_id dla zmiennej (gmina vs powiat).
+
+        Zmienne transportowe i infrastrukturalne są dostępne tylko na poziomie powiatu.
+        Pozostałe zmienne są dostępne na poziomie gminy.
+
+        Args:
+            var_key: Klucz zmiennej (np. "personal_cars", "population_total")
+
+        Returns:
+            Unit ID (gmina Rybno lub powiat Działdowski)
+        """
+        if var_key in self.POWIAT_LEVEL_VARS:
+            return self.UNIT_ID_POWIAT
+        return self.UNIT_ID_RYBNO
 
     async def _make_request(
         self,
@@ -369,6 +395,9 @@ class GUSDataService:
         """
         Pobierz statystyki transportowe dla Powiatu Działdowskiego
 
+        UWAGA: Dane transportowe są dostępne tylko na poziomie POWIATU,
+        nie dla pojedynczych gmin.
+
         Returns:
             Dict ze statystykami:
             {
@@ -409,7 +438,8 @@ class GUSDataService:
         }
 
         try:
-            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
+            # ZMIANA: Używamy POWIAT zamiast RYBNO dla danych transportowych
+            endpoint = f"/data/by-unit/{self.UNIT_ID_POWIAT}"
 
             for stat_name, var_id in vars_to_fetch.items():
                 params = {"var-id": var_id}
@@ -456,6 +486,9 @@ class GUSDataService:
         """
         Pobierz statystyki infrastruktury i finansów dla Powiatu Działdowskiego
 
+        UWAGA: Dane infrastrukturalne są dostępne tylko na poziomie POWIATU,
+        nie dla pojedynczych gmin.
+
         Returns:
             Dict ze statystykami:
             {
@@ -484,7 +517,8 @@ class GUSDataService:
         }
 
         try:
-            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
+            # ZMIANA: Używamy POWIAT zamiast RYBNO dla danych infrastrukturalnych
+            endpoint = f"/data/by-unit/{self.UNIT_ID_POWIAT}"
 
             for stat_name, var_id in vars_to_fetch.items():
                 params = {"var-id": var_id}
@@ -679,18 +713,31 @@ class GUSDataService:
     async def get_comparative_stats(
         self,
         var_id: str,
-        year: Optional[int] = None
+        year: Optional[int] = None,
+        var_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Pobierz dane porównawcze dla wszystkich gmin w powiecie
+        LUB dla powiatu (jeśli zmienna dostępna tylko na poziomie powiatu)
 
         Args:
             var_id: ID zmiennej GUS
             year: Rok danych (domyślnie: ostatni dostępny)
+            var_key: Klucz zmiennej (opcjonalnie, dla określenia poziomu)
 
         Returns:
-            Dict z danymi dla wszystkich gmin
+            Dict z danymi dla wszystkich gmin lub powiatu
         """
+        # Znajdź var_key jeśli nie podano
+        if not var_key:
+            for key, vid in self.VARS.items():
+                if vid == var_id:
+                    var_key = key
+                    break
+
+        # Sprawdź czy to zmienna powiatowa
+        is_powiat_level = var_key in self.POWIAT_LEVEL_VARS if var_key else False
+
         comparison = {
             "var_id": var_id,
             "year": year,
@@ -698,9 +745,10 @@ class GUSDataService:
             "fetched_at": datetime.utcnow().isoformat()
         }
 
-        for gmina_name, unit_id in self.GMINY.items():
+        if is_powiat_level:
+            # Dla zmiennych powiatowych - pobierz tylko dane powiatu
             try:
-                endpoint = f"/data/by-unit/{unit_id}"
+                endpoint = f"/data/by-unit/{self.UNIT_ID_POWIAT}"
                 params = {"var-id": var_id}
                 if year:
                     params["year"] = str(year)
@@ -711,38 +759,77 @@ class GUSDataService:
                 if results:
                     values = results[0].get("values", [])
                     if values:
-                        # Weź ostatnią wartość
                         latest = values[-1]
-                        comparison["gminy"][gmina_name] = {
+                        # Dla powiatu używamy nazwy "Rybno" żeby frontend działał
+                        comparison["gminy"]["Rybno"] = {
                             "value": float(latest["val"]) if latest["val"] else None,
                             "year": int(latest["year"])
                         }
-                        # Ustaw rok z pierwszej odpowiedzi
-                        if comparison["year"] is None:
-                            comparison["year"] = int(latest["year"])
-
+                        comparison["year"] = int(latest["year"])
             except Exception as e:
-                self.logger.warning(f"Failed to get data for {gmina_name}: {e}")
-                comparison["gminy"][gmina_name] = {"value": None, "year": None}
+                self.logger.warning(f"Failed to get powiat data: {e}")
+                comparison["gminy"]["Rybno"] = {"value": None, "year": None}
+        else:
+            # Dla zmiennych gminnych - pobierz dane wszystkich gmin
+            for gmina_name, unit_id in self.GMINY.items():
+                try:
+                    endpoint = f"/data/by-unit/{unit_id}"
+                    params = {"var-id": var_id}
+                    if year:
+                        params["year"] = str(year)
+
+                    response = await self._make_request(endpoint, params)
+                    results = response.get("results", [])
+
+                    if results:
+                        values = results[0].get("values", [])
+                        if values:
+                            # Weź ostatnią wartość
+                            latest = values[-1]
+                            comparison["gminy"][gmina_name] = {
+                                "value": float(latest["val"]) if latest["val"] else None,
+                                "year": int(latest["year"])
+                            }
+                            # Ustaw rok z pierwszej odpowiedzi
+                            if comparison["year"] is None:
+                                comparison["year"] = int(latest["year"])
+
+                except Exception as e:
+                    self.logger.warning(f"Failed to get data for {gmina_name}: {e}")
+                    comparison["gminy"][gmina_name] = {"value": None, "year": None}
 
         return comparison
 
     async def get_historical_trend(
         self,
         var_id: str,
-        years_back: int = 22
+        years_back: int = 22,
+        var_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Pobierz pełny trend historyczny dla Gminy Rybno
+        Pobierz pełny trend historyczny (gmina Rybno lub powiat Działdowski)
+
+        Automatycznie wybiera właściwy poziom w zależności od typu zmiennej.
 
         Args:
             var_id: ID zmiennej GUS
             years_back: Ile lat wstecz (domyślnie 22 - od 2002)
+            var_key: Klucz zmiennej (opcjonalnie, dla określenia poziomu)
 
         Returns:
             Dict z danymi historycznymi
         """
-        return await self.get_gmina_stats(self.UNIT_ID_RYBNO, var_id, years_back)
+        # Znajdź var_key jeśli nie podano
+        if not var_key:
+            for key, vid in self.VARS.items():
+                if vid == var_id:
+                    var_key = key
+                    break
+
+        # Określ właściwy unit_id
+        unit_id = self._get_unit_id_for_variable(var_key) if var_key else self.UNIT_ID_RYBNO
+
+        return await self.get_gmina_stats(unit_id, var_id, years_back)
 
     async def get_single_variable(
         self,
@@ -750,7 +837,10 @@ class GUSDataService:
         year: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Pobierz pojedynczą zmienną dla Gminy Rybno (uniwersalna metoda)
+        Pobierz pojedynczą zmienną (uniwersalna metoda)
+
+        Automatycznie wybiera właściwy poziom (gmina Rybno vs powiat Działdowski)
+        w zależności od typu zmiennej.
 
         Args:
             var_key: Klucz zmiennej (np. "population_density", "unemployment_rate")
@@ -771,8 +861,11 @@ class GUSDataService:
         if not var_id:
             raise ValueError(f"Unknown variable key: {var_key}")
 
+        # Określ właściwy unit_id (gmina vs powiat)
+        unit_id = self._get_unit_id_for_variable(var_key)
+
         try:
-            endpoint = f"/data/by-unit/{self.UNIT_ID_RYBNO}"
+            endpoint = f"/data/by-unit/{unit_id}"
             params = {"var-id": var_id}
             if year:
                 params["year"] = str(year)
@@ -786,7 +879,7 @@ class GUSDataService:
                     "var_id": var_id,
                     "value": None,
                     "year": year,
-                    "unit_id": self.UNIT_ID_RYBNO,
+                    "unit_id": unit_id,
                     "updated_at": datetime.utcnow().isoformat()
                 }
 
@@ -797,7 +890,7 @@ class GUSDataService:
                     "var_id": var_id,
                     "value": None,
                     "year": year,
-                    "unit_id": self.UNIT_ID_RYBNO,
+                    "unit_id": unit_id,
                     "updated_at": datetime.utcnow().isoformat()
                 }
 
@@ -817,14 +910,14 @@ class GUSDataService:
                 except (ValueError, TypeError):
                     value = float(value_raw)
 
-            self.logger.info(f"Variable {var_key} ({var_id}): {value} in {year_val}")
+            self.logger.info(f"Variable {var_key} ({var_id}): {value} in {year_val} [unit: {unit_id}]")
 
             return {
                 "var_key": var_key,
                 "var_id": var_id,
                 "value": value,
                 "year": year_val,
-                "unit_id": self.UNIT_ID_RYBNO,
+                "unit_id": unit_id,
                 "updated_at": datetime.utcnow().isoformat()
             }
 

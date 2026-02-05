@@ -22,6 +22,9 @@ from src.newsletter.routes import router as newsletter_router
 # GUS Stats with tier-based access (Sprint 3)
 from src.api.endpoints.gus import router as gus_router
 
+# Business / CEIDG directory (Sprint 3+)
+from src.api.endpoints.business import router as business_router
+
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
 
 # CORS for frontend
@@ -45,6 +48,9 @@ app.include_router(newsletter_router)  # /api/newsletter/*
 
 # GUS Stats routes (Sprint 3 - Enhanced GUS Dashboard)
 app.include_router(gus_router)  # /api/stats/*
+
+# Business / CEIDG directory routes
+app.include_router(business_router)  # /api/business/*
 
 @app.on_event("startup")
 async def startup_event():
@@ -451,101 +457,17 @@ async def sync_gus_data(session: AsyncSession = Depends(get_session)):
         raise HTTPException(500, f"Sync failed: {str(e)}")
 
 
-@app.get("/api/stats/trend/{var_id}")
-async def get_historical_trend(
-    var_id: str,
-    years_back: int = 10,
-    session: AsyncSession = Depends(get_session)
-):
-    """
-    Pobierz trend historyczny dla Gminy Rybno z bazy danych.
-    Dane cache'owane - brak wywołań do zewnętrznego API.
-    """
-    from src.database.schema import GUSGminaStats
-    from src.integrations.gus_api import GUSDataService
-    from sqlalchemy import func
+# NOTE: Endpointy /api/stats/trend i /api/stats/comparison przeniesione
+# do router /api/stats w src/api/endpoints/gus.py
+# Nowe endpointy pobierają dane bezpośrednio z API GUS (bez cache)
 
-    unit_id = GUSDataService.UNIT_ID_RYBNO
+# @app.get("/api/stats/trend/{var_id}")
+# async def get_historical_trend(...):
+#     """ZAKOMENTOWANE - użyj endpointu z gus.py router"""
 
-    # Znajdź dostępny zakres lat w cache
-    result = await session.execute(
-        select(func.max(GUSGminaStats.year))
-        .where(
-            GUSGminaStats.unit_id == unit_id,
-            GUSGminaStats.var_id == var_id
-        )
-    )
-    max_year = result.scalar()
-    
-    if not max_year:
-        raise HTTPException(404, f"Brak danych w cache dla Rybna, zmienna {var_id}. Uruchom POST /api/stats/sync-gus")
-
-    min_year = max_year - years_back
-
-    # Pobierz dane z cache
-    result = await session.execute(
-        select(GUSGminaStats)
-        .where(
-            GUSGminaStats.unit_id == unit_id,
-            GUSGminaStats.var_id == var_id,
-            GUSGminaStats.year >= min_year
-        )
-        .order_by(GUSGminaStats.year)
-    )
-    cached = result.scalars().all()
-
-    return {
-        "unit_id": unit_id,
-        "unit_name": "Rybno",
-        "var_id": var_id,
-        "source": "database",
-        "values": [{"year": r.year, "value": r.value} for r in cached]
-    }
-
-
-@app.get("/api/stats/comparison/{var_id}")
-async def get_comparative_stats(
-    var_id: str,
-    year: int = None,
-    session: AsyncSession = Depends(get_session)
-):
-    """
-    Pobierz dane porównawcze dla wszystkich gmin z bazy danych.
-    Używa najnowszego dostępnego roku w cache (nie bieżącego roku).
-    """
-    from src.database.schema import GUSGminaStats
-    from sqlalchemy import func
-
-    # Jeśli nie podano roku, znajdź najnowszy dostępny w cache
-    if not year:
-        result = await session.execute(
-            select(func.max(GUSGminaStats.year))
-            .where(GUSGminaStats.var_id == var_id)
-        )
-        year = result.scalar()
-        
-        if not year:
-            raise HTTPException(404, f"Brak danych w cache dla zmiennej {var_id}. Uruchom POST /api/stats/sync-gus")
-
-    # Pobierz dane z cache
-    result = await session.execute(
-        select(GUSGminaStats)
-        .where(
-            GUSGminaStats.var_id == var_id,
-            GUSGminaStats.year == year
-        )
-    )
-    cached = result.scalars().all()
-
-    if not cached:
-        raise HTTPException(404, f"Brak danych dla roku {year}. Uruchom POST /api/stats/sync-gus")
-
-    return {
-        "var_id": var_id,
-        "year": year,
-        "source": "database",
-        "gminy": {r.unit_name: {"value": r.value, "year": r.year} for r in cached}
-    }
+# @app.get("/api/stats/comparison/{var_id}")
+# async def get_comparative_stats(...):
+#     """ZAKOMENTOWANE - użyj endpointu z gus.py router"""
 
 
 @app.get("/api/stats/variables")

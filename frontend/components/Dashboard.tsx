@@ -3,6 +3,9 @@ import React, { useState } from 'react';
 import TrafficWidget from './TrafficWidget';
 import { CinemaWidget } from './CinemaWidget';
 import BusTrackerWidget from './BusTrackerWidget';
+import RegonSearchWidget from './RegonSearchWidget';
+import WasteWidget from './WasteWidget';
+import WasteWidgetPaywall from './WasteWidgetPaywall';
 import { MOCK_ARTICLES, MOCK_WEATHER, MOCK_TRAFFIC, MOCK_EVENTS } from '../constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -10,13 +13,17 @@ import { useWeather } from '../src/hooks/useWeather';
 import { useArticles } from '../src/hooks/useArticles';
 import { useDailySummary } from '../src/hooks/useDailySummary';
 import { useEvents } from '../src/hooks/useEvents';
+import { useWasteSchedule } from '../src/hooks/useWasteSchedule';
+import { useAuth } from '../src/context/AuthContext';
 import { AppSection } from '../types';
 
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ onNavigate }) => {
+  const { user, isPremium, userLocation } = useAuth();
   const { weather, loading: weatherLoading, error: weatherError } = useWeather();
   const { articles, loading: articlesLoading, error: articlesError } = useArticles(10); // Fetch more for diversity
   const { summary, loading: summaryLoading, error: summaryError, lastUpdated } = useDailySummary();
   const { events, loading: eventsLoading, error: eventsError } = useEvents(1);
+  const wasteEvents = useWasteSchedule(userLocation);
 
   const weatherData = weather || MOCK_WEATHER; // Fallback to mock
 
@@ -243,6 +250,11 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
 
         {/* Right Sidebar Widgets */}
         <div className="space-y-8">
+          {/* REGON Search Widget */}
+          <div className="h-[400px]">
+            <RegonSearchWidget />
+          </div>
+
           {/* Weather Widget */}
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-6">
@@ -285,6 +297,13 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
               </div>
             </div>
           </div>
+
+          {/* Waste Collection Widget - Premium & Business only */}
+          {isPremium ? (
+            <WasteWidget events={wasteEvents} town={userLocation} />
+          ) : user ? (
+            <WasteWidgetPaywall />
+          ) : null}
 
           {/* Traffic Widget */}
           <TrafficWidget />

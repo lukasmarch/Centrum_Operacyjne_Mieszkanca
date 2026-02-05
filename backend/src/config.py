@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     APIFY_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     AIRLY_API_KEY: Optional[str] = None
+    CEIDG_API_TOKEN: Optional[str] = None  # Token do API CEIDG v3
+    REGON_API_KEY: Optional[str] = "b220c4e85a1b4e1da8b8"  # Klucz do API REGON (GUS)
 
     SCRAPER_USER_AGENT: str = "Mozilla/5.0 (compatible; CentrumOperacyjneBot/1.0)"
     SCRAPER_TIMEOUT: int = 30

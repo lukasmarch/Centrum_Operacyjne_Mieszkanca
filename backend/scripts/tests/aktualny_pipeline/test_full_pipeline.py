@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-backend_path = Path(__file__).parent.parent.parent
+backend_path = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(backend_path))
 
 from src.scheduler.article_job import update_articles_job

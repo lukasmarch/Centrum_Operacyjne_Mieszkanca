@@ -16,6 +16,7 @@ from src.scheduler.gus_job import run_gus_job
 from src.scheduler.cinema_job import run_cinema_job
 from src.scheduler.newsletter_job import run_weekly_newsletter, run_daily_newsletter
 from src.scheduler.air_quality_job import update_air_quality
+from src.scheduler.ceidg_job import run_ceidg_job
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
@@ -114,6 +115,16 @@ def start_scheduler():
         trigger=CronTrigger(hour=8, minute=0),
         id='cinema_update',
         name='Update Cinema Repertoire',
+        replace_existing=True
+    )
+
+    # CEIDG Business sync - weekly on Sunday at 3:00 AM
+    # Data doesn't change often, weekly sync is sufficient
+    scheduler.add_job(
+        func=run_ceidg_job,
+        trigger=CronTrigger(day_of_week='sun', hour=3, minute=0),
+        id='ceidg_sync',
+        name='Sync CEIDG businesses',
         replace_existing=True
     )
 

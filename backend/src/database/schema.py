@@ -310,3 +310,84 @@ class GUSGminaStats(SQLModel, table=True):
     # Indeks dla szybkiego pobierania porównań
     category: str = Field(max_length=50, default="business", index=True)  # business, demographics, employment
 
+
+# ======================
+# CEIDG Business Tables
+# ======================
+
+class CEIDGBusiness(SQLModel, table=True):
+    """Firmy z rejestru CEIDG dla Gminy Rybno"""
+    __tablename__ = "ceidg_businesses"
+    __table_args__ = (
+        Index('idx_ceidg_nip', 'nip'),
+        Index('idx_ceidg_miasto', 'miasto'),
+        Index('idx_ceidg_gmina_powiat', 'gmina', 'powiat'),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    ceidg_id: str = Field(max_length=50, unique=True, index=True)  # UUID from CEIDG API
+    
+    # Business data
+    nazwa: str = Field(max_length=500)
+    nip: str = Field(max_length=20, index=True)
+    regon: Optional[str] = Field(default=None, max_length=20)
+    
+    # PKD codes
+    pkd_main: Optional[str] = Field(default=None, max_length=20, index=True)
+    pkd_list: Optional[List[dict]] = Field(default=None, sa_column=Column(JSONB))
+
+    status: str = Field(max_length=30, default="AKTYWNY")  # AKTYWNY, ZAWIESZONY, WYKRESLONY
+    data_rozpoczecia: Optional[datetime] = None
+    
+    # Owner
+    wlasciciel_imie: Optional[str] = Field(default=None, max_length=100)
+    wlasciciel_nazwisko: Optional[str] = Field(default=None, max_length=100)
+    
+    # Address (denormalized for quick queries)
+    ulica: Optional[str] = Field(default=None, max_length=200)
+    budynek: Optional[str] = Field(default=None, max_length=20)
+    lokal: Optional[str] = Field(default=None, max_length=20)
+    miasto: str = Field(max_length=100, index=True)
+    kod_pocztowy: str = Field(max_length=10)
+    gmina: str = Field(max_length=100)
+    powiat: str = Field(max_length=100)
+    wojewodztwo: Optional[str] = Field(default=None, max_length=100)
+    
+    # Full data as JSON for future extensibility
+    raw_data: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    
+    # External link
+    ceidg_link: Optional[str] = Field(default=None, max_length=500)
+    
+    # Detailed Data (fetched from /firma/{id})
+    adres_korespondencyjny: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    spolki: Optional[List[dict]] = Field(default=None, sa_column=Column(JSONB))
+    obywatelstwa: Optional[List[dict]] = Field(default=None, sa_column=Column(JSONB))
+    email: Optional[str] = Field(default=None, max_length=255)
+    www: Optional[str] = Field(default=None, max_length=500)
+    telefon: Optional[str] = Field(default=None, max_length=50)
+    
+    # Metadata
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CEIDGSyncStats(SQLModel, table=True):
+    """Statystyki synchronizacji CEIDG"""
+    __tablename__ = "ceidg_sync_stats"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    gmina: str = Field(max_length=100, unique=True, index=True)
+    powiat: str = Field(max_length=100)
+    
+    # Counts
+    total_count: int = Field(default=0)
+    active_count: int = Field(default=0)
+    
+    # Breakdown by locality (JSONB)
+    by_miejscowosc: dict = Field(default_factory=dict, sa_column=Column(JSONB))
+    
+    # Sync metadata
+    last_sync: datetime = Field(default_factory=datetime.utcnow)
+    sync_status: str = Field(max_length=20, default="success")  # success, failed, in_progress
+

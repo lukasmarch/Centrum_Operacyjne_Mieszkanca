@@ -16,6 +16,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
     { id: 'weather', label: 'Pogoda i Powietrze', icon: '🌊' },
     { id: 'traffic', label: 'Ruch Drogowy', icon: '🚗' },
     { id: 'stats', label: 'Statystyki GUS', icon: '📊' },
+    { id: 'business', label: 'Katalog Firm', icon: '🏢' },
     { id: 'premium', label: 'Strefa Premium', icon: '⭐' },
   ];
 
@@ -38,8 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
             key={item.id}
             onClick={() => onSectionChange(item.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === item.id
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
+              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
           >
             <span className="text-xl">{item.icon}</span>
@@ -56,8 +57,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
             <button
               onClick={() => onSectionChange('profile')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'profile'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
             >
               <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center font-bold text-sm">
@@ -86,8 +87,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
             <button
               onClick={() => onSectionChange('login')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'login'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
             >
               <span className="text-xl">🔑</span>
@@ -96,8 +97,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
             <button
               onClick={() => onSectionChange('register')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeSection === 'register'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
             >
               <span className="text-xl">✨</span>
