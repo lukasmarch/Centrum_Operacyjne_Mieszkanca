@@ -1,0 +1,11 @@
+{
+  "started_at": "2026-02-06T19:48:20.687018",
+  "total_variables": 88,
+  "successful_variables": 88,
+  "failed_variables": 0,
+  "total_api_calls": 792,
+  "gmina_records_inserted": 9123,
+  "national_records_inserted": 3942,
+  "errors": [],
+  "finished_at": "2026-02-06T19:57:25.696174"
+}
