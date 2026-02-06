@@ -100,12 +100,13 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # GUS statistics update daily at 6:00 AM
+    # GUS statistics update quarterly (Jan, Apr, Jul, Oct) at 4:00 AM
+    # Data publikowane raz na rok, quarterly refresh wystarczy
     scheduler.add_job(
         func=run_gus_job,
-        trigger=CronTrigger(hour=6, minute=0),
+        trigger=CronTrigger(month='1,4,7,10', day=1, hour=4, minute=0),
         id='gus_update',
-        name='Update GUS statistics',
+        name='Update GUS statistics (quarterly)',
         replace_existing=True
     )
     
