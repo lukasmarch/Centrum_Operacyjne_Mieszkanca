@@ -1,0 +1,1680 @@
+{
+  "verified_at": "2026-02-06T19:07:28.881746",
+  "total_variables": 88,
+  "successful": 88,
+  "failed": 0,
+  "variables": {
+    "population_total": {
+      "var_id": "72305",
+      "name_pl": "Ludność ogółem",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "free",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "population_male": {
+      "var_id": "1645344",
+      "name_pl": "Ludność mężczyźni",
+      "unit": "tys.",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "population_female": {
+      "var_id": "1645343",
+      "name_pl": "Ludność kobiety",
+      "unit": "tys.",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "population_density": {
+      "var_id": "60559",
+      "name_pl": "Gęstość zaludnienia",
+      "unit": "os./km²",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "births_live": {
+      "var_id": "59",
+      "name_pl": "Urodzenia żywe",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "free",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "deaths_total": {
+      "var_id": "65",
+      "name_pl": "Zgony ogółem",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "deaths_male": {
+      "var_id": "66",
+      "name_pl": "Zgony mężczyźni",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "deaths_female": {
+      "var_id": "67",
+      "name_pl": "Zgony kobiety",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "infant_deaths": {
+      "var_id": "62",
+      "name_pl": "Zgony niemowląt",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "infant_mortality_rate": {
+      "var_id": "60569",
+      "name_pl": "Zgony niemowląt na 1000 urodzeń",
+      "unit": "",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "mortality_rate": {
+      "var_id": "454134",
+      "name_pl": "Zgony ogółem na 1000 urodzeń żywych",
+      "unit": "",
+      "category": "demografia",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "divorces": {
+      "var_id": "1616553",
+      "name_pl": "Rozwody",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "internal_migration_in": {
+      "var_id": "269607",
+      "name_pl": "Migracje wewnętrzne - napływ (rok)",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "internal_migration_out": {
+      "var_id": "269593",
+      "name_pl": "Migracje wewnętrzne - odpływ (rok)",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "migration_balance_total": {
+      "var_id": "1365234",
+      "name_pl": "Saldo migracji ogółem",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "migration_balance_internal": {
+      "var_id": "80125",
+      "name_pl": "Saldo migracji wewnętrznych",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "migration_balance_foreign": {
+      "var_id": "80108",
+      "name_pl": "Saldo migracji zagranicznych",
+      "unit": "os.",
+      "category": "demografia",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "migration_balance_per_1k": {
+      "var_id": "1365239",
+      "name_pl": "Saldo migracji ogółem na 1000 ludności",
+      "unit": "",
+      "category": "demografia",
+      "tier": "free",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "migration_internal_per_1k": {
+      "var_id": "498816",
+      "name_pl": "Saldo migracji wewnętrznych na 1000 ludności",
+      "unit": "",
+      "category": "demografia",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "migration_foreign_per_1k": {
+      "var_id": "745534",
+      "name_pl": "Saldo migracji zagranicznych na 1000 ludności",
+      "unit": "",
+      "category": "demografia",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "unemployment_rate": {
+      "var_id": "60270",
+      "name_pl": "Stopa bezrobocia rejestrowanego",
+      "unit": "%",
+      "category": "rynek_pracy",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "avg_salary": {
+      "var_id": "64428",
+      "name_pl": "Przeciętne wynagrodzenie brutto",
+      "unit": "PLN",
+      "category": "rynek_pracy",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "registered_unemployed": {
+      "var_id": "106027",
+      "name_pl": "Bezrobotni zarejestrowani",
+      "unit": "os.",
+      "category": "rynek_pracy",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "unemployed_total": {
+      "var_id": "459121",
+      "name_pl": "Bezrobocie ogółem",
+      "unit": "os.",
+      "category": "rynek_pracy",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "employed_per_1000": {
+      "var_id": "454132",
+      "name_pl": "Pracujący na 1000 ludności",
+      "unit": "",
+      "category": "rynek_pracy",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "employed_per_1000_working_age": {
+      "var_id": "1620621",
+      "name_pl": "Pracujący na 1000 ludności w wieku produkcyjnym",
+      "unit": "",
+      "category": "rynek_pracy",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "entities_regon_per_10k": {
+      "var_id": "60530",
+      "name_pl": "Podmioty REGON na 10 tys. ludności",
+      "unit": "",
+      "category": "przedsiebiorczosc",
+      "tier": "free",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "new_entities_per_10k": {
+      "var_id": "60529",
+      "name_pl": "Nowo zarejestrowane na 10 tys. ludności",
+      "unit": "",
+      "category": "przedsiebiorczosc",
+      "tier": "free",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "deregistered_per_10k": {
+      "var_id": "60528",
+      "name_pl": "Wykreślone z REGON na 10 tys. ludności",
+      "unit": "",
+      "category": "przedsiebiorczosc",
+      "tier": "free",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "micro_enterprises_share": {
+      "var_id": "1548709",
+      "name_pl": "Udział mikroprzedsiębiorstw (do 9 osób)",
+      "unit": "%",
+      "category": "przedsiebiorczosc",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "deregistered_share": {
+      "var_id": "471845",
+      "name_pl": "Udział podmiotów wyrejestrowanych",
+      "unit": "%",
+      "category": "przedsiebiorczosc",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "new_to_deregistered_ratio": {
+      "var_id": "1645253",
+      "name_pl": "Stosunek nowych do wyrejestrowanych",
+      "unit": "%",
+      "category": "przedsiebiorczosc",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "entities_per_1k": {
+      "var_id": "458173",
+      "name_pl": "Podmioty na 1000 ludności",
+      "unit": "",
+      "category": "przedsiebiorczosc",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "sme_per_10k": {
+      "var_id": "1620132",
+      "name_pl": "MŚP (0-249 pracujących) na 10 tys.",
+      "unit": "",
+      "category": "przedsiebiorczosc",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "large_entities_per_10k": {
+      "var_id": "634131",
+      "name_pl": "Podmioty >49 osób na 10 tys.",
+      "unit": "",
+      "category": "przedsiebiorczosc",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "natural_persons_business": {
+      "var_id": "152710",
+      "name_pl": "Osoby fizyczne - działalność gospodarcza",
+      "unit": "os.",
+      "category": "przedsiebiorczosc",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "foreign_capital_companies": {
+      "var_id": "1725014",
+      "name_pl": "Spółki z kapitałem zagranicznym/10k",
+      "unit": "",
+      "category": "przedsiebiorczosc",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "personal_cars": {
+      "var_id": "32561",
+      "name_pl": "Samochody osobowe",
+      "unit": "szt.",
+      "category": "transport",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "vehicles_total": {
+      "var_id": "10505",
+      "name_pl": "Pojazdy samochodowe i ciągniki",
+      "unit": "szt.",
+      "category": "transport",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "vehicles_per_1000": {
+      "var_id": "454131",
+      "name_pl": "Pojazdy na 1000 ludności",
+      "unit": "",
+      "category": "transport",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "buses": {
+      "var_id": "32555",
+      "name_pl": "Autobusy ogółem",
+      "unit": "szt.",
+      "category": "transport",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "trucks": {
+      "var_id": "32556",
+      "name_pl": "Samochody ciężarowe",
+      "unit": "szt.",
+      "category": "transport",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "paved_roads_km": {
+      "var_id": "7723",
+      "name_pl": "Drogi o nawierzchni twardej",
+      "unit": "km",
+      "category": "transport",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "improved_roads_km": {
+      "var_id": "7724",
+      "name_pl": "Drogi o nawierzchni twardej ulepszonej",
+      "unit": "km",
+      "category": "transport",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "unpaved_roads_km": {
+      "var_id": "7725",
+      "name_pl": "Drogi gruntowe",
+      "unit": "km",
+      "category": "transport",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "revenue_total": {
+      "var_id": "76037",
+      "name_pl": "Dochody ogółem",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "revenue_per_capita": {
+      "var_id": "76973",
+      "name_pl": "Dochody ogółem per capita",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "free",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "own_revenue": {
+      "var_id": "76070",
+      "name_pl": "Dochody własne razem",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "own_revenue_per_capita": {
+      "var_id": "76976",
+      "name_pl": "Dochody własne per capita",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "pit_per_capita": {
+      "var_id": "149128",
+      "name_pl": "PIT per capita",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "property_tax": {
+      "var_id": "76077",
+      "name_pl": "Podatek od nieruchomości",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "subsidy_total": {
+      "var_id": "77005",
+      "name_pl": "Subwencja ogólna razem",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "subsidy_education": {
+      "var_id": "77002",
+      "name_pl": "Subwencja oświatowa",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "expenditure_total": {
+      "var_id": "1548644",
+      "name_pl": "Wydatki ogółem",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "expenditure_per_capita": {
+      "var_id": "76964",
+      "name_pl": "Wydatki ogółem per capita",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "free",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "education_spending_per_capita": {
+      "var_id": "76967",
+      "name_pl": "Wydatki na oświatę per capita",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "culture_spending_per_capita": {
+      "var_id": "76970",
+      "name_pl": "Wydatki na kulturę per capita",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "business",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "investment_expenditure": {
+      "var_id": "76450",
+      "name_pl": "Wydatki inwestycyjne gmin",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "investment_per_capita": {
+      "var_id": "1725023",
+      "name_pl": "Wydatki inwestycyjne per capita",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "road_spending": {
+      "var_id": "395094",
+      "name_pl": "Wydatki na drogi powiatowe",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "library_spending": {
+      "var_id": "8536",
+      "name_pl": "Wydatki na biblioteki",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "social_care_spending": {
+      "var_id": "395146",
+      "name_pl": "Wydatki na domy pomocy",
+      "unit": "PLN",
+      "category": "finanse_gminy",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "water_supply_population": {
+      "var_id": "9152",
+      "name_pl": "Ludność korzystająca z sieci wodociągowej",
+      "unit": "os.",
+      "category": "mieszkalnictwo",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "water_network_km": {
+      "var_id": "1612162",
+      "name_pl": "Długość sieci wodociągowej",
+      "unit": "km",
+      "category": "mieszkalnictwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "housing_municipal_area": {
+      "var_id": "389",
+      "name_pl": "Zasoby gminne - pow. użytkowa",
+      "unit": "m²",
+      "category": "mieszkalnictwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "housing_private_area": {
+      "var_id": "63993",
+      "name_pl": "Zasoby osób fizycznych - pow. użytkowa",
+      "unit": "m²",
+      "category": "mieszkalnictwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "dwellings_per_1000": {
+      "var_id": "148156",
+      "name_pl": "Mieszkania oddane na 1000 ludności",
+      "unit": "",
+      "category": "mieszkalnictwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "dwellings_per_10000": {
+      "var_id": "148158",
+      "name_pl": "Mieszkania oddane na 10 tys. ludności",
+      "unit": "",
+      "category": "mieszkalnictwo",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "primary_schools": {
+      "var_id": "838",
+      "name_pl": "Szkoły podstawowe",
+      "unit": "szt.",
+      "category": "edukacja",
+      "tier": "premium",
+      "level": "gmina",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "students_primary": {
+      "var_id": "862",
+      "name_pl": "Uczniowie szkół podstawowych",
+      "unit": "os.",
+      "category": "edukacja",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "preschools": {
+      "var_id": "804",
+      "name_pl": "Przedszkola",
+      "unit": "szt.",
+      "category": "edukacja",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "preschool_children": {
+      "var_id": "1617142",
+      "name_pl": "Dzieci objęte wychowaniem przedszkolnym",
+      "unit": "os.",
+      "category": "edukacja",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "nursery_children": {
+      "var_id": "410640",
+      "name_pl": "Dzieci w żłobkach",
+      "unit": "os.",
+      "category": "edukacja",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "crimes_total_per_1k": {
+      "var_id": "398594",
+      "name_pl": "Przestępstwa ogółem na 1000 mieszkańców",
+      "unit": "",
+      "category": "bezpieczenstwo",
+      "tier": "free",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "crimes_criminal_per_1k": {
+      "var_id": "498627",
+      "name_pl": "Przestępstwa kryminalne na 1000 mieszkańców",
+      "unit": "",
+      "category": "bezpieczenstwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "crimes_economic_per_1k": {
+      "var_id": "498626",
+      "name_pl": "Przestępstwa gospodarcze na 1000 mieszkańców",
+      "unit": "",
+      "category": "bezpieczenstwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "crimes_road_per_1k": {
+      "var_id": "498625",
+      "name_pl": "Przestępstwa drogowe na 1000 mieszkańców",
+      "unit": "",
+      "category": "bezpieczenstwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "crimes_property_per_1k": {
+      "var_id": "498623",
+      "name_pl": "Przestępstwa przeciwko mieniu na 1000",
+      "unit": "",
+      "category": "bezpieczenstwo",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "crimes_family_per_1k": {
+      "var_id": "498621",
+      "name_pl": "Przestępstwa przeciwko rodzinie na 1000",
+      "unit": "",
+      "category": "bezpieczenstwo",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "road_accidents_per_100k": {
+      "var_id": "471916",
+      "name_pl": "Wypadki drogowe na 100 tys. ludności",
+      "unit": "",
+      "category": "bezpieczenstwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "road_accidents_yearly": {
+      "var_id": "1605997",
+      "name_pl": "Wypadki drogowe (rok)",
+      "unit": "szt.",
+      "category": "bezpieczenstwo",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "pharmacies": {
+      "var_id": "194884",
+      "name_pl": "Apteki",
+      "unit": "szt.",
+      "category": "zdrowie",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "medical_consultations": {
+      "var_id": "1616687",
+      "name_pl": "Porady lekarskie ogółem",
+      "unit": "szt.",
+      "category": "zdrowie",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "accommodations_per_10000": {
+      "var_id": "1539594",
+      "name_pl": "Noclegi na 10000 ludności",
+      "unit": "",
+      "category": "turystyka",
+      "tier": "business",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "tourist_objects_per_10k": {
+      "var_id": "1539658",
+      "name_pl": "Obiekty noclegowe na 10 tys. ludności",
+      "unit": "",
+      "category": "turystyka",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "tourist_objects_non_hotel": {
+      "var_id": "1539718",
+      "name_pl": "Obiekty noclegowe (bez hotelowych)",
+      "unit": "szt.",
+      "category": "turystyka",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "overnight_stays_per_10k": {
+      "var_id": "1539596",
+      "name_pl": "Noclegi udzielone turystom na 10 tys.",
+      "unit": "",
+      "category": "turystyka",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    },
+    "tourists_per_1000": {
+      "var_id": "60297",
+      "name_pl": "Turyści korzystający z noclegów na 1000",
+      "unit": "",
+      "category": "turystyka",
+      "tier": "premium",
+      "level": "powiat",
+      "verification": {
+        "status": "success",
+        "years": [],
+        "year_range": "N/A",
+        "units_count": 100,
+        "has_rybno": false,
+        "has_powiat": false,
+        "latest_value": null,
+        "latest_year": null,
+        "total_records": 100
+      }
+    }
+  }
+}
