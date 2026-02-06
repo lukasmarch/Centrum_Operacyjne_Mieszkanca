@@ -1,0 +1,3879 @@
+{
+  "demografia": {
+    "4238": {
+      "id": "4238",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "ogółem",
+      "subject_id": "P1385",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=4238"
+    },
+    "4239": {
+      "id": "4239",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "mężczyźni",
+      "subject_id": "P1385",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=4239"
+    },
+    "4240": {
+      "id": "4240",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "kobiety",
+      "subject_id": "P1385",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=4240"
+    },
+    "479086": {
+      "id": "479086",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "ogółem",
+      "subject_id": "P2347",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=479086"
+    },
+    "479092": {
+      "id": "479092",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "mężczyźni",
+      "subject_id": "P2347",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=479092"
+    },
+    "479098": {
+      "id": "479098",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "kobiety",
+      "subject_id": "P2347",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=479098"
+    },
+    "478345": {
+      "id": "478345",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "ogółem",
+      "subject_id": "P2348",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478345"
+    },
+    "478333": {
+      "id": "478333",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "miasta",
+      "subject_id": "P2348",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478333"
+    },
+    "478339": {
+      "id": "478339",
+      "name": "ludność ogółem w wieku 15 lat i więcej (stan na 31 grudnia)",
+      "unit": "wieś",
+      "subject_id": "P2348",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478339"
+    },
+    "478388": {
+      "id": "478388",
+      "name": "ludność ogółem wg BAEL",
+      "unit": "15-29",
+      "subject_id": "P2349",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478388"
+    },
+    "478364": {
+      "id": "478364",
+      "name": "ludność ogółem wg BAEL",
+      "unit": "15-29",
+      "subject_id": "P2349",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478364"
+    },
+    "478370": {
+      "id": "478370",
+      "name": "ludność ogółem wg BAEL",
+      "unit": "30-39",
+      "subject_id": "P2349",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478370"
+    },
+    "478346": {
+      "id": "478346",
+      "name": "ludność ogółem wg BAEL",
+      "unit": "30-39",
+      "subject_id": "P2349",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478346"
+    },
+    "478376": {
+      "id": "478376",
+      "name": "ludność ogółem wg BAEL",
+      "unit": "40-49",
+      "subject_id": "P2349",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478376"
+    },
+    "478352": {
+      "id": "478352",
+      "name": "ludność ogółem wg BAEL",
+      "unit": "40-49",
+      "subject_id": "P2349",
+      "search_term": "ludność ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=478352"
+    },
+    "458238": {
+      "id": "458238",
+      "name": "gęstość zaludnienia powierzchni zabudowanej i zurbanizowanej (osoby/km2)",
+      "unit": "",
+      "subject_id": "P2425",
+      "search_term": "gęstość zaludnienia",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=458238"
+    },
+    "59": {
+      "id": "59",
+      "name": "Urodzenia żywe",
+      "unit": "ogółem",
+      "subject_id": "P1873",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59"
+    },
+    "60": {
+      "id": "60",
+      "name": "Urodzenia żywe",
+      "unit": "mężczyźni",
+      "subject_id": "P1873",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60"
+    },
+    "61": {
+      "id": "61",
+      "name": "Urodzenia żywe",
+      "unit": "kobiety",
+      "subject_id": "P1873",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=61"
+    },
+    "63216": {
+      "id": "63216",
+      "name": "1 kwartał",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63216"
+    },
+    "63240": {
+      "id": "63240",
+      "name": "1 kwartał",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63240"
+    },
+    "63217": {
+      "id": "63217",
+      "name": "2 kwartał",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63217"
+    },
+    "63241": {
+      "id": "63241",
+      "name": "2 kwartał",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63241"
+    },
+    "63220": {
+      "id": "63220",
+      "name": "pierwsze półrocze",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63220"
+    },
+    "63244": {
+      "id": "63244",
+      "name": "pierwsze półrocze",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63244"
+    },
+    "63218": {
+      "id": "63218",
+      "name": "3 kwartał",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63218"
+    },
+    "63242": {
+      "id": "63242",
+      "name": "3 kwartał",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63242"
+    },
+    "65787": {
+      "id": "65787",
+      "name": "1-3 kwartały",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=65787"
+    },
+    "65791": {
+      "id": "65791",
+      "name": "1-3 kwartały",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=65791"
+    },
+    "63219": {
+      "id": "63219",
+      "name": "4 kwartał",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63219"
+    },
+    "63243": {
+      "id": "63243",
+      "name": "4 kwartał",
+      "unit": "urodzenia żywe",
+      "subject_id": "P2458",
+      "search_term": "urodzenia żywe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63243"
+    },
+    "68": {
+      "id": "68",
+      "name": "Przyrost naturalny",
+      "unit": "ogółem",
+      "subject_id": "P1873",
+      "search_term": "przyrost naturalny",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=68"
+    },
+    "69": {
+      "id": "69",
+      "name": "Przyrost naturalny",
+      "unit": "mężczyźni",
+      "subject_id": "P1873",
+      "search_term": "przyrost naturalny",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=69"
+    },
+    "70": {
+      "id": "70",
+      "name": "Przyrost naturalny",
+      "unit": "kobiety",
+      "subject_id": "P1873",
+      "search_term": "przyrost naturalny",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=70"
+    },
+    "63204": {
+      "id": "63204",
+      "name": "1 kwartał",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63204"
+    },
+    "63228": {
+      "id": "63228",
+      "name": "1 kwartał",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=63228"
+    },
+    "63205": {
+      "id": "63205",
+      "name": "2 kwartał",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false
+    },
+    "63229": {
+      "id": "63229",
+      "name": "2 kwartał",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false
+    },
+    "63208": {
+      "id": "63208",
+      "name": "pierwsze półrocze",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": -6,
+      "years_count": 10,
+      "first_year": "2016"
+    },
+    "63232": {
+      "id": "63232",
+      "name": "pierwsze półrocze",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": -1.8,
+      "years_count": 10,
+      "first_year": "2016"
+    },
+    "63206": {
+      "id": "63206",
+      "name": "3 kwartał",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false
+    },
+    "63230": {
+      "id": "63230",
+      "name": "3 kwartał",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false
+    },
+    "65785": {
+      "id": "65785",
+      "name": "1-3 kwartały",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false
+    },
+    "65789": {
+      "id": "65789",
+      "name": "1-3 kwartały",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false
+    },
+    "63207": {
+      "id": "63207",
+      "name": "4 kwartał",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false
+    },
+    "63231": {
+      "id": "63231",
+      "name": "4 kwartał",
+      "unit": "przyrost naturalny",
+      "subject_id": "P2458",
+      "search_term": "przyrost naturalny",
+      "has_data": false
+    },
+    "1616128": {
+      "id": "1616128",
+      "name": "ogółem",
+      "unit": "małżeństwa bez dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616129": {
+      "id": "1616129",
+      "name": "ogółem",
+      "unit": "małżeństwa z 1 dzieckiem",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616130": {
+      "id": "1616130",
+      "name": "ogółem",
+      "unit": "małżeństwa z 2 dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616131": {
+      "id": "1616131",
+      "name": "ogółem",
+      "unit": "małżeństwa z 3 dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616132": {
+      "id": "1616132",
+      "name": "ogółem",
+      "unit": "małżeństwa z 4 dzieci i więcej",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616134": {
+      "id": "1616134",
+      "name": "miasta",
+      "unit": "małżeństwa bez dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616135": {
+      "id": "1616135",
+      "name": "miasta",
+      "unit": "małżeństwa z 1 dzieckiem",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616136": {
+      "id": "1616136",
+      "name": "miasta",
+      "unit": "małżeństwa z 2 dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616137": {
+      "id": "1616137",
+      "name": "miasta",
+      "unit": "małżeństwa z 3 dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616138": {
+      "id": "1616138",
+      "name": "miasta",
+      "unit": "małżeństwa z 4 dzieci i więcej",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616140": {
+      "id": "1616140",
+      "name": "wieś",
+      "unit": "małżeństwa bez dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616141": {
+      "id": "1616141",
+      "name": "wieś",
+      "unit": "małżeństwa z 1 dzieckiem",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616142": {
+      "id": "1616142",
+      "name": "wieś",
+      "unit": "małżeństwa z 2 dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616143": {
+      "id": "1616143",
+      "name": "wieś",
+      "unit": "małżeństwa z 3 dzieci",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "1616144": {
+      "id": "1616144",
+      "name": "wieś",
+      "unit": "małżeństwa z 4 dzieci i więcej",
+      "subject_id": "P1347",
+      "search_term": "małżeństwa",
+      "has_data": false
+    },
+    "65": {
+      "id": "65",
+      "name": "Zgony ogółem",
+      "unit": "ogółem",
+      "subject_id": "P1873",
+      "search_term": "zgony",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 70,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "66": {
+      "id": "66",
+      "name": "Zgony ogółem",
+      "unit": "mężczyźni",
+      "subject_id": "P1873",
+      "search_term": "zgony",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 39,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "67": {
+      "id": "67",
+      "name": "Zgony ogółem",
+      "unit": "kobiety",
+      "subject_id": "P1873",
+      "search_term": "zgony",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 31,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "62": {
+      "id": "62",
+      "name": "Zgony niemowląt",
+      "unit": "ogółem",
+      "subject_id": "P1873",
+      "search_term": "zgony",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 0,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "63": {
+      "id": "63",
+      "name": "Zgony niemowląt",
+      "unit": "mężczyźni",
+      "subject_id": "P1873",
+      "search_term": "zgony",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 0,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "64": {
+      "id": "64",
+      "name": "Zgony niemowląt",
+      "unit": "kobiety",
+      "subject_id": "P1873",
+      "search_term": "zgony",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 0,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "60569": {
+      "id": "60569",
+      "name": "zgony niemowląt na 1000 urodzeń żywych",
+      "unit": "",
+      "subject_id": "P2428",
+      "search_term": "zgony",
+      "has_data": false
+    },
+    "395395": {
+      "id": "395395",
+      "name": "zgony osób w wieku do 65 lat na 1000 ludności w tej grupie wiekowej",
+      "unit": "",
+      "subject_id": "P2428",
+      "search_term": "zgony",
+      "has_data": false
+    },
+    "454134": {
+      "id": "454134",
+      "name": "zgony ogółem na 1000 urodzeń żywych",
+      "unit": "",
+      "subject_id": "P2428",
+      "search_term": "zgony",
+      "has_data": false
+    },
+    "63210": {
+      "id": "63210",
+      "name": "1 kwartał",
+      "unit": "zgony",
+      "subject_id": "P2458",
+      "search_term": "zgony",
+      "has_data": false
+    },
+    "63234": {
+      "id": "63234",
+      "name": "1 kwartał",
+      "unit": "zgony",
+      "subject_id": "P2458",
+      "search_term": "zgony",
+      "has_data": false
+    },
+    "63211": {
+      "id": "63211",
+      "name": "2 kwartał",
+      "unit": "zgony",
+      "subject_id": "P2458",
+      "search_term": "zgony",
+      "has_data": false
+    },
+    "63235": {
+      "id": "63235",
+      "name": "2 kwartał",
+      "unit": "zgony",
+      "subject_id": "P2458",
+      "search_term": "zgony",
+      "has_data": false
+    },
+    "63214": {
+      "id": "63214",
+      "name": "pierwsze półrocze",
+      "unit": "zgony",
+      "subject_id": "P2458",
+      "search_term": "zgony",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": 31,
+      "years_count": 10,
+      "first_year": "2016"
+    },
+    "63238": {
+      "id": "63238",
+      "name": "pierwsze półrocze",
+      "unit": "zgony",
+      "subject_id": "P2458",
+      "search_term": "zgony",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": 9.29,
+      "years_count": 10,
+      "first_year": "2016"
+    },
+    "269602": {
+      "id": "269602",
+      "name": "1 kwartał",
+      "unit": "migracje wewnętrzne na pobyt stały - napływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269588": {
+      "id": "269588",
+      "name": "1 kwartał",
+      "unit": "migracje wewnętrzne na pobyt stały - odpływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269603": {
+      "id": "269603",
+      "name": "2 kwartał",
+      "unit": "migracje wewnętrzne na pobyt stały - napływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269589": {
+      "id": "269589",
+      "name": "2 kwartał",
+      "unit": "migracje wewnętrzne na pobyt stały - odpływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269606": {
+      "id": "269606",
+      "name": "pierwsze półrocze",
+      "unit": "migracje wewnętrzne na pobyt stały - napływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": 34,
+      "years_count": 10,
+      "first_year": "2016"
+    },
+    "269592": {
+      "id": "269592",
+      "name": "pierwsze półrocze",
+      "unit": "migracje wewnętrzne na pobyt stały - odpływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": 46,
+      "years_count": 10,
+      "first_year": "2016"
+    },
+    "269604": {
+      "id": "269604",
+      "name": "3 kwartał",
+      "unit": "migracje wewnętrzne na pobyt stały - napływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269590": {
+      "id": "269590",
+      "name": "3 kwartał",
+      "unit": "migracje wewnętrzne na pobyt stały - odpływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269608": {
+      "id": "269608",
+      "name": "1-3 kwartały",
+      "unit": "migracje wewnętrzne na pobyt stały - napływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269594": {
+      "id": "269594",
+      "name": "1-3 kwartały",
+      "unit": "migracje wewnętrzne na pobyt stały - odpływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269605": {
+      "id": "269605",
+      "name": "4 kwartał",
+      "unit": "migracje wewnętrzne na pobyt stały - napływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269591": {
+      "id": "269591",
+      "name": "4 kwartał",
+      "unit": "migracje wewnętrzne na pobyt stały - odpływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": false
+    },
+    "269607": {
+      "id": "269607",
+      "name": "rok",
+      "unit": "migracje wewnętrzne na pobyt stały - napływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 42,
+      "years_count": 9,
+      "first_year": "2016"
+    },
+    "269593": {
+      "id": "269593",
+      "name": "rok",
+      "unit": "migracje wewnętrzne na pobyt stały - odpływ",
+      "subject_id": "P3000",
+      "search_term": "migracje wewnętrzne",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 87,
+      "years_count": 9,
+      "first_year": "2016"
+    },
+    "1365234": {
+      "id": "1365234",
+      "name": "saldo migracji ogółem",
+      "unit": "ogółem",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": -42,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "1365235": {
+      "id": "1365235",
+      "name": "saldo migracji ogółem",
+      "unit": "mężczyźni",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": -18,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "1365236": {
+      "id": "1365236",
+      "name": "saldo migracji ogółem",
+      "unit": "kobiety",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": -24,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "80125": {
+      "id": "80125",
+      "name": "saldo migracji wewnętrznych",
+      "unit": "ogółem",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": -45,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "80119": {
+      "id": "80119",
+      "name": "saldo migracji wewnętrznych",
+      "unit": "mężczyźni",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": -20,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "80113": {
+      "id": "80113",
+      "name": "saldo migracji wewnętrznych",
+      "unit": "kobiety",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": -25,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "80108": {
+      "id": "80108",
+      "name": "saldo migracji zagranicznych",
+      "unit": "ogółem",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 3,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "80120": {
+      "id": "80120",
+      "name": "saldo migracji zagranicznych",
+      "unit": "mężczyźni",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 2,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "80114": {
+      "id": "80114",
+      "name": "saldo migracji zagranicznych",
+      "unit": "kobiety",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 1,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "1365239": {
+      "id": "1365239",
+      "name": "saldo migracji ogółem na 1000 ludności",
+      "unit": "ogółem",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": -6.28,
+      "years_count": 22,
+      "first_year": "2003"
+    },
+    "498816": {
+      "id": "498816",
+      "name": "saldo migracji wewnętrznych na 1000 ludności",
+      "unit": "ogółem",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": -6.7,
+      "years_count": 30,
+      "first_year": "1995"
+    },
+    "745534": {
+      "id": "745534",
+      "name": "saldo migracji zagranicznych na 1000 ludności",
+      "unit": "ogółem",
+      "subject_id": "P1350",
+      "search_term": "saldo migracji",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 0.45,
+      "years_count": 22,
+      "first_year": "2003"
+    },
+    "72195": {
+      "id": "72195",
+      "name": "saldo migracji",
+      "unit": "ogółem",
+      "subject_id": "P1351",
+      "search_term": "saldo migracji",
+      "has_data": false
+    },
+    "72194": {
+      "id": "72194",
+      "name": "saldo migracji",
+      "unit": "poniżej 20",
+      "subject_id": "P1351",
+      "search_term": "saldo migracji",
+      "has_data": false
+    },
+    "72193": {
+      "id": "72193",
+      "name": "saldo migracji",
+      "unit": "20-29",
+      "subject_id": "P1351",
+      "search_term": "saldo migracji",
+      "has_data": false
+    }
+  },
+  "rynek_pracy": {
+    "77553": {
+      "id": "77553",
+      "name": "1 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77469": {
+      "id": "77469",
+      "name": "1 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77581": {
+      "id": "77581",
+      "name": "1 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77497": {
+      "id": "77497",
+      "name": "1 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77609": {
+      "id": "77609",
+      "name": "1 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77525": {
+      "id": "77525",
+      "name": "1 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77554": {
+      "id": "77554",
+      "name": "2 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77470": {
+      "id": "77470",
+      "name": "2 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77582": {
+      "id": "77582",
+      "name": "2 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77498": {
+      "id": "77498",
+      "name": "2 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77610": {
+      "id": "77610",
+      "name": "2 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77526": {
+      "id": "77526",
+      "name": "2 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77555": {
+      "id": "77555",
+      "name": "3 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77471": {
+      "id": "77471",
+      "name": "3 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "77583": {
+      "id": "77583",
+      "name": "3 kwartał",
+      "unit": "stopa bezrobocia",
+      "subject_id": "P2567",
+      "search_term": "stopa bezrobocia",
+      "has_data": false
+    },
+    "217828": {
+      "id": "217828",
+      "name": "styczeń",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217829": {
+      "id": "217829",
+      "name": "luty",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217830": {
+      "id": "217830",
+      "name": "marzec",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217831": {
+      "id": "217831",
+      "name": "kwiecień",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217832": {
+      "id": "217832",
+      "name": "maj",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217833": {
+      "id": "217833",
+      "name": "czerwiec",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217834": {
+      "id": "217834",
+      "name": "lipiec",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217835": {
+      "id": "217835",
+      "name": "sierpień",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217836": {
+      "id": "217836",
+      "name": "wrzesień",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217837": {
+      "id": "217837",
+      "name": "październik",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217838": {
+      "id": "217838",
+      "name": "listopad",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "217839": {
+      "id": "217839",
+      "name": "grudzień",
+      "unit": "bezrobotni zarejestrowani na 1 ofertę pracy",
+      "subject_id": "P2965",
+      "search_term": "bezrobotni zarejestrowani",
+      "has_data": false
+    },
+    "1633004": {
+      "id": "1633004",
+      "name": "pracujący",
+      "unit": "pracujący ogółem",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false
+    },
+    "1633040": {
+      "id": "1633040",
+      "name": "pracujący",
+      "unit": "pracujący ogółem",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false
+    },
+    "1633006": {
+      "id": "1633006",
+      "name": "pracujący",
+      "unit": "pracujący ogółem",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false
+    },
+    "1633007": {
+      "id": "1633007",
+      "name": "pracujący",
+      "unit": "pracujący ogółem",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false
+    },
+    "1633008": {
+      "id": "1633008",
+      "name": "pracujący",
+      "unit": "pracujący ogółem",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1633008"
+    },
+    "1633009": {
+      "id": "1633009",
+      "name": "pracujący",
+      "unit": "pracujący ogółem",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1633009"
+    },
+    "1633010": {
+      "id": "1633010",
+      "name": "pracujący",
+      "unit": "pracujący ogółem na 1000 mieszkańców",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1633010"
+    },
+    "1633041": {
+      "id": "1633041",
+      "name": "pracujący",
+      "unit": "pracujący ogółem na 1000 mieszkańców",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1633041"
+    },
+    "1633012": {
+      "id": "1633012",
+      "name": "pracujący",
+      "unit": "pracujący ogółem na 1000 mieszkańców",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1633012"
+    },
+    "1633013": {
+      "id": "1633013",
+      "name": "pracujący",
+      "unit": "pracujący ogółem na 1000 mieszkańców",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1633013"
+    },
+    "1633014": {
+      "id": "1633014",
+      "name": "pracujący",
+      "unit": "pracujący ogółem na 1000 mieszkańców",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1633014"
+    },
+    "1633015": {
+      "id": "1633015",
+      "name": "pracujący",
+      "unit": "pracujący ogółem na 1000 mieszkańców",
+      "subject_id": "P2893",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1633015"
+    },
+    "454185": {
+      "id": "454185",
+      "name": "lekarze (personel pracujący ogółem)",
+      "unit": "",
+      "subject_id": "P3173",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=454185"
+    },
+    "1725609": {
+      "id": "1725609",
+      "name": "pracujący ogółem w działalności podstawowej w bibliotekach publicznych na 10 000 ludności",
+      "unit": "sektor publiczny ogółem",
+      "subject_id": "P4418",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1725609"
+    },
+    "1725610": {
+      "id": "1725610",
+      "name": "pracujący ogółem w działalności podstawowej w bibliotekach publicznych na 10 000 ludności",
+      "unit": "samorząd powiatowy",
+      "subject_id": "P4418",
+      "search_term": "pracujący ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1725610"
+    },
+    "454132": {
+      "id": "454132",
+      "name": "pracujący na 1000 ludności ogółem",
+      "unit": "",
+      "subject_id": "P3469",
+      "search_term": "pracujący na 1000",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=454132"
+    },
+    "1620621": {
+      "id": "1620621",
+      "name": "pracujący na 1000 ludności w wieku produkcyjnym",
+      "unit": "",
+      "subject_id": "P3469",
+      "search_term": "pracujący na 1000",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1620621"
+    }
+  },
+  "mieszkalnictwo": {
+    "56111": {
+      "id": "56111",
+      "name": "mieszkania ogółem",
+      "unit": "mieszkania",
+      "subject_id": "P2191",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56111"
+    },
+    "56855": {
+      "id": "56855",
+      "name": "mieszkania ogółem",
+      "unit": "1 izba",
+      "subject_id": "P2191",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56855"
+    },
+    "56856": {
+      "id": "56856",
+      "name": "mieszkania ogółem",
+      "unit": "2 izby",
+      "subject_id": "P2191",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56856"
+    },
+    "56853": {
+      "id": "56853",
+      "name": "mieszkania ogółem",
+      "unit": "3 izby",
+      "subject_id": "P2191",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56853"
+    },
+    "56114": {
+      "id": "56114",
+      "name": "mieszkania ogółem",
+      "unit": "4 izby",
+      "subject_id": "P2191",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56114"
+    },
+    "56118": {
+      "id": "56118",
+      "name": "mieszkania ogółem",
+      "unit": "5 izb i więcej",
+      "subject_id": "P2191",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56118"
+    },
+    "56107": {
+      "id": "56107",
+      "name": "mieszkania ogółem",
+      "unit": "izby",
+      "subject_id": "P2191",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56107"
+    },
+    "56027": {
+      "id": "56027",
+      "name": "mieszkania ogółem",
+      "unit": "ogółem",
+      "subject_id": "P2194",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56027"
+    },
+    "55698": {
+      "id": "55698",
+      "name": "mieszkania ogółem",
+      "unit": "poniżej 30 m2",
+      "subject_id": "P2194",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=55698"
+    },
+    "55706": {
+      "id": "55706",
+      "name": "mieszkania ogółem",
+      "unit": "30 - 39 m2",
+      "subject_id": "P2194",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=55706"
+    },
+    "55703": {
+      "id": "55703",
+      "name": "mieszkania ogółem",
+      "unit": "40 - 49 m2",
+      "subject_id": "P2194",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=55703"
+    },
+    "55705": {
+      "id": "55705",
+      "name": "mieszkania ogółem",
+      "unit": "50 - 59 m2",
+      "subject_id": "P2194",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=55705"
+    },
+    "55710": {
+      "id": "55710",
+      "name": "mieszkania ogółem",
+      "unit": "60 - 79 m2",
+      "subject_id": "P2194",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=55710"
+    },
+    "55707": {
+      "id": "55707",
+      "name": "mieszkania ogółem",
+      "unit": "80 - 99 m2",
+      "subject_id": "P2194",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=55707"
+    },
+    "55697": {
+      "id": "55697",
+      "name": "mieszkania ogółem",
+      "unit": "100 - 119 m2",
+      "subject_id": "P2194",
+      "search_term": "mieszkania ogółem",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=55697"
+    },
+    "148156": {
+      "id": "148156",
+      "name": "mieszkania oddane do użytkowania na 1000 ludności",
+      "unit": "",
+      "subject_id": "P2407",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=148156"
+    },
+    "148157": {
+      "id": "148157",
+      "name": "mieszkania oddane do użytkowania na 1000 zawartych małżeństw",
+      "unit": "",
+      "subject_id": "P2407",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=148157"
+    },
+    "148158": {
+      "id": "148158",
+      "name": "mieszkania oddane do użytkowania na 10 tys. ludności",
+      "unit": "",
+      "subject_id": "P2407",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=148158"
+    },
+    "217306": {
+      "id": "217306",
+      "name": "styczeń",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217306"
+    },
+    "217353": {
+      "id": "217353",
+      "name": "styczeń",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217353"
+    },
+    "217402": {
+      "id": "217402",
+      "name": "styczeń",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217402"
+    },
+    "217450": {
+      "id": "217450",
+      "name": "styczeń",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217450"
+    },
+    "217498": {
+      "id": "217498",
+      "name": "styczeń",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217498"
+    },
+    "217545": {
+      "id": "217545",
+      "name": "styczeń",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217545"
+    },
+    "217257": {
+      "id": "217257",
+      "name": "styczeń",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217257"
+    },
+    "217307": {
+      "id": "217307",
+      "name": "styczeń-luty",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217307"
+    },
+    "217354": {
+      "id": "217354",
+      "name": "styczeń-luty",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217354"
+    },
+    "217403": {
+      "id": "217403",
+      "name": "styczeń-luty",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217403"
+    },
+    "217451": {
+      "id": "217451",
+      "name": "styczeń-luty",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217451"
+    },
+    "217499": {
+      "id": "217499",
+      "name": "styczeń-luty",
+      "unit": "mieszkania oddane do użytkowania",
+      "subject_id": "P2956",
+      "search_term": "mieszkania oddane",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=217499"
+    },
+    "5070": {
+      "id": "5070",
+      "name": "zimna woda z miejskiej sieci wodociągowej - za 1m3",
+      "unit": "",
+      "subject_id": "P1469",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=5070"
+    },
+    "1612162": {
+      "id": "1612162",
+      "name": "długość eksploatowanej sieci wodociągowej (rozdzielczej i przesyłowej)",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1612162"
+    },
+    "475705": {
+      "id": "475705",
+      "name": "awarie sieci wodociągowej",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=475705"
+    },
+    "493": {
+      "id": "493",
+      "name": "mieszkania w budynkach mieszkalnych nowo dołączonych do sieci wodociągowej",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=493"
+    },
+    "492": {
+      "id": "492",
+      "name": "ludność korzystająca z sieci wodociągowej w miastach",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=492"
+    },
+    "9152": {
+      "id": "9152",
+      "name": "ludność korzystająca z sieci wodociągowej",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=9152"
+    },
+    "1621929": {
+      "id": "1621929",
+      "name": "dobowa zdolność produkcyjna czynnych urządzeń całego wodociągu",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1621929"
+    },
+    "1621931": {
+      "id": "1621931",
+      "name": "dobowa produkcja wody w relacji do dobowej zdolności produkcyjnej czynnych urządzeń całego wodociągu",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1621931"
+    },
+    "1621932": {
+      "id": "1621932",
+      "name": "liczba awarii sieci wodociągowej na 1 km sieci wodociągowej",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1621932"
+    },
+    "1641698": {
+      "id": "1641698",
+      "name": "ludność korzystająca z sieci wodociągowej na wsi",
+      "unit": "",
+      "subject_id": "P1600",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1641698"
+    },
+    "2114": {
+      "id": "2114",
+      "name": "eksploatacja sieci wodociągowej",
+      "unit": "",
+      "subject_id": "P1669",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2114"
+    },
+    "10086": {
+      "id": "10086",
+      "name": "eksploatacja sieci wodociągowej - gospodarstwa domowe",
+      "unit": "",
+      "subject_id": "P1669",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10086"
+    },
+    "2063": {
+      "id": "2063",
+      "name": "zakup wody z wodociągów komunalnych na cele produkcyjne",
+      "unit": "",
+      "subject_id": "P1703",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2063"
+    },
+    "60834": {
+      "id": "60834",
+      "name": "ogółem",
+      "unit": "wodociąg",
+      "subject_id": "P1732",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60834"
+    },
+    "60831": {
+      "id": "60831",
+      "name": "w miastach",
+      "unit": "wodociąg",
+      "subject_id": "P1732",
+      "search_term": "wodociąg",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60831"
+    },
+    "449": {
+      "id": "449",
+      "name": "budynki",
+      "unit": "kanalizacja",
+      "subject_id": "P1741",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=449"
+    },
+    "455": {
+      "id": "455",
+      "name": "mieszkania, których remont bezpośrednio dotyczył",
+      "unit": "kanalizacja",
+      "subject_id": "P1741",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=455"
+    },
+    "10344": {
+      "id": "10344",
+      "name": "mieszkania",
+      "unit": "kanalizacja",
+      "subject_id": "P1742",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10344"
+    },
+    "10350": {
+      "id": "10350",
+      "name": "mieszkania, których remont bezpośrednio dotyczył",
+      "unit": "kanalizacja",
+      "subject_id": "P1742",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10350"
+    },
+    "2154": {
+      "id": "2154",
+      "name": "kanalizacja odprowadzająca ścieki",
+      "unit": "",
+      "subject_id": "P1837",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2154"
+    },
+    "2155": {
+      "id": "2155",
+      "name": "kanalizacja odprowadzająca wody opadowe",
+      "unit": "",
+      "subject_id": "P1837",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2155"
+    },
+    "10639": {
+      "id": "10639",
+      "name": "kanalizacja zbiorcza przykanaliki do budynków w km",
+      "unit": "",
+      "subject_id": "P1989",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10639"
+    },
+    "10640": {
+      "id": "10640",
+      "name": "kanalizacja zbiorcza przykanaliki do budynków w szt.",
+      "unit": "",
+      "subject_id": "P1989",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10640"
+    },
+    "10652": {
+      "id": "10652",
+      "name": "kanalizacja zbiorcza nakłady inwestycyjne ogółem",
+      "unit": "",
+      "subject_id": "P1990",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10652"
+    },
+    "10653": {
+      "id": "10653",
+      "name": "kanalizacja zbiorcza efekty rzeczowe inwestycji oddanych do użytku zbiorcza sieć kanalizacyjna",
+      "unit": "",
+      "subject_id": "P1990",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10653"
+    },
+    "275460": {
+      "id": "275460",
+      "name": "kanalizacja zbiorcza efekty rzeczowe inwestycji oddanych do użytku przykanaliki do budynków w szt.",
+      "unit": "",
+      "subject_id": "P1990",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=275460"
+    },
+    "10654": {
+      "id": "10654",
+      "name": "kanalizacja zbiorcza efekty rzeczowe inwestycji oddanych do użytku przykanaliki do budynków",
+      "unit": "",
+      "subject_id": "P1990",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10654"
+    },
+    "56582": {
+      "id": "56582",
+      "name": "budynki",
+      "unit": "kanalizacja",
+      "subject_id": "P2229",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56582"
+    },
+    "56575": {
+      "id": "56575",
+      "name": "mieszkania",
+      "unit": "kanalizacja",
+      "subject_id": "P2229",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56575"
+    },
+    "56589": {
+      "id": "56589",
+      "name": "powierzchnia użytkowa mieszkań",
+      "unit": "kanalizacja",
+      "subject_id": "P2229",
+      "search_term": "kanalizacja",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56589"
+    },
+    "5075": {
+      "id": "5075",
+      "name": "centralne ogrzewanie lokali mieszkalnych - za 1m2",
+      "unit": "",
+      "subject_id": "P1469",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=5075"
+    },
+    "60838": {
+      "id": "60838",
+      "name": "ogółem",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1732",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60838"
+    },
+    "60833": {
+      "id": "60833",
+      "name": "w miastach",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1732",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60833"
+    },
+    "60835": {
+      "id": "60835",
+      "name": "na wsi",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1732",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60835"
+    },
+    "59351": {
+      "id": "59351",
+      "name": "ogółem",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1737",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59351"
+    },
+    "59365": {
+      "id": "59365",
+      "name": "osoby fizycznej",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1737",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59365"
+    },
+    "59339": {
+      "id": "59339",
+      "name": "spółdzielni mieszkaniowej",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1737",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59339"
+    },
+    "59370": {
+      "id": "59370",
+      "name": "gmin",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1737",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59370"
+    },
+    "59367": {
+      "id": "59367",
+      "name": "zakładu pracy",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1737",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59367"
+    },
+    "59387": {
+      "id": "59387",
+      "name": "Towarzystw Budownictwa Społecznego (TBS)",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1737",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59387"
+    },
+    "59369": {
+      "id": "59369",
+      "name": "innego podmiotu",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1737",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59369"
+    },
+    "450": {
+      "id": "450",
+      "name": "budynki",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1741",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=450"
+    },
+    "456": {
+      "id": "456",
+      "name": "mieszkania, których remont bezpośrednio dotyczył",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1741",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=456"
+    },
+    "10345": {
+      "id": "10345",
+      "name": "mieszkania",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1742",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10345"
+    },
+    "10351": {
+      "id": "10351",
+      "name": "mieszkania, których remont bezpośrednio dotyczył",
+      "unit": "centralne ogrzewanie",
+      "subject_id": "P1742",
+      "search_term": "centralne ogrzewanie",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10351"
+    },
+    "60841": {
+      "id": "60841",
+      "name": "ogółem",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1732",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60841"
+    },
+    "60842": {
+      "id": "60842",
+      "name": "w miastach",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1732",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60842"
+    },
+    "60836": {
+      "id": "60836",
+      "name": "na wsi",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1732",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60836"
+    },
+    "59363": {
+      "id": "59363",
+      "name": "ogółem",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1737",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59363"
+    },
+    "59388": {
+      "id": "59388",
+      "name": "osoby fizycznej",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1737",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59388"
+    },
+    "59371": {
+      "id": "59371",
+      "name": "spółdzielni mieszkaniowej",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1737",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59371"
+    },
+    "59375": {
+      "id": "59375",
+      "name": "gmin",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1737",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59375"
+    },
+    "59376": {
+      "id": "59376",
+      "name": "zakładu pracy",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1737",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59376"
+    },
+    "59384": {
+      "id": "59384",
+      "name": "Towarzystw Budownictwa Społecznego (TBS)",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1737",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59384"
+    },
+    "59383": {
+      "id": "59383",
+      "name": "innego podmiotu",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1737",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59383"
+    },
+    "452": {
+      "id": "452",
+      "name": "budynki",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1741",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=452"
+    },
+    "458": {
+      "id": "458",
+      "name": "mieszkania, których remont bezpośrednio dotyczył",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1741",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=458"
+    },
+    "10347": {
+      "id": "10347",
+      "name": "mieszkania",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1742",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10347"
+    },
+    "10353": {
+      "id": "10353",
+      "name": "mieszkania, których remont bezpośrednio dotyczył",
+      "unit": "gaz sieciowy",
+      "subject_id": "P1742",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=10353"
+    },
+    "59334": {
+      "id": "59334",
+      "name": "mieszkania wyposażone w gaz sieciowy",
+      "unit": "",
+      "subject_id": "P2352",
+      "search_term": "gaz sieciowy",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=59334"
+    },
+    "148159": {
+      "id": "148159",
+      "name": "izby w mieszkaniach oddanych do użytkowania na 1000 ludności",
+      "unit": "",
+      "subject_id": "P2407",
+      "search_term": "izby w mieszkaniach",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=148159"
+    },
+    "1672": {
+      "id": "1672",
+      "name": "budynki mieszkalne powierzchnia ogółem",
+      "unit": "ogółem",
+      "subject_id": "P1881",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1672"
+    },
+    "1673": {
+      "id": "1673",
+      "name": "budynki mieszkalne powierzchnia ogółem",
+      "unit": "gospodarstwa indywidualne",
+      "subject_id": "P1881",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1673"
+    },
+    "1674": {
+      "id": "1674",
+      "name": "budynki mieszkalne powierzchnia niewykorzystana",
+      "unit": "ogółem",
+      "subject_id": "P1881",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1674"
+    },
+    "1675": {
+      "id": "1675",
+      "name": "budynki mieszkalne powierzchnia niewykorzystana",
+      "unit": "gospodarstwa indywidualne",
+      "subject_id": "P1881",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1675"
+    },
+    "56470": {
+      "id": "56470",
+      "name": "budynki mieszkalne",
+      "unit": "budynki",
+      "subject_id": "P2213",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56470"
+    },
+    "56471": {
+      "id": "56471",
+      "name": "budynki mieszkalne",
+      "unit": "mieszkania ogółem",
+      "subject_id": "P2213",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56471"
+    },
+    "56469": {
+      "id": "56469",
+      "name": "budynki mieszkalne",
+      "unit": "mieszkania zamieszkane stale",
+      "subject_id": "P2213",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56469"
+    },
+    "56473": {
+      "id": "56473",
+      "name": "budynki mieszkalne",
+      "unit": "powierzchnia użytkowa mieszkań ogółem",
+      "subject_id": "P2213",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56473"
+    },
+    "56479": {
+      "id": "56479",
+      "name": "budynki mieszkalne",
+      "unit": "powierzchnia użytkowa mieszkań zamieszkanych stale",
+      "subject_id": "P2213",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56479"
+    },
+    "56468": {
+      "id": "56468",
+      "name": "budynki mieszkalne",
+      "unit": "ludność w mieszkaniach",
+      "subject_id": "P2213",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=56468"
+    },
+    "152343": {
+      "id": "152343",
+      "name": "budynki mieszkalne objęte zbieraniem odpadów z gospodarstw domowych",
+      "unit": "",
+      "subject_id": "P2438",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=152343"
+    },
+    "284554": {
+      "id": "284554",
+      "name": "nowe",
+      "unit": "budynki mieszkalne jednorodzinne nieprzystosowane do stałego zamieszkania (PKOB 1110)",
+      "subject_id": "P2969",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=284554"
+    },
+    "259258": {
+      "id": "259258",
+      "name": "nowe",
+      "unit": "budynki mieszkalne jednorodzinne nieprzystosowane do stałego zamieszkania (PKOB 1110)",
+      "subject_id": "P2969",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=259258"
+    },
+    "259138": {
+      "id": "259138",
+      "name": "nowe",
+      "unit": "budynki mieszkalne jednorodzinne nieprzystosowane do stałego zamieszkania (PKOB 1110)",
+      "subject_id": "P2969",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=259138"
+    },
+    "284596": {
+      "id": "284596",
+      "name": "nowe",
+      "unit": "budynki mieszkalne jednorodzinne nieprzystosowane do stałego zamieszkania (PKOB 1110)",
+      "subject_id": "P2969",
+      "search_term": "budynki mieszkalne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=284596"
+    }
+  },
+  "finanse_gminy": {
+    "3551": {
+      "id": "3551",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3551"
+    },
+    "3552": {
+      "id": "3552",
+      "name": "wydatki majątkowe inwestycyjne",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3552"
+    },
+    "101498": {
+      "id": "101498",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1530",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101498"
+    },
+    "6981": {
+      "id": "6981",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1531",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6981"
+    },
+    "6982": {
+      "id": "6982",
+      "name": "wydatki majątkowe inwestycyjne",
+      "unit": "",
+      "subject_id": "P1531",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6982"
+    },
+    "7632": {
+      "id": "7632",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1532",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=7632"
+    },
+    "7633": {
+      "id": "7633",
+      "name": "wydatki majątkowe inwestycyjne",
+      "unit": "",
+      "subject_id": "P1532",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=7633"
+    },
+    "101497": {
+      "id": "101497",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1534",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101497"
+    },
+    "6992": {
+      "id": "6992",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1535",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6992"
+    },
+    "6993": {
+      "id": "6993",
+      "name": "wydatki majątkowe inwestycyjne",
+      "unit": "",
+      "subject_id": "P1535",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6993"
+    },
+    "101499": {
+      "id": "101499",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1538",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101499"
+    },
+    "7006": {
+      "id": "7006",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1539",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=7006"
+    },
+    "7007": {
+      "id": "7007",
+      "name": "wydatki majątkowe inwestycyjne",
+      "unit": "",
+      "subject_id": "P1539",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=7007"
+    },
+    "7014": {
+      "id": "7014",
+      "name": "wydatki majątkowe ogółem",
+      "unit": "",
+      "subject_id": "P1540",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=7014"
+    },
+    "7015": {
+      "id": "7015",
+      "name": "wydatki majątkowe inwestycyjne",
+      "unit": "",
+      "subject_id": "P1540",
+      "search_term": "wydatki majątkowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=7015"
+    },
+    "101454": {
+      "id": "101454",
+      "name": "wydatki bieżące ogółem",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101454"
+    },
+    "101455": {
+      "id": "101455",
+      "name": "wydatki bieżące na wynagrodzenia",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101455"
+    },
+    "101456": {
+      "id": "101456",
+      "name": "wydatki bieżące wynagrodzenia osobowe",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101456"
+    },
+    "101457": {
+      "id": "101457",
+      "name": "wydatki bieżące na pochodne od wynagrodzeń",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101457"
+    },
+    "3553": {
+      "id": "3553",
+      "name": "wydatki bieżące jednostek budżetowych ogółem",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3553"
+    },
+    "3554": {
+      "id": "3554",
+      "name": "wydatki bieżące jednostek budżetowych na wynagrodzenia",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3554"
+    },
+    "3555": {
+      "id": "3555",
+      "name": "wydatki bieżące jednostek budżetowych na wynagrodzenia osobowe",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3555"
+    },
+    "3556": {
+      "id": "3556",
+      "name": "wydatki bieżące jednostek budżetowych pochodne od wynagrodzeń",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3556"
+    },
+    "1645359": {
+      "id": "1645359",
+      "name": "wydatki bieżące na zakup materiałów i usług",
+      "unit": "",
+      "subject_id": "P1528",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1645359"
+    },
+    "6973": {
+      "id": "6973",
+      "name": "wydatki bieżące jednostek budżetowych ogółem",
+      "unit": "",
+      "subject_id": "P1529",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6973"
+    },
+    "6974": {
+      "id": "6974",
+      "name": "wydatki bieżące jednostek budżetowych na wynagrodzenia",
+      "unit": "",
+      "subject_id": "P1529",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6974"
+    },
+    "6975": {
+      "id": "6975",
+      "name": "wydatki bieżące jednostek budżetowych na zakup materiałów i usług",
+      "unit": "",
+      "subject_id": "P1529",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6975"
+    },
+    "101459": {
+      "id": "101459",
+      "name": "wydatki bieżące ogółem",
+      "unit": "",
+      "subject_id": "P1530",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101459"
+    },
+    "101460": {
+      "id": "101460",
+      "name": "wydatki bieżące na wynagrodzenia",
+      "unit": "",
+      "subject_id": "P1530",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101460"
+    },
+    "101461": {
+      "id": "101461",
+      "name": "wydatki bieżące na zakup materiałów i usług",
+      "unit": "",
+      "subject_id": "P1530",
+      "search_term": "wydatki bieżące",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101461"
+    },
+    "58602": {
+      "id": "58602",
+      "name": "nakłady na aktywa trwałe (wydatki inwestycyjne)",
+      "unit": "",
+      "subject_id": "P2296",
+      "search_term": "wydatki inwestycyjne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=58602"
+    },
+    "1749763": {
+      "id": "1749763",
+      "name": "wydatki inwestycyjne",
+      "unit": "",
+      "subject_id": "P2414",
+      "search_term": "wydatki inwestycyjne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1749763"
+    },
+    "1749766": {
+      "id": "1749766",
+      "name": "wydatki inwestycyjne",
+      "unit": "",
+      "subject_id": "P2416",
+      "search_term": "wydatki inwestycyjne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1749766"
+    },
+    "1725023": {
+      "id": "1725023",
+      "name": "gminy łącznie z miastami na prawach powiatu",
+      "unit": "wydatki inwestycyjne",
+      "subject_id": "P2644",
+      "search_term": "wydatki inwestycyjne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1725023"
+    },
+    "1613009": {
+      "id": "1613009",
+      "name": "wydatki inwestycyjne JST w przeliczeniu na 1 mieszkańca",
+      "unit": "",
+      "subject_id": "P3960",
+      "search_term": "wydatki inwestycyjne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1613009"
+    },
+    "60504": {
+      "id": "60504",
+      "name": "dochody własne",
+      "unit": "",
+      "subject_id": "P2410",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60504"
+    },
+    "149135": {
+      "id": "149135",
+      "name": "dochody własne - udziały w podatkach stanowiących dochody budżetu państwa podatek dochodowy od osób fizycznych",
+      "unit": "",
+      "subject_id": "P2410",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149135"
+    },
+    "149134": {
+      "id": "149134",
+      "name": "dochody własne - udziały w podatkach stanowiących dochody budżetu państwa podatek dochodowy od osób prawnych",
+      "unit": "",
+      "subject_id": "P2410",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149134"
+    },
+    "60509": {
+      "id": "60509",
+      "name": "dochody własne",
+      "unit": "",
+      "subject_id": "P2412",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=60509"
+    },
+    "149138": {
+      "id": "149138",
+      "name": "dochody własne - udziały w podatkach stanowiących dochody budżetu państwa podatek dochodowy od osób fizycznych",
+      "unit": "",
+      "subject_id": "P2412",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149138"
+    },
+    "149137": {
+      "id": "149137",
+      "name": "dochody własne - udziały w podatkach stanowiących dochody budżetu państwa podatek dochodowy od osób prawnych",
+      "unit": "",
+      "subject_id": "P2412",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149137"
+    },
+    "76976": {
+      "id": "76976",
+      "name": "gminy łącznie z miastami na prawach powiatu",
+      "unit": "dochody własne",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=76976"
+    },
+    "149128": {
+      "id": "149128",
+      "name": "gminy łącznie z miastami na prawach powiatu",
+      "unit": "dochody własne - udziały w podatkach stanowiących dochody budżetu państwa podatek dochodowy od osób fizycznych",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149128"
+    },
+    "149131": {
+      "id": "149131",
+      "name": "gminy łącznie z miastami na prawach powiatu",
+      "unit": "dochody własne - udziały w podatkach stanowiących dochody budżetu państwa podatek dochodowy od osób prawnych",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149131"
+    },
+    "76982": {
+      "id": "76982",
+      "name": "gminy łącznie z miastami na prawach powiatu",
+      "unit": "dochody własne - dochody podatkowe ustalone i pobierane na podstawie odrębnych ustaw",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=76982"
+    },
+    "76978": {
+      "id": "76978",
+      "name": "gminy bez miast na prawach powiatu",
+      "unit": "dochody własne",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=76978"
+    },
+    "149130": {
+      "id": "149130",
+      "name": "gminy bez miast na prawach powiatu",
+      "unit": "dochody własne - udziały w podatkach stanowiących dochody budżetu państwa podatek dochodowy od osób fizycznych",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149130"
+    },
+    "149133": {
+      "id": "149133",
+      "name": "gminy bez miast na prawach powiatu",
+      "unit": "dochody własne - udziały w podatkach stanowiących dochody budżetu państwa podatek dochodowy od osób prawnych",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149133"
+    },
+    "76984": {
+      "id": "76984",
+      "name": "gminy bez miast na prawach powiatu",
+      "unit": "dochody własne - dochody podatkowe ustalone i pobierane na podstawie odrębnych ustaw",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=76984"
+    },
+    "76977": {
+      "id": "76977",
+      "name": "miasta na prawach powiatu",
+      "unit": "dochody własne",
+      "subject_id": "P2627",
+      "search_term": "dochody własne",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=76977"
+    },
+    "101525": {
+      "id": "101525",
+      "name": "dotacje celowe",
+      "unit": "ogółem",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=101525"
+    },
+    "3516": {
+      "id": "3516",
+      "name": "dotacje celowe z budżetu państwa",
+      "unit": "ogółem",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3516"
+    },
+    "149185": {
+      "id": "149185",
+      "name": "dotacje celowe z budżetu państwa",
+      "unit": "inwestycyjne",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=149185"
+    },
+    "3517": {
+      "id": "3517",
+      "name": "dotacje celowe z budżetu państwa na zadania z zakresu administracji rządowej",
+      "unit": "ogółem",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3517"
+    },
+    "3537": {
+      "id": "3537",
+      "name": "dotacje celowe z budżetu państwa na zadania z zakresu administracji rządowej",
+      "unit": "inwestycyjne",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3537"
+    },
+    "3518": {
+      "id": "3518",
+      "name": "dotacje celowe z budżetu państwa na zadania własne",
+      "unit": "ogółem",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3518"
+    },
+    "3519": {
+      "id": "3519",
+      "name": "dotacje celowe z budżetu państwa na zadania własne",
+      "unit": "inwestycyjne",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3519"
+    },
+    "3520": {
+      "id": "3520",
+      "name": "dotacje celowe z budżetu państwa na zadania realizowane na podstawie porozumień z organami administracji rządowej",
+      "unit": "ogółem",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3520"
+    },
+    "3521": {
+      "id": "3521",
+      "name": "dotacje celowe z budżetu państwa na zadania realizowane na podstawie porozumień z organami administracji rządowej",
+      "unit": "inwestycyjne",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3521"
+    },
+    "3522": {
+      "id": "3522",
+      "name": "dotacje celowe na zadania realizowane na podstawie porozumień między jednostkami samorządu terytorialnego",
+      "unit": "ogółem",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3522"
+    },
+    "3523": {
+      "id": "3523",
+      "name": "dotacje celowe na zadania realizowane na podstawie porozumień między jednostkami samorządu terytorialnego",
+      "unit": "inwestycyjne",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3523"
+    },
+    "273454": {
+      "id": "273454",
+      "name": "dotacje celowe otrzymane z funduszy celowych",
+      "unit": "ogółem",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=273454"
+    },
+    "273453": {
+      "id": "273453",
+      "name": "dotacje celowe otrzymane z funduszy celowych",
+      "unit": "inwestycyjne",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=273453"
+    },
+    "1621995": {
+      "id": "1621995",
+      "name": "dotacje celowe z tytułu pomocy finansowej udzielanej między jst na dofinansowanie własnych zadań",
+      "unit": "ogółem",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1621995"
+    },
+    "1728576": {
+      "id": "1728576",
+      "name": "dotacje celowe z tytułu pomocy finansowej udzielanej między jst na dofinansowanie własnych zadań",
+      "unit": "inwestycyjne",
+      "subject_id": "P1517",
+      "search_term": "dotacje celowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=1728576"
+    }
+  },
+  "edukacja": {
+    "8534": {
+      "id": "8534",
+      "name": "wydatki w rozdziale 80102 - Szkoły podstawowe specjalne",
+      "unit": "",
+      "subject_id": "P1535",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=8534"
+    },
+    "838": {
+      "id": "838",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=838"
+    },
+    "839": {
+      "id": "839",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=839"
+    },
+    "2310": {
+      "id": "2310",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2310"
+    },
+    "2311": {
+      "id": "2311",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2311"
+    },
+    "6752": {
+      "id": "6752",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6752"
+    },
+    "2312": {
+      "id": "2312",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2312"
+    },
+    "840": {
+      "id": "840",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=840"
+    },
+    "841": {
+      "id": "841",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=841"
+    },
+    "6753": {
+      "id": "6753",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=6753"
+    },
+    "2313": {
+      "id": "2313",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2313"
+    },
+    "2314": {
+      "id": "2314",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2314"
+    },
+    "842": {
+      "id": "842",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "pomieszczenia szkolne",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=842"
+    },
+    "843": {
+      "id": "843",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "pomieszczenia szkolne",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=843"
+    },
+    "2315": {
+      "id": "2315",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "pomieszczenia szkolne",
+      "subject_id": "P1781",
+      "search_term": "szkoły podstawowe",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2315"
+    },
+    "810": {
+      "id": "810",
+      "name": "przedszkola bez specjalnych",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=810"
+    },
+    "811": {
+      "id": "811",
+      "name": "przedszkola bez specjalnych",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=811"
+    },
+    "2271": {
+      "id": "2271",
+      "name": "przedszkola bez specjalnych",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2271"
+    },
+    "2272": {
+      "id": "2272",
+      "name": "przedszkola bez specjalnych",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2272"
+    },
+    "8558": {
+      "id": "8558",
+      "name": "przedszkola bez specjalnych",
+      "unit": "nauczyciele niepełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=8558"
+    },
+    "8559": {
+      "id": "8559",
+      "name": "przedszkola bez specjalnych",
+      "unit": "nauczyciele niepełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=8559"
+    },
+    "8560": {
+      "id": "8560",
+      "name": "przedszkola bez specjalnych",
+      "unit": "nauczyciele niepełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=8560"
+    },
+    "824": {
+      "id": "824",
+      "name": "przedszkola specjalne",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=824"
+    },
+    "825": {
+      "id": "825",
+      "name": "przedszkola specjalne",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=825"
+    },
+    "2295": {
+      "id": "2295",
+      "name": "przedszkola specjalne",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2295"
+    },
+    "2296": {
+      "id": "2296",
+      "name": "przedszkola specjalne",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2296"
+    },
+    "8561": {
+      "id": "8561",
+      "name": "przedszkola specjalne",
+      "unit": "nauczyciele niepełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=8561"
+    },
+    "8562": {
+      "id": "8562",
+      "name": "przedszkola specjalne",
+      "unit": "nauczyciele niepełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=8562"
+    },
+    "8563": {
+      "id": "8563",
+      "name": "przedszkola specjalne",
+      "unit": "nauczyciele niepełnozatrudnieni",
+      "subject_id": "P1775",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=8563"
+    },
+    "858": {
+      "id": "858",
+      "name": "szkoły podstawowe dla dzieci i młodzieży bez specjalnych",
+      "unit": "nauczyciele pełnozatrudnieni",
+      "subject_id": "P1781",
+      "search_term": "nauczyciele",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=858"
+    },
+    "804": {
+      "id": "804",
+      "name": "przedszkola bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=804"
+    },
+    "805": {
+      "id": "805",
+      "name": "przedszkola bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=805"
+    },
+    "2262": {
+      "id": "2262",
+      "name": "przedszkola bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2262"
+    },
+    "2263": {
+      "id": "2263",
+      "name": "przedszkola bez specjalnych",
+      "unit": "ogółem",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2263"
+    },
+    "806": {
+      "id": "806",
+      "name": "przedszkola bez specjalnych",
+      "unit": "oddziały",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=806"
+    },
+    "807": {
+      "id": "807",
+      "name": "przedszkola bez specjalnych",
+      "unit": "oddziały",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=807"
+    },
+    "2265": {
+      "id": "2265",
+      "name": "przedszkola bez specjalnych",
+      "unit": "oddziały",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2265"
+    },
+    "2266": {
+      "id": "2266",
+      "name": "przedszkola bez specjalnych",
+      "unit": "oddziały",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2266"
+    },
+    "808": {
+      "id": "808",
+      "name": "przedszkola bez specjalnych",
+      "unit": "miejsca",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=808"
+    },
+    "809": {
+      "id": "809",
+      "name": "przedszkola bez specjalnych",
+      "unit": "miejsca",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=809"
+    },
+    "2268": {
+      "id": "2268",
+      "name": "przedszkola bez specjalnych",
+      "unit": "miejsca",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2268"
+    },
+    "2269": {
+      "id": "2269",
+      "name": "przedszkola bez specjalnych",
+      "unit": "miejsca",
+      "subject_id": "P1775",
+      "search_term": "przedszkola",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=2269"
+    },
+    "3291": {
+      "id": "3291",
+      "name": "ogółem",
+      "unit": "osoby dotychczas niepracujące absolwenci ogółem",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3291"
+    },
+    "3292": {
+      "id": "3292",
+      "name": "ogółem",
+      "unit": "osoby dotychczas niepracujące absolwenci szkół wyższych",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3292"
+    },
+    "3293": {
+      "id": "3293",
+      "name": "ogółem",
+      "unit": "osoby dotychczas niepracujące absolwenci szkół policealnych i średnich zawodowych",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3293"
+    },
+    "3294": {
+      "id": "3294",
+      "name": "ogółem",
+      "unit": "osoby dotychczas niepracujące absolwenci liceów ogólnokształcących",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3294"
+    },
+    "3295": {
+      "id": "3295",
+      "name": "ogółem",
+      "unit": "osoby dotychczas niepracujące absolwenci szkół zasadniczych zawodowych",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3295"
+    },
+    "3296": {
+      "id": "3296",
+      "name": "ogółem",
+      "unit": "osoby dotychczas niepracujące absolwenci szkół pozostałych",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=3296"
+    },
+    "378644": {
+      "id": "378644",
+      "name": "ogółem",
+      "unit": "absolwenci ogółem",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=378644"
+    },
+    "378641": {
+      "id": "378641",
+      "name": "ogółem",
+      "unit": "absolwenci szkół wyższych, którzy nie ukończyli 27 lat",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=378641"
+    },
+    "33526": {
+      "id": "33526",
+      "name": "mężczyźni",
+      "unit": "osoby dotychczas niepracujące absolwenci ogółem",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=33526"
+    },
+    "33527": {
+      "id": "33527",
+      "name": "mężczyźni",
+      "unit": "osoby dotychczas niepracujące absolwenci szkół wyższych",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=33527"
+    },
+    "33528": {
+      "id": "33528",
+      "name": "mężczyźni",
+      "unit": "osoby dotychczas niepracujące absolwenci szkół policealnych i średnich zawodowych",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=33528"
+    },
+    "33529": {
+      "id": "33529",
+      "name": "mężczyźni",
+      "unit": "osoby dotychczas niepracujące absolwenci liceów ogólnokształcących",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=33529"
+    },
+    "33530": {
+      "id": "33530",
+      "name": "mężczyźni",
+      "unit": "osoby dotychczas niepracujące absolwenci szkół zasadniczych zawodowych",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=33530"
+    },
+    "33531": {
+      "id": "33531",
+      "name": "mężczyźni",
+      "unit": "osoby dotychczas niepracujące absolwenci szkół pozostałych",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=33531"
+    },
+    "378645": {
+      "id": "378645",
+      "name": "mężczyźni",
+      "unit": "absolwenci ogółem",
+      "subject_id": "P1364",
+      "search_term": "absolwenci",
+      "has_data": false,
+      "error": "429 Client Error: Too Many Requests for url: https://bdl.stat.gov.pl/api/v1/data/by-unit/042815403062?format=json&page-size=100&var-id=378645"
+    }
+  },
+  "bezpieczenstwo": {
+    "398594": {
+      "id": "398594",
+      "name": "przestępstwa stwierdzone przez Policję ogółem na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 16.81,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "498627": {
+      "id": "498627",
+      "name": "przestępstwa stwierdzone przez Policję o charakterze kryminalnym na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 8.42,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "498626": {
+      "id": "498626",
+      "name": "przestępstwa stwierdzone przez Policję o charakterze gospodarczym na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 5.56,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "498625": {
+      "id": "498625",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko bezpieczeństwu powszechnemu i bezpieczeństwu w komunikacji - drogowe na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 1.57,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "498624": {
+      "id": "498624",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko życiu i zdrowiu na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 0.26,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "498623": {
+      "id": "498623",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko mieniu na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 9.48,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "498622": {
+      "id": "498622",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko wolności, wolności sumienia i wyznania, wolności seksualnej i obyczajności na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 0.57,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "498621": {
+      "id": "498621",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko rodzinie i opiece na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 1.05,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "632884": {
+      "id": "632884",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko bezpieczeństwu powszechnemu i bezpieczeństwu w komunikacji na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P2290",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 1.77,
+      "years_count": 12,
+      "first_year": "2013"
+    },
+    "400313": {
+      "id": "400313",
+      "name": "przestępstwa stwierdzone przez Policję ogółem na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P3362",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2012",
+      "latest_value": 21.2,
+      "years_count": 1,
+      "first_year": "2012"
+    },
+    "400314": {
+      "id": "400314",
+      "name": "przestępstwa stwierdzone przez Policję o charakterze kryminalnym na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P3362",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2012",
+      "latest_value": 15.1,
+      "years_count": 1,
+      "first_year": "2012"
+    },
+    "400315": {
+      "id": "400315",
+      "name": "przestępstwa stwierdzone przez Policję o charakterze gospodarczym na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P3362",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2012",
+      "latest_value": 1.06,
+      "years_count": 1,
+      "first_year": "2012"
+    },
+    "400316": {
+      "id": "400316",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko bezpieczeństwu powszechnemu i bezpieczeństwu w komunikacji - drogowe na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P3362",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2012",
+      "latest_value": 4.63,
+      "years_count": 1,
+      "first_year": "2012"
+    },
+    "400317": {
+      "id": "400317",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko życiu i zdrowiu na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P3362",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2012",
+      "latest_value": 0.57,
+      "years_count": 1,
+      "first_year": "2012"
+    },
+    "400318": {
+      "id": "400318",
+      "name": "przestępstwa stwierdzone przez Policję przeciwko mieniu na 1000 mieszkańców",
+      "unit": "",
+      "subject_id": "P3362",
+      "search_term": "przestępstwa stwierdzone",
+      "has_data": true,
+      "latest_year": "2012",
+      "latest_value": 10.17,
+      "years_count": 1,
+      "first_year": "2012"
+    },
+    "471916": {
+      "id": "471916",
+      "name": "wypadki drogowe na 100 tys. ludności",
+      "unit": "",
+      "subject_id": "P2423",
+      "search_term": "wypadki drogowe",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 47.4,
+      "years_count": 14,
+      "first_year": "2011"
+    },
+    "1605982": {
+      "id": "1605982",
+      "name": "1 kwartał",
+      "unit": "wypadki drogowe",
+      "subject_id": "P3884",
+      "search_term": "wypadki drogowe",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": 5,
+      "years_count": 6,
+      "first_year": "2020"
+    },
+    "1605987": {
+      "id": "1605987",
+      "name": "pierwsze półrocze",
+      "unit": "wypadki drogowe",
+      "subject_id": "P3884",
+      "search_term": "wypadki drogowe",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": 10,
+      "years_count": 6,
+      "first_year": "2020"
+    },
+    "1605992": {
+      "id": "1605992",
+      "name": "1-3 kwartały",
+      "unit": "wypadki drogowe",
+      "subject_id": "P3884",
+      "search_term": "wypadki drogowe",
+      "has_data": true,
+      "latest_year": "2025",
+      "latest_value": 20,
+      "years_count": 6,
+      "first_year": "2020"
+    },
+    "1605997": {
+      "id": "1605997",
+      "name": "rok",
+      "unit": "wypadki drogowe",
+      "subject_id": "P3884",
+      "search_term": "wypadki drogowe",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 29,
+      "years_count": 5,
+      "first_year": "2020"
+    }
+  },
+  "zdrowie": {
+    "1209": {
+      "id": "1209",
+      "name": "ogółem",
+      "unit": "apteki",
+      "subject_id": "P1794",
+      "search_term": "apteki",
+      "has_data": true,
+      "latest_year": "2002",
+      "latest_value": 13,
+      "years_count": 8,
+      "first_year": "1995"
+    },
+    "1210": {
+      "id": "1210",
+      "name": "prywatne",
+      "unit": "apteki",
+      "subject_id": "P1794",
+      "search_term": "apteki",
+      "has_data": true,
+      "latest_year": "2002",
+      "latest_value": 13,
+      "years_count": 8,
+      "first_year": "1995"
+    },
+    "194884": {
+      "id": "194884",
+      "name": "apteki",
+      "unit": "",
+      "subject_id": "P2873",
+      "search_term": "apteki",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 16,
+      "years_count": 22,
+      "first_year": "2003"
+    },
+    "1616687": {
+      "id": "1616687",
+      "name": "porady lekarskie ogółem",
+      "unit": "",
+      "subject_id": "P3225",
+      "search_term": "porady lekarskie",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 403309,
+      "years_count": 13,
+      "first_year": "2012"
+    },
+    "1751412": {
+      "id": "1751412",
+      "name": "porady lekarskie ogółem",
+      "unit": "",
+      "subject_id": "P4614",
+      "search_term": "porady lekarskie",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 109958,
+      "years_count": 5,
+      "first_year": "2020"
+    }
+  },
+  "turystyka": {
+    "1539658": {
+      "id": "1539658",
+      "name": "turystyczne obiekty noclegowe ogółem na 10 tys. ludności",
+      "unit": "ogółem",
+      "subject_id": "P2396",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 2.0,
+      "years_count": 23,
+      "first_year": "2002"
+    },
+    "1539718": {
+      "id": "1539718",
+      "name": "turystyczne obiekty noclegowe (bez obiektów hotelowych)",
+      "unit": "ogółem",
+      "subject_id": "P2396",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 5,
+      "years_count": 23,
+      "first_year": "2002"
+    },
+    "201925": {
+      "id": "201925",
+      "name": "styczeń",
+      "unit": "turystyczne obiekty noclegowe ogółem",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201947": {
+      "id": "201947",
+      "name": "styczeń",
+      "unit": "turystyczne obiekty noclegowe ogółem",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201916": {
+      "id": "201916",
+      "name": "styczeń",
+      "unit": "turystyczne obiekty noclegowe ogółem",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "202012": {
+      "id": "202012",
+      "name": "styczeń",
+      "unit": "turystyczne obiekty noclegowe ogółem",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201922": {
+      "id": "201922",
+      "name": "styczeń",
+      "unit": "turystyczne obiekty noclegowe ogółem",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201932": {
+      "id": "201932",
+      "name": "styczeń",
+      "unit": "pozostałe turystyczne obiekty noclegowe",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201931": {
+      "id": "201931",
+      "name": "styczeń",
+      "unit": "pozostałe turystyczne obiekty noclegowe",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201801": {
+      "id": "201801",
+      "name": "styczeń",
+      "unit": "pozostałe turystyczne obiekty noclegowe",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201981": {
+      "id": "201981",
+      "name": "styczeń",
+      "unit": "pozostałe turystyczne obiekty noclegowe",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201803": {
+      "id": "201803",
+      "name": "styczeń",
+      "unit": "pozostałe turystyczne obiekty noclegowe",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201946": {
+      "id": "201946",
+      "name": "luty",
+      "unit": "turystyczne obiekty noclegowe ogółem",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201957": {
+      "id": "201957",
+      "name": "luty",
+      "unit": "turystyczne obiekty noclegowe ogółem",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "201728": {
+      "id": "201728",
+      "name": "luty",
+      "unit": "turystyczne obiekty noclegowe ogółem",
+      "subject_id": "P2882",
+      "search_term": "turystyczne obiekty noclegowe",
+      "has_data": false
+    },
+    "1539596": {
+      "id": "1539596",
+      "name": "noclegi udzielone turystom krajowym w turystycznych obiektach noclegowych ogółem na 10 tys. mieszkańców",
+      "unit": "ogółem",
+      "subject_id": "P2396",
+      "search_term": "noclegi udzielone",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 4770,
+      "years_count": 23,
+      "first_year": "2002"
+    },
+    "60297": {
+      "id": "60297",
+      "name": "turyści korzystający z noclegów na 1000 ludności",
+      "unit": "ogółem",
+      "subject_id": "P2396",
+      "search_term": "korzystający z noclegów",
+      "has_data": true,
+      "latest_year": "2024",
+      "latest_value": 162.28,
+      "years_count": 23,
+      "first_year": "2002"
+    },
+    "60299": {
+      "id": "60299",
+      "name": "turyści korzystający z noclegów na 1000 ludności",
+      "unit": "hotele, motele, pensjonaty, inne obiekty hotelowe",
+      "subject_id": "P2396",
+      "search_term": "korzystający z noclegów",
+      "has_data": true,
+      "latest_year": "2014",
+      "latest_value": 99.0,
+      "years_count": 13,
+      "first_year": "2002"
+    }
+  }
+}
