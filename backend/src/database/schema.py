@@ -379,15 +379,101 @@ class CEIDGSyncStats(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     gmina: str = Field(max_length=100, unique=True, index=True)
     powiat: str = Field(max_length=100)
-    
+
     # Counts
     total_count: int = Field(default=0)
     active_count: int = Field(default=0)
-    
+
     # Breakdown by locality (JSONB)
     by_miejscowosc: dict = Field(default_factory=dict, sa_column=Column(JSONB))
-    
+
     # Sync metadata
     last_sync: datetime = Field(default_factory=datetime.utcnow)
     sync_status: str = Field(max_length=20, default="success")  # success, failed, in_progress
+
+
+# ======================
+# GUS Database-First Tables (2026-02-06)
+# ======================
+
+class GUSDataRefreshLog(SQLModel, table=True):
+    """
+    Tracking odświeżania danych GUS - kiedy ostatnio zaktualizowano każdą zmienną.
+    Używane przez scheduler do monitorowania monthly refresh jobs.
+    """
+    __tablename__ = "gus_data_refresh_log"
+    __table_args__ = (
+        Index('idx_gus_refresh_var_key', 'var_key', unique=True),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Variable identification
+    var_key: str = Field(max_length=100, unique=True, index=True)  # Key from gus_variables.py
+    var_id: str = Field(max_length=20)  # GUS BDL variable ID
+
+    # Refresh tracking
+    last_refresh: datetime = Field(default_factory=datetime.utcnow)  # Ostatni successful refresh
+    records_updated: int = Field(default=0)  # Liczba zaktualizowanych rekordów
+
+    # Status
+    status: str = Field(max_length=20, default="success")  # success, failed, in_progress
+    error_message: Optional[str] = Field(default=None, max_length=500)  # Jeśli failed
+
+    # Metadata
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class GUSNationalAverages(SQLModel, table=True):
+    """
+    Średnie krajowe i wojewódzkie dla zmiennych GUS.
+    Używane do porównań: "Rybno: 6,837 PLN (79.2% średniej krajowej)".
+    Populowane przez scheduler wraz z danymi gminnymi.
+    """
+    __tablename__ = "gus_national_averages"
+    __table_args__ = (
+        Index('idx_gus_avg_var_year_level', 'var_id', 'year', 'level', unique=True),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Variable identification
+    var_id: str = Field(max_length=20, index=True)  # GUS BDL variable ID
+    var_key: str = Field(max_length=100, index=True)  # Key from gus_variables.py
+
+    # Data
+    year: int = Field(index=True)  # Rok danych
+    level: str = Field(max_length=20, index=True)  # "national" | "voivodeship"
+    value: Optional[float] = None  # Wartość średniej
+
+    # Metadata
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy pobrano z API
+
+
+class GUSInsight(SQLModel, table=True):
+    """
+    AI-generowane analizy statystyk GUS dla Business tier.
+    Generowane raz w miesiącu przez scheduler + GPT-4o-mini.
+
+    UWAGA: Niższy priorytet - implementacja w późniejszym sprincie.
+    """
+    __tablename__ = "gus_insights"
+    __table_args__ = (
+        Index('idx_gus_insight_category', 'category'),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Classification
+    category: str = Field(max_length=50, index=True)  # demografia, rynek_pracy, etc.
+    insight_type: str = Field(max_length=50)  # trend, comparison, recommendation
+
+    # Content
+    content: str = Field(max_length=2000)  # Treść insightu po polsku (3-5 bullet points)
+    data_context: dict = Field(default_factory=dict, sa_column=Column(JSONB))  # Dane źródłowe
+
+    # Validity
+    generated_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy wygenerowano
+    valid_until: datetime  # Do kiedy aktualny (typically +1 month)
 
