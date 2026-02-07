@@ -38,10 +38,130 @@ export interface Event {
   externalUrl?: string;
 }
 
+// Legacy GUS type (kept for backward compatibility)
 export interface GUSStat {
   year: number;
   value: number;
   label: string;
+}
+
+// GUS Dashboard Types (Database-First Architecture)
+
+export interface GUSVariableMetadata {
+  key: string;
+  var_id: string;
+  name: string;
+  unit: string;
+  category: string;
+  tier: UserTier;
+  level: 'gmina' | 'powiat';
+  format_type: 'integer' | 'decimal' | 'percentage' | 'currency';
+}
+
+export interface GUSVariableValue {
+  value: number;
+  year: number;
+  trend_pct?: number; // Year-over-year change percentage
+  metadata: GUSVariableMetadata;
+}
+
+export interface GUSOverviewResponse {
+  variables: Record<string, GUSVariableValue>;
+  user_tier: UserTier;
+  last_refresh: string;
+}
+
+export interface GUSHistoricalData {
+  year: number;
+  value: number;
+}
+
+export interface GUSComparison {
+  unit_name: string;
+  unit_id: string;
+  value: number;
+  year: number;
+}
+
+export interface GUSNationalComparison {
+  national_value: number;
+  gmina_value: number;
+  percentage_of_national: number;
+  year: number;
+}
+
+export interface GUSSectionVariable {
+  current: GUSVariableValue;
+  trend: GUSHistoricalData[];
+  comparison: GUSComparison[];
+  national_comparison?: GUSNationalComparison;
+}
+
+export interface GUSSectionResponse {
+  section_key: string;
+  section_name: string;
+  variables: Record<string, GUSSectionVariable>;
+  user_tier: UserTier;
+  last_refresh: string;
+}
+
+export interface GUSVariableDetailResponse {
+  variable: GUSVariableMetadata;
+  current: {
+    value: number;
+    year: number;
+    trend_pct?: number;
+  };
+  historical_trend: GUSHistoricalData[];
+  comparison_gminy: GUSComparison[];
+  national_comparison?: GUSNationalComparison;
+  last_refresh: string;
+}
+
+export interface GUSCategory {
+  key: string;
+  name: string;
+  description: string;
+  variable_count: number;
+  required_tier: UserTier;
+}
+
+export interface GUSCategoriesResponse {
+  categories: GUSCategory[];
+  user_tier: UserTier;
+}
+
+export interface GUSVariableListItem {
+  key: string;
+  var_id: string;
+  name: string;
+  unit: string;
+  category: string;
+  tier: UserTier;
+  level: 'gmina' | 'powiat';
+}
+
+export interface GUSVariablesListResponse {
+  variables: GUSVariableListItem[];
+  user_tier: UserTier;
+  total_count: number;
+  tier_counts: {
+    free: number;
+    premium: number;
+    business: number;
+  };
+}
+
+export interface GUSFreshnessEntry {
+  category: string;
+  variable_count: number;
+  last_refresh: string;
+  next_scheduled_refresh: string;
+}
+
+export interface GUSFreshnessResponse {
+  freshness: GUSFreshnessEntry[];
+  last_global_refresh: string;
 }
 
 export interface Business {
