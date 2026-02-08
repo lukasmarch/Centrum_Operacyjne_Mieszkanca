@@ -62,6 +62,7 @@ export interface GUSVariableValue {
   value: number;
   year: number;
   trend_pct?: number; // Year-over-year change percentage
+  historical?: GUSHistoricalData[]; // 10 years of historical data (added 2026-02-08)
   metadata: GUSVariableMetadata;
 }
 
@@ -90,11 +91,21 @@ export interface GUSNationalComparison {
   year: number;
 }
 
+// Powiat comparison (gmina vs powiat Działdowski) - added 2026-02-08
+export interface GUSPowiatComparison {
+  powiat_value: number;
+  gmina_value: number;
+  percentage_of_powiat: number;
+  difference: number;
+  year: number;
+}
+
 export interface GUSSectionVariable {
   current: GUSVariableValue;
   trend: GUSHistoricalData[];
   comparison: GUSComparison[];
-  national_comparison?: GUSNationalComparison;
+  national_comparison?: GUSNationalComparison; // legacy, deprecated
+  powiat_comparison?: GUSPowiatComparison; // new: gmina vs powiat
 }
 
 export interface GUSSectionResponse {

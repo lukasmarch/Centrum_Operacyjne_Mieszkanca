@@ -273,3 +273,54 @@ def get_unit_id_for_variable(key: str) -> str:
     if var and var.level == "powiat":
         return UNIT_ID_POWIAT
     return UNIT_IDS["Rybno"]
+
+
+# ============================================================
+#  GMINA DATA AVAILABILITY
+# ============================================================
+
+# Variables with actual data for gmina Rybno (042815403062)
+# These 55 var_ids have historical records in gus_gmina_stats table
+# Query: SELECT var_id FROM gus_gmina_stats WHERE unit_id='042815403062' GROUP BY var_id
+GMINA_AVAILABLE_VAR_IDS = {
+    '1365234', '1365239', '149128', '152710', '1548644', '1548709',
+    '1612162', '1616687', '1617142', '1620132', '1620621', '1645253',
+    '1645343', '1645344', '1725014', '1725023', '194884', '269593',
+    '269607', '389', '410640', '454132', '458173', '471845', '498816',
+    '59', '60528', '60529', '60530', '60559', '62', '634131', '63993',
+    '65', '66', '67', '72305', '745534', '76037', '76070', '76077',
+    '76450', '76964', '76967', '76970', '76973', '76976', '77002',
+    '77005', '80108', '80125', '804', '838', '862', '9152'
+}
+
+
+def get_gmina_available_variables() -> List[GUSVariable]:
+    """Get ONLY variables that have actual data for gmina Rybno.
+
+    Returns 55 variables with historical records in database.
+    Excludes variables without gmina data (transport, bezpieczeństwo, turystyka).
+    """
+    return [var for var in _VARIABLES_LIST if var.var_id in GMINA_AVAILABLE_VAR_IDS]
+
+
+def get_gmina_variables_for_category(category: str) -> List[GUSVariable]:
+    """Get variables with gmina data for a specific category.
+
+    Only returns variables that:
+    1. Belong to the category
+    2. Have actual data in database for gmina Rybno
+    """
+    return [
+        var for var in _VARIABLES_LIST
+        if var.category == category and var.var_id in GMINA_AVAILABLE_VAR_IDS
+    ]
+
+
+def get_gmina_variables_for_tier(tier: str) -> List[GUSVariable]:
+    """Get gmina-available variables for a tier (cumulative).
+
+    Similar to get_variables_for_tier() but filtered to only show
+    variables with actual gmina data.
+    """
+    all_tier_vars = get_variables_for_tier(tier)
+    return [var for var in all_tier_vars if var.var_id in GMINA_AVAILABLE_VAR_IDS]

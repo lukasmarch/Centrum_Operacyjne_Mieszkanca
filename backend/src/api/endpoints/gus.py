@@ -1,12 +1,18 @@
 """
-GUS Statistics API Endpoints - Database-First Architecture
+GUS Statistics API Endpoints - Database-First Architecture (Gmina-Only)
 
 Provides tier-based access to GUS data from local database:
-- Free tier: 9 core KPI variables
-- Premium tier: 57 variables across 10 categories
-- Business tier: All 88 variables + advanced features
+- Free tier: 8 core KPI variables (gmina Rybno only)
+- Premium tier: 31 premium variables (gmina data only)
+- Business tier: 55 total variables with gmina data
 
-All endpoints query local PostgreSQL database (gus_gmina_stats, gus_national_averages).
+Focus: ONLY variables with actual data for gmina Rybno (042815403062)
+Comparisons: Gmina vs Powiat Działdowski (not national)
+Categories with data: 7 (Demografia, Rynek Pracy, Przedsiębiorczość, Finanse,
+                       Mieszkalnictwo, Edukacja, Zdrowie)
+Hidden categories: Transport, Bezpieczeństwo, Turystyka (no gmina data)
+
+All endpoints query local PostgreSQL database (gus_gmina_stats).
 Zero live API calls to GUS BDL.
 Data refreshed quarterly by scheduler.
 """
@@ -25,6 +31,9 @@ from src.integrations.gus_variables import (
     get_variables_for_tier,
     get_variables_for_category,
     get_all_variables,
+    get_gmina_available_variables,
+    get_gmina_variables_for_category,
+    get_gmina_variables_for_tier,
     CATEGORIES,
     UNIT_IDS,
     UNIT_ID_POWIAT,
@@ -38,16 +47,16 @@ router = APIRouter(prefix="/api/stats", tags=["gus"])
 # All variable metadata now comes from gus_variables.py (single source of truth)
 
 def get_allowed_variables(user: Optional[User]) -> List[str]:
-    """Get list of variable keys allowed for user's tier"""
+    """Get list of variable keys allowed for user's tier (gmina data only)"""
     tier = user.tier if user else "free"
-    variables = get_variables_for_tier(tier)
+    variables = get_gmina_variables_for_tier(tier)  # CHANGED: Only gmina data
     return [var.key for var in variables]
 
 
 def check_variable_access(var_key: str, user: Optional[User]) -> bool:
-    """Check if user has access to specific variable"""
+    """Check if user has access to specific variable (gmina data only)"""
     tier = user.tier if user else "free"
-    allowed_vars = get_variables_for_tier(tier)
+    allowed_vars = get_gmina_variables_for_tier(tier)  # CHANGED: Only gmina data
     allowed_keys = [var.key for var in allowed_vars]
     return var_key in allowed_keys
 
@@ -78,7 +87,10 @@ async def get_overview(
     current_user: Optional[User] = Depends(get_optional_user)
 ):
     """
-    Get Free tier KPI overview (9 variables) - Database-only
+    Get Free tier KPI overview (8 variables) - Gmina data only
+
+    Returns ONLY variables with actual data for gmina Rybno.
+    Historical trends from 1995-2024.
 
     Returns:
         - variables: Dict with current values, trends, metadata
@@ -88,42 +100,113 @@ async def get_overview(
     Free tier endpoint - no auth required
     """
     user_tier = current_user.tier if current_user else "free"
-    free_vars = get_variables_for_tier("free")
+    free_vars = get_gmina_variables_for_tier("free")  # CHANGED: Only gmina data
     var_ids = [v.var_id for v in free_vars]
 
-    # Get latest year from DB for Free tier variables specifically
+    # Get latest year from DB
     stmt = select(GUSGminaStats.year).where(
-        and_(
-            GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
-            GUSGminaStats.var_id.in_(var_ids)
-        )
+        GUSGminaStats.var_id.in_(var_ids)
     ).order_by(desc(GUSGminaStats.year)).limit(1)
     latest_year = await session.scalar(stmt)
 
     if not latest_year:
         raise HTTPException(status_code=404, detail="No GUS data available in database")
 
-    # Fetch current year data for Rybno
-    stmt = select(GUSGminaStats).where(
-        and_(
-            GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
-            GUSGminaStats.var_id.in_(var_ids),
-            GUSGminaStats.year == latest_year
-        )
-    )
-    current_result = await session.execute(stmt)
-    current_data = {row.var_id: row for row in current_result.scalars()}
+    # Split variables by level (gmina vs powiat)
+    gmina_var_ids = [v.var_id for v in free_vars if v.level == "gmina"]
+    powiat_var_ids = [v.var_id for v in free_vars if v.level == "powiat"]
 
-    # Fetch previous year data for trend calculation
-    stmt = select(GUSGminaStats).where(
-        and_(
-            GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
-            GUSGminaStats.var_id.in_(var_ids),
-            GUSGminaStats.year == latest_year - 1
+    # Fetch current year data - separate queries for gmina and powiat
+    current_data = {}
+    prev_data = {}
+
+    if gmina_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
+                GUSGminaStats.var_id.in_(gmina_var_ids),
+                GUSGminaStats.year == latest_year
+            )
         )
-    )
-    prev_result = await session.execute(stmt)
-    prev_data = {row.var_id: row for row in prev_result.scalars()}
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            current_data[row.var_id] = row
+
+        # Previous year for trend
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
+                GUSGminaStats.var_id.in_(gmina_var_ids),
+                GUSGminaStats.year == latest_year - 1
+            )
+        )
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            prev_data[row.var_id] = row
+
+    if powiat_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_ID_POWIAT,
+                GUSGminaStats.var_id.in_(powiat_var_ids),
+                GUSGminaStats.year == latest_year
+            )
+        )
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            current_data[row.var_id] = row
+
+        # Previous year for trend
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_ID_POWIAT,
+                GUSGminaStats.var_id.in_(powiat_var_ids),
+                GUSGminaStats.year == latest_year - 1
+            )
+        )
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            prev_data[row.var_id] = row
+
+    # Fetch historical data (last 10 years for trend charts)
+    historical_by_var = {}
+    start_year = latest_year - 9  # 10 years total including latest
+
+    if gmina_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
+                GUSGminaStats.var_id.in_(gmina_var_ids),
+                GUSGminaStats.year >= start_year,
+                GUSGminaStats.year <= latest_year
+            )
+        ).order_by(GUSGminaStats.var_id, GUSGminaStats.year)
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            if row.var_id not in historical_by_var:
+                historical_by_var[row.var_id] = []
+            historical_by_var[row.var_id].append({
+                "year": row.year,
+                "value": row.value
+            })
+
+    if powiat_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_ID_POWIAT,
+                GUSGminaStats.var_id.in_(powiat_var_ids),
+                GUSGminaStats.year >= start_year,
+                GUSGminaStats.year <= latest_year
+            )
+        ).order_by(GUSGminaStats.var_id, GUSGminaStats.year)
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            if row.var_id not in historical_by_var:
+                historical_by_var[row.var_id] = []
+            historical_by_var[row.var_id].append({
+                "year": row.year,
+                "value": row.value
+            })
 
     # Build response
     variables = {}
@@ -143,6 +226,7 @@ async def get_overview(
             "year": current_row.year,
             "unit_name": current_row.unit_name,
             "trend_pct": trend_pct,
+            "historical": historical_by_var.get(var.var_id, []),  # ADDED: 10 years of history
             "metadata": {
                 "key": var.key,
                 "name": var.name_pl,
@@ -177,7 +261,11 @@ async def get_section(
     current_user: User = Depends(get_premium_user)  # Premium tier required
 ):
     """
-    Get complete section data with trends, comparisons, and national averages
+    Get complete section data with trends and comparisons (Gmina data only)
+
+    Returns ONLY variables with actual data for gmina Rybno.
+    Comparisons: Gmina Rybno vs Powiat Działdowski (not national).
+    Hidden sections: transport, bezpieczenstwo, turystyka (no gmina data).
 
     Args:
         section_key: Category key (demografia, rynek_pracy, etc.)
@@ -185,7 +273,7 @@ async def get_section(
 
     Returns:
         - section: Section metadata
-        - variables: Dict with current values, trends, comparisons, national %
+        - variables: Dict with current values, historical trends, powiat comparison
         - latest_year: Most recent data year
 
     Requires: Premium tier
@@ -194,14 +282,21 @@ async def get_section(
     if section_key not in CATEGORIES:
         raise HTTPException(status_code=404, detail=f"Section '{section_key}' not found")
 
-    # Get variables for this category
-    section_vars = get_variables_for_category(section_key)
+    # Get variables for this category - ONLY those with gmina data
+    section_vars = get_gmina_variables_for_category(section_key)  # CHANGED: Only gmina data
     if not section_vars:
+        # Check if category exists but has no gmina data
+        all_category_vars = get_variables_for_category(section_key)
+        if all_category_vars:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Section '{section_key}' has no data available for gmina Rybno"
+            )
         raise HTTPException(status_code=404, detail=f"No variables found for section '{section_key}'")
 
     # Check user has access to at least some variables in this section
     user_tier = current_user.tier
-    allowed_vars = get_variables_for_tier(user_tier)
+    allowed_vars = get_gmina_variables_for_tier(user_tier)  # CHANGED: Only gmina data
     allowed_keys = {v.key for v in allowed_vars}
     accessible_vars = [v for v in section_vars if v.key in allowed_keys]
 
@@ -211,57 +306,97 @@ async def get_section(
             detail=f"Section '{section_key}' requires premium or business tier"
         )
 
+    # Get latest year from DB (check all available data)
     var_ids = [v.var_id for v in accessible_vars]
-
-    # Get latest year from DB for this section's variables
-    # Determine unit_id based on variable level (gmina vs powiat)
-    sample_var = accessible_vars[0]
-    unit_id = UNIT_ID_POWIAT if sample_var.level == "powiat" else UNIT_IDS["Rybno"]
-
     stmt = select(GUSGminaStats.year).where(
-        and_(
-            GUSGminaStats.unit_id == unit_id,
-            GUSGminaStats.var_id.in_(var_ids)
-        )
+        GUSGminaStats.var_id.in_(var_ids)
     ).order_by(desc(GUSGminaStats.year)).limit(1)
     latest_year = await session.scalar(stmt)
 
     if not latest_year:
         raise HTTPException(status_code=404, detail="No GUS data available in database")
 
-    # Fetch current year data for Rybno
-    stmt = select(GUSGminaStats).where(
-        and_(
-            GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
-            GUSGminaStats.var_id.in_(var_ids),
-            GUSGminaStats.year == latest_year
-        )
-    )
-    current_result = await session.execute(stmt)
-    current_data = {row.var_id: row for row in current_result.scalars()}
+    # Build unit_id mapping per variable (gmina vs powiat level)
+    var_unit_map = {}
+    for var in accessible_vars:
+        if var.level == "powiat":
+            var_unit_map[var.var_id] = UNIT_ID_POWIAT
+        else:  # gmina level
+            var_unit_map[var.var_id] = UNIT_IDS["Rybno"]
 
-    # Fetch historical data for trends (last N years, Rybno only)
+    # Fetch current year data - separate queries for gmina and powiat variables
+    gmina_var_ids = [v.var_id for v in accessible_vars if v.level == "gmina"]
+    powiat_var_ids = [v.var_id for v in accessible_vars if v.level == "powiat"]
+
+    current_data = {}
+
+    # Fetch gmina-level data for Rybno
+    if gmina_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
+                GUSGminaStats.var_id.in_(gmina_var_ids),
+                GUSGminaStats.year == latest_year
+            )
+        )
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            current_data[row.var_id] = row
+
+    # Fetch powiat-level data
+    if powiat_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_ID_POWIAT,
+                GUSGminaStats.var_id.in_(powiat_var_ids),
+                GUSGminaStats.year == latest_year
+            )
+        )
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            current_data[row.var_id] = row
+
+    # Fetch historical data - separate for gmina and powiat
     start_year = latest_year - years_back + 1
-    stmt = select(GUSGminaStats).where(
-        and_(
-            GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
-            GUSGminaStats.var_id.in_(var_ids),
-            GUSGminaStats.year >= start_year,
-            GUSGminaStats.year <= latest_year
-        )
-    ).order_by(GUSGminaStats.var_id, GUSGminaStats.year)
-    historical_result = await session.execute(stmt)
-    historical_rows = historical_result.scalars().all()
-
-    # Group historical data by var_id
     historical_by_var = {}
-    for row in historical_rows:
-        if row.var_id not in historical_by_var:
-            historical_by_var[row.var_id] = []
-        historical_by_var[row.var_id].append({
-            "year": row.year,
-            "value": row.value
-        })
+
+    # Gmina historical data
+    if gmina_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
+                GUSGminaStats.var_id.in_(gmina_var_ids),
+                GUSGminaStats.year >= start_year,
+                GUSGminaStats.year <= latest_year
+            )
+        ).order_by(GUSGminaStats.var_id, GUSGminaStats.year)
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            if row.var_id not in historical_by_var:
+                historical_by_var[row.var_id] = []
+            historical_by_var[row.var_id].append({
+                "year": row.year,
+                "value": row.value
+            })
+
+    # Powiat historical data
+    if powiat_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_ID_POWIAT,
+                GUSGminaStats.var_id.in_(powiat_var_ids),
+                GUSGminaStats.year >= start_year,
+                GUSGminaStats.year <= latest_year
+            )
+        ).order_by(GUSGminaStats.var_id, GUSGminaStats.year)
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            if row.var_id not in historical_by_var:
+                historical_by_var[row.var_id] = []
+            historical_by_var[row.var_id].append({
+                "year": row.year,
+                "value": row.value
+            })
 
     # Fetch comparison data (all gminy + powiat, latest year only)
     all_unit_ids = list(UNIT_IDS.values()) + [UNIT_ID_POWIAT]
@@ -283,73 +418,112 @@ async def get_section(
         comparison_by_var[row.var_id].append({
             "unit_id": row.unit_id,
             "unit_name": row.unit_name,
-            "value": row.value
+            "value": row.value,
+            "year": latest_year
         })
 
-    # Fetch national averages (Polska + Województwo)
-    stmt = select(GUSNationalAverages).where(
+    # Fetch previous year data for trend_pct calculation
+    prev_data = {}
+    if gmina_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_IDS["Rybno"],
+                GUSGminaStats.var_id.in_(gmina_var_ids),
+                GUSGminaStats.year == latest_year - 1
+            )
+        )
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            prev_data[row.var_id] = row
+
+    if powiat_var_ids:
+        stmt = select(GUSGminaStats).where(
+            and_(
+                GUSGminaStats.unit_id == UNIT_ID_POWIAT,
+                GUSGminaStats.var_id.in_(powiat_var_ids),
+                GUSGminaStats.year == latest_year - 1
+            )
+        )
+        result = await session.execute(stmt)
+        for row in result.scalars():
+            prev_data[row.var_id] = row
+
+    # Fetch powiat data for comparison (gmina vs powiat)
+    powiat_comparison_data = {}
+    stmt = select(GUSGminaStats).where(
         and_(
-            GUSNationalAverages.var_id.in_(var_ids),
-            GUSNationalAverages.year == latest_year
+            GUSGminaStats.unit_id == UNIT_ID_POWIAT,
+            GUSGminaStats.var_id.in_(var_ids),
+            GUSGminaStats.year == latest_year
         )
     )
-    national_result = await session.execute(stmt)
-    national_rows = national_result.scalars().all()
+    powiat_result = await session.execute(stmt)
+    powiat_rows = powiat_result.scalars().all()
 
-    # Group national averages by var_id and level
-    national_by_var = {}
-    for row in national_rows:
-        if row.var_id not in national_by_var:
-            national_by_var[row.var_id] = {}
-        national_by_var[row.var_id][row.level] = row.value
+    # Group powiat data by var_id
+    for row in powiat_rows:
+        powiat_comparison_data[row.var_id] = row.value
 
-    # Build response
+    # Get last refresh timestamp
+    stmt = select(GUSDataRefreshLog.last_refresh).order_by(
+        desc(GUSDataRefreshLog.last_refresh)
+    ).limit(1)
+    last_refresh = await session.scalar(stmt)
+
+    # Build response - format matches frontend GUSSectionVariable type
     variables = {}
     for var in accessible_vars:
         current_row = current_data.get(var.var_id)
         if not current_row:
             continue
 
-        # Calculate % of national average
-        national_pct = None
-        voivodeship_pct = None
-        national_data = national_by_var.get(var.var_id, {})
-        if national_data.get("national") and current_row.value:
-            national_pct = round((current_row.value / national_data["national"]) * 100, 2)
-        if national_data.get("voivodeship") and current_row.value:
-            voivodeship_pct = round((current_row.value / national_data["voivodeship"]) * 100, 2)
+        # Calculate trend_pct (YoY change)
+        prev_row = prev_data.get(var.var_id)
+        trend_pct = None
+        if prev_row and prev_row.value and prev_row.value != 0:
+            trend_pct = round(((current_row.value - prev_row.value) / prev_row.value) * 100, 2)
 
+        # Build powiat_comparison (gmina vs powiat)
+        powiat_comparison = None
+        powiat_val = powiat_comparison_data.get(var.var_id)
+        if powiat_val and current_row.value:
+            powiat_comparison = {
+                "powiat_value": powiat_val,
+                "gmina_value": current_row.value,
+                "percentage_of_powiat": round((current_row.value / powiat_val) * 100, 2),
+                "difference": round(current_row.value - powiat_val, 2),
+                "year": latest_year
+            }
+
+        # Format matches GUSSectionVariable { current: GUSVariableValue, trend, comparison, powiat_comparison }
         variables[var.key] = {
             "current": {
                 "value": current_row.value,
                 "year": current_row.year,
-                "unit_name": current_row.unit_name,
+                "trend_pct": trend_pct,
+                "metadata": {
+                    "key": var.key,
+                    "name": var.name_pl,
+                    "unit": var.unit,
+                    "category": var.category,
+                    "tier": var.tier,
+                    "level": var.level,
+                    "format_type": var.format_type,
+                }
             },
             "trend": historical_by_var.get(var.var_id, []),
             "comparison": comparison_by_var.get(var.var_id, []),
-            "national_comparison": {
-                "national_avg": national_data.get("national"),
-                "national_pct": national_pct,
-                "voivodeship_avg": national_data.get("voivodeship"),
-                "voivodeship_pct": voivodeship_pct,
-            },
-            "metadata": {
-                "key": var.key,
-                "name": var.name_pl,
-                "unit": var.unit,
-                "category": var.category,
-                "tier": var.tier,
-                "level": var.level,
-                "format_type": var.format_type,
-            }
+            "powiat_comparison": powiat_comparison,  # CHANGED: gmina vs powiat, not national
         }
 
     return {
-        "section": section_key,
+        "section_key": section_key,
         "section_name": CATEGORIES[section_key]["name"],
         "section_icon": CATEGORIES[section_key]["icon"],
         "variables": variables,
+        "user_tier": user_tier,
         "latest_year": latest_year,
+        "last_refresh": last_refresh.isoformat() if last_refresh else None,
         "count": len(variables)
     }
 
@@ -659,13 +833,16 @@ async def list_variables(current_user: Optional[User] = Depends(get_optional_use
 @router.get("/categories")
 async def get_categories(current_user: Optional[User] = Depends(get_optional_user)):
     """
-    Get available categories for user's tier
+    Get available categories for user's tier (gmina data only)
+
+    Returns ONLY categories with gmina data (7 total).
+    Hidden: transport, bezpieczenstwo, turystyka (no gmina data).
 
     Returns:
         List of categories with variable counts
     """
     user_tier = current_user.tier if current_user else "free"
-    allowed_vars = get_variables_for_tier(user_tier)
+    allowed_vars = get_gmina_variables_for_tier(user_tier)  # CHANGED: Only gmina data
 
     # Build categories dict
     categories = {}
