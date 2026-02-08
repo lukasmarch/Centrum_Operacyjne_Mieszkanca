@@ -293,17 +293,18 @@ class GUSGminaStats(SQLModel, table=True):
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    
+
     # Identyfikacja
     unit_id: str = Field(max_length=20, index=True)  # ID jednostki GUS (np. "042815403062")
     unit_name: str = Field(max_length=100)  # Nazwa gminy (np. "Rybno")
     var_id: str = Field(max_length=20, index=True)  # ID zmiennej GUS (np. "60530")
     var_name: str = Field(max_length=200)  # Nazwa zmiennej (np. "Podmioty REGON na 10k")
-    
+    category: Optional[str] = Field(default=None, max_length=50, index=True)  # Kategoria (demografia, finanse_gminy, etc.)
+
     # Dane
     year: int = Field(index=True)  # Rok danych
     value: Optional[float] = None  # Wartość
-    
+
     # Metadata
     fetched_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy pobrano z API GUS
     

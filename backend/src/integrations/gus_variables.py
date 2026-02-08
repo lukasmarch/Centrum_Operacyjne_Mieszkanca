@@ -304,23 +304,29 @@ def get_gmina_available_variables() -> List[GUSVariable]:
 
 
 def get_gmina_variables_for_category(category: str) -> List[GUSVariable]:
-    """Get variables with gmina data for a specific category.
+    """Get variables for a specific category (Gmina + Powiat level).
 
-    Only returns variables that:
-    1. Belong to the category
-    2. Have actual data in database for gmina Rybno
+    Returns:
+    1. Variables with ACTUAL data for gmina Rybno
+    2. Variables defined at 'powiat' level (fallback context)
     """
     return [
         var for var in _VARIABLES_LIST
-        if var.category == category and var.var_id in GMINA_AVAILABLE_VAR_IDS
+        if var.category == category and (
+            var.var_id in GMINA_AVAILABLE_VAR_IDS or var.level == "powiat"
+        )
     ]
 
 
 def get_gmina_variables_for_tier(tier: str) -> List[GUSVariable]:
-    """Get gmina-available variables for a tier (cumulative).
+    """Get available variables for a tier (Gmina + Powiat level).
 
-    Similar to get_variables_for_tier() but filtered to only show
-    variables with actual gmina data.
+    Similar to get_variables_for_tier() but filtered to show:
+    1. Variables with ACTUAL gmina data
+    2. Variables defined at 'powiat' level
     """
     all_tier_vars = get_variables_for_tier(tier)
-    return [var for var in all_tier_vars if var.var_id in GMINA_AVAILABLE_VAR_IDS]
+    return [
+        var for var in all_tier_vars
+        if var.var_id in GMINA_AVAILABLE_VAR_IDS or var.level == "powiat"
+    ]
