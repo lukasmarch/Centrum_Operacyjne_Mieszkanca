@@ -24,7 +24,7 @@ export const fetchTrafficData = async (latitude?: number, longitude?: number): P
     `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-pro",
+            model: "gemini-2.0-flash",
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],

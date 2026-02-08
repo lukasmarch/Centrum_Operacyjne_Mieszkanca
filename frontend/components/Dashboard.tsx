@@ -17,6 +17,8 @@ import { useWasteSchedule } from '../src/hooks/useWasteSchedule';
 import { useAuth } from '../src/context/AuthContext';
 import { AppSection } from '../types';
 
+import { getHoliday, getNameDays } from '../src/utils/calendarUtils';
+
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ onNavigate }) => {
   const { user, isPremium, userLocation } = useAuth();
   const { weather, loading: weatherLoading, error: weatherError } = useWeather();
@@ -26,6 +28,10 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
   const wasteEvents = useWasteSchedule(userLocation);
 
   const weatherData = weather || MOCK_WEATHER; // Fallback to mock
+
+  const today = new Date();
+  const holiday = getHoliday(today);
+  const nameDays = getNameDays(today);
 
   // Select 2 articles with source diversity
   const diverseArticles = (() => {
@@ -90,11 +96,20 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
           <h2 className="text-3xl font-bold text-slate-900">Witaj, mieszkańcu! 👋</h2>
           <p className="text-slate-500">Oto najważniejsze informacje z powiatu działdowskiego na dziś.</p>
         </div>
-        <div className="flex items-center gap-3 bg-white p-2 px-4 rounded-2xl shadow-sm border border-slate-100">
-          <span className="text-2xl">🗓️</span>
+        <div className="flex items-start gap-3 bg-white p-3 px-5 rounded-2xl shadow-sm border border-slate-100 max-w-full md:max-w-md">
+          <span className="text-3xl mt-1">🗓️</span>
           <div className="text-sm">
-            <p className="font-semibold">{new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-            <p className="text-slate-400 text-xs">Imprezy: {MOCK_EVENTS.length} zaplanowane</p>
+            <p className="font-semibold text-lg">{today.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <div className="text-slate-500 text-xs mt-1 flex flex-col gap-1">
+              {holiday && (
+                <span className="text-blue-600 font-bold text-sm leading-tight">
+                  🎉 {holiday}
+                </span>
+              )}
+              <span className="leading-relaxed" title={nameDays}>
+                <span className="font-semibold">Imieniny:</span> {nameDays}
+              </span>
+            </div>
           </div>
         </div>
       </header>
