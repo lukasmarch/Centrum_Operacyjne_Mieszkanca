@@ -114,12 +114,13 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 min-w-0">
       {title && (
         <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>
       )}
 
-      <ResponsiveContainer width="100%" height={height}>
+      <div style={{ width: '100%', height: `${height}px`, minWidth: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={sortedData}
           layout="vertical"
@@ -161,7 +162,8 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
             ))}
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
 
       {/* Legend */}
       <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-sm">

@@ -22,9 +22,10 @@
  */
 
 import React, { useState } from 'react';
-import { RefreshCw, AlertCircle, ChevronLeft, TrendingUp } from 'lucide-react';
+import { RefreshCw, AlertCircle, ChevronLeft, TrendingUp, Info } from 'lucide-react';
 import { useGUSSection } from '../../src/hooks/useGUSStats';
 import { useAuth } from '../../src/context/AuthContext';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import KPICard from './charts/KPICard';
 import TrendChart from './charts/TrendChart';
 import ComparisonBar from './charts/ComparisonBar';
@@ -95,6 +96,25 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
   const firstVariableKey = selectedVariable || variableKeys[0];
   const primaryVariable = variables[firstVariableKey];
 
+  // Guard: no variables returned for this section
+  if (!primaryVariable || variableKeys.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto mt-12 p-8 bg-amber-50 border border-amber-200 rounded-xl text-center">
+        <AlertCircle className="text-amber-600 mx-auto mb-4" size={32} />
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Brak danych dla tej sekcji</h3>
+        <p className="text-gray-600 mb-4">
+          Sekcja nie zawiera jeszcze danych dla Gminy Rybno.
+        </p>
+        <button
+          onClick={onBack}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+        >
+          Powrót do przeglądu
+        </button>
+      </div>
+    );
+  }
+
   // Prepare data for main trend chart
   const trendData = primaryVariable?.trend?.map(item => ({
     year: item.year,
@@ -139,18 +159,17 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
       {/* KPI Cards Row (all variables in section) */}
       <div className="mb-8">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Kluczowe wskaźniki</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-w-0">
           {variableKeys.map(varKey => {
             const variable = variables[varKey];
             return (
               <button
                 key={varKey}
                 onClick={() => setSelectedVariable(varKey)}
-                className={`text-left transition-all ${
-                  selectedVariable === varKey || (!selectedVariable && varKey === firstVariableKey)
-                    ? 'ring-2 ring-blue-500'
-                    : ''
-                }`}
+                className={`text-left transition-all min-w-0 ${selectedVariable === varKey || (!selectedVariable && varKey === firstVariableKey)
+                  ? 'ring-2 ring-blue-500'
+                  : ''
+                  }`}
               >
                 <KPICard
                   label={variable.current.metadata.name}
@@ -158,6 +177,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
                   unit={variable.current.metadata.unit}
                   trend={variable.current.trend_pct}
                   formatType={variable.current.metadata.format_type}
+                  level={variable.current.metadata.level as 'gmina' | 'powiat'}
                 />
               </button>
             );
@@ -180,33 +200,85 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
       )}
 
       {/* Comparison Charts Grid (2x2) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 min-w-0">
         {/* Gminy comparison */}
         {comparisonData.length > 0 && (
-          <ComparisonBar
-            data={comparisonData}
-            title="Porównanie z innymi gminami"
-            unit={primaryVariable.current.metadata.unit}
-            maxItems={8}
-            height={320}
-            formatType={primaryVariable.current.metadata.format_type}
-          />
+          <div className="min-w-0">
+            <ComparisonBar
+              data={comparisonData}
+              title="Porównanie z innymi gminami"
+              unit={primaryVariable.current.metadata.unit}
+              maxItems={8}
+              height={320}
+              formatType={primaryVariable.current.metadata.format_type}
+            />
+          </div>
         )}
 
-        {/* National average gauge */}
-        {primaryVariable.national_comparison && (
-          <GaugeChart
-            value={primaryVariable.national_comparison.gmina_value}
-            nationalValue={primaryVariable.national_comparison.national_value}
-            title="Porównanie ze średnią krajową"
-            unit={primaryVariable.current.metadata.unit}
-            formatType={primaryVariable.current.metadata.format_type}
-            comparisonLevel="krajowa"
-          />
+        {/* Gmina vs Powiat Comparison (Only for Gmina-level variables) */}
+        {primaryVariable.current.metadata.level === 'gmina' && primaryVariable.powiat_comparison && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 min-w-0">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Gmina vs Powiat</h3>
+            <div style={{ width: '100%', height: '320px', minWidth: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[
+                    { name: 'Gmina Rybno', value: primaryVariable.powiat_comparison.gmina_value, fill: '#3b82f6' },
+                    { name: 'Powiat Działdowski', value: primaryVariable.powiat_comparison.powiat_value, fill: '#9ca3af' }
+                  ]}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value: number) => [
+                      value.toLocaleString('pl-PL') + ' ' + primaryVariable.current.metadata.unit,
+                      'Wartość'
+                    ]}
+                  />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {
+                      [
+                        { name: 'Gmina Rybno', fill: '#3b82f6' },
+                        { name: 'Powiat Działdowski', fill: '#9ca3af' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))
+                    }
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-gray-700 text-center border border-blue-100">
+              Gmina stanowi <strong>{primaryVariable.powiat_comparison.percentage_of_powiat}%</strong> wartości powiatu.
+            </div>
+          </div>
+        )}
+
+        {/* Powiat Level Information (Fallback for missing gmina data) */}
+        {primaryVariable.current.metadata.level === 'powiat' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col justify-center items-center text-center h-full min-h-[400px] min-w-0">
+            <div className="bg-amber-50 p-4 rounded-full mb-4">
+              <Info className="text-amber-500" size={32} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Dane na poziomie powiatu</h3>
+            <p className="text-gray-600 max-w-sm">
+              Dla tego wskaźnika szczegółowe dane dla Gminy Rybno nie są dostępne w Banku Danych Lokalnych GUS.
+            </p>
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">
+                Wartość dla Powiatu Działdowskiego
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {primaryVariable.current.value.toLocaleString('pl-PL')} {primaryVariable.current.metadata.unit}
+              </p>
+            </div>
+          </div>
         )}
 
         {/* Additional metrics - placeholder for future donut/bar charts */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 min-w-0">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Dodatkowe metryki</h3>
           <div className="space-y-3">
             {variableKeys.slice(0, 5).map(varKey => {
@@ -218,11 +290,10 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
                     <span className="text-gray-900 font-bold">
                       {variable.current.value.toLocaleString('pl-PL')} {variable.current.metadata.unit}
                     </span>
-                    {variable.current.trend_pct !== undefined && (
+                    {variable.current.trend_pct != null && (
                       <span
-                        className={`text-xs font-semibold ${
-                          variable.current.trend_pct >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}
+                        className={`text-xs font-semibold ${variable.current.trend_pct >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}
                       >
                         {variable.current.trend_pct >= 0 ? '+' : ''}
                         {variable.current.trend_pct.toFixed(1)}%
@@ -299,13 +370,12 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
                       {variable.current.value.toLocaleString('pl-PL')} {variable.current.metadata.unit}
                     </td>
                     <td className="px-5 py-4 text-sm text-right">
-                      {variable.current.trend_pct !== undefined ? (
+                      {variable.current.trend_pct != null ? (
                         <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
-                            variable.current.trend_pct >= 0
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
+                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${variable.current.trend_pct >= 0
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                            }`}
                         >
                           {variable.current.trend_pct >= 0 ? '+' : ''}
                           {variable.current.trend_pct.toFixed(2)}%

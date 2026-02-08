@@ -80,12 +80,13 @@ const TrendChart: React.FC<TrendChartProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 min-w-0">
       {title && (
         <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>
       )}
 
-      <ResponsiveContainer width="100%" height={height}>
+      <div style={{ width: '100%', height: `${height}px`, minWidth: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -132,7 +133,8 @@ const TrendChart: React.FC<TrendChartProps> = ({
             animationEasing="ease-in-out"
           />
         </AreaChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
 
       {/* Stats summary below chart */}
       {data.length > 1 && (

@@ -33,10 +33,7 @@ import {
   Wallet,
   Home,
   GraduationCap,
-  Bus,
-  Shield,
   HeartPulse,
-  Palmtree,
   Lock,
 } from 'lucide-react';
 import { UserTier } from '../../../types';
@@ -63,10 +60,7 @@ const SECTIONS: Section[] = [
   { key: 'finanse_gminy', name: 'Finanse Gminy', icon: <Wallet size={18} />, tier: 'premium' },
   { key: 'mieszkalnictwo', name: 'Mieszkalnictwo', icon: <Home size={18} />, tier: 'premium' },
   { key: 'edukacja', name: 'Edukacja', icon: <GraduationCap size={18} />, tier: 'premium' },
-  { key: 'transport', name: 'Transport', icon: <Bus size={18} />, tier: 'premium' },
-  { key: 'bezpieczenstwo', name: 'Bezpieczeństwo', icon: <Shield size={18} />, tier: 'premium' },
   { key: 'zdrowie', name: 'Zdrowie', icon: <HeartPulse size={18} />, tier: 'premium' },
-  { key: 'turystyka', name: 'Turystyka', icon: <Palmtree size={18} />, tier: 'premium' },
 ];
 
 const SectionNav: React.FC<SectionNavProps> = ({
@@ -131,10 +125,9 @@ const SectionNav: React.FC<SectionNavProps> = ({
               disabled={!isAccessible && !isActive}
               className={`
                 relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all
-                ${
-                  isActive
-                    ? 'border-blue-500 bg-blue-50 shadow-md'
-                    : isAccessible
+                ${isActive
+                  ? 'border-blue-500 bg-blue-50 shadow-md'
+                  : isAccessible
                     ? 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-sm'
                     : 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
                 }
@@ -151,10 +144,9 @@ const SectionNav: React.FC<SectionNavProps> = ({
               <div
                 className={`
                   p-2 rounded-lg
-                  ${
-                    isActive
-                      ? 'bg-blue-500 text-white'
-                      : isAccessible
+                  ${isActive
+                    ? 'bg-blue-500 text-white'
+                    : isAccessible
                       ? 'bg-gray-100 text-gray-600'
                       : 'bg-gray-200 text-gray-400'
                   }
@@ -167,10 +159,9 @@ const SectionNav: React.FC<SectionNavProps> = ({
               <span
                 className={`
                   text-xs font-semibold text-center leading-tight
-                  ${
-                    isActive
-                      ? 'text-blue-700'
-                      : isAccessible
+                  ${isActive
+                    ? 'text-blue-700'
+                    : isAccessible
                       ? 'text-gray-700'
                       : 'text-gray-400'
                   }

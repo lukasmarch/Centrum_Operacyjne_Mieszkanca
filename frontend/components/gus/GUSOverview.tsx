@@ -60,15 +60,20 @@ const GUSOverview: React.FC = () => {
 
   const { variables, user_tier, latest_year, last_refresh } = data;
 
-  // Extract Free tier variables (8 from gmina)
+  // Extract Free tier variables (ONLY 8 verified gmina Rybno variables)
+  // Demografia (3 vars)
   const population = variables.population_total;
-  const birthsLive = variables.births_live;
-  const migrationBalance = variables.migration_balance_per_1k;
-  const entitiesRegon = variables.entities_regon_per_10k;
+  const births = variables.births_live;
+  const migration = variables.migration_balance_per_1k;
+
+  // Przedsiębiorczość (3 vars)
+  const entities = variables.entities_regon_per_10k;
   const newEntities = variables.new_entities_per_10k;
   const deregistered = variables.deregistered_per_10k;
-  const revenuePerCapita = variables.revenue_per_capita;
-  const expenditurePerCapita = variables.expenditure_per_capita;
+
+  // Finanse Gminy (2 vars)
+  const revenue = variables.revenue_per_capita;
+  const expenditure = variables.expenditure_per_capita;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -94,51 +99,120 @@ const GUSOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* Hero KPI Row (4 cards with sparklines) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Hero KPI Row (8 Free tier variables - Gmina Rybno only) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 min-w-0">
+        {/* Row 1: Core Metrics */}
         {population && (
-          <KPICard
-            label="Liczba ludności"
-            value={population.value}
-            unit="osób"
-            trend={population.trend_pct}
-            sparklineData={population.historical}
-            icon={Users}
-            formatType="integer"
-          />
+          <div className="min-w-0">
+            <KPICard
+              label="Liczba ludności"
+              value={population.value}
+              unit="osób"
+              trend={population.trend_pct}
+              sparklineData={population.historical}
+              icon={Users}
+              formatType="integer"
+            />
+          </div>
         )}
-        {entitiesRegon && (
-          <KPICard
-            label="Firmy na 10k mieszkańców"
-            value={entitiesRegon.value}
-            unit=""
-            trend={entitiesRegon.trend_pct}
-            sparklineData={entitiesRegon.historical}
-            icon={Building2}
-            formatType="float"
-          />
+
+        {births && (
+          <div className="min-w-0">
+            <KPICard
+              label="Urodzenia żywe"
+              value={births.value}
+              unit="os."
+              trend={births.trend_pct}
+              sparklineData={births.historical}
+              icon={Users}
+              formatType="integer"
+            />
+          </div>
         )}
-        {revenuePerCapita && (
-          <KPICard
-            label="Dochody per capita"
-            value={revenuePerCapita.value}
-            unit="PLN"
-            trend={revenuePerCapita.trend_pct}
-            sparklineData={revenuePerCapita.historical}
-            icon={Wallet}
-            formatType="currency"
-          />
+
+        {revenue && (
+          <div className="min-w-0">
+            <KPICard
+              label="Dochody per capita"
+              value={revenue.value}
+              unit="PLN"
+              trend={revenue.trend_pct}
+              sparklineData={revenue.historical}
+              icon={Wallet}
+              formatType="currency"
+            />
+          </div>
         )}
-        {expenditurePerCapita && (
-          <KPICard
-            label="Wydatki per capita"
-            value={expenditurePerCapita.value}
-            unit="PLN"
-            trend={expenditurePerCapita.trend_pct}
-            sparklineData={expenditurePerCapita.historical}
-            icon={Wallet}
-            formatType="currency"
-          />
+
+        {expenditure && (
+          <div className="min-w-0">
+            <KPICard
+              label="Wydatki per capita"
+              value={expenditure.value}
+              unit="PLN"
+              trend={expenditure.trend_pct}
+              sparklineData={expenditure.historical}
+              icon={Wallet}
+              formatType="currency"
+            />
+          </div>
+        )}
+
+        {/* Row 2: Business & Migration */}
+        {entities && (
+          <div className="min-w-0">
+            <KPICard
+              label="Firmy na 10k mieszkańców"
+              value={entities.value}
+              unit=""
+              trend={entities.trend_pct}
+              sparklineData={entities.historical}
+              icon={Building2}
+              formatType="float"
+            />
+          </div>
+        )}
+
+        {newEntities && (
+          <div className="min-w-0">
+            <KPICard
+              label="Nowe firmy na 10k"
+              value={newEntities.value}
+              unit=""
+              trend={newEntities.trend_pct}
+              sparklineData={newEntities.historical}
+              icon={TrendingUp}
+              formatType="float"
+            />
+          </div>
+        )}
+
+        {deregistered && (
+          <div className="min-w-0">
+            <KPICard
+              label="Wykreślone firmy na 10k"
+              value={deregistered.value}
+              unit=""
+              trend={deregistered.trend_pct}
+              sparklineData={deregistered.historical}
+              icon={Building2}
+              formatType="float"
+            />
+          </div>
+        )}
+
+        {migration && (
+          <div className="min-w-0">
+            <KPICard
+              label="Saldo migracji na 1000"
+              value={migration.value}
+              unit=""
+              trend={migration.trend_pct}
+              sparklineData={migration.historical}
+              icon={Users}
+              formatType="float"
+            />
+          </div>
         )}
       </div>
 
@@ -151,10 +225,10 @@ const GUSOverview: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
           {/* Population Trend */}
           {population && population.historical && population.historical.length > 0 && (
-            <div className="bg-gray-50 rounded-xl p-6">
+            <div className="bg-gray-50 rounded-xl p-6 min-w-0">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-gray-900 mb-1">Ludność gminy</h3>
                 <p className="text-sm text-gray-500">
@@ -174,17 +248,17 @@ const GUSOverview: React.FC = () => {
           )}
 
           {/* Births Trend */}
-          {birthsLive && birthsLive.historical && birthsLive.historical.length > 0 && (
-            <div className="bg-gray-50 rounded-xl p-6">
+          {births && births.historical && births.historical.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-6 min-w-0">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-gray-900 mb-1">Urodzenia żywe</h3>
                 <p className="text-sm text-gray-500">
-                  Trend: {birthsLive.trend_pct && birthsLive.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(birthsLive.trend_pct || 0).toFixed(2)}% rok do roku
+                  Trend: {births.trend_pct && births.trend_pct > 0 ? '▲' : '▼'}{' '}
+                  {Math.abs(births.trend_pct || 0).toFixed(2)}% rok do roku
                 </p>
               </div>
               <TrendChart
-                data={birthsLive.historical}
+                data={births.historical}
                 title=""
                 unit="os."
                 height={250}
@@ -195,17 +269,17 @@ const GUSOverview: React.FC = () => {
           )}
 
           {/* Migration Balance Trend */}
-          {migrationBalance && migrationBalance.historical && migrationBalance.historical.length > 0 && (
-            <div className="bg-gray-50 rounded-xl p-6">
+          {migration && migration.historical && migration.historical.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-6 min-w-0">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-gray-900 mb-1">Saldo migracji na 1000 ludności</h3>
                 <p className="text-sm text-gray-500">
-                  Trend: {migrationBalance.trend_pct && migrationBalance.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(migrationBalance.trend_pct || 0).toFixed(2)}% zmiana YoY
+                  Trend: {migration.trend_pct && migration.trend_pct > 0 ? '▲' : '▼'}{' '}
+                  {Math.abs(migration.trend_pct || 0).toFixed(2)}% zmiana YoY
                 </p>
               </div>
               <TrendChart
-                data={migrationBalance.historical}
+                data={migration.historical}
                 title=""
                 unit=""
                 height={250}
@@ -215,23 +289,65 @@ const GUSOverview: React.FC = () => {
             </div>
           )}
 
-          {/* Business Dynamics - New Entities */}
-          {newEntities && newEntities.historical && newEntities.historical.length > 0 && (
-            <div className="bg-gray-50 rounded-xl p-6">
+          {/* Business Dynamics - Entity Registrations */}
+          {entities && entities.historical && entities.historical.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-6 min-w-0">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-1">Nowe firmy na 10k mieszkańców</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-1">Podmioty REGON na 10k</h3>
                 <p className="text-sm text-gray-500">
-                  Trend: {newEntities.trend_pct && newEntities.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(newEntities.trend_pct || 0).toFixed(2)}% rok do roku
+                  Trend: {entities.trend_pct && entities.trend_pct > 0 ? '▲' : '▼'}{' '}
+                  {Math.abs(entities.trend_pct || 0).toFixed(2)}% rok do roku
                 </p>
               </div>
               <TrendChart
-                data={newEntities.historical}
+                data={entities.historical}
                 title=""
                 unit=""
                 height={250}
                 color="#8b5cf6"
                 formatType="decimal"
+              />
+            </div>
+          )}
+
+          {/* Revenue Per Capita Trend */}
+          {revenue && revenue.historical && revenue.historical.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-6 min-w-0">
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-gray-900 mb-1">Dochody gminy per capita</h3>
+                <p className="text-sm text-gray-500">
+                  Trend: {revenue.trend_pct && revenue.trend_pct > 0 ? '▲' : '▼'}{' '}
+                  {Math.abs(revenue.trend_pct || 0).toFixed(2)}% rok do roku
+                </p>
+              </div>
+              <TrendChart
+                data={revenue.historical}
+                title=""
+                unit="PLN"
+                height={250}
+                color="#0ea5e9"
+                formatType="currency"
+              />
+            </div>
+          )}
+
+          {/* Expenditure Per Capita Trend */}
+          {expenditure && expenditure.historical && expenditure.historical.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-6 min-w-0">
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-gray-900 mb-1">Wydatki gminy per capita</h3>
+                <p className="text-sm text-gray-500">
+                  Trend: {expenditure.trend_pct && expenditure.trend_pct > 0 ? '▲' : '▼'}{' '}
+                  {Math.abs(expenditure.trend_pct || 0).toFixed(2)}% rok do roku
+                </p>
+              </div>
+              <TrendChart
+                data={expenditure.historical}
+                title=""
+                unit="PLN"
+                height={250}
+                color="#f43f5e"
+                formatType="currency"
               />
             </div>
           )}
