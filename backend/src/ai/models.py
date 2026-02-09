@@ -68,12 +68,12 @@ class DailySummary(BaseModel):
     date: str = Field(description="Data w formacie YYYY-MM-DD")
     headline: str = Field(
         max_length=200,
-        description="Główny nagłówek dnia"
+        description="Główny nagłówek dnia - chwytliwy, przyciągający uwagę"
     )
-    highlights: List[str] = Field(
-        min_length=3,
-        max_length=5,
-        description="Top 3-5 najważniejszych wiadomości"
+    highlights: str = Field(
+        min_length=200,
+        max_length=800,
+        description="Akapit opisowy (3-5 zdań) z najważniejszymi wiadomościami, pogodą i wydarzeniami. Najważniejsze info w **bold** (markdown)"
     )
     summary_by_category: dict[str, str] = Field(
         description="Podsumowanie per moduł (klucz: kategoria, wartość: opis)"
@@ -82,6 +82,6 @@ class DailySummary(BaseModel):
         default_factory=list,
         description="Nadchodzące wydarzenia"
     )
-    weather_summary: str = Field(
-        description="Podsumowanie pogody"
+    air_quality_summary: str = Field(
+        description="Podsumowanie jakości powietrza i warunków pogodowych (dane z czujnika w Rybnie)"
     )

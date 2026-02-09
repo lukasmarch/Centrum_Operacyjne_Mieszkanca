@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.models import DailySummary as DailySummaryModel
 from src.ai.prompts import DAILY_SUMMARY_PROMPT
-from src.database.schema import Article, Event, Weather, DailySummary
+from src.database.schema import Article, Event, AirQuality, DailySummary
 from src.utils.logger import setup_logger
 from src.config import settings
 
@@ -104,21 +104,21 @@ class SummaryGenerator:
         )
         events = events_result.scalars().all()
 
-        # 4. Pobierz aktualną pogodę
-        weather_result = await session.execute(
-            select(Weather)
-            .where(Weather.is_current == True)
-            .order_by(Weather.fetched_at.desc())
+        # 4. Pobierz aktualne dane air quality (czujnik w Rybnie)
+        air_quality_result = await session.execute(
+            select(AirQuality)
+            .where(AirQuality.is_current == True)
+            .order_by(AirQuality.fetched_at.desc())
             .limit(1)
         )
-        weather = weather_result.scalar_one_or_none()
+        air_quality = air_quality_result.scalar_one_or_none()
 
         # 5. Przygotuj dane wejściowe dla AI
         input_data = self._prepare_input_for_ai(
             date_start,
             articles_by_category,
             events,
-            weather
+            air_quality
         )
 
         try:
@@ -137,7 +137,7 @@ class SummaryGenerator:
                     "highlights": summary_data.highlights,
                     "summary_by_category": summary_data.summary_by_category,
                     "upcoming_events": summary_data.upcoming_events,
-                    "weather_summary": summary_data.weather_summary,
+                    "air_quality_summary": summary_data.air_quality_summary,
                     "stats": {
                         "total_articles": len(articles),
                         "categories_count": len(articles_by_category),
@@ -168,7 +168,7 @@ class SummaryGenerator:
         date: datetime,
         articles_by_category: dict,
         events: list,
-        weather: Optional[Weather]
+        air_quality: Optional[AirQuality]
     ) -> str:
         """Przygotuj sformatowany tekst dla AI"""
 
@@ -208,16 +208,19 @@ class SummaryGenerator:
                     lines.append(f"  Miejsce: {event.location}")
                 lines.append("")
 
-        # Dodaj pogodę
-        if weather:
+        # Dodaj dane air quality (czujnik w Rybnie)
+        if air_quality:
             lines.append("\n" + "=" * 80)
-            lines.append("POGODA:")
+            lines.append("JAKOŚĆ POWIETRZA I WARUNKI (czujnik w Rybnie):")
             lines.append("=" * 80 + "\n")
-            lines.append(f"Lokalizacja: {weather.location}")
-            lines.append(f"Temperatura: {weather.temperature}°C (odczuwalna: {weather.feels_like}°C)")
-            lines.append(f"Warunki: {weather.description}")
-            lines.append(f"Wilgotność: {weather.humidity}%, Wiatr: {weather.wind_speed} m/s")
-            if weather.rain_1h:
-                lines.append(f"Opady: {weather.rain_1h}mm/h")
+            lines.append(f"Lokalizacja: {air_quality.location}")
+            lines.append(f"Temperatura: {air_quality.temperature}°C")
+            lines.append(f"Wilgotność: {air_quality.humidity}%")
+            lines.append(f"Ciśnienie: {air_quality.pressure} hPa")
+            lines.append(f"\nJakość powietrza: {air_quality.caqi_level} (CAQI: {air_quality.caqi})")
+            lines.append(f"Pyły zawieszone:")
+            lines.append(f"  - PM2.5: {air_quality.pm25} µg/m³")
+            lines.append(f"  - PM10: {air_quality.pm10} µg/m³")
+            lines.append(f"\nAktualizacja: {air_quality.fetched_at}")
 
         return "\n".join(lines)

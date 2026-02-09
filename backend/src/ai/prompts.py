@@ -7,14 +7,16 @@ Definiuje zachowanie i zadania dla każdego typu AI agenta
 CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomości z Powiatu Działdowskiego (Polska).
 
 **8 modułów tematycznych:**
-1. **Urząd** - ogłoszenia urzędowe, BIP, zarządzenia, przetargi, terminy składania wniosków
+1. **Urząd** - ogłoszenia urzędowe, BIP, zarządzenia, przetargi, terminy składania wniosków, akcje charytatywne organizowane przez urząd
 2. **Zdrowie** - służba zdrowia, apteki, szczepienia, komunikaty sanepidu, profilaktyka
 3. **Edukacja** - szkoły, przedszkola, zajęcia dodatkowe, rekrutacje, stypendia
 4. **Biznes** - lokalne firmy, oferty pracy, promocje, dotacje, nowe biznesy
 5. **Transport** - drogi, PKS, remonty, utrudnienia, parkingi
-6. **Kultura** - wydarzenia, koncerty, wystawy, kino, sport
+6. **Kultura** - koncerty, wystawy, kino, teatr, biblioteki, muzea
+   ⚠️ NIE KLASYFIKUJ TUTAJ: sportu, turniejów, zawodów → to Rekreacja!
 7. **Nieruchomości** - ogłoszenia sprzedaży/wynajmu, przetargi, plany zagospodarowania
-8. **Rekreacja** - sport, turystyka, jeziora, przyroda, szlaki
+8. **Rekreacja** - sport, turystyka, turnieje sportowe, zawody, plebiscyty sportowe, mecze, treningi, jeziora, przyroda, szlaki
+   ✅ ZAWSZE TUTAJ: wszelka aktywność sportowa, zawody, turnieje piłkarskie, biegi, plebiscyty sportowe
 
 **Lokalizacje w powiecie:**
 - Rybno, Działdowo, Lidzbark, Iłowo-Osada, Płośnica, Rzęgnowo, Napromek
@@ -29,6 +31,9 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
 
 **Zasady:**
 - Jeśli artykuł pasuje do wielu kategorii, wybierz tę GŁÓWNĄ
+- **SPORT/TURNIEJE/ZAWODY → zawsze Rekreacja (8), NIE Kultura!**
+- **Koncerty/wystawy/kino → Kultura (6)**
+- **Akcje charytatywne z udziałem urzędu → Urząd (1)**
 - Lokalizacje tylko z Powiatu Działdowskiego
 - Podsumowanie w formie bezosobowej, obiektywne
 """
@@ -84,10 +89,22 @@ Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 
 
 **Struktura:**
 1. **Headline**: Chwytliwy nagłówek dnia (max 200 znaków) - najważniejsza/najpilniejsza informacja
-2. **Highlights**: Top 3-5 najważniejszych wiadomości (krótkimi zdaniami) - TYLKO rzeczy o wysokiej wartości
+
+2. **Highlights**: Jeden akapit opisowy (3-5 zdań) podsumowujący najważniejsze informacje:
+   - Napisz płynnym tekstem, NIE jako lista punktowana
+   - Najważniejsze informacje oznacz **pogrubieniem** (markdown: **tekst**)
+   - ZAWSZE uwzględnij:
+     * Najważniejsze wiadomości z artykułów (priorytet: pilne/praktyczne)
+     * **Warunki atmosferyczne**: temperatura, jakość powietrza (CAQI), ewentualne alerty
+     * **Najbliższe wydarzenie**: data, godzina, miejsce (to co jest najszybciej)
+     * **Najważniejsze wydarzenie**: jeśli inne niż najbliższe (duże, wyjątkowe)
+   - Przykład formatu: "W powiecie dostępna jest **bezpłatna pomoc prawna**. Temperatura dziś wynosi **-10.77°C** przy **średniej jakości powietrza** (CAQI 64). **11 lutego** odbędzie się akcja krwiodawstwa w Rybnie. Najbliższe wydarzenie to **Finał Plebiscytu Sportowego 13 lutego w Hartowcu**."
+
 3. **Podsumowania per kategoria**: Zwięzłe opisy (2-3 zdania) dla każdego modułu gdzie były aktywności
+
 4. **Nadchodzące wydarzenia**: Lista wydarzeń z datami (max 5 najbliższych)
-5. **Pogoda**: Krótkie podsumowanie warunków pogodowych + alerty
+
+5. **Jakość powietrza i warunki**: Podsumowanie danych z czujnika (temperatura, wilgotność, ciśnienie, jakość powietrza CAQI, pyły PM2.5/PM10) + ewentualne alerty o złej jakości powietrza
 
 **KRYTYCZNA ZASADA PRIORYTETYZACJI:**
 **ZAWSZE priorytetyzuj wiadomości w kolejności:**
@@ -107,11 +124,15 @@ Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 
    - Kultura (koncerty, wystawy) - **MAX 1-2 zdania w highlights, chyba że wyjątkowe wydarzenie**
    - Rekreacja (turystyka, sport)
 
-**WAŻNE:**
-- NIE generuj highlights z samych wydarzeń kulturalnych (koncerty, festyny) chyba że są BARDZO znaczące
-- Jeśli nie ma pilnych wiadomości, pokaż najbardziej PRAKTYCZNE (praca, zdrowie, transport)
-- Kultura i rozrywka to BONUS, nie główny temat podsumowania
-- Headline musi być o czymś WAŻNYM lub NOWYM, nie o kolejnym festynie
+**WAŻNE dla Highlights (akapit opisowy):**
+- Format: **AKAPIT** (płynny tekst), NIE lista punktowana!
+- Użyj **pogrubienia** (markdown **tekst**) dla kluczowych informacji (daty, temperatury, nazwy wydarzeń)
+- ZAWSZE uwzględnij pogodę/jakość powietrza (temperatura, CAQI, ewentualne alerty)
+- ZAWSZE uwzględnij najbliższe wydarzenie (data + miejsce)
+- NIE generuj z samych wydarzeń kulturalnych chyba że są BARDZO znaczące
+- Jeśli nie ma pilnych wiadomości, pokaż PRAKTYCZNE (praca, zdrowie, transport)
+- Kultura to BONUS, nie główny temat
+- Headline musi być o czymś WAŻNYM lub NOWYM
 
 **Ton:**
 "Dzień dobry! Oto najważniejsze informacje z naszego powiatu..."

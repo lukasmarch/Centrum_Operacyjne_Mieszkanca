@@ -17,13 +17,13 @@ from src.utils.logger import setup_logger
 logger = setup_logger("ArticleScheduler")
 
 
-def filter_recent_articles(articles: list, days: int = 30) -> list:
+def filter_recent_articles(articles: list, days: int = 2) -> list:
     """
     Filter articles to only include recent ones (published within last N days)
 
     Args:
         articles: List of article dicts
-        days: Number of days to look back (default: 30)
+        days: Number of days to look back (default: 2)
 
     Returns:
         Filtered list of articles
@@ -37,8 +37,9 @@ def filter_recent_articles(articles: list, days: int = 30) -> list:
     for article in articles:
         published_at = article.get('published_at')
 
-        # Jeśli brak daty publikacji, przyjmij że jest świeży (może być nowy artykuł)
+        # Jeśli brak daty publikacji, przyjmij datę scrapowania (teraz)
         if published_at is None:
+            # Artykuły bez daty publikacji są traktowane jako świeże
             filtered.append(article)
             continue
 
@@ -132,8 +133,8 @@ async def update_articles_job():
                         html = await scraper.fetch(scrape_url)
                         articles = await scraper.parse(html, scrape_url)
 
-                    # Filter articles by date (only last 30 days)
-                    articles = filter_recent_articles(articles, days=30)
+                    # Filter articles by date (only last 2 days)
+                    articles = filter_recent_articles(articles, days=2)
 
                     saved_ids = await scraper.save_to_db(articles, session)
 

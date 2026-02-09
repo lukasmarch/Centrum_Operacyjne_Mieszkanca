@@ -1,8 +1,8 @@
 # Instrukcja — Ręczne uruchomienie pipeline i dodawanie źródeł
 
-## 1. Ręczny trigger dziennego pipeline
+## 1. Ręczny trigger dziennego pipeline (PEŁNY)
 
-**Plik:** `scripts/tests/test_full_pipeline.py`
+**Plik:** `scripts/tests/aktualny_pipeline/test_full_pipeline.py`
 
 Symuluje dokładnie to, co scheduler robi automatycznie (patrz `scheduler.py`):
 
@@ -19,7 +19,7 @@ Wszystko zapisuje się do bazy danych — artykuły, kategorie, wydarzenia i pod
 
 ```bash
 cd backend
-python scripts/tests/test_full_pipeline.py
+python scripts/tests/aktualny_pipeline/test_full_pipeline.py
 ```
 
 ### Wymogi przed uruchomieniem
@@ -34,10 +34,55 @@ python scripts/tests/test_full_pipeline.py
 - Scheduler czegoś nie goldnął (brak artykułów, brak podsumowania)
 - Chcesz wymusić pipeline po ręcznym dodaniu nowego źródła
 - Testujesz zmianę w scraperach lub AI
+- **WYMAGA:** Apify API key dla Facebook scraperów
 
 ---
 
-## 2. Dodawanie nowych źródeł Facebook / Apify
+## 2. Ręczny trigger AI + Summary (BEZ scrapowania)
+
+**Plik:** `scripts/tests/aktualny_pipeline/test_ai_and_summary.py`
+
+**Robi TYLKO:**
+1. Kategoryzacja artykułów przez AI (GPT-4o-mini)
+2. Ekstrakcja wydarzeń z artykułów
+3. Generowanie dziennego podsumowania
+
+**Pomija:** Scraping (krok 1) — używa artykułów już w bazie.
+
+### Uruchomienie
+
+```bash
+cd backend
+python scripts/tests/aktualny_pipeline/test_ai_and_summary.py
+```
+
+### Kiedy tego użyć
+
+- **Masz już artykuły w bazie** (po wcześniejszym scrapowaniu)
+- Testujesz bez Apify (brak API key lub limit wyczerpany)
+- Chcesz tylko przetworzyć istniejące artykuły przez AI
+- Chcesz regenerować summary z tych samych artykułów
+- **Szybsze testy** - pomija wolne scrapowanie Facebook/Apify
+
+### Wymogi
+
+- Baza danych z artykułami (`processed=False` dla kategoryzacji)
+- `OPENAI_API_KEY` w `.env` (dla AI processing)
+- **NIE wymaga:** Apify API key
+
+### Przykładowy workflow
+
+```bash
+# Sprawdź ile nieprzetworzonych artykułów masz
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM articles WHERE processed=false;"
+
+# Uruchom AI processing + summary
+python scripts/tests/aktualny_pipeline/test_ai_and_summary.py
+```
+
+---
+
+## 3. Dodawanie nowych źródeł Facebook / Apify
 
 **Plik:** `scripts/setup/add_facebook_sources.py`
 
@@ -79,13 +124,30 @@ Bez argumentów dodaje listę predefiniowanych kont z kodu źródłowego.
 python scripts/setup/add_facebook_sources.py \
   --add "https://www.facebook.com/NowaSzkolna" "Nowa Szkolna"
 
-# 2. Uruchom pipeline (pobrze artykuły i przetwórze przez AI)
-python scripts/tests/test_full_pipeline.py
+# 2. Uruchom PEŁNY pipeline (scraping + AI + summary)
+python scripts/tests/aktualny_pipeline/test_full_pipeline.py
+
+# LUB bez scrapowania (jeśli masz już artykuły):
+python scripts/tests/aktualny_pipeline/test_ai_and_summary.py
 ```
 
 ---
 
-## Struktura scheduler-ów (dla odniesienia)
+## 4. Porównanie skryptów testowych
+
+| Skrypt | Scraping | AI Processing | Summary | Wymaga Apify | Czas |
+|--------|----------|--------------|---------|--------------|------|
+| **test_full_pipeline.py** | ✅ Wszystkie źródła | ✅ | ✅ | ✅ TAK | ~5-10 min |
+| **test_ai_and_summary.py** | ❌ Pomija | ✅ | ✅ | ❌ NIE | ~30-60s |
+
+**Rekomendacja:**
+- **Pełny test systemu** → `test_full_pipeline.py`
+- **Szybkie testy AI/summary** → `test_ai_and_summary.py`
+- **Production** → Scheduler automatyczny (6:00 AM codziennie)
+
+---
+
+## 5. Struktura scheduler-ów (dla odniesienia)
 
 ```
 src/scheduler/

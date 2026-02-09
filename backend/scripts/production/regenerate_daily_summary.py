@@ -75,10 +75,9 @@ async def regenerate_summary():
             print(f"\n📰 HEADLINE:")
             print(f'   "{summary.headline}"')
 
-            highlights = summary.content.get('highlights', [])
-            print(f"\n⭐ HIGHLIGHTS ({len(highlights)}):")
-            for i, highlight in enumerate(highlights, 1):
-                print(f"   {i}. {highlight}")
+            highlights = summary.content.get('highlights', '')
+            print(f"\n⭐ HIGHLIGHTS (akapit opisowy):")
+            print(f"   {highlights}")
 
             print(f"\n📋 PODSUMOWANIA PER KATEGORIA:")
             summaries = summary.content.get('summaries_by_category', {})
@@ -94,10 +93,10 @@ async def regenerate_summary():
                 else:
                     print(f"   - {event}")
 
-            weather = summary.content.get('weather_summary')
-            if weather:
-                print(f"\n🌤️  POGODA:")
-                print(f"   {weather}")
+            air_quality = summary.content.get('air_quality_summary')
+            if air_quality:
+                print(f"\n🌤️  JAKOŚĆ POWIETRZA I WARUNKI:")
+                print(f"   {air_quality}")
 
             stats = summary.content.get('stats', {})
             print(f"\n📊 STATYSTYKI:")
@@ -115,10 +114,10 @@ async def regenerate_summary():
                 print(f"   Stary headline: \"{existing.headline}\"")
                 print(f"   Nowy headline:  \"{summary.headline}\"")
 
-                old_highlights = existing.content.get('highlights', [])
-                new_highlights = summary.content.get('highlights', [])
-                print(f"\n   Stare highlights: {len(old_highlights)}")
-                print(f"   Nowe highlights:  {len(new_highlights)}")
+                old_highlights = existing.content.get('highlights', '')
+                new_highlights = summary.content.get('highlights', '')
+                print(f"\n   Stare highlights (pierwsze 100 znaków): {old_highlights[:100] if isinstance(old_highlights, str) else 'lista'}...")
+                print(f"   Nowe highlights (pierwsze 100 znaków):  {new_highlights[:100]}...")
 
                 old_categories = set(existing.content.get('summaries_by_category', {}).keys())
                 new_categories = set(summary.content.get('summaries_by_category', {}).keys())
