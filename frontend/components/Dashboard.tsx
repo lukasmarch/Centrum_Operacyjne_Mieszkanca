@@ -136,9 +136,22 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
             <>
               <h3 className="text-2xl font-bold mb-4 italic">"{summary.headline}"</h3>
               <div className="text-blue-100 leading-relaxed space-y-2">
-                {summary.highlights && summary.highlights.slice(0, 3).map((highlight, index) => (
-                  <p key={index}>• {highlight}</p>
-                ))}
+                {summary.highlights && (
+                  typeof summary.highlights === 'string' ? (
+                    // Nowy format: akapit opisowy z markdown
+                    <p
+                      className="leading-relaxed"
+                      dangerouslySetInnerHTML={{
+                        __html: summary.highlights.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      }}
+                    />
+                  ) : (
+                    // Stary format: lista punktowana
+                    summary.highlights.slice(0, 3).map((highlight, index) => (
+                      <p key={index}>• {highlight}</p>
+                    ))
+                  )
+                )}
               </div>
               <button
                 onClick={() => handleNavigate('news')}
