@@ -46,10 +46,11 @@ def start_scheduler():
 
     DAILY PIPELINE (1x per day at 6:00 AM):
     1. Article Scraping (6:00) - fetch new articles from sources
-    2. AI Processing (6:15) - categorize articles (processed=True)
-    3. Daily Summary (6:45) - generate summary for yesterday (requires processed articles)
+    2. AI Processing (6:15) - categorize up to 100 articles (processed=True, ~32 min)
+    3. Daily Summary (7:00) - generate summary for yesterday (requires processed articles)
 
-    This sequence ensures articles are scraped AND processed before summary generation.
+    This sequence ensures articles are scraped AND fully processed before summary generation.
+    Summary runs at 7:00 to allow AI processing to complete (batch=100 takes ~32 minutes).
     """
 
     # Weather update every hour
@@ -80,21 +81,23 @@ def start_scheduler():
     )
 
     # AI processing once daily at 6:15 AM, right after scraping (STEP 2 of daily pipeline)
+    # Processes up to 100 articles (batch_size=100), takes ~32 minutes
     # Previously ran every hour (IntervalTrigger) which caused timing issues
     scheduler.add_job(
         func=run_ai_job,
         trigger=CronTrigger(hour=6, minute=15),
         id='ai_processing',
-        name='AI article processing',
+        name='AI article processing (batch=100)',
         replace_existing=True
     )
 
-    # Daily summary generation once at 6:45 AM (STEP 3 of daily pipeline)
-    # Runs 30 minutes after AI processing to ensure articles are categorized
+    # Daily summary generation once at 7:00 AM (STEP 3 of daily pipeline)
+    # Runs 45 minutes after AI processing to ensure all articles are categorized
     # Generates summary for YESTERDAY (full day of data)
+    # Moved from 6:45 to 7:00 to allow AI processing (batch=100, ~32 min) to complete
     scheduler.add_job(
         func=run_summary_job,
-        trigger=CronTrigger(hour=6, minute=45),
+        trigger=CronTrigger(hour=7, minute=0),
         id='daily_summary',
         name='Generate daily summary',
         replace_existing=True

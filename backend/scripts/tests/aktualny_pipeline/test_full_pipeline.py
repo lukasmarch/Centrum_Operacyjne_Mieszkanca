@@ -4,15 +4,18 @@ Ręczny trigger dziennego pipeline — simuluje to, co robi scheduler automatycz
 
 Kolejność (identyczna jak w scheduler.py):
     1. Scraping wszystkich aktywnych źródeł  (article_job)
-    2. Kategoryzacja artykułów przez AI        (ai_jobs — ArticleProcessor)
+    2. Kategoryzacja artykułów przez AI        (ai_jobs — ArticleProcessor, batch=100)
     3. Ekstrakcja wydarzeń z artykułów         (ai_jobs — EventExtractor)
     4. Generowanie dziennego podsumowania      (summary_job)
+
+UWAGA: AI processing przetwarza tylko artykuły z processed=False (nie duplikuje pracy).
+       Batch size: 100 artykułów, czas wykonania: ~32 minuty dla pełnego batcha.
 
 Wszystko zapisuje się do bazy danych.
 
 Uruchomienie:
     cd backend
-    python scripts/tests/test_full_pipeline.py
+    python scripts/tests/aktualny_pipeline/test_full_pipeline.py
 """
 import asyncio
 import sys
@@ -45,7 +48,7 @@ async def main():
     logger.info("✓ Scraping zakończony\n")
 
     # --- 2. AI — kategoryzacja ---
-    logger.info("[2-3/4] AI PIPELINE — kategoryzacja + ekstrakcja wydarzeń")
+    logger.info("[2-3/4] AI PIPELINE — kategoryzacja + ekstrakcja wydarzeń (batch=100)")
     logger.info("-" * 60)
     await run_ai_processing()
     logger.info("✓ AI pipeline zakończony\n")

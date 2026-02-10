@@ -22,10 +22,10 @@ async def run_ai_processing():
     Główny pipeline AI - kategoryzacja + ekstrakcja wydarzeń
 
     Workflow:
-    1. ArticleProcessor - przetwórz nieprzetwórzone artykuły (batch 20)
+    1. ArticleProcessor - przetwórz nieprzetwórzone artykuły (batch 100)
     2. EventExtractor - wyekstrahuj wydarzenia z ostatnich 6h
 
-    Uruchamiany przez scheduler co 30 minut
+    Uruchamiany przez scheduler 1x dziennie o 6:15 AM
     """
     logger.info("="*60)
     logger.info("Starting AI processing job...")
@@ -47,7 +47,7 @@ async def run_ai_processing():
             processor = ArticleProcessor()
             processed_count = await processor.process_batch(
                 session,
-                batch_size=20  # Maksymalnie 20 artykułów na raz
+                batch_size=100  # Maksymalnie 100 artykułów na raz (~32 min dla 100 art)
             )
 
             logger.info(f"✓ Processed {processed_count} articles\n")

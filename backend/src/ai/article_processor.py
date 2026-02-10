@@ -143,7 +143,12 @@ class ArticleProcessor:
                     Article.published_at.is_(None)  # Lub bez daty (przetwórz i tak)
                 )
             )
-            .where(Article.content.isnot(None))  # Musi mieć content
+            .where(
+                or_(
+                    Article.content.isnot(None),  # Musi mieć content
+                    Article.summary.isnot(None)   # LUB summary (dla RSS)
+                )
+            )
             .order_by(Article.published_at.desc().nulls_last())  # Najpierw z datą, potem NULL
             .limit(batch_size)
         )
