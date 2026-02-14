@@ -25,6 +25,9 @@ from src.api.endpoints.gus import router as gus_router
 # Business / CEIDG directory (Sprint 3+)
 from src.api.endpoints.business import router as business_router
 
+# Zgłoszenie24 – Citizen Reports (Sprint 4)
+from src.api.endpoints.reports import router as reports_router
+
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
 
 # CORS for frontend
@@ -35,6 +38,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for report uploads
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+uploads_dir = Path(__file__).parent.parent.parent / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 app.include_router(cinema.router, prefix="/api/cinema", tags=["cinema"])
 app.include_router(weather_router)  # /api/weather/*
@@ -51,6 +61,9 @@ app.include_router(gus_router)  # /api/stats/*
 
 # Business / CEIDG directory routes
 app.include_router(business_router)  # /api/business/*
+
+# Zgłoszenie24 – Reports routes (Sprint 4)
+app.include_router(reports_router)  # /api/reports/*
 
 @app.on_event("startup")
 async def startup_event():

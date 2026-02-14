@@ -17,6 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
     { id: 'traffic', label: 'Ruch Drogowy', icon: '🚗' },
     { id: 'stats', label: 'Statystyki GUS', icon: '📊' },
     { id: 'business', label: 'Katalog Firm', icon: '🏢' },
+    { id: 'reports', label: 'Zgłoszenie24', icon: '🚨' },
     { id: 'premium', label: 'Strefa Premium', icon: '⭐' },
   ];
 

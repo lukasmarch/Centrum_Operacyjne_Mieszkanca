@@ -202,7 +202,57 @@ export interface Business {
   telefon?: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'business' | 'premium' | 'login' | 'register' | 'profile';
+// Zgłoszenie24 – Citizen Reports
+export type ReportStatus = 'new' | 'verified' | 'in_progress' | 'resolved' | 'rejected';
+export type ReportCategory = 'emergency' | 'fire' | 'infrastructure' | 'waste' | 'greenery' | 'safety' | 'water' | 'other';
+export type ReportSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export interface Report {
+  id: number;
+  title: string;
+  description: string;
+  ai_summary?: string;
+  category: ReportCategory;
+  ai_detected_objects?: Record<string, any>;
+  ai_condition_assessment?: string;
+  ai_severity?: ReportSeverity;
+  image_url?: string;
+  generated_image_url?: string;
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  location_name?: string;
+  status: ReportStatus;
+  is_spam: boolean;
+  upvotes: number;
+  views_count: number;
+  author_name?: string;
+  created_at: string;
+  updated_at: string;
+  resolved_at?: string;
+}
+
+export interface ReportListResponse {
+  reports: Report[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ReportMapItem {
+  id: number;
+  title: string;
+  category: ReportCategory;
+  ai_severity?: ReportSeverity;
+  latitude: number;
+  longitude: number;
+  status: string;
+  upvotes: number;
+  image_url?: string;
+  created_at: string;
+}
+
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'business' | 'reports' | 'premium' | 'login' | 'register' | 'profile';
 
 // New Traffic Widget Types
 export enum TrafficCondition {

@@ -12,6 +12,7 @@ import ProfilePage from './src/pages/ProfilePage';
 import GUSPage from './src/pages/GUSPage';
 import WeatherPage from './src/pages/WeatherPage';
 import BusinessPage from './src/pages/BusinessPage';
+import ReportsPage from './src/pages/ReportsPage';
 
 const AppContent: React.FC = () => {
     const [activeSection, setActiveSection] = useState<AppSection>('dashboard');
@@ -58,6 +59,8 @@ const AppContent: React.FC = () => {
                 return <GUSPage />;
             case 'business':
                 return <BusinessPage />;
+            case 'reports':
+                return <ReportsPage onNavigate={setActiveSection} />;
             case 'premium':
                 return (
                     <div className="max-w-4xl mx-auto py-12">

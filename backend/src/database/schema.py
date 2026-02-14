@@ -478,3 +478,72 @@ class GUSInsight(SQLModel, table=True):
     generated_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy wygenerowano
     valid_until: datetime  # Do kiedy aktualny (typically +1 month)
 
+
+# ======================
+# Zgłoszenie24 – Centrum Powiadamiania (Sprint Reports)
+# ======================
+
+class ReportStatus(str, Enum):
+    NEW = "new"
+    VERIFIED = "verified"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    REJECTED = "rejected"
+
+
+class ReportCategory(str, Enum):
+    EMERGENCY = "emergency"            # Wypadki, tonięcie, zawalenie
+    FIRE = "fire"                      # Pożary
+    INFRASTRUCTURE = "infrastructure"  # Roads, sidewalks, lighting
+    WASTE = "waste"                    # Waste, trash, overflowing bins
+    GREENERY = "greenery"              # Greenery, parks
+    SAFETY = "safety"                  # Safety, road signs, barriers
+    WATER = "water"                    # Water, sewage, leaks
+    OTHER = "other"                    # Other issues
+
+
+class Report(SQLModel, table=True):
+    """Zgłoszenia mieszkańców – usterki, awarie, zdarzenia"""
+    __tablename__ = "reports"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Autor (opcjonalnie zalogowany)
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    author_name: Optional[str] = Field(default=None, max_length=100)
+    author_email: Optional[str] = Field(default=None, max_length=255)
+    author_phone: Optional[str] = Field(default=None, max_length=50)
+
+    # Treść
+    title: str = Field(max_length=200)
+    description: str
+    ai_summary: Optional[str] = None
+
+    # Kategoryzacja (AI)
+    category: str = Field(default=ReportCategory.OTHER.value, max_length=50, index=True)
+    ai_detected_objects: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    ai_condition_assessment: Optional[str] = Field(default=None, max_length=500)
+    ai_severity: Optional[str] = Field(default=None, max_length=20)  # low, medium, high, critical
+
+    # Media
+    image_url: Optional[str] = Field(default=None, max_length=500)
+    generated_image_url: Optional[str] = Field(default=None, max_length=500)
+
+    # Geolokalizacja
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    address: Optional[str] = Field(default=None, max_length=300)
+    location_name: Optional[str] = Field(default=None, max_length=100)
+
+    # Status
+    status: str = Field(default=ReportStatus.NEW.value, max_length=20, index=True)
+    is_spam: bool = Field(default=False)
+
+    # Interakcja
+    upvotes: int = Field(default=0)
+    views_count: int = Field(default=0)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    resolved_at: Optional[datetime] = None
