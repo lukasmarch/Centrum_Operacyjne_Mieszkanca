@@ -11,7 +11,8 @@ import {
   UserUpdateData,
 } from '../../types';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+// Use env var with fallback to localhost (for development)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'access_token';

@@ -141,10 +141,12 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # Daily Newsletter (Premium) - Mon-Fri at 6:30 AM (Sprint 2)
+    # Daily Newsletter (Premium) - Mon-Fri at 7:15 AM (Sprint 2)
+    # Runs AFTER daily summary (7:00) to ensure AI processing is complete
+    # Timeline: scraping (6:00) → AI (6:15, ~32min) → summary (7:00) → newsletter (7:15)
     scheduler.add_job(
         func=run_daily_newsletter,
-        trigger=CronTrigger(day_of_week='mon-fri', hour=6, minute=30),
+        trigger=CronTrigger(day_of_week='mon-fri', hour=7, minute=15),
         id='newsletter_daily',
         name='Send daily newsletter (Premium)',
         replace_existing=True

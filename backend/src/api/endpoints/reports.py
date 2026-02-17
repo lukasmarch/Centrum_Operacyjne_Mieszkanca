@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.connection import async_session
 from src.database.schema import Report, ReportStatus, ReportCategory
-from src.auth.dependencies import get_optional_user
+from src.auth.dependencies import get_optional_user, get_business_user
 from src.utils.logger import setup_logger
 
 logger = setup_logger("ReportsAPI")
@@ -324,9 +324,9 @@ async def upvote_report(report_id: int):
 async def update_report_status(
     report_id: int,
     new_status: str = Query(..., regex="^(new|verified|in_progress|resolved|rejected)$"),
-    user=Depends(get_optional_user),
+    user=Depends(get_business_user),
 ):
-    """Zmień status zgłoszenia (admin/moderator)."""
+    """Zmień status zgłoszenia (admin/moderator). Wymaga subskrypcji Business."""
     async with async_session() as session:
         result = await session.execute(
             select(Report).where(Report.id == report_id)
@@ -384,11 +384,13 @@ async def get_reports_stats():
 
 
 @router.post("/reanalyze-all")
-async def reanalyze_all_reports():
+async def reanalyze_all_reports(user=Depends(get_business_user)):
     """
     Re-analyze ALL existing reports with the current AI prompt.
     Updates category, severity, and summary for each report.
     Use this after updating the AI prompt to fix miscategorized reports.
+
+    Requires Business subscription (admin only).
     """
     from src.ai.report_analyzer import analyze_report
 
@@ -523,12 +525,14 @@ FIRE_KEYWORDS = [
 
 
 @router.post("/fix-existing")
-async def fix_existing_reports():
+async def fix_existing_reports(user=Depends(get_business_user)):
     """
     Fix existing reports in-place (NO Gemini API calls).
     - Updates categories based on keyword matching (wypadek→emergency, pożar→fire)
     - Adds GPS coordinates from location_name using built-in lookup table
     - Adjusts severity for emergency/fire categories
+
+    Requires Business subscription (admin only).
     """
     fixed = []
 

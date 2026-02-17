@@ -18,6 +18,9 @@ from .schemas import (
     MessageResponse, RefreshTokenRequest
 )
 
+# Cookie security: False for localhost (HTTP), True for production (HTTPS)
+COOKIE_SECURE = not settings.APP_URL.startswith("http://localhost")
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
@@ -74,7 +77,7 @@ async def register(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,  # Set to False for localhost development
+        secure=COOKIE_SECURE,  # Set to False for localhost development
         samesite="lax",
         max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
@@ -82,7 +85,7 @@ async def register(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
     )
@@ -145,7 +148,7 @@ async def login(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
@@ -153,7 +156,7 @@ async def login(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
     )
@@ -223,7 +226,7 @@ async def refresh_tokens(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
@@ -231,7 +234,7 @@ async def refresh_tokens(
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        secure=True,
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
     )

@@ -6,9 +6,11 @@ interface SidebarProps {
   activeSection: AppSection;
   onSectionChange: (section: AppSection | 'logout') => void;
   user: User | null;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user, isOpen, onToggle }) => {
   const menuItems: { id: AppSection; label: string; icon: string; requiresAuth?: boolean }[] = [
     { id: 'dashboard', label: 'Panel Główny', icon: '🏠' },
     { id: 'news', label: 'Wiadomości', icon: '📰' },
@@ -24,7 +26,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user 
   const isAuthenticated = !!user;
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-slate-900 text-white p-6 z-50 transition-all duration-300 md:translate-x-0 -translate-x-full flex flex-col">
+    <aside className={`fixed left-0 top-0 h-screen w-64 bg-slate-900 text-white p-6 z-50 transition-all duration-300 flex flex-col ${
+      isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+    }`}>
       <div className="flex items-center gap-3 mb-10">
         <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-xl">D</div>
         <div>

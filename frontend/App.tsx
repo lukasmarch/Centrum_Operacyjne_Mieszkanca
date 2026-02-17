@@ -16,6 +16,7 @@ import ReportsPage from './src/pages/ReportsPage';
 
 const AppContent: React.FC = () => {
     const [activeSection, setActiveSection] = useState<AppSection>('dashboard');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { user, isAuthenticated, isLoading, logout } = useAuth();
 
     const handleNavigate = (section: AppSection | 'logout') => {
@@ -25,6 +26,8 @@ const AppContent: React.FC = () => {
         } else {
             setActiveSection(section);
         }
+        // Close sidebar on mobile after navigation
+        setIsSidebarOpen(false);
     };
 
     const renderContent = () => {
@@ -143,15 +146,40 @@ const AppContent: React.FC = () => {
 
     return (
         <div className="flex min-h-screen">
+            {/* Mobile overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             <Sidebar
                 activeSection={activeSection}
                 onSectionChange={handleNavigate}
                 user={user}
+                isOpen={isSidebarOpen}
+                onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
             />
 
             <main className="flex-1 md:ml-64 bg-slate-50 min-h-screen transition-all duration-300">
                 {/* Top Header */}
                 <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 p-4 px-8 flex items-center justify-between">
+                    {/* Mobile hamburger button */}
+                    <button
+                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors"
+                        aria-label="Toggle menu"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {isSidebarOpen ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            )}
+                        </svg>
+                    </button>
+
                     <div className="relative w-full max-w-md hidden md:block">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
                         <input

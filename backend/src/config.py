@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     SCRAPER_MAX_RETRIES: int = 3
 
     # Auth settings (Sprint 1)
-    JWT_SECRET: str = "your-secret-key-min-32-chars-change-in-production"
+    JWT_SECRET: str  # REQUIRED: Min 32 chars, set in .env
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     NEWSLETTER_FROM_EMAIL: str = "newsletter@centrum-mieszkanca.pl"
     NEWSLETTER_FROM_NAME: str = "Centrum Operacyjne Mieszkańca"
     APP_URL: str = "http://localhost:3000"  # Frontend URL for links
+
+    # CORS settings
+    CORS_ORIGINS: str = "http://localhost:3001,http://localhost:3002,http://localhost:5173"  # Comma-separated list
 
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(

@@ -307,9 +307,6 @@ class GUSGminaStats(SQLModel, table=True):
 
     # Metadata
     fetched_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy pobrano z API GUS
-    
-    # Indeks dla szybkiego pobierania porównań
-    category: str = Field(max_length=50, default="business", index=True)  # business, demographics, employment
 
 
 # ======================

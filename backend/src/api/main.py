@@ -7,6 +7,7 @@ from src.database import get_session, Source, Article, Weather, DailySummary, Ev
 from src.models import ArticleOutput
 from src.integrations.weather import WeatherService
 from src.scheduler.scheduler import start_scheduler
+from src.config import settings
 from datetime import datetime
 from src.api.endpoints import cinema
 from src.api.weather import router as weather_router
@@ -30,10 +31,15 @@ from src.api.endpoints.reports import router as reports_router
 
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
 
-# CORS for frontend
+# CORS for frontend (use env var, fallback to localhost)
+cors_origins = settings.CORS_ORIGINS.split(",") if settings.CORS_ORIGINS else [
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:5173"
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://localhost:3002", "http://localhost:5173"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
