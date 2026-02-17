@@ -15,7 +15,7 @@ export function useEvents(limit: number = 50) {
         const fetchEvents = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_URL}/api/events?limit=${limit}`);
+                const response = await fetch(`${API_URL}/events?limit=${limit}`);
 
                 if (!response.ok) {
                     throw new Error('Nie udało się pobrać wydarzeń');

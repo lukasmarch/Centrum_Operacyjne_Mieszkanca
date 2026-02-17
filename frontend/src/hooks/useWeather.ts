@@ -35,7 +35,7 @@ export function useWeather(location: string = 'Rybno') {
 
       try {
         setLoading(true);
-        const response = await fetch(`${API_URL}/api/weather/${location}`);
+        const response = await fetch(`${API_URL}/weather/${location}`);
 
         if (!response.ok) {
           throw new Error('Nie udało się pobrać danych pogody');

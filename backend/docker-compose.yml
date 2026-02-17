@@ -12,10 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
+  # Redis removed (2026-02-17): Not used - all cache in PostgreSQL
 
   adminer:
     image: adminer

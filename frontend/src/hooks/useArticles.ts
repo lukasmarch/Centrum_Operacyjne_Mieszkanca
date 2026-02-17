@@ -58,7 +58,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
       try {
         setLoading(true);
         const response = await fetch(
-          `${API_URL}/api/articles?limit=${limit}&per_source=${perSource}&days=${days}`
+          `${API_URL}/articles?limit=${limit}&per_source=${perSource}&days=${days}`
         );
 
         if (!response.ok) {

@@ -10,8 +10,8 @@ httpx>=0.27.2
 beautifulsoup4==4.12.3
 alembic==1.13.1
 python-dotenv==1.0.0
-redis==5.0.1
-celery==5.3.6
+# redis==5.0.1  # REMOVED (2026-02-17): Not used - all cache in PostgreSQL
+# celery==5.3.6  # REMOVED (2026-02-17): Not used - using APScheduler instead
 lxml==5.1.0
 apscheduler==3.10.4
 openai>=1.12.0

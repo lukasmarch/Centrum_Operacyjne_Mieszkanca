@@ -263,27 +263,50 @@ class DailySummary(SQLModel, table=True):
     generated_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy wygenerowano
 
 
-class GUSStatistic(SQLModel, table=True):
-    """Statystyki GUS (Bank Danych Lokalnych) - Demografia i Rynek Pracy"""
-    __tablename__ = "gus_statistics"
+class CinemaShowtime(SQLModel, table=True):
+    """Repertuar kin - Dzialdowo i Lubawa (scraped daily)"""
+    __tablename__ = "cinema_showtimes"
     __table_args__ = (
-        Index('idx_gus_category_year', 'category', 'year', unique=True),
+        Index('idx_cinema_date_title', 'cinema_name', 'date', 'title'),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    category: str = Field(max_length=50, index=True)  # "demographics" lub "employment"
-    year: int = Field(index=True)  # Rok danych (np. 2025)
-    data: dict = Field(sa_column=Column(JSONB))  # Wszystkie statystyki jako JSONB
+
+    # Cinema & Schedule
+    cinema_name: str = Field(max_length=100, index=True)  # "Kino Dzialdowo", "Kino Lubawa"
+    date: str = Field(max_length=10, index=True)  # "DD.MM.YYYY" format (matches scraper)
+
+    # Movie Details
+    title: str = Field(max_length=200)  # Film title
+    genre: str = Field(max_length=50, default="Film")  # Genre
+    showtimes: List[str] = Field(sa_column=Column(ARRAY(String)))  # ["16:50", "20:30"]
+    poster_url: str = Field(max_length=500)  # Poster image URL
+    rating: str = Field(max_length=10, default="N/A")  # Rating (usually "N/A")
+    link: Optional[str] = Field(default=None, max_length=500)  # Link to movie page
 
     # Metadata
-    fetched_at: datetime = Field(default_factory=datetime.utcnow)  # Kiedy pobrano z API
-    updated_at: datetime = Field(default_factory=datetime.utcnow)  # Ostatnia aktualizacja
+    fetched_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
-    # Opcjonalnie: Szybki dostęp do kluczowych metryk (denormalizacja)
-    # Demografia:
-    population_total: Optional[int] = None  # Ludność ogółem
-    unemployment_rate: Optional[float] = None  # Stopa bezrobocia (%)
 
+class TrafficCache(SQLModel, table=True):
+    """Cache danych o ruchu drogowym - Gemini Grounding API (refreshed every 4h)"""
+    __tablename__ = "traffic_cache"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Traffic data (JSONB for flexibility)
+    # Structure: {"roads": [...], "sources": [...]}
+    data: dict = Field(sa_column=Column(JSONB))
+
+    # Metadata
+    fetched_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    is_current: bool = Field(default=True)  # Flag for latest record
+    ttl_seconds: int = Field(default=14400)  # TTL: 4 hours
+
+
+# Legacy GUSStatistic model removed (2026-02-17)
+# Replaced by: GUSGminaStats, GUSNationalAverages, GUSDataRefreshLog
+# See: backend/src/api/endpoints/gus.py for new database-first architecture
 
 class GUSGminaStats(SQLModel, table=True):
     """Cache danych GUS dla gmin - pobierane raz miesięcznie"""

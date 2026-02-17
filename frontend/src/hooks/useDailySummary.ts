@@ -33,7 +33,7 @@ export function useDailySummary() {
 
             try {
                 setLoading(true);
-                const response = await fetch(`${API_URL}/api/summary/daily`);
+                const response = await fetch(`${API_URL}/summary/daily`);
 
                 if (!response.ok) {
                     throw new Error('Nie udało się pobrać podsumowania');

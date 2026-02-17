@@ -14,6 +14,7 @@ from src.scheduler.ai_jobs import run_ai_job
 from src.scheduler.summary_job import run_summary_job
 from src.scheduler.gus_job import run_gus_job
 from src.scheduler.cinema_job import run_cinema_job
+from src.scheduler.traffic_job import run_traffic_job
 from src.scheduler.newsletter_job import run_weekly_newsletter, run_daily_newsletter
 from src.scheduler.air_quality_job import update_air_quality
 from src.scheduler.ceidg_job import run_ceidg_job
@@ -68,6 +69,16 @@ def start_scheduler():
         trigger=IntervalTrigger(hours=4),
         id='air_quality_update',
         name='Update Air Quality (Airly)',
+        replace_existing=True
+    )
+
+    # Traffic cache update every 4 hours (Gemini API - kosztowne)
+    # Runs at: 2:00, 6:00, 10:00, 14:00, 18:00, 22:00 (6 calls/day)
+    scheduler.add_job(
+        func=run_traffic_job,
+        trigger=CronTrigger(hour='2,6,10,14,18,22', minute=0),
+        id='traffic_update',
+        name='Update Traffic Cache (Gemini)',
         replace_existing=True
     )
 

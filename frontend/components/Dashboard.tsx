@@ -22,7 +22,7 @@ import { getHoliday, getNameDays } from '../src/utils/calendarUtils';
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ onNavigate }) => {
   const { user, isPremium, userLocation } = useAuth();
   const { weather, loading: weatherLoading, error: weatherError } = useWeather();
-  const { articles, loading: articlesLoading, error: articlesError } = useArticles(10); // Fetch more for diversity
+  const { articles, loading: articlesLoading, error: articlesError } = useArticles({ limit: 10 });
   const { summary, loading: summaryLoading, error: summaryError, lastUpdated } = useDailySummary();
   const { events, loading: eventsLoading, error: eventsError } = useEvents(1);
   const wasteEvents = useWasteSchedule(userLocation);

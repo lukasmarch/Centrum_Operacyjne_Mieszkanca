@@ -7,7 +7,7 @@ BACKEND_DIR = Path(__file__).parent.parent
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # REDIS_URL removed (2026-02-17): Not used - all cache in PostgreSQL
     OPENAI_API_KEY: str
     OPENWEATHER_API_KEY: str
     APIFY_API_KEY: Optional[str] = None

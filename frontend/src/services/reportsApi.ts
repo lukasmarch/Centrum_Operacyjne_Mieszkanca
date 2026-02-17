@@ -1,6 +1,6 @@
 /**
  * Zgłoszenie24 – Reports API Service
- * Frontend client for /api/reports/* endpoints
+ * Frontend client for /reports/* endpoints
  */
 import type { Report, ReportListResponse, ReportMapItem, ReportCategory } from '../../types';
 
@@ -23,7 +23,7 @@ export async function fetchReports(params: {
     if (params.status) searchParams.set('status', params.status);
     if (params.sort) searchParams.set('sort', params.sort);
 
-    const res = await fetch(`${API_BASE}/api/reports?${searchParams}`);
+    const res = await fetch(`${API_BASE}/reports?${searchParams}`);
     if (!res.ok) throw new Error(`Failed to fetch reports: ${res.status}`);
     return res.json();
 }
@@ -32,7 +32,7 @@ export async function fetchReports(params: {
  * Fetch a single report by ID
  */
 export async function fetchReport(id: number): Promise<Report> {
-    const res = await fetch(`${API_BASE}/api/reports/${id}`);
+    const res = await fetch(`${API_BASE}/reports/${id}`);
     if (!res.ok) throw new Error(`Failed to fetch report: ${res.status}`);
     return res.json();
 }
@@ -50,7 +50,7 @@ export async function fetchReportsForMap(params: {
     if (params.status) searchParams.set('status', params.status);
     if (params.limit) searchParams.set('limit', String(params.limit));
 
-    const res = await fetch(`${API_BASE}/api/reports/map?${searchParams}`);
+    const res = await fetch(`${API_BASE}/reports/map?${searchParams}`);
     if (!res.ok) throw new Error(`Failed to fetch map reports: ${res.status}`);
     return res.json();
 }
@@ -82,7 +82,7 @@ export async function createReport(data: {
     if (data.location_name) formData.append('location_name', data.location_name);
     if (data.image) formData.append('image', data.image);
 
-    const res = await fetch(`${API_BASE}/api/reports`, {
+    const res = await fetch(`${API_BASE}/reports`, {
         method: 'POST',
         body: formData,
     });
@@ -98,7 +98,7 @@ export async function createReport(data: {
  * Upvote (confirm problem) a report
  */
 export async function upvoteReport(id: number): Promise<Report> {
-    const res = await fetch(`${API_BASE}/api/reports/${id}/upvote`, {
+    const res = await fetch(`${API_BASE}/reports/${id}/upvote`, {
         method: 'PATCH',
     });
     if (!res.ok) throw new Error(`Failed to upvote: ${res.status}`);
@@ -113,7 +113,7 @@ export async function fetchReportsStats(): Promise<{
     by_status: Record<string, number>;
     by_category: Record<string, number>;
 }> {
-    const res = await fetch(`${API_BASE}/api/reports/stats/summary`);
+    const res = await fetch(`${API_BASE}/reports/stats/summary`);
     if (!res.ok) throw new Error(`Failed to fetch stats: ${res.status}`);
     return res.json();
 }

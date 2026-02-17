@@ -104,7 +104,7 @@ export const fetchCinemaRepertoire = async (location: CinemaLocation): Promise<C
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
     try {
-        const response = await fetch(`${API_URL}/api/cinema/repertoire?location=${location}`);
+        const response = await fetch(`${API_URL}/cinema/repertoire?location=${location}`);
 
         if (!response.ok) {
             throw new Error(`API error: ${response.status}`);

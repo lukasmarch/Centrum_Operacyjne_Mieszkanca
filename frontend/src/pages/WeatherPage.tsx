@@ -52,9 +52,9 @@ const WeatherPage: React.FC = () => {
             setLoading(true);
             try {
                 const [currentRes, weatherHistRes, aqHistRes] = await Promise.all([
-                    fetch(`${API_URL}/api/weather/air-quality/current`),
-                    fetch(`${API_URL}/api/weather/history?days=${selectedDays}`),
-                    fetch(`${API_URL}/api/weather/air-quality/history?days=${selectedDays}`)
+                    fetch(`${API_URL}/weather/air-quality/current`),
+                    fetch(`${API_URL}/weather/history?days=${selectedDays}`),
+                    fetch(`${API_URL}/weather/air-quality/history?days=${selectedDays}`)
                 ]);
 
                 if (currentRes.ok) {
