@@ -143,14 +143,52 @@ class EmailService:
         }
 
         # Process events to extract day/month for display
+        DATE_FORMATS = [
+            "%Y-%m-%d",       # 2026-02-18
+            "%d.%m.%Y",       # 18.02.2026
+            "%d-%m-%Y",       # 18-02-2026
+            "%d/%m/%Y",       # 18/02/2026
+            "%d %B %Y",       # 18 February 2026
+            "%d %b %Y",       # 18 Feb 2026
+        ]
+        MONTHS_PL_LONG = [
+            "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+            "lipca", "sierpnia", "września", "października", "listopada", "grudnia"
+        ]
+        MONTHS_PL_SHORT = ["STY", "LUT", "MAR", "KWI", "MAJ", "CZE",
+                           "LIP", "SIE", "WRZ", "PAŹ", "LIS", "GRU"]
+
+        def parse_event_date(date_str: str):
+            # Try Polish format first: "19 lutego 2026"
+            parts = date_str.strip().split()
+            if len(parts) == 3:
+                try:
+                    day = int(parts[0])
+                    month_idx = next(
+                        (i + 1 for i, m in enumerate(MONTHS_PL_LONG) if m == parts[1].lower()),
+                        None
+                    )
+                    year = int(parts[2])
+                    if month_idx and 1 <= day <= 31:
+                        return datetime(year, month_idx, day)
+                except (ValueError, StopIteration):
+                    pass
+            # Fallback: standard formats
+            for fmt in DATE_FORMATS:
+                try:
+                    return datetime.strptime(date_str, fmt)
+                except ValueError:
+                    continue
+            return None
+
         events = context["sections"].get("events", [])
         for event in events:
             if "date" in event:
-                try:
-                    date_obj = datetime.strptime(event["date"], "%Y-%m-%d")
-                    event["day"] = date_obj.day
-                    event["month"] = date_obj.strftime("%b").upper()
-                except ValueError:
+                parsed = parse_event_date(event["date"])
+                if parsed:
+                    event["day"] = parsed.day
+                    event["month"] = MONTHS_PL_SHORT[parsed.month - 1]
+                else:
                     event["day"] = "?"
                     event["month"] = "?"
 
