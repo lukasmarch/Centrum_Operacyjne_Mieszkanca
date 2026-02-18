@@ -78,8 +78,6 @@
             font-weight: 600;
             color: #1e3a5f;
             margin: 0 0 15px 0;
-            display: flex;
-            align-items: center;
         }
 
         .news-item {
@@ -228,6 +226,17 @@
             color: #aaa;
         }
 
+        /* Category badges */
+        .category-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin: 2px; }
+        .category-emergency { background: #ffebee; color: #c62828; }
+        .category-fire { background: #fff3e0; color: #e65100; }
+        .category-infrastructure { background: #e3f2fd; color: #1565c0; }
+        .category-waste { background: #f3e5f5; color: #6a1b9a; }
+        .category-safety { background: #fff8e1; color: #f57f17; }
+        .category-water { background: #e0f7fa; color: #006064; }
+        .category-greenery { background: #e8f5e9; color: #2e7d32; }
+        .category-other { background: #f5f5f5; color: #424242; }
+
         /* Responsive */
         @media screen and (max-width: 600px) {
             .wrapper {
@@ -298,15 +307,83 @@
                             </td>
                         </tr>
 
-                        <!-- Weather -->
+                        <!-- Weekly Weather -->
                         <tr>
                             <td class="section">
-                                <h2 class="section-title">☁️ Prognoza na Weekend</h2>
+                                <h2 class="section-title">🌤️ Pogoda w Tygodniu</h2>
+                                {% if weekly_weather and (weekly_weather.temp_avg or weekly_weather.caqi_avg) %}
+                                <table width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; font-size: 14px;">
+                                    <tr>
+                                        {% if weekly_weather.temp_min is not none %}
+                                        <td style="padding: 8px; text-align: center; background: #f0f4f8; border-radius: 8px; width: 25%;">
+                                            <div style="font-size: 24px; color: #1e3a5f; font-weight: 300;">{{ weekly_weather.temp_min }}°C</div>
+                                            <div style="color: #888; font-size: 12px;">Min</div>
+                                        </td>
+                                        {% endif %}
+                                        {% if weekly_weather.temp_avg is not none %}
+                                        <td style="padding: 8px; text-align: center;">
+                                            <div style="font-size: 24px; color: #1e3a5f; font-weight: 300;">{{ weekly_weather.temp_avg }}°C</div>
+                                            <div style="color: #888; font-size: 12px;">Średnia</div>
+                                        </td>
+                                        {% endif %}
+                                        {% if weekly_weather.temp_max is not none %}
+                                        <td style="padding: 8px; text-align: center; background: #f0f4f8; border-radius: 8px; width: 25%;">
+                                            <div style="font-size: 24px; color: #1e3a5f; font-weight: 300;">{{ weekly_weather.temp_max }}°C</div>
+                                            <div style="color: #888; font-size: 12px;">Max</div>
+                                        </td>
+                                        {% endif %}
+                                        {% if weekly_weather.humidity_avg is not none %}
+                                        <td style="padding: 8px; text-align: center; width: 25%;">
+                                            <div style="font-size: 24px; color: #1e3a5f; font-weight: 300;">{{ weekly_weather.humidity_avg }}%</div>
+                                            <div style="color: #888; font-size: 12px;">Wilgotność</div>
+                                        </td>
+                                        {% endif %}
+                                    </tr>
+                                </table>
+                                {% if weekly_weather.caqi_avg %}
+                                <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center; font-size: 14px;">
+                                    <strong>Jakość powietrza w tygodniu:</strong>
+                                    CAQI {{ weekly_weather.caqi_avg }}
+                                    &nbsp;({{ weekly_weather.caqi_level_pl }})
+                                </div>
+                                {% endif %}
+                                {% else %}
                                 <div class="weather-box">
                                     <p style="margin: 0; font-size: 14px; opacity: 0.9;">{{ sections.weather }}</p>
                                 </div>
+                                {% endif %}
                             </td>
                         </tr>
+
+                        <!-- Weekly Reports -->
+                        {% if weekly_reports and weekly_reports.total > 0 %}
+                        <tr>
+                            <td class="section">
+                                <h2 class="section-title">📢 Zgłoszenia Tygodnia</h2>
+                                <p style="color: #666; font-size: 14px; margin: 0 0 10px 0;">
+                                    W tym tygodniu mieszkańcy zgłosili <strong>{{ weekly_reports.total }}</strong> zdarzeń:
+                                </p>
+                                {% for category, count in weekly_reports.by_category.items() %}
+                                <span class="category-badge category-{{ category }}">{{ category }}: {{ count }}</span>
+                                {% endfor %}
+                                {% if weekly_reports.top_reports %}
+                                <div style="margin-top: 12px;">
+                                    {% for report in weekly_reports.top_reports[:3] %}
+                                    <div style="margin-top: 8px; padding: 8px 10px; border-left: 3px solid #ff9500; background: #fff8f0;">
+                                        <strong style="font-size: 14px;">{{ report.title }}</strong>
+                                        {% if report.address %}
+                                        <div style="font-size: 12px; color: #888;">📍 {{ report.address }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                <a href="{{ app_url }}/reports" style="font-size: 13px; color: #1e3a5f; text-decoration: none; display: inline-block; margin-top: 10px;">
+                                    Wszystkie zgłoszenia na naszej stronie →
+                                </a>
+                            </td>
+                        </tr>
+                        {% endif %}
 
                         <!-- Premium CTA -->
                         <tr>

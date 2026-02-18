@@ -39,6 +39,12 @@
             font-size: 14px;
             margin-top: 5px;
         }
+        .name-days-strip {
+            background: #fff8e7;
+            padding: 10px 20px;
+            text-align: center;
+            border-bottom: 1px solid #ffe0a0;
+        }
         .weather-strip {
             background-color: #1e3a5f;
             padding: 15px 20px;
@@ -134,6 +140,27 @@
             font-weight: 600;
             margin-left: 5px;
         }
+        /* CAQI badges */
+        .caqi-VERY_LOW { color: #00c853; font-weight: 700; font-size: 15px; }
+        .caqi-LOW { color: #64dd17; font-weight: 700; font-size: 15px; }
+        .caqi-MEDIUM { color: #ffd600; font-weight: 700; font-size: 15px; }
+        .caqi-HIGH { color: #ff6d00; font-weight: 700; font-size: 15px; }
+        .caqi-VERY_HIGH { color: #ff1744; font-weight: 700; font-size: 15px; }
+        /* Category badges */
+        .category-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .category-emergency { background: #ffebee; color: #c62828; }
+        .category-fire { background: #fff3e0; color: #e65100; }
+        .category-infrastructure { background: #e3f2fd; color: #1565c0; }
+        .category-waste { background: #f3e5f5; color: #6a1b9a; }
+        .category-safety { background: #fff8e1; color: #f57f17; }
+        .category-water { background: #e0f7fa; color: #006064; }
+        .category-greenery { background: #e8f5e9; color: #2e7d32; }
+        .category-other { background: #f5f5f5; color: #424242; }
+        /* Report item */
+        .report-item { padding: 10px; border-bottom: 1px solid #f0f0f0; margin-bottom: 8px; }
+        .report-item:last-child { border-bottom: none; }
+        .cinema-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+        .cinema-item:last-child { border-bottom: none; }
         @media screen and (max-width: 600px) {
             .wrapper { width: 100% !important; }
             .section { padding: 15px !important; }
@@ -155,15 +182,56 @@
                             </td>
                         </tr>
 
-                        <!-- Weather Strip -->
+                        <!-- Name Days Strip -->
+                        {% if name_days %}
+                        <tr>
+                            <td class="name-days-strip">
+                                <span style="font-size: 13px; color: #b8860b;">
+                                    🎂 Dziś imieniny: <strong>{{ name_days | join(", ") }}</strong>
+                                </span>
+                                {% if special_day %}
+                                <span style="margin-left: 15px; font-size: 13px; color: #b8860b;">• {{ special_day }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% elif special_day %}
+                        <tr>
+                            <td class="name-days-strip">
+                                <span style="font-size: 13px; color: #b8860b;">{{ special_day }}</span>
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        <!-- Weather Strip (Airly) -->
                         <tr>
                             <td class="weather-strip">
+                                {% if air_quality %}
+                                <table width="100%" cellspacing="0" cellpadding="0" border="0" style="color: white;">
+                                    <tr>
+                                        <td style="text-align: center; width: 33%; padding: 5px;">
+                                            <div style="font-size: 36px; font-weight: 300; line-height: 1.1;">{{ air_quality.temperature }}°C</div>
+                                            <div style="font-size: 12px; opacity: 0.8;">Temperatura</div>
+                                        </td>
+                                        <td style="text-align: center; width: 34%; padding: 5px; border-left: 1px solid rgba(255,255,255,0.3); border-right: 1px solid rgba(255,255,255,0.3);">
+                                            <div style="font-size: 20px; font-weight: 300;">{{ air_quality.humidity }}%</div>
+                                            <div style="font-size: 12px; opacity: 0.8;">Wilgotność</div>
+                                            <div style="margin-top: 4px; font-size: 11px; opacity: 0.7;">PM2.5: {{ air_quality.pm25 }} | PM10: {{ air_quality.pm10 }}</div>
+                                        </td>
+                                        <td style="text-align: center; width: 33%; padding: 5px;">
+                                            <div class="caqi-{{ air_quality.caqi_level }}" style="font-size: 14px; font-weight: 700;">{{ air_quality.caqi_label }}</div>
+                                            <div style="font-size: 12px; opacity: 0.8;">Jakość powietrza</div>
+                                            <div style="font-size: 11px; opacity: 0.6;">CAQI: {{ air_quality.caqi }}</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                                {% else %}
                                 <span class="temp">{{ weather_temp }}°C</span>
                                 <span class="conditions">{{ sections.weather_brief }}</span>
+                                {% endif %}
                             </td>
                         </tr>
 
-                        <!-- Highlights -->
+                        <!-- Highlights (AI) -->
                         <tr>
                             <td class="section">
                                 <h2 class="section-title">🤖 AI Podsumowanie <span class="premium-badge">PREMIUM</span></h2>
@@ -175,6 +243,54 @@
                                 {% endfor %}
                             </td>
                         </tr>
+
+                        <!-- Reports Today -->
+                        <tr>
+                            <td class="section">
+                                <h2 class="section-title">
+                                    📢 Zgłoszenia Mieszkańców
+                                    <span style="font-size: 12px; font-weight: 400; color: #888;">({{ reports_date_label }})</span>
+                                </h2>
+                                {% if reports_today %}
+                                {% for r in reports_today %}
+                                <div class="report-item">
+                                    <span class="category-badge category-{{ r.category }}">{{ r.category }}</span>
+                                    <strong style="font-size: 14px; margin-left: 6px;">{{ r.title }}</strong>
+                                    {% if r.address %}
+                                    <div style="font-size: 12px; color: #888; margin-top: 2px;">📍 {{ r.address }}</div>
+                                    {% endif %}
+                                    <p style="font-size: 13px; color: #555; margin: 4px 0 0 0;">{{ r.description }}</p>
+                                </div>
+                                {% endfor %}
+                                <a href="{{ app_url }}/reports" style="font-size: 13px; color: #1e3a5f; text-decoration: none;">
+                                    Zobacz wszystkie zgłoszenia →
+                                </a>
+                                {% else %}
+                                <p style="color: #888; font-size: 14px; margin: 0;">Brak nowych zgłoszeń.</p>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        <!-- Cinema Evening (conditional) -->
+                        {% if cinema_evening %}
+                        <tr>
+                            <td class="section">
+                                <h2 class="section-title">🎬 Kino Wieczorem</h2>
+                                {% for movie in cinema_evening %}
+                                <div class="cinema-item">
+                                    <strong style="font-size: 14px;">{{ movie.title }}</strong>
+                                    <span style="font-size: 12px; color: #888;"> ({{ movie.genre }}, {{ movie.rating }})</span>
+                                    <div style="font-size: 13px; color: #1e3a5f; margin-top: 4px;">
+                                        🕐 {{ movie.times | join(", ") }} &nbsp;|&nbsp; 📍 {{ movie.cinema }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                <a href="{{ app_url }}/cinema" style="font-size: 13px; color: #1e3a5f; text-decoration: none;">
+                                    Pełny repertuar na naszej stronie →
+                                </a>
+                            </td>
+                        </tr>
+                        {% endif %}
 
                         <!-- Today's Events -->
                         <tr>
@@ -190,7 +306,7 @@
                                 </div>
                                 {% endfor %}
                                 {% if not sections.events_today %}
-                                <p style="color: #888; font-size: 14px; text-align: center;">Brak zaplanowanych wydarzeń na dziś</p>
+                                <p style="color: #888; font-size: 14px; text-align: center; margin: 0;">Brak zaplanowanych wydarzeń na dziś</p>
                                 {% endif %}
                             </td>
                         </tr>

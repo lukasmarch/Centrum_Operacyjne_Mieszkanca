@@ -137,7 +137,9 @@ class EmailService:
             "sections": content.get("sections", {}),
             "unsubscribe_url": f"{settings.APP_URL}/newsletter/unsubscribe?token={unsubscribe_token}",
             "preferences_url": f"{settings.APP_URL}/newsletter/preferences?token={unsubscribe_token}",
-            "premium_url": f"{settings.APP_URL}/premium"
+            "premium_url": f"{settings.APP_URL}/premium",
+            "weekly_weather": content.get("weekly_weather"),
+            "weekly_reports": content.get("weekly_reports"),
         }
 
         # Process events to extract day/month for display
@@ -182,12 +184,19 @@ class EmailService:
             Send result
         """
         # Build context
+        air_quality = content.get("air_quality")
         context = {
             "subject": content.get("subject", "Dzień Dobry!"),
             "sections": content.get("sections", {}),
-            "weather_temp": weather_temp or "?",
+            "weather_temp": weather_temp or (air_quality or {}).get("temperature") or "?",
+            "air_quality": air_quality,
+            "name_days": content.get("name_days", []),
+            "special_day": content.get("special_day", ""),
+            "cinema_evening": content.get("cinema_evening", []),
+            "reports_today": content.get("reports_today", []),
+            "reports_date_label": content.get("reports_date_label", "dzisiaj"),
             "unsubscribe_url": f"{settings.APP_URL}/newsletter/unsubscribe?token={unsubscribe_token}",
-            "preferences_url": f"{settings.APP_URL}/newsletter/preferences?token={unsubscribe_token}"
+            "preferences_url": f"{settings.APP_URL}/newsletter/preferences?token={unsubscribe_token}",
         }
 
         # Render template
