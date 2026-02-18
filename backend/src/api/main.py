@@ -29,6 +29,9 @@ from src.api.endpoints.business import router as business_router
 # Zgłoszenie24 – Citizen Reports (Sprint 4)
 from src.api.endpoints.reports import router as reports_router
 
+# Push Notifications (Sprint 5C)
+from src.api.endpoints.push import router as push_router
+
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
 
 # CORS for frontend (use env var, fallback to localhost)
@@ -70,6 +73,9 @@ app.include_router(business_router)  # /api/business/*
 
 # Zgłoszenie24 – Reports routes (Sprint 4)
 app.include_router(reports_router)  # /api/reports/*
+
+# Push Notifications routes (Sprint 5C)
+app.include_router(push_router)  # /api/push/*
 
 @app.on_event("startup")
 async def startup_event():

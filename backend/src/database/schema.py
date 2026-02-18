@@ -567,3 +567,36 @@ class Report(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     resolved_at: Optional[datetime] = None
+
+
+# ======================
+# Push Notifications (Sprint 5C)
+# ======================
+
+class PushSubscription(SQLModel, table=True):
+    """Subskrypcje Web Push Notifications"""
+    __tablename__ = "push_subscriptions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Powiązanie z użytkownikiem (opcjonalne)
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    email: Optional[str] = Field(default=None, max_length=255)  # dla niezalogowanych
+
+    # Web Push Protocol fields
+    endpoint: str = Field(max_length=1000, unique=True, index=True)  # URL push service
+    p256dh: str = Field(max_length=200)   # klucz szyfrowania
+    auth: str = Field(max_length=100)     # auth secret
+
+    # Kategorie powiadomień: alerty, powietrze, artykuly, wydarzenia
+    categories: list = Field(default_factory=list, sa_column=Column(JSONB))
+
+    # Metadata urządzenia
+    user_agent: Optional[str] = Field(default=None, max_length=500)
+
+    # Status
+    active: bool = Field(default=True)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used_at: Optional[datetime] = None

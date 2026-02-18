@@ -31,3 +31,9 @@ email-validator>=2.0.0
 # Newsletter (Sprint 2)
 resend>=0.7.0
 jinja2>=3.0.0
+
+# Push Notifications (Sprint 5C)
+pywebpush>=2.0.0
+
+# BIP Scraper (Sprint 5D)
+pdfplumber>=0.11.0

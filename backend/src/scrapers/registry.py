@@ -11,6 +11,7 @@ from src.scrapers.gmina_rybno import GminaRybnoScraper
 from src.scrapers.mojedzialdowo import MojeDzialdowoScraper
 from src.scrapers.apify_facebook import ApifyFacebookScraper
 from src.scrapers.rss_scraper import RSSFeedScraper
+from src.scrapers.bip_rybno import BipRybnoScraper
 from src.utils.logger import setup_logger
 
 logger = setup_logger("ScraperRegistry")
@@ -22,6 +23,7 @@ SCRAPER_REGISTRY: Dict[str, Type[BaseScraper]] = {
     "Moje Działdowo": MojeDzialdowoScraper,
     "Facebook - Syla": ApifyFacebookScraper,
     "Nasze Miasto Działdowo": RSSFeedScraper,
+    "BIP Gminy Rybno": BipRybnoScraper,
 }
 
 

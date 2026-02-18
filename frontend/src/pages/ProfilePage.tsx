@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 interface ProfilePageProps {
   onNavigate: (section: 'dashboard' | 'premium') => void;
@@ -12,6 +13,8 @@ interface ProfilePageProps {
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
   const { user, updateProfile, changePassword, logout, isLoading, error, clearError, isPremium } = useAuth();
+  const { status: pushStatus, isSubscribed: pushSubscribed, isSupported: pushSupported, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
+  const [pushLoading, setPushLoading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences'>('profile');
   const [successMessage, setSuccessMessage] = useState('');
@@ -407,6 +410,63 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     />
                   </label>
                 </div>
+              </div>
+
+              {/* Push Notifications */}
+              <div className="bg-white rounded-2xl p-8 border border-slate-100">
+                <h2 className="text-xl font-bold mb-4">Powiadomienia push</h2>
+
+                {!pushSupported ? (
+                  <div className="p-4 bg-slate-50 rounded-xl text-slate-500 text-sm">
+                    Twoja przeglądarka nie obsługuje powiadomień push.
+                  </div>
+                ) : pushStatus === 'denied' ? (
+                  <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-700 text-sm">
+                    Powiadomienia zostały zablokowane w ustawieniach przeglądarki.
+                    Zmień pozwolenia ręcznie aby je włączyć.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer">
+                      <div>
+                        <p className="font-semibold">Alerty bezpieczeństwa</p>
+                        <p className="text-sm text-slate-500">
+                          Pożary, wypadki – natychmiastowe powiadomienia
+                        </p>
+                        <p className="text-xs text-green-600 mt-0.5">Dostępne bezpłatnie</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setPushLoading(true);
+                          if (pushSubscribed) {
+                            await pushUnsubscribe();
+                          } else {
+                            await pushSubscribe(['alerty', 'powietrze', 'artykuly']);
+                          }
+                          setPushLoading(false);
+                        }}
+                        disabled={pushLoading || pushStatus === 'loading'}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          pushSubscribed ? 'bg-blue-600' : 'bg-slate-200'
+                        } disabled:opacity-50`}
+                        role="switch"
+                        aria-checked={pushSubscribed}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            pushSubscribed ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </label>
+
+                    {pushSubscribed && (
+                      <p className="text-xs text-slate-500 px-1">
+                        Powiadomienia włączone. Otrzymasz alerty o pożarach, wypadkach, smogu i dziennym podsumowaniu.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Account info */}

@@ -297,6 +297,18 @@ async def create_report(
         await session.refresh(report)
 
         logger.info(f"Report created: id={report.id}, title='{report.title}', category={report.category}")
+
+        # Trigger emergency push notification for critical categories
+        if not report.is_spam and report.category in [
+            ReportCategory.EMERGENCY.value, ReportCategory.FIRE.value
+        ]:
+            try:
+                from src.services.push_service import push_service
+                sent = await push_service.send_emergency_alert(session, report)
+                logger.info(f"Emergency push sent to {sent} subscribers for report {report.id}")
+            except Exception as push_err:
+                logger.error(f"Emergency push failed for report {report.id}: {push_err}")
+
         return ReportResponse.model_validate(report)
 
 

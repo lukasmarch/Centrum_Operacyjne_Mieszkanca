@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     # CORS settings
     CORS_ORIGINS: str = "http://localhost:3001,http://localhost:3002,http://localhost:5173"  # Comma-separated list
 
+    # Push Notifications (Sprint 5C) - VAPID keys
+    VAPID_PUBLIC_KEY: Optional[str] = None
+    VAPID_PRIVATE_KEY: Optional[str] = None
+    VAPID_CLAIMS_EMAIL: str = "push@centrum-mieszkanca.pl"
+
+    # BIP Scraper / Firecrawl (Sprint 5D)
+    FIRECRAWL_API_KEY: Optional[str] = None
+
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),

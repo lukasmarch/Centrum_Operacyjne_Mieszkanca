@@ -52,6 +52,14 @@ async def run_daily_summary():
                 logger.info(f"  Date: {summary.date.date()}")
                 logger.info(f"  Generated at: {summary.generated_at}")
                 logger.info(f"  Articles count: {len(summary.headline.split())}")  # Approximate
+
+                # Trigger push notification for daily summary
+                try:
+                    from src.services.push_service import push_service
+                    sent = await push_service.send_daily_summary_push(session, summary.headline)
+                    logger.info(f"Push sent to {sent} subscribers (daily summary)")
+                except Exception as push_err:
+                    logger.error(f"Daily summary push failed: {push_err}")
             else:
                 logger.warning("⚠ SUMMARY IS NONE - Possible reasons:")
                 logger.warning("  1. Summary for this date already exists in database")

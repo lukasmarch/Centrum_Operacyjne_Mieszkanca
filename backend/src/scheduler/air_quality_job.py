@@ -56,7 +56,19 @@ async def update_air_quality():
             
             session.add(new_record)
             await session.commit()
-            
+
+            # Trigger smog alert push if PM2.5 exceeds threshold
+            pm25 = parsed.get("pm25", 0) or 0
+            if pm25 > 50:
+                try:
+                    from src.services.push_service import push_service
+                    from sqlalchemy.ext.asyncio import AsyncSession
+                    async with AsyncSession(engine) as push_session:
+                        sent = await push_service.send_air_alert_push(push_session, pm25)
+                    logger.info(f"Smog alert push sent to {sent} subscribers (PM2.5={pm25})")
+                except Exception as push_err:
+                    logger.error(f"Smog alert push failed: {push_err}")
+
         logger.info(f"Air quality data updated for Rybno (CAQI: {parsed['caqi']})")
         
     except Exception as e:
