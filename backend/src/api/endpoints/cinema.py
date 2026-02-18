@@ -56,8 +56,13 @@ async def get_cinema_repertoire(
     if normalized_location == "Dzialdowo":
         normalized_location = "Działdowo"
 
-    # Map location to cinema_name
-    cinema_name = f"Kino {normalized_location}"
+    # Map location to cinema_name (must match scraper output!)
+    # Scraper uses city_slug without Polish chars: f"Kino {city_slug}" -> "Kino Dzialdowo"
+    cinema_name_map = {
+        "Działdowo": "Kino Dzialdowo",
+        "Lubawa": "Kino Pokój Lubawa",  # Scraper uses full name
+    }
+    cinema_name = cinema_name_map.get(normalized_location, f"Kino {normalized_location}")
 
     # Get today's date in DD.MM.YYYY format (matches scraper format)
     today = datetime.now().strftime('%d.%m.%Y')
