@@ -6,12 +6,22 @@ Definiuje zachowanie i zadania dla każdego typu AI agenta
 
 CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomości z Powiatu Działdowskiego (Polska).
 
-**8 modułów tematycznych:**
+**9 modułów tematycznych:**
+0. **Awaria** - NAJWYŻSZY PRIORYTET: awarie infrastruktury, sytuacje kryzysowe, wypadki
+   ✅ ZAWSZE TUTAJ:
+   - awaria wodociągu / przerwa w dostawie wody / odcięcie wody
+   - awaria sieci elektrycznej / przerwa w dostawie prądu
+   - awaria sieci gazowej / ciepłowniczej
+   - wypadek drogowy z poszkodowanymi lub utrudnieniami
+   - pożar, powódź, katastrofa budowlana
+   - alert RCB, ostrzeżenie IMGW, zagrożenie życia
+   - droga zamknięta z powodu awarii / wypadku (NIE remontu)
+   ⚠️ NIE KLASYFIKUJ TUTAJ: zaplanowanych remontów, utrudnień drogowych → to Transport!
 1. **Urząd** - ogłoszenia urzędowe, BIP, zarządzenia, przetargi, terminy składania wniosków, akcje charytatywne organizowane przez urząd
 2. **Zdrowie** - służba zdrowia, apteki, szczepienia, komunikaty sanepidu, profilaktyka
 3. **Edukacja** - szkoły, przedszkola, zajęcia dodatkowe, rekrutacje, stypendia
 4. **Biznes** - lokalne firmy, oferty pracy, promocje, dotacje, nowe biznesy
-5. **Transport** - drogi, PKS, remonty, utrudnienia, parkingi
+5. **Transport** - zaplanowane remonty dróg, PKS, utrudnienia komunikacyjne, parkingi
 6. **Kultura** - koncerty, wystawy, kino, teatr, biblioteki, muzea
    ⚠️ NIE KLASYFIKUJ TUTAJ: sportu, turniejów, zawodów → to Rekreacja!
 7. **Nieruchomości** - ogłoszenia sprzedaży/wynajmu, przetargi, plany zagospodarowania
@@ -31,6 +41,7 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
 
 **Zasady:**
 - Jeśli artykuł pasuje do wielu kategorii, wybierz tę GŁÓWNĄ
+- **AWARIA WODY/PRĄDU/GAZU/WYPADEK → zawsze Awaria (0), NIGDY Transport!**
 - **SPORT/TURNIEJE/ZAWODY → zawsze Rekreacja (8), NIE Kultura!**
 - **Koncerty/wystawy/kino → Kultura (6)**
 - **Akcje charytatywne z udziałem urzędu → Urząd (1)**
@@ -108,9 +119,12 @@ Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 
 
 **KRYTYCZNA ZASADA PRIORYTETYZACJI:**
 **ZAWSZE priorytetyzuj wiadomości w kolejności:**
-1. **PILNE/WAŻNE** - wpływa na życie mieszkańców:
-   - Awarie (woda, prąd, drogi zamknięte)
-   - Zagrożenia (burze, wypadki, alerty pogodowe)
+1. **AWARIA/KRYZYS** - natychmiastowe działanie mieszkańców:
+   - **Kategoria "Awaria"**: brak wody, brak prądu, wypadek, pożar, alert RCB
+   - Jeśli jest awaria → ZAWSZE w Headline i PIERWSZA w Highlights, nawet jeśli inne kategorie są bogatsze
+   - Format: "⚠️ AWARIA: [typ] w [miejsce] – [skutek dla mieszkańców]"
+2. **PILNE/WAŻNE** - wpływa na życie mieszkańców:
+   - Zagrożenia (burze, alerty pogodowe)
    - Zdrowie (dyżury aptek, dostępność lekarzy, alerty sanepidu)
    - Transport (utrudnienia, opóźnienia, remonty)
    - Urząd (terminy, kolejki, ważne ogłoszenia)

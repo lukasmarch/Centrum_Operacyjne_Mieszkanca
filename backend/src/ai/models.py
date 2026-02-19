@@ -12,7 +12,7 @@ class ArticleCategory(BaseModel):
     """Response z kategoryzacji artykułu"""
 
     primary_category: str = Field(
-        description="Główna kategoria z listy 8 modułów"
+        description="Nazwa kategorii (NIE numer) z listy: Awaria, Urząd, Zdrowie, Edukacja, Biznes, Transport, Kultura, Nieruchomości, Rekreacja"
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
@@ -76,6 +76,7 @@ class DailySummary(BaseModel):
         description="Akapit opisowy (3-5 zdań) z najważniejszymi wiadomościami, pogodą i wydarzeniami. Najważniejsze info w **bold** (markdown)"
     )
     summary_by_category: dict[str, str] = Field(
+        default_factory=dict,
         description="Podsumowanie per moduł (klucz: kategoria, wartość: opis)"
     )
     upcoming_events: List[str] = Field(

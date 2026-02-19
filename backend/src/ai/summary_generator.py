@@ -51,14 +51,20 @@ class SummaryGenerator:
         Returns:
             DailySummary object lub None jeśli brak danych
         """
-        # Domyślnie: wczorajszy dzień (0:00 - 23:59)
+        # Domyślnie: dzisiejszy dzień (00:00 – teraz)
+        # Jeśli mało artykułów z dziś (<10), rozszerzamy okno o wczoraj
+        MIN_ARTICLES_THRESHOLD = 10
+
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
         if target_date is None:
-            target_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+            target_date = today_start
         else:
             target_date = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
 
         date_start = target_date
-        date_end = target_date + timedelta(days=1)
+        date_end = min(target_date + timedelta(days=1), now)  # nie sięgamy w przyszłość
 
         self.logger.info(f"Generating daily summary for {date_start.date()}")
 
@@ -70,7 +76,7 @@ class SummaryGenerator:
             self.logger.warning(f"Summary for {date_start.date()} already exists")
             return None
 
-        # 1. Pobierz artykuły z ostatnich 24h (tylko przetworzone, po dacie PUBLIKACJI)
+        # 1. Pobierz artykuły z dziś (tylko przetworzone, po dacie PUBLIKACJI)
         articles_result = await session.execute(
             select(Article)
             .where(Article.published_at >= date_start)
@@ -80,9 +86,29 @@ class SummaryGenerator:
         )
         articles = articles_result.scalars().all()
 
+        # Fallback: jeśli mało artykułów z dziś, rozszerz okno o wczoraj
+        extended = False
+        if len(articles) < MIN_ARTICLES_THRESHOLD and date_start == today_start:
+            yesterday_start = today_start - timedelta(days=1)
+            self.logger.info(
+                f"Only {len(articles)} articles for today – extending window to yesterday ({yesterday_start.date()})"
+            )
+            articles_result = await session.execute(
+                select(Article)
+                .where(Article.published_at >= yesterday_start)
+                .where(Article.published_at < date_end)
+                .where(Article.processed == True)
+                .order_by(Article.published_at.desc())
+            )
+            articles = articles_result.scalars().all()
+            extended = True
+
         if not articles:
             self.logger.warning(f"No articles found for {date_start.date()}")
             return None
+
+        if extended:
+            self.logger.info(f"Extended window: {len(articles)} articles (today + yesterday)")
 
         # 2. Pogrupuj artykuły po kategoriach
         articles_by_category = {}

@@ -189,7 +189,7 @@ class BipRybnoScraper(BaseScraper):
 
             return {
                 "published_at": published_at,
-                "content": content_text[:10000] if content_text else None,
+                "content": content_text[:1000] if content_text else None,  # limit 1000 znaków (RAG będzie czytał PDF)
                 "pdf_url": pdf_links[0] if pdf_links else None,
                 "all_pdf_urls": pdf_links,
             }
@@ -262,17 +262,24 @@ class BipRybnoScraper(BaseScraper):
         """
         Główna metoda scraping BIP.
         Pobiera listingi (max_pages_per_run stron) + opcjonalnie PDF.
+
+        Zabezpieczenia:
+        - Detekcja duplikatów między stronami (BIP nie obsługuje ?start=N → ta sama strona)
+        - Filtr daty: artykuły starsze niż 2 dni są pomijane
+        - PDF extraction wyłączone (download_pdfs=False) – aktywowane przy wdrożeniu RAG
         """
         all_saved_ids = []
         page_num = 1
+        previous_page_ids: set = set()
+        cutoff_date = datetime.utcnow() - timedelta(days=2)
 
         async with self:
             while page_num <= self.max_pages_per_run:
-                # URL paginacji: /112/?page=2 lub /112/?start=10 (zależy od systemu)
+                # BIP Rybno używa strony głównej /112/ – paginacja przez ?start=N
+                # UWAGA: BIP może nie obsługiwać ?start= → wykrywamy duplikaty
                 if page_num == 1:
                     url = self.news_url
                 else:
-                    # BIP Rybno: paginacja offset-based (10 per page)
                     offset = (page_num - 1) * 10
                     url = f"{self.news_url}?start={offset}"
 
@@ -286,28 +293,55 @@ class BipRybnoScraper(BaseScraper):
                         self.logger.info(f"No articles found on page {page_num} – stopping")
                         break
 
-                    # Dla każdego artykułu: pobierz szczegóły + PDF
+                    # Detekcja duplikatów stron: jeśli ta sama strona co poprzednia → stop
+                    current_page_ids = {a["external_id"] for a in articles}
+                    if page_num > 1 and current_page_ids == previous_page_ids:
+                        self.logger.info(
+                            f"Page {page_num} identical to page {page_num - 1} "
+                            f"(BIP pagination ?start=N not supported) – stopping"
+                        )
+                        break
+                    previous_page_ids = current_page_ids
+
+                    # Dla każdego artykułu: pobierz szczegóły (data + treść)
+                    fresh_articles = []
                     for article in articles:
                         detail = await self.scrape_detail(article["url"])
                         await asyncio.sleep(0.5)  # respektuj rate limit
 
                         # Data publikacji z detail page
-                        if detail.get("published_at") and not article.get("published_at"):
+                        if detail.get("published_at"):
                             article["published_at"] = detail["published_at"]
 
-                        # Treść z detail page
-                        if detail.get("content") and not article.get("content"):
+                        # Filtr daty: pomijaj artykuły starsze niż 2 dni
+                        if article.get("published_at") and article["published_at"] < cutoff_date:
+                            self.logger.debug(
+                                f"Skipping old article ({article['published_at'].date()}): {article['title'][:60]}"
+                            )
+                            continue
+
+                        # Treść z detail page (max 1000 znaków)
+                        if detail.get("content"):
                             article["content"] = detail["content"]
 
-                        # Wyciągnij tekst z PDF jeśli dostępny i włączone
-                        if self.download_pdfs and detail.get("pdf_url"):
-                            pdf_text = await self.extract_pdf_text(detail["pdf_url"])
-                            if pdf_text:
-                                article["content"] = pdf_text
+                        # PDF extraction – wyłączone do czasu wdrożenia RAG
+                        # Odkomentuj gdy RAG będzie gotowy:
+                        # if self.download_pdfs and detail.get("pdf_url"):
+                        #     pdf_text = await self.extract_pdf_text(detail["pdf_url"])
+                        #     if pdf_text:
+                        #         article["content"] = pdf_text
 
-                    saved_ids = await self.save_to_db(articles, session)
+                        fresh_articles.append(article)
+
+                    if not fresh_articles:
+                        self.logger.info(
+                            f"Page {page_num}: all articles older than {cutoff_date.date()} – stopping"
+                        )
+                        break
+
+                    saved_ids = await self.save_to_db(fresh_articles, session)
                     all_saved_ids.extend(saved_ids)
-                    self.logger.info(f"Page {page_num}: saved {len(saved_ids)} articles")
+                    self.logger.info(f"Page {page_num}: saved {len(saved_ids)} articles ({len(articles) - len(fresh_articles)} skipped as old)")
 
                     page_num += 1
                     await asyncio.sleep(1.0)  # delay między stronami
