@@ -97,14 +97,7 @@ def run_cinema_job():
     Wrapper synchroniczny dla async job.
     (APScheduler wymaga funkcji synchronicznej)
     """
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        # No running event loop - safe to use asyncio.run()
-        asyncio.run(run_cinema_job_async())
-    else:
-        # Already in a running loop - create and run task
-        loop.run_until_complete(run_cinema_job_async())
+    asyncio.run(run_cinema_job_async())
 
 
 if __name__ == "__main__":

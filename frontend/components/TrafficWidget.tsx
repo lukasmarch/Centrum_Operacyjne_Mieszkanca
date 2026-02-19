@@ -1,22 +1,29 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrafficData } from '../types';
-import { fetchTrafficData } from '../src/services/geminiService';
+import { TrafficData, TrafficCondition } from '../types';
 import TrafficItem from './TrafficItem';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 const TrafficWidget: React.FC = () => {
     const [data, setData] = useState<TrafficData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
 
-    const loadTraffic = useCallback(async (lat?: number, lng?: number) => {
+    const loadTraffic = useCallback(async () => {
         setLoading(true);
         try {
-            const result = await fetchTrafficData(lat, lng);
+            const response = await fetch(`${API_URL}/traffic`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const result = await response.json();
             setData({
-                roads: result.roads,
-                sources: result.sources,
+                roads: result.roads.map((r: any) => ({
+                    ...r,
+                    status: (Object.values(TrafficCondition) as string[]).includes(r.status)
+                        ? r.status as TrafficCondition
+                        : TrafficCondition.UNKNOWN,
+                })),
+                sources: result.sources ?? [],
                 lastUpdated: new Date()
             });
             setError(null);
@@ -28,33 +35,18 @@ const TrafficWidget: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        // Start with Rybno coordinates as base
-        loadTraffic(53.3917, 19.9111);
-
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    setLocation({ lat: latitude, lng: longitude });
-                    // Optional: re-load if location changes significantly? 
-                    // For now, Rybno is the focus, so maybe we don't strictly need user location unless they are the dispatcher.
-                    // But keeping it as in original.
-                },
-                () => console.log("Lokalizacja niedostępna, używam współrzędnych Rybna.")
-            );
-        }
-
-        // Refresh every 2 hours (7200000 ms) as requested to save quota
-        const interval = setInterval(() => loadTraffic(location?.lat, location?.lng), 7200000);
+        loadTraffic();
+        // Odświeżaj co 4 godziny (zgodnie z cyklem cache w schedulerze)
+        const interval = setInterval(loadTraffic, 4 * 60 * 60 * 1000);
         return () => clearInterval(interval);
     }, [loadTraffic]);
 
     return (
-        <div className="w-full bg-gradient-to-br from-[#1e293b] to-[#0f172a] rounded-3xl p-5 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden text-white">
+        <div className="w-full glass-panel rounded-3xl p-5 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden text-slate-100">
 
             {/* Glow Effects */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/40 to-transparent"></div>
-            <div className="absolute -top-24 -left-24 w-64 h-64 bg-blue-600/10 blur-[100px] rounded-full"></div>
+            <div className="absolute -top-24 -left-24 w-64 h-64 bg-blue-600/10 blur-[100px] rounded-full pointer-events-none"></div>
 
             <div className="relative z-10">
                 <header className="flex justify-between items-center mb-6">
@@ -71,7 +63,7 @@ const TrafficWidget: React.FC = () => {
                         </div>
                     </div>
                     <button
-                        onClick={() => loadTraffic(location?.lat, location?.lng)}
+                        onClick={() => loadTraffic()}
                         disabled={loading}
                         className="group p-3 bg-white/5 hover:bg-white/10 active:scale-95 transition-all rounded-xl border border-white/10 shadow-lg"
                     >

@@ -16,7 +16,7 @@ from src.scheduler.gus_job import run_gus_job
 from src.scheduler.cinema_job import run_cinema_job
 from src.scheduler.traffic_job import run_traffic_job
 from src.scheduler.newsletter_job import run_weekly_newsletter, run_daily_newsletter
-from src.scheduler.air_quality_job import update_air_quality
+from src.scheduler.air_quality_job import run_air_quality_job
 from src.scheduler.ceidg_job import run_ceidg_job
 from src.utils.logger import setup_logger
 
@@ -65,7 +65,7 @@ def start_scheduler():
 
     # Air Quality update every 4 hours (Airly API limits)
     scheduler.add_job(
-        func=update_air_quality,
+        func=run_air_quality_job,
         trigger=IntervalTrigger(hours=4),
         id='air_quality_update',
         name='Update Air Quality (Airly)',

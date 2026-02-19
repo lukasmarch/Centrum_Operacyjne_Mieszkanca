@@ -8,9 +8,11 @@ Kosztowny API call - ograniczony do 6 razy dziennie.
 import asyncio
 from datetime import datetime
 from sqlalchemy import update
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 from src.integrations.traffic_service import TrafficService
-from src.database.connection import async_session
+from src.config import settings
 from src.database.schema import TrafficCache
 from src.utils.logger import setup_logger
 
@@ -24,6 +26,10 @@ async def run_traffic_job_async():
     logger.info("=" * 80)
     logger.info("TRAFFIC CACHE UPDATE - Gemini Grounding API")
     logger.info("=" * 80)
+
+    # Create fresh engine per run (avoids "attached to different loop" error)
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     service = TrafficService()
 
@@ -61,6 +67,8 @@ async def run_traffic_job_async():
 
     except Exception as e:
         logger.error(f"  ✗ Error in traffic job: {e}", exc_info=True)
+    finally:
+        await engine.dispose()
 
 
 def run_traffic_job():
@@ -68,14 +76,7 @@ def run_traffic_job():
     Wrapper synchroniczny dla async job.
     (APScheduler wymaga funkcji synchronicznej)
     """
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        # No running event loop - safe to use asyncio.run()
-        asyncio.run(run_traffic_job_async())
-    else:
-        # Already in a running loop - create and run task
-        loop.run_until_complete(run_traffic_job_async())
+    asyncio.run(run_traffic_job_async())
 
 
 if __name__ == "__main__":
