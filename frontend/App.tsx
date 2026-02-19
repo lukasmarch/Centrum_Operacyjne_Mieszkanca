@@ -136,7 +136,7 @@ const AppContent: React.FC = () => {
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="text-center">
                     <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-3xl text-white mx-auto mb-4 animate-pulse">
-                        D
+                        R
                     </div>
                     <p className="text-slate-500">Ładowanie...</p>
                 </div>
@@ -145,7 +145,7 @@ const AppContent: React.FC = () => {
     }
 
     return (
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500/30">
             {/* Mobile overlay */}
             {isSidebarOpen && (
                 <div
@@ -162,13 +162,16 @@ const AppContent: React.FC = () => {
                 onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
             />
 
-            <main className="flex-1 md:ml-64 bg-slate-50 min-h-screen transition-all duration-300">
+            <main className="flex-1 md:ml-64 bg-slate-950 min-h-screen transition-all duration-300 relative">
+                {/* Background Gradients */}
+                <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950 pointer-events-none"></div>
+
                 {/* Top Header */}
-                <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 p-4 px-8 flex items-center justify-between">
+                <div className="relative z-40 bg-transparent p-4 px-8 flex items-center justify-between">
                     {/* Mobile hamburger button */}
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors"
+                        className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
                         aria-label="Toggle menu"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -180,74 +183,88 @@ const AppContent: React.FC = () => {
                         </svg>
                     </button>
 
-                    <div className="relative w-full max-w-md hidden md:block">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                    <div className="relative w-full max-w-md hidden md:block group">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">🔍</span>
                         <input
                             type="text"
                             placeholder="Szukaj informacji, wydarzeń, BIP..."
-                            className="w-full pl-10 pr-4 py-2 bg-slate-100 rounded-full text-sm border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+                            className="w-full pl-10 pr-4 py-2 bg-slate-800/50 rounded-full text-sm text-slate-200 border border-white/5 focus:bg-slate-800 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none placeholder:text-slate-600"
                         />
                     </div>
                     <div className="flex items-center gap-4">
-                        <button className="relative w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors">
-                            <span className="text-lg">🔔</span>
-                            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
-                        </button>
-
                         {isAuthenticated && user ? (
                             <button
                                 onClick={() => setActiveSection('profile')}
-                                className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 pr-3 rounded-full transition-colors"
+                                className="group transition-transform hover:scale-105 active:scale-95"
                             >
-                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-xs">
-                                    {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                <div className={`px-5 py-2 rounded-full font-bold text-white text-sm shadow-lg tracking-wide bg-gradient-to-r ${user.tier === 'business' ? 'from-blue-600 via-indigo-600 to-purple-600 shadow-indigo-500/20' :
+                                    user.tier === 'premium' ? 'from-indigo-500 via-purple-500 to-pink-500 shadow-purple-500/20' :
+                                        'from-slate-600 to-slate-500'
+                                    }`}>
+                                    {user.tier === 'business' ? 'Business' : user.tier === 'premium' ? 'Premium' : 'Free'}
                                 </div>
-                                <span className="text-sm font-semibold hidden sm:block">{user.full_name.split(' ')[0]}</span>
-                                {user.tier === 'premium' && (
-                                    <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">PRO</span>
-                                )}
                             </button>
                         ) : (
-                            <button
-                                onClick={() => setActiveSection('login')}
-                                className="flex items-center gap-2 cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full transition-colors"
-                            >
-                                <span className="text-sm font-semibold">Zaloguj się</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setActiveSection('login')}
+                                    className="flex items-center gap-2 cursor-pointer text-slate-400 hover:text-white px-4 py-2 rounded-full transition-colors font-semibold text-sm"
+                                >
+                                    Zaloguj
+                                </button>
+                                <button
+                                    onClick={() => setActiveSection('register')}
+                                    className="flex items-center gap-2 cursor-pointer bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-full transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-0.5"
+                                >
+                                    <span className="text-sm font-bold">Zarejestruj</span>
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>
 
                 {/* User location banner */}
                 {isAuthenticated && user && (
-                    <div className="bg-blue-50 border-b border-blue-100 px-8 py-2 flex items-center justify-between">
-                        <p className="text-sm text-blue-700">
-                            📍 Twoja lokalizacja: <strong>{user.location}</strong>
-                        </p>
-                        <button
-                            onClick={() => setActiveSection('profile')}
-                            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                            Zmień
-                        </button>
+                    <div className="relative z-30 py-2">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <div className="w-fit mx-auto bg-slate-950/80 backdrop-blur-md border border-white/10 rounded-full py-1.5 px-6 flex items-center gap-6 shadow-xl shadow-black/20">
+                                <p className="text-xs font-medium text-slate-400 flex items-center gap-3">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                    </span>
+                                    <span className="tracking-wide">Lokalizacja:</span>
+                                    <strong className="text-indigo-300 font-semibold tracking-wide text-sm">{user.location}</strong>
+                                </p>
+                                <div className="h-4 w-px bg-white/10"></div>
+                                <button
+                                    onClick={() => setActiveSection('profile')}
+                                    className="text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-white transition-colors hover:underline decoration-indigo-500 decoration-2 underline-offset-4"
+                                >
+                                    Zmień
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* Dynamic Content */}
-                <div className="max-w-7xl mx-auto p-4 md:p-8">
+                <div className="max-w-7xl mx-auto p-4 md:p-8 relative z-10">
                     {renderContent()}
                 </div>
 
                 {/* Footer info for better UX */}
-                <footer className="max-w-7xl mx-auto px-8 py-10 mt-10 border-t border-slate-200 text-slate-400 text-sm flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div className="flex items-center gap-4">
-                        <p>© 2024 Działdowo Live</p>
-                        <a href="#" className="hover:text-blue-600">Polityka prywatności</a>
-                        <a href="#" className="hover:text-blue-600">Regulamin</a>
+                <footer className="max-w-7xl mx-auto px-8 py-10 mt-10 border-t border-white/5 text-slate-500 text-xs flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
+                    <div className="flex items-center gap-6">
+                        <p className="font-medium">© 2024 Rybno Live</p>
+                        <div className="flex gap-4">
+                            <a href="#" className="hover:text-blue-400 transition-colors">Prywatność</a>
+                            <a href="#" className="hover:text-blue-400 transition-colors">Regulamin</a>
+                        </div>
                     </div>
-                    <div className="flex gap-4">
-                        <span className="flex items-center gap-1">🟢 Serwer: Rybno-1</span>
-                        <span className="flex items-center gap-1">📡 API: Active</span>
+                    <div className="flex gap-4 font-mono opacity-50">
+                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Rybno-1</span>
+                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> API: v2.4</span>
                     </div>
                 </footer>
             </main>

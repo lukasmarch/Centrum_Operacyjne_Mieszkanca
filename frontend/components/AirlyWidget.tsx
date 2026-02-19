@@ -81,7 +81,7 @@ const AirlyWidget: React.FC<AirlyWidgetProps> = ({ data, loading, error }) => {
     const pm10Percent = Math.min((data.pm10 / 45) * 100, 100); // WHO standard 45 µg/m³
 
     return (
-        <div className="relative overflow-hidden rounded-3xl bg-slate-900 text-white p-8 shadow-2xl">
+        <div className="relative overflow-hidden glass-panel rounded-3xl text-white p-8 shadow-2xl">
             {/* Background gradients */}
             <div className={`absolute -top-20 -right-20 w-64 h-64 rounded-full blur-[100px] opacity-40 ${levelColor.split(' ')[0]}`}></div>
             <div className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full bg-blue-600 blur-[100px] opacity-20"></div>

@@ -81,24 +81,24 @@ const SectionNav: React.FC<SectionNavProps> = ({
   const getTierBadgeColor = (tier: UserTier): string => {
     switch (tier) {
       case 'free':
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-slate-800 text-slate-400 border border-slate-700';
       case 'premium':
-        return 'bg-indigo-100 text-indigo-700';
+        return 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
       case 'business':
-        return 'bg-amber-100 text-amber-700';
+        return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-slate-800 text-slate-400';
     }
   };
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-4 ${className}`}>
+    <div className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-gray-900">Kategorie Statystyk</h3>
+        <h3 className="text-lg font-bold text-slate-100">Kategorie Statystyk</h3>
         {userTier && (
           <span
-            className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getTierBadgeColor(userTier)}`}
+            className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getTierBadgeColor(userTier as UserTier)}`}
           >
             {userTier}
           </span>
@@ -126,10 +126,10 @@ const SectionNav: React.FC<SectionNavProps> = ({
               className={`
                 relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all
                 ${isActive
-                  ? 'border-blue-500 bg-blue-50 shadow-md'
+                  ? 'border-blue-500/50 bg-blue-500/10 shadow-lg shadow-blue-500/10'
                   : isAccessible
-                    ? 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-sm'
-                    : 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                    ? 'border-slate-800 bg-slate-800/30 hover:border-slate-600 hover:bg-slate-800'
+                    : 'border-slate-800/50 bg-slate-900 opacity-40 cursor-not-allowed grayscale'
                 }
               `}
             >
@@ -145,10 +145,10 @@ const SectionNav: React.FC<SectionNavProps> = ({
                 className={`
                   p-2 rounded-lg
                   ${isActive
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
                     : isAccessible
-                      ? 'bg-gray-100 text-gray-600'
-                      : 'bg-gray-200 text-gray-400'
+                      ? 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'
+                      : 'bg-slate-800/50 text-slate-600'
                   }
                 `}
               >
@@ -160,10 +160,10 @@ const SectionNav: React.FC<SectionNavProps> = ({
                 className={`
                   text-xs font-semibold text-center leading-tight
                   ${isActive
-                    ? 'text-blue-700'
+                    ? 'text-blue-400'
                     : isAccessible
-                      ? 'text-gray-700'
-                      : 'text-gray-400'
+                      ? 'text-slate-400 group-hover:text-slate-200'
+                      : 'text-slate-600'
                   }
                 `}
               >
@@ -188,11 +188,11 @@ const SectionNav: React.FC<SectionNavProps> = ({
 
       {/* Upgrade prompt for free users */}
       {userTier === 'free' && (
-        <div className="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-lg">
-          <p className="text-sm text-gray-700">
+        <div className="mt-4 p-3 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-lg">
+          <p className="text-sm text-indigo-300">
             <Lock size={14} className="inline mr-1" />
             <strong>10 kategorii Premium</strong> z pełnymi danymi dostępne po upgradzie.
-            <button className="ml-2 text-indigo-600 hover:text-indigo-700 font-semibold underline">
+            <button className="ml-2 text-indigo-400 hover:text-indigo-300 font-semibold underline decoration-indigo-500/30">
               Zobacz plany
             </button>
           </p>

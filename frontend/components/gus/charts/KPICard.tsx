@@ -67,8 +67,8 @@ const KPICard: React.FC<KPICardProps> = ({
   };
 
   const getTrendBgColor = () => {
-    if (!trend || trend === 0) return 'bg-gray-50';
-    return trend > 0 ? 'bg-green-50' : 'bg-red-50';
+    if (!trend || trend === 0) return 'bg-slate-800';
+    return trend > 0 ? 'bg-green-500/10' : 'bg-red-500/10';
   };
 
   const getTrendIcon = () => {
@@ -78,11 +78,11 @@ const KPICard: React.FC<KPICardProps> = ({
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow relative overflow-hidden min-w-0 ${className}`}
+      className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-5 hover:border-slate-700 transition-all relative overflow-hidden min-w-0 ${className}`}
     >
       {/* Level Badge (if powiat) */}
       {level === 'powiat' && (
-        <div className="absolute top-0 right-0 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wide border-b border-l border-amber-100">
+        <div className="absolute top-0 right-0 bg-amber-500/10 text-amber-500 text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wide border-b border-l border-amber-500/20">
           Powiat
         </div>
       )}
@@ -90,15 +90,15 @@ const KPICard: React.FC<KPICardProps> = ({
       {/* Header with icon and label */}
       <div className="flex items-start justify-between mb-3 mt-1">
         <div className="flex-1 pr-4">
-          <p className="text-sm text-gray-500 font-medium mb-1 line-clamp-2 min-h-[40px]" title={label}>{label}</p>
+          <p className="text-sm text-slate-400 font-medium mb-1 line-clamp-2 min-h-[40px]" title={label}>{label}</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-gray-900">{formatValue(value)}</span>
-            <span className="text-sm text-gray-500 font-medium">{unit}</span>
+            <span className="text-2xl font-bold text-slate-100">{formatValue(value)}</span>
+            <span className="text-sm text-slate-500 font-medium">{unit}</span>
           </div>
         </div>
         {Icon && (
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-2.5 rounded-lg flex-shrink-0">
-            <Icon className="text-blue-600" size={20} />
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-2.5 rounded-lg flex-shrink-0 border border-slate-700">
+            <Icon className="text-blue-400" size={20} />
           </div>
         )}
       </div>
@@ -112,7 +112,7 @@ const KPICard: React.FC<KPICardProps> = ({
             {getTrendIcon()}
             {Math.abs(trend).toFixed(2)}%
           </span>
-          <span className="text-xs text-gray-500">rok do roku</span>
+          <span className="text-xs text-slate-500">rok do roku</span>
         </div>
       )}
 
@@ -123,14 +123,14 @@ const KPICard: React.FC<KPICardProps> = ({
             <AreaChart data={sparklineData}>
               <defs>
                 <linearGradient id="sparklineGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#3b82f6"
+                stroke="#60a5fa"
                 strokeWidth={1.5}
                 fill="url(#sparklineGradient)"
                 animationDuration={800}

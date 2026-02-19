@@ -77,14 +77,14 @@ const GUSPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Page Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-slate-900/50 backdrop-blur-xl border-b border-slate-800 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Statystyki GUS</h1>
-              <p className="text-gray-600 mt-1">
+              <h1 className="text-3xl font-black text-slate-100 tracking-tight">Statystyki GUS</h1>
+              <p className="text-slate-400 mt-1 font-medium">
                 Bank Danych Lokalnych GUS · Gmina Rybno · Powiat Działdowski
               </p>
             </div>
@@ -92,15 +92,14 @@ const GUSPage: React.FC = () => {
             {/* Tier badge */}
             {user && (
               <div className="text-right">
-                <p className="text-xs text-gray-500 mb-1">Twój plan</p>
+                <p className="text-xs text-slate-400 mb-1 uppercase tracking-wider font-bold">Twój plan</p>
                 <span
-                  className={`inline-block px-4 py-2 rounded-full text-sm font-bold uppercase ${
-                    user.tier === 'free'
-                      ? 'bg-gray-100 text-gray-600'
+                  className={`inline-block px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider ${user.tier === 'free'
+                      ? 'bg-slate-800 text-slate-300 border border-slate-700'
                       : user.tier === 'premium'
-                      ? 'bg-indigo-100 text-indigo-700'
-                      : 'bg-amber-100 text-amber-700'
-                  }`}
+                        ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}
                 >
                   {user.tier}
                 </span>
@@ -112,7 +111,7 @@ const GUSPage: React.FC = () => {
 
       {/* Section Navigation (only show if not on overview) */}
       {activeSection !== 'overview' && (
-        <div className="bg-white border-b border-gray-200">
+        <div className="bg-slate-900 border-b border-slate-800">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <SectionNav
               activeSection={activeSection}
@@ -132,7 +131,7 @@ const GUSPage: React.FC = () => {
 
             {/* Section Navigation below overview */}
             <div className="mt-12">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Odkryj więcej kategorii</h2>
+              <h2 className="text-2xl font-bold text-slate-100 mb-6">Odkryj więcej kategorii</h2>
               <SectionNav
                 activeSection={activeSection}
                 onSectionChange={handleSectionChange}
@@ -150,34 +149,37 @@ const GUSPage: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <div className="bg-white border-t border-gray-200 mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm text-gray-600">
+      <div className="bg-slate-900 border-t border-slate-800 mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-sm text-slate-400">
             <div>
-              <h3 className="font-bold text-gray-900 mb-2">O danych GUS</h3>
-              <p>
+              <h3 className="font-bold text-slate-200 mb-4 text-lg">O danych GUS</h3>
+              <p className="leading-relaxed">
                 Dane pochodzą z Banku Danych Lokalnych GUS (bdl.stat.gov.pl).
                 Statystyki są aktualizowane kwartalnie i przechowywane lokalnie
                 dla szybkiego dostępu.
               </p>
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 mb-2">Dostępne plany</h3>
-              <ul className="space-y-1">
-                <li>
-                  <strong>Free:</strong> 9 podstawowych wskaźników
+              <h3 className="font-bold text-slate-200 mb-4 text-lg">Dostępne plany</h3>
+              <ul className="space-y-3">
+                <li className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-slate-500"></div>
+                  <span><strong>Free:</strong> 9 podstawowych wskaźników</span>
                 </li>
-                <li>
-                  <strong>Premium (19 PLN/mies):</strong> 57 wskaźników, 10 kategorii
+                <li className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                  <span><strong>Premium (19 PLN/mies):</strong> 57 wskaźników, 10 kategorii</span>
                 </li>
-                <li>
-                  <strong>Business (99 PLN/mies):</strong> 88 wskaźników, AI insights
+                <li className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                  <span><strong>Business (99 PLN/mies):</strong> 88 wskaźników, AI insights</span>
                 </li>
               </ul>
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 mb-2">Źródła danych</h3>
-              <ul className="space-y-1">
+              <h3 className="font-bold text-slate-200 mb-4 text-lg">Źródła danych</h3>
+              <ul className="space-y-2">
                 <li>• Gmina Rybno (kod TERYT: 042815403062)</li>
                 <li>• Powiat Działdowski (kod TERYT: 042815403000)</li>
                 <li>• Województwo warmińsko-mazurskie</li>
@@ -186,7 +188,7 @@ const GUSPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 pt-8 border-t border-gray-200 text-center text-xs text-gray-500">
+          <div className="mt-12 pt-8 border-t border-slate-800 text-center text-xs text-slate-600">
             <p>
               Dane GUS © Główny Urząd Statystyczny · Ostatnia aktualizacja:{' '}
               {new Date().toLocaleDateString('pl-PL', {

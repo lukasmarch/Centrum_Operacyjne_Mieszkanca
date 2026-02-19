@@ -66,11 +66,11 @@ const TrendChart: React.FC<TrendChartProps> = ({
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white px-4 py-3 rounded-lg shadow-lg border border-gray-200">
-          <p className="text-sm font-semibold text-gray-900">
+        <div className="bg-slate-900 px-4 py-3 rounded-lg shadow-lg border border-slate-700">
+          <p className="text-sm font-semibold text-slate-200">
             Rok {payload[0].payload.year}
           </p>
-          <p className="text-lg font-bold text-blue-600 mt-1">
+          <p className="text-lg font-bold text-blue-400 mt-1">
             {formatValue(payload[0].value)} {unit}
           </p>
         </div>
@@ -80,85 +80,84 @@ const TrendChart: React.FC<TrendChartProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 min-w-0">
+    <div className="bg-transparent rounded-xl min-w-0">
       {title && (
-        <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>
+        <h3 className="text-lg font-bold text-slate-100 mb-4">{title}</h3>
       )}
 
       <div style={{ width: '100%', height: `${height}px`, minWidth: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={data}
-          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-        >
-          <defs>
-            <linearGradient id={`areaGradient-${color}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.3} />
-              <stop offset="100%" stopColor={color} stopOpacity={0.05} />
-            </linearGradient>
-          </defs>
+          <AreaChart
+            data={data}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id={`areaGradient-${color}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+                <stop offset="100%" stopColor={color} stopOpacity={0.05} />
+              </linearGradient>
+            </defs>
 
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
 
-          <XAxis
-            dataKey="year"
-            stroke="#9ca3af"
-            style={{ fontSize: '12px', fontWeight: 500 }}
-            tick={{ fill: '#6b7280' }}
-          />
-
-          <YAxis
-            stroke="#9ca3af"
-            style={{ fontSize: '12px', fontWeight: 500 }}
-            tick={{ fill: '#6b7280' }}
-            tickFormatter={(value) => formatValue(value).split(',')[0]} // Remove decimals for axis
-          />
-
-          <Tooltip content={<CustomTooltip />} />
-
-          {showLegend && (
-            <Legend
-              wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-              iconType="line"
+            <XAxis
+              dataKey="year"
+              stroke="#94a3b8"
+              style={{ fontSize: '12px', fontWeight: 500 }}
+              tick={{ fill: '#94a3b8' }}
             />
-          )}
 
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={2.5}
-            fill={`url(#areaGradient-${color})`}
-            animationDuration={1000}
-            animationEasing="ease-in-out"
-          />
-        </AreaChart>
+            <YAxis
+              stroke="#94a3b8"
+              style={{ fontSize: '12px', fontWeight: 500 }}
+              tick={{ fill: '#94a3b8' }}
+              tickFormatter={(value) => formatValue(value).split(',')[0]} // Remove decimals for axis
+            />
+
+            <Tooltip content={<CustomTooltip />} />
+
+            {showLegend && (
+              <Legend
+                wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                iconType="line"
+              />
+            )}
+
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke={color}
+              strokeWidth={2.5}
+              fill={`url(#areaGradient-${color})`}
+              animationDuration={1000}
+              animationEasing="ease-in-out"
+            />
+          </AreaChart>
         </ResponsiveContainer>
       </div>
 
       {/* Stats summary below chart */}
       {data.length > 1 && (
-        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-sm">
+        <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between text-sm">
           <div>
-            <span className="text-gray-500">Najwcześniejszy: </span>
-            <span className="font-semibold text-gray-900">
+            <span className="text-slate-500">Najwcześniejszy: </span>
+            <span className="font-semibold text-slate-200">
               {formatValue(data[0].value)} {unit} ({data[0].year})
             </span>
           </div>
           <div>
-            <span className="text-gray-500">Najnowszy: </span>
-            <span className="font-semibold text-gray-900">
+            <span className="text-slate-500">Najnowszy: </span>
+            <span className="font-semibold text-slate-200">
               {formatValue(data[data.length - 1].value)} {unit} ({data[data.length - 1].year})
             </span>
           </div>
           <div>
-            <span className="text-gray-500">Zmiana: </span>
+            <span className="text-slate-500">Zmiana: </span>
             <span
-              className={`font-semibold ${
-                data[data.length - 1].value >= data[0].value
-                  ? 'text-green-600'
-                  : 'text-red-600'
-              }`}
+              className={`font-semibold ${data[data.length - 1].value >= data[0].value
+                ? 'text-green-600'
+                : 'text-red-600'
+                }`}
             >
               {((((data[data.length - 1].value - data[0].value) / data[0].value) * 100).toFixed(1))}%
             </span>

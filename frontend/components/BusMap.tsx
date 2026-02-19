@@ -138,7 +138,7 @@ const BusMap: React.FC<BusMapProps> = ({ activeBuses }) => {
     const center: [number, number] = [53.315, 20.06];
 
     return (
-        <div className="w-full h-64 bg-slate-100 rounded-2xl overflow-hidden shadow-inner border border-slate-200 relative">
+        <div className="w-full h-64 glass-panel rounded-2xl overflow-hidden shadow-inner border border-white/10 relative">
             <MapContainer
                 center={center}
                 zoom={12}
@@ -147,7 +147,7 @@ const BusMap: React.FC<BusMapProps> = ({ activeBuses }) => {
                 className="h-full w-full"
             >
                 <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
 
                 {/* Glow trasy */}

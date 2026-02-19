@@ -95,7 +95,7 @@ const EventsFeed: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">Nadchodzące Wydarzenia</h2>
+            <h2 className="text-2xl font-bold text-slate-100">Nadchodzące Wydarzenia</h2>
 
             {/* Categories */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -104,8 +104,8 @@ const EventsFeed: React.FC = () => {
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
                         className={`px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap ${activeCategory === cat
-                            ? 'bg-purple-600 text-white shadow-md shadow-purple-200'
-                            : 'bg-white text-slate-500 hover:bg-slate-100'
+                            ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                            : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/5'
                             }`}
                     >
                         {cat}
@@ -114,13 +114,13 @@ const EventsFeed: React.FC = () => {
             </div>
 
             {/* Events List */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-100">
+            <div className="glass-panel rounded-3xl shadow-sm border border-white/10 overflow-hidden divide-y divide-white/5">
                 {filteredEvents.map((event) => (
-                    <div key={event.id} className="p-6 hover:bg-slate-50 transition-colors group">
+                    <div key={event.id} className="p-6 hover:bg-white/5 transition-colors group">
                         <div className="flex flex-col md:flex-row gap-6">
                             {/* Image Thumbnail */}
                             {event.imageUrl && (
-                                <div className="flex-shrink-0 w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-100">
+                                <div className="flex-shrink-0 w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-800">
                                     <img
                                         src={event.imageUrl}
                                         alt={event.title}
@@ -134,25 +134,25 @@ const EventsFeed: React.FC = () => {
 
                             {/* Date Badge (if no image) */}
                             {!event.imageUrl && (
-                                <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-slate-100 rounded-2xl border border-slate-200 group-hover:border-purple-200 group-hover:bg-purple-50 transition-colors">
-                                    <span className="text-xs font-bold text-slate-400 uppercase group-hover:text-purple-400">{new Date(event.date).toLocaleDateString('pl-PL', { month: 'short' })}</span>
-                                    <span className="text-2xl font-black text-slate-700 group-hover:text-purple-600">{new Date(event.date).getDate()}</span>
+                                <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-white/5 rounded-2xl border border-white/10 group-hover:border-purple-500/30 group-hover:bg-purple-500/10 transition-colors">
+                                    <span className="text-xs font-bold text-slate-500 uppercase group-hover:text-purple-400">{new Date(event.date).toLocaleDateString('pl-PL', { month: 'short' })}</span>
+                                    <span className="text-2xl font-black text-slate-300 group-hover:text-purple-400">{new Date(event.date).getDate()}</span>
                                 </div>
                             )}
 
                             {/* Content */}
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
                                         {event.category}
                                     </span>
                                     {event.isPromoted && (
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                                             ⭐ Promowane
                                         </span>
                                     )}
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-purple-600 transition-colors">
+                                <h3 className="text-lg font-bold text-slate-200 mb-2 group-hover:text-purple-400 transition-colors">
                                     {event.title}
                                 </h3>
                                 <div className="flex flex-col gap-1 text-sm text-slate-500 mb-3">
@@ -166,7 +166,7 @@ const EventsFeed: React.FC = () => {
                                     <span className="flex items-center gap-1">📍 {event.location}</span>
                                 </div>
                                 {event.description && (
-                                    <p className="text-sm text-slate-600 line-clamp-2 mb-3">{event.description}</p>
+                                    <p className="text-sm text-slate-400 line-clamp-2 mb-3">{event.description}</p>
                                 )}
                             </div>
 
@@ -178,7 +178,7 @@ const EventsFeed: React.FC = () => {
                                         href={event.externalUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all"
+                                        className="px-4 py-2 rounded-xl border border-white/10 text-slate-400 font-bold text-sm hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-all"
                                     >
                                         Szczegóły
                                     </a>
@@ -188,20 +188,20 @@ const EventsFeed: React.FC = () => {
                                 <div className="relative">
                                     <button
                                         onClick={() => setExpandedEventId(expandedEventId === event.id ? null : event.id)}
-                                        className="px-4 py-2 rounded-xl border border-purple-200 text-purple-600 font-bold text-sm hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all flex items-center gap-2"
+                                        className="px-4 py-2 rounded-xl border border-purple-500/30 text-purple-400 font-bold text-sm hover:bg-purple-600 hover:text-white hover:border-purple-500 transition-all flex items-center gap-2 bg-purple-500/5"
                                     >
                                         📅 Zaplanuj
                                         <span className="text-xs">{expandedEventId === event.id ? '▲' : '▼'}</span>
                                     </button>
 
                                     {expandedEventId === event.id && (
-                                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-10">
+                                        <div className="absolute right-0 mt-2 w-56 glass-panel-solid rounded-xl shadow-lg border border-white/10 overflow-hidden z-10 bg-slate-900">
                                             <button
                                                 onClick={() => {
                                                     window.open(generateGoogleCalendarUrl(event), '_blank');
                                                     setExpandedEventId(null);
                                                 }}
-                                                className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3"
+                                                className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-300 hover:bg-white/10 transition-colors flex items-center gap-3"
                                             >
                                                 <span className="text-lg">📆</span>
                                                 <span>Google Calendar</span>
@@ -211,7 +211,7 @@ const EventsFeed: React.FC = () => {
                                                     generateICalendar(event);
                                                     setExpandedEventId(null);
                                                 }}
-                                                className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3 border-t border-slate-100"
+                                                className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-300 hover:bg-white/10 transition-colors flex items-center gap-3 border-t border-white/5"
                                             >
                                                 <span className="text-lg">📥</span>
                                                 <span>Pobierz .ics (iCalendar)</span>

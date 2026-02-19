@@ -68,6 +68,7 @@ export const FIXED_HOLIDAYS: Record<string, string> = {
     "2-16": "Dzień Listonoszy i Doręczycieli Przesyłek Pocztowych",
     "2-17": "Dzień Kota",
     "2-18": "Dzień Baterii",
+    "2-19": "Dzień Nauki Polskiej",
     "2-20": "Światowy Dzień Sprawiedliwości Społecznej",
     "2-21": "Dzień Języka Ojczystego / Dzień Sprzeciwu Wobec Reżimu Kolonialnego",
     "2-27": "Dzień Niedźwiedzia Polarnego / Dzień Organizacji Społecznych",
@@ -217,17 +218,51 @@ export const FIXED_HOLIDAYS: Record<string, string> = {
     "12-31": "Sylwester",
 };
 
+const CUSTOMARY_HOLIDAYS: Record<string, string> = {
+    "1-1": "Nowy Rok",
+    "1-6": "Święto Trzech Króli",
+    "1-21": "Dzień Babci",
+    "1-22": "Dzień Dziadka",
+    "2-14": "Walentynki",
+    "3-8": "Dzień Kobiet",
+    "3-10": "Dzień Mężczyzn",
+    "4-1": "Prima Aprilis",
+    "5-1": "Święto Pracy",
+    "5-2": "Dzień Flagi",
+    "5-3": "Święto Konstytucji 3 Maja",
+    "5-26": "Dzień Matki",
+    "6-1": "Dzień Dziecka",
+    "6-23": "Dzień Ojca",
+    "8-15": "Wniebowzięcie NMP / Święto Wojska Polskiego",
+    "9-30": "Dzień Chłopaka",
+    "10-14": "Dzień Edukacji Narodowej",
+    "11-1": "Wszystkich Świętych",
+    "11-11": "Święto Niepodległości",
+    "11-29": "Andrzejki",
+    "12-6": "Mikołajki",
+    "12-24": "Wigilia",
+    "12-25": "Boże Narodzenie (pierwszy dzień)",
+    "12-26": "Boże Narodzenie (drugi dzień)",
+    "12-31": "Sylwester"
+};
+
 export const getHoliday = (date: Date): string | null => {
     const dayKey = `${date.getMonth() + 1}-${date.getDate()}`;
     const year = date.getFullYear();
 
-    if (FIXED_HOLIDAYS[dayKey]) {
-        return FIXED_HOLIDAYS[dayKey];
+    // Prioritize customary/major holidays
+    if (CUSTOMARY_HOLIDAYS[dayKey]) {
+        return CUSTOMARY_HOLIDAYS[dayKey];
     }
 
     const movableHolidays = getMovableHolidays(year);
     if (movableHolidays[dayKey]) {
         return movableHolidays[dayKey];
+    }
+
+    // Fallback to the extensive list if nothing else matches
+    if (FIXED_HOLIDAYS[dayKey]) {
+        return FIXED_HOLIDAYS[dayKey];
     }
 
     return null;

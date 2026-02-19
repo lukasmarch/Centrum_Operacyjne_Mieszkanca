@@ -127,31 +127,30 @@ const BusinessPage: React.FC = () => {
     return (
         <div className="space-y-8 pb-12">
             {/* Header / Stats */}
-            <header className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
+            <header className="bg-slate-900/50 backdrop-blur-xl rounded-3xl p-8 border border-slate-800 shadow-sm">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
                     <div>
-                        <h2 className="text-3xl font-black text-slate-900">Katalog Firm</h2>
-                        <p className="text-slate-500 mt-2">Baza przedsiębiorców z Gminy Rybno (CEIDG)</p>
+                        <h2 className="text-3xl font-black text-slate-100 tracking-tight">Katalog Firm</h2>
+                        <p className="text-slate-400 mt-2">Baza przedsiębiorców z Gminy Rybno (CEIDG)</p>
                     </div>
-                    {/* Sync button removed as requested */}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
                         <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Wszystkie Firmy</p>
-                        <p className="text-2xl font-black text-slate-900">{stats?.total_count || 0}</p>
+                        <p className="text-2xl font-black text-slate-100">{stats?.total_count || 0}</p>
                     </div>
-                    <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                        <p className="text-xs text-green-600 font-bold uppercase tracking-wider mb-1">Aktywne</p>
-                        <p className="text-2xl font-black text-green-700">{stats?.active_count || 0}</p>
+                    <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20">
+                        <p className="text-xs text-green-400 font-bold uppercase tracking-wider mb-1">Aktywne</p>
+                        <p className="text-2xl font-black text-green-400">{stats?.active_count || 0}</p>
                     </div>
-                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                        <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Miejscowości</p>
-                        <p className="text-2xl font-black text-blue-700">{localities.length}</p>
+                    <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20">
+                        <p className="text-xs text-blue-400 font-bold uppercase tracking-wider mb-1">Miejscowości</p>
+                        <p className="text-2xl font-black text-blue-400">{localities.length}</p>
                     </div>
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
                         <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Ostatnia Akt.</p>
-                        <p className="text-sm font-semibold text-slate-700 mt-1">
+                        <p className="text-sm font-semibold text-slate-300 mt-1">
                             {stats?.last_sync ? new Date(stats.last_sync).toLocaleDateString() : '-'}
                         </p>
                     </div>
@@ -162,9 +161,9 @@ const BusinessPage: React.FC = () => {
             <div className="flex flex-wrap gap-2 pb-4 overflow-x-auto">
                 <button
                     onClick={() => setSelectedLocality(null)}
-                    className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${selectedLocality === null
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${selectedLocality === null
+                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                        : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800 border border-slate-700 hover:text-slate-200'
                         }`}
                 >
                     Wszystkie
@@ -173,12 +172,12 @@ const BusinessPage: React.FC = () => {
                     <button
                         key={loc.name}
                         onClick={() => setSelectedLocality(loc.name)}
-                        className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${selectedLocality === loc.name
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                        className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${selectedLocality === loc.name
+                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                            : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800 border border-slate-700 hover:text-slate-200'
                             }`}
                     >
-                        {loc.name} <span className="ml-1 opacity-60 text-xs">({loc.count})</span>
+                        {loc.name} <span className="ml-1 opacity-60">({loc.count})</span>
                     </button>
                 ))}
             </div>
@@ -186,31 +185,33 @@ const BusinessPage: React.FC = () => {
             {/* Business Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {businesses.map((business) => (
-                    <div key={business.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex flex-col h-full">
+                    <div key={business.id} className="group bg-slate-900/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-800 hover:border-slate-700 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full">
                         <div className="flex justify-between items-start mb-4">
-                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${business.status === 'AKTYWNY' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${business.status === 'AKTYWNY'
+                                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                    : 'bg-slate-800 text-slate-500 border border-slate-700'
                                 }`}>
                                 {business.status}
                             </span>
                             {/* Initials Logo */}
-                            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400">
+                            <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:bg-slate-700 group-hover:text-white transition-colors">
                                 {business.nazwa.substring(0, 2).toUpperCase()}
                             </div>
                         </div>
 
-                        <h3 className="font-bold text-slate-900 mb-2 min-h-[3rem]">
+                        <h3 className="font-bold text-slate-100 mb-2 min-h-[3rem] line-clamp-2 group-hover:text-blue-400 transition-colors">
                             {business.nazwa}
                         </h3>
 
-                        <div className="space-y-2 text-sm text-slate-500 mb-6 flex-1">
+                        <div className="space-y-3 text-sm text-slate-400 mb-6 flex-1">
                             {business.wlasciciel_imie && (
                                 <p className="flex items-center gap-2">
-                                    <span className="text-slate-400">👤</span>
-                                    {business.wlasciciel_imie} {business.wlasciciel_nazwisko}
+                                    <span className="text-slate-500">👤</span>
+                                    <span>{business.wlasciciel_imie} {business.wlasciciel_nazwisko}</span>
                                 </p>
                             )}
                             <p className="flex items-start gap-2">
-                                <span className="text-slate-400 mt-0.5">📍</span>
+                                <span className="text-slate-500 mt-0.5">📍</span>
                                 <span>
                                     {business.ulica ? `${business.ulica} ${business.budynek}` : business.miasto}
                                     {business.lokal ? `/${business.lokal}` : ''} <br />
@@ -218,38 +219,30 @@ const BusinessPage: React.FC = () => {
                                 </span>
                             </p>
                             <p className="flex items-center gap-2">
-                                <span className="text-slate-400">💼</span>
-                                NIP: {business.nip}
+                                <span className="text-slate-500">💼</span>
+                                NIP: <span className="font-mono text-slate-300">{business.nip}</span>
                             </p>
                             {business.branza && (
-                                <p className="flex items-start gap-2">
-                                    <span className="text-slate-400 mt-0.5">🏭</span>
-                                    <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg whitespace-normal">
+                                <p className="flex items-start gap-2 pt-2">
+                                    <span className="text-xs font-semibold text-slate-300 bg-slate-800 border border-slate-700 px-2 py-1 rounded-lg">
                                         {business.branza}
                                     </span>
                                 </p>
                             )}
-
-                            {/* PREMIUM FEATURES (Business Account Only) 
-                                - Contact Info (Phone, Email, WWW)
-                                - Correspondence Address
-                                - Partnerships
-                                - Raw PKD
-                            */}
                         </div>
 
-                        <div className="pt-4 border-t border-slate-50 mt-auto">
+                        <div className="pt-4 border-t border-slate-800 mt-auto">
                             {business.ceidg_link ? (
                                 <a
                                     href={business.ceidg_link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="block w-full text-center py-2 rounded-xl bg-slate-50 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors"
+                                    className="block w-full text-center py-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-700 hover:text-white hover:border-slate-600 transition-all"
                                 >
                                     Zobacz w CEIDG ↗
                                 </a>
                             ) : (
-                                <button disabled className="block w-full text-center py-2 rounded-xl bg-slate-50 text-slate-300 font-bold text-sm cursor-not-allowed">
+                                <button disabled className="block w-full text-center py-2 rounded-xl bg-slate-800/50 text-slate-600 border border-slate-800 font-bold text-xs uppercase tracking-wider cursor-not-allowed">
                                     Brak linku
                                 </button>
                             )}
@@ -264,7 +257,7 @@ const BusinessPage: React.FC = () => {
                     <button
                         onClick={loadMore}
                         disabled={loading}
-                        className="px-8 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 disabled:opacity-50"
+                        className="px-8 py-3 bg-slate-900 border border-slate-700 text-slate-300 rounded-xl font-bold hover:bg-slate-800 disabled:opacity-50 transition-colors"
                     >
                         {loading ? 'Ładowanie...' : 'Pokaż więcej firm'}
                     </button>

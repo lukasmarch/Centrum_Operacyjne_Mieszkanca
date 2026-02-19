@@ -61,7 +61,7 @@ const NewsFeed: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">Aktualności</h2>
+            <h2 className="text-2xl font-bold text-slate-100">Aktualności</h2>
 
             {/* Categories */}
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -70,8 +70,8 @@ const NewsFeed: React.FC = () => {
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
                         className={`px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap ${activeCategory === cat
-                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
-                            : 'bg-white text-slate-500 hover:bg-slate-100'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/5'
                             }`}
                     >
                         {cat}
@@ -82,9 +82,9 @@ const NewsFeed: React.FC = () => {
             {/* Articles Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredArticles.map(article => (
-                    <div key={article.id} className="group bg-white rounded-3xl p-4 border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full">
+                    <div key={article.id} className="group glass-panel rounded-3xl p-4 border border-white/10 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full hover:bg-white/5">
                         {/* Image */}
-                        <div className="h-48 rounded-2xl bg-slate-100 overflow-hidden mb-4 relative">
+                        <div className="h-48 rounded-2xl bg-slate-800 overflow-hidden mb-4 relative">
                             {article.imageUrl ? (
                                 <img
                                     src={article.imageUrl}
@@ -96,11 +96,11 @@ const NewsFeed: React.FC = () => {
                                     }}
                                 />
                             ) : null}
-                            <div className={`w-full h-full flex items-center justify-center text-4xl bg-slate-100 text-slate-300 ${article.imageUrl ? 'hidden' : ''}`}>
+                            <div className={`w-full h-full flex items-center justify-center text-4xl bg-slate-800 text-slate-600 ${article.imageUrl ? 'hidden' : ''}`}>
                                 📰
                             </div>
                             <div className="absolute top-3 left-3">
-                                <span className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-blue-600 shadow-sm">
+                                <span className="bg-slate-900/80 backdrop-blur-sm px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-blue-400 border border-blue-500/30">
                                     {article.category}
                                 </span>
                             </div>
@@ -109,21 +109,21 @@ const NewsFeed: React.FC = () => {
                         {/* Content */}
                         <div className="flex-1 flex flex-col">
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xs font-bold text-slate-400 uppercase">{article.source}</span>
-                                <span className="text-xs text-slate-300">•</span>
-                                <span className="text-xs text-slate-400">{article.timestamp}</span>
+                                <span className="text-xs font-bold text-slate-500 uppercase">{article.source}</span>
+                                <span className="text-xs text-slate-600">•</span>
+                                <span className="text-xs text-slate-500">{article.timestamp}</span>
                             </div>
-                            <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors leading-snug">
+                            <h3 className="text-lg font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors leading-snug">
                                 {article.title}
                             </h3>
-                            <p className="text-sm text-slate-500 line-clamp-3 mb-4 flex-1">
+                            <p className="text-sm text-slate-400 line-clamp-3 mb-4 flex-1">
                                 {article.summary}
                             </p>
                             <a
                                 href={article.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="w-full py-2 rounded-xl bg-slate-50 text-slate-600 font-bold text-sm hover:bg-blue-50 hover:text-blue-600 transition-colors text-center"
+                                className="w-full py-2 rounded-xl bg-white/5 text-slate-300 font-bold text-sm hover:bg-blue-600 hover:text-white transition-all text-center border border-white/5"
                             >
                                 Czytaj więcej
                             </a>
