@@ -160,6 +160,7 @@ class Article(SQLModel, table=True):
     tags: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAY(String)))
     location_mentioned: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAY(String)))
     processed: bool = Field(default=False)
+    embedded: bool = Field(default=False)  # True when RAG embeddings generated (Sprint 6)
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"

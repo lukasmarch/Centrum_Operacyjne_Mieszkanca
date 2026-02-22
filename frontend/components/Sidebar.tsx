@@ -11,6 +11,7 @@ import {
   Building2,
   Megaphone,
   Sparkles,
+  Bot,
   LogOut,
   User as UserIcon,
   Menu,
@@ -27,15 +28,16 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, user, isOpen, onToggle }) => {
   const menuItems: { id: AppSection; label: string; icon: React.ReactNode; requiresAuth?: boolean }[] = [
-    { id: 'dashboard', label: 'Panel Główny', icon: <Home size={20} /> },
-    { id: 'news', label: 'Wiadomości', icon: <Newspaper size={20} /> },
-    { id: 'events', label: 'Wydarzenia', icon: <CalendarDays size={20} /> },
-    { id: 'weather', label: 'Pogoda i Powietrze', icon: <CloudSun size={20} /> },
-    { id: 'traffic', label: 'Ruch Drogowy', icon: <Car size={20} /> },
-    { id: 'stats', label: 'Statystyki GUS', icon: <BarChart3 size={20} /> },
-    { id: 'business', label: 'Katalog Firm', icon: <Building2 size={20} /> },
-    { id: 'reports', label: 'Zgłoszenie24', icon: <Megaphone size={20} /> },
-    { id: 'premium', label: 'Strefa Premium', icon: <Sparkles size={20} /> },
+    { id: 'dashboard',  label: 'Panel Główny',    icon: <Home size={20} /> },
+    { id: 'assistant',  label: 'Asystent AI',     icon: <Bot size={20} /> },
+    { id: 'news',       label: 'Wiadomości',      icon: <Newspaper size={20} /> },
+    { id: 'events',     label: 'Wydarzenia',      icon: <CalendarDays size={20} /> },
+    { id: 'weather',    label: 'Pogoda i Powietrze', icon: <CloudSun size={20} /> },
+    { id: 'traffic',    label: 'Ruch Drogowy',    icon: <Car size={20} /> },
+    { id: 'stats',      label: 'Statystyki GUS',  icon: <BarChart3 size={20} /> },
+    { id: 'business',   label: 'Katalog Firm',    icon: <Building2 size={20} /> },
+    { id: 'reports',    label: 'Zgłoszenie24',    icon: <Megaphone size={20} /> },
+    { id: 'premium',    label: 'Strefa Premium',  icon: <Sparkles size={20} /> },
   ];
 
   const isAuthenticated = !!user;

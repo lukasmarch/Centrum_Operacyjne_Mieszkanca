@@ -18,6 +18,7 @@ from src.scheduler.traffic_job import run_traffic_job
 from src.scheduler.newsletter_job import run_weekly_newsletter, run_daily_newsletter
 from src.scheduler.air_quality_job import run_air_quality_job
 from src.scheduler.ceidg_job import run_ceidg_job
+from src.scheduler.embedding_job import run_embedding_job
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
@@ -99,6 +100,15 @@ def start_scheduler():
         trigger=CronTrigger(hour=6, minute=15),
         id='ai_processing',
         name='AI article processing (batch=100)',
+        replace_existing=True
+    )
+
+    # Embedding job at 6:20 AM (STEP 2.5 - after AI processing starts, embeds new articles)
+    scheduler.add_job(
+        func=run_embedding_job,
+        trigger=CronTrigger(hour=6, minute=20),
+        id='embedding_update',
+        name='Embed new articles for RAG (text-embedding-3-small)',
         replace_existing=True
     )
 

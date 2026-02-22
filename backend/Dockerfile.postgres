@@ -1,0 +1,7 @@
+# PostgreSQL 16 with PostGIS + pgvector
+# Based on postgis/postgis:16-3.4, adds pgvector for RAG semantic search
+FROM postgis/postgis:16-3.4
+
+RUN apt-get update \
+    && apt-get install -y postgresql-16-pgvector \
+    && rm -rf /var/lib/apt/lists/*

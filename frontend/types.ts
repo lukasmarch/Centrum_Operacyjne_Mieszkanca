@@ -254,7 +254,7 @@ export interface ReportMapItem {
   created_at: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'business' | 'reports' | 'premium' | 'login' | 'register' | 'profile';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'business' | 'reports' | 'premium' | 'assistant' | 'login' | 'register' | 'profile';
 
 // New Traffic Widget Types
 export enum TrafficCondition {

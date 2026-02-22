@@ -52,6 +52,37 @@ const AppContent: React.FC = () => {
         switch (activeSection) {
             case 'dashboard':
                 return <Dashboard onNavigate={setActiveSection} />;
+            case 'assistant':
+                return (
+                    <div className="max-w-3xl mx-auto py-12 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-blue-500/30">
+                            <span className="text-4xl">🤖</span>
+                        </div>
+                        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400 mb-3">
+                            Asystent AI
+                        </h2>
+                        <p className="text-slate-400 mb-6">
+                            Interfejs czatu z 5 specjalizowanymi agentami AI. Dostępny wkrótce w Fazie 2.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
+                            {[
+                                { name: 'Redaktor.ai', desc: 'Wiadomości lokalne', icon: '📰' },
+                                { name: 'Urzędnik.ai', desc: 'BIP i sprawy urzędowe', icon: '🏛️' },
+                                { name: 'Strażnik.ai', desc: 'Awarie i bezpieczeństwo', icon: '🛡️' },
+                                { name: 'Przewodnik.ai', desc: 'Wydarzenia i pogoda', icon: '🗺️' },
+                                { name: 'GUS-Analityk.ai', desc: 'Statystyki i dane', icon: '📊' },
+                            ].map(agent => (
+                                <div key={agent.name} className="glass-panel rounded-2xl p-4 flex items-center gap-3">
+                                    <span className="text-2xl">{agent.icon}</span>
+                                    <div>
+                                        <p className="font-bold text-slate-100 text-sm">{agent.name}</p>
+                                        <p className="text-xs text-slate-400">{agent.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
             case 'news':
                 return <NewsFeed />;
             case 'events':

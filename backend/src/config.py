@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # BIP Scraper / Firecrawl (Sprint 5D)
     FIRECRAWL_API_KEY: Optional[str] = None
 
+    # AI Chat + RAG (Sprint 6)
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIMENSIONS: int = 1536
+    CHAT_MODEL: str = "gpt-4o"
+    CHAT_MAX_CONTEXT_TOKENS: int = 8000
+
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
