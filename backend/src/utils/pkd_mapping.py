@@ -24,6 +24,30 @@ PKD_SECTIONS = {
     "U": "Organizacje i zespoły eksterytorialne"
 }
 
+PKD_FRIENDLY_NAMES = {
+    "A": "Rolnictwo",
+    "B": "Górnictwo",
+    "C": "Przetwórstwo",
+    "D": "Energia",
+    "E": "Woda i odpady",
+    "F": "Budownictwo",
+    "G": "Handel i naprawy",
+    "H": "Transport",
+    "I": "Zakwaterowanie i gastronomia",
+    "J": "Informacja i komunikacja",
+    "K": "Finanse i ubezpieczenia",
+    "L": "Nieruchomości",
+    "M": "Nauka i technika",
+    "N": "Administracja i wsparcie",
+    "O": "Administracja publiczna",
+    "P": "Edukacja",
+    "Q": "Opieka zdrowotna",
+    "R": "Kultura i rekreacja",
+    "S": "Pozostałe usługi",
+    "T": "Gospodarstwa domowe",
+    "U": "Organizacje eksterytorialne"
+}
+
 PKD_DIVISION_MAP = {
     # This is a simplified mapping based on first 2 digits of PKD code
     "01": "A", "02": "A", "03": "A",
@@ -53,7 +77,7 @@ PKD_DIVISION_MAP = {
 
 def get_industry_from_pkd(pkd_code: str) -> Optional[str]:
     """
-    Map PKD main code (e.g. "62.01.Z") to Industry Name (e.g. "Informacja i komunikacja")
+    Map PKD main code (e.g. "62.01.Z") to full Industry Name (e.g. "Informacja i komunikacja")
     """
     if not pkd_code:
         return None
@@ -68,3 +92,33 @@ def get_industry_from_pkd(pkd_code: str) -> Optional[str]:
         pass
         
     return None
+
+
+def get_friendly_category(pkd_code: str) -> Optional[str]:
+    """
+    Map PKD main code (e.g. "62.01.Z") to short UI-friendly category name (e.g. "Informacja i komunikacja")
+    Used for filter badges and category pills in the business catalog.
+    """
+    if not pkd_code:
+        return None
+    
+    try:
+        division = pkd_code[:2]
+        section = PKD_DIVISION_MAP.get(division)
+        if section:
+            return PKD_FRIENDLY_NAMES.get(section)
+    except Exception:
+        pass
+        
+    return None
+
+
+def get_pkd_section(pkd_code: str) -> Optional[str]:
+    """Return the PKD section letter (A-U) for a given PKD code."""
+    if not pkd_code:
+        return None
+    try:
+        division = pkd_code[:2]
+        return PKD_DIVISION_MAP.get(division)
+    except Exception:
+        return None

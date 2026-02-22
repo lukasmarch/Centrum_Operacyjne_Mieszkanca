@@ -186,6 +186,7 @@ export interface Business {
   wlasciciel_nazwisko?: string;
   ulica?: string;
   budynek?: string;
+  lokal?: string;
   miasto: string;
   kod_pocztowy: string;
   gmina: string;
@@ -193,7 +194,8 @@ export interface Business {
   ceidg_link?: string;
   pkd_main?: string;
   pkd_list?: Array<{ kod: string; nazwa: string }>;
-  branza?: string; // New mapped field
+  branza?: string; // UI-friendly category from PKD_FRIENDLY_NAMES
+  data_rozpoczecia?: string; // ISO datetime string – year founded
   adres_korespondencyjny?: Record<string, any>;
   spolki?: Array<Record<string, any>>;
   obywatelstwa?: Array<Record<string, any>>;
