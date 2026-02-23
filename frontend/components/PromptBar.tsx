@@ -4,6 +4,7 @@ import { AppSection } from '../types';
 
 interface PromptBarProps {
   onNavigate?: (section: AppSection) => void;
+  onSubmit?: (query: string) => void;
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -17,7 +18,7 @@ const DEFAULT_SUGGESTIONS = [
   'Co mówi BIP o przetargach?',
 ];
 
-const PromptBar: React.FC<PromptBarProps> = ({ onNavigate }) => {
+const PromptBar: React.FC<PromptBarProps> = ({ onNavigate, onSubmit }) => {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
   const [currentSuggestion, setCurrentSuggestion] = useState(0);
@@ -40,6 +41,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ onNavigate }) => {
 
   const handleSubmit = (text: string) => {
     if (!text.trim()) return;
+    onSubmit?.(text);
     onNavigate?.('assistant');
   };
 

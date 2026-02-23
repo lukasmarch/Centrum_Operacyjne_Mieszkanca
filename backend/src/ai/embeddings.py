@@ -1,6 +1,7 @@
 """
 EmbeddingService - generates and searches vector embeddings using OpenAI text-embedding-3-small
 """
+import json
 import openai
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,22 +62,23 @@ class EmbeddingService:
         metadata: dict
     ):
         """Store a single embedding in the database"""
+        # asyncpg doesn't support :param::vector casting - interpolate literals directly
+        # Use dollar-quoting ($emb$...$emb$) to avoid issues with special chars in metadata
         embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+        metadata_str = json.dumps(metadata, ensure_ascii=False) if metadata else "{}"
 
         await session.execute(
-            text("""
+            text(f"""
                 INSERT INTO document_embeddings (source_type, source_id, chunk_index, chunk_text, embedding, metadata)
-                VALUES (:source_type, :source_id, :chunk_index, :chunk_text, :embedding::vector, :metadata::jsonb)
+                VALUES (:source_type, :source_id, :chunk_index, :chunk_text, $emb${embedding_str}$emb$::vector, $meta${metadata_str}$meta$::jsonb)
                 ON CONFLICT (source_type, source_id, chunk_index)
-                DO UPDATE SET chunk_text = :chunk_text, embedding = :embedding::vector, metadata = :metadata::jsonb, created_at = NOW()
+                DO UPDATE SET chunk_text = :chunk_text, embedding = $emb${embedding_str}$emb$::vector, metadata = $meta${metadata_str}$meta$::jsonb, created_at = NOW()
             """),
             {
                 "source_type": source_type,
                 "source_id": source_id,
                 "chunk_index": chunk_index,
                 "chunk_text": chunk_text,
-                "embedding": embedding_str,
-                "metadata": str(metadata).replace("'", '"') if metadata else "{}"
             }
         )
 

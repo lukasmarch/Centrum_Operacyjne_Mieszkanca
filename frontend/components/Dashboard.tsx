@@ -21,7 +21,7 @@ import WeatherTile from './WeatherTile';
 import EventsTile from './EventsTile';
 import NewsTile from './NewsTile';
 
-const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ onNavigate }) => {
+const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQuerySubmit?: (query: string) => void }> = ({ onNavigate, onQuerySubmit }) => {
   const { user, isPremium, userLocation } = useAuth();
   const wasteEvents = useWasteSchedule(userLocation);
 
@@ -55,7 +55,7 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void }> = ({ o
       </header>
 
       {/* PromptBar - AI Assistant Hero */}
-      <PromptBar onNavigate={onNavigate} />
+      <PromptBar onNavigate={onNavigate} onSubmit={onQuerySubmit} />
 
       {/* Bento Grid */}
       <BentoGrid>
