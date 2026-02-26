@@ -16,10 +16,11 @@ ROUTING_PROMPT = """Jestes routerem zapytan. Przeanalizuj pytanie uzytkownika i 
 
 Dostepni agenci:
 - redaktor: wiadomosci, artykuly, aktualnosci lokalne, co nowego, podsumowania newsow
-- urzednik: BIP, uchwaly, przetargi, regulacje, harmonogram odbioru smieci, sprawy urzedowe
+- urzednik: BIP, uchwaly, przetargi, regulacje, sprawy urzedowe, dokumenty gminy
 - gus_analityk: statystyki GUS, demografia, rynek pracy, finanse gminy, dane liczbowe, porownania
-- przewodnik: pogoda, wydarzenia, co robic, rozrywka, kino, kultura, sport
+- przewodnik: pogoda, wydarzenia kulturalne, imprezy, co sie dzieje w gminie, sport
 - straznik: zgloszenia, awarie, usterki, bezpieczenstwo, problemy w gminie
+- organizator: harmonogram smieci, wywoz odpadow, repertuar kina, co gra w kinie, atrakcje, co robic w wolnym czasie, miejsca do odwiedzenia
 
 Odpowiedz TYLKO jedna nazwa agenta (np. "redaktor"). Nic wiecej."""
 

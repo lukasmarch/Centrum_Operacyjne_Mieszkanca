@@ -72,8 +72,8 @@ const BusinessCard: React.FC<{ item: LocalBusiness; onClose: () => void }> = ({ 
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'AKTYWNY'
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-                            : 'bg-slate-700 text-slate-400 border border-slate-600'
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+                        : 'bg-slate-700 text-slate-400 border border-slate-600'
                         }`}>
                         {item.status === 'AKTYWNY' ? '● aktywna' : item.status.toLowerCase()}
                     </span>
@@ -145,8 +145,8 @@ const ResultRow: React.FC<{ item: LocalBusiness; isSelected: boolean; onClick: (
     <button
         onClick={onClick}
         className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${isSelected
-                ? 'bg-blue-500/10 border-blue-500/30 text-slate-100'
-                : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.07] hover:border-white/10 text-slate-300'
+            ? 'bg-blue-500/10 border-blue-500/30 text-slate-100'
+            : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.07] hover:border-white/10 text-slate-300'
             }`}
     >
         <div className="min-w-0">
@@ -215,16 +215,11 @@ const BusinessSearchWidget: React.FC = () => {
     const selectedItem = results.find(r => r.id === selectedId) ?? null;
 
     return (
-        <div className="glass-panel rounded-3xl p-5 border border-white/10 shadow-sm h-full flex flex-col gap-4">
+        <div className="bg-slate-900 rounded-3xl p-5 border border-slate-800 h-full flex flex-col gap-4">
             {/* Header */}
-            <div className="flex items-center gap-3">
-                <span className="p-2 rounded-xl bg-blue-500/20 border border-blue-500/25 text-blue-400 shrink-0">
-                    <Building2 className="w-4 h-4" />
-                </span>
-                <div>
-                    <h3 className="font-bold text-slate-100 text-sm leading-tight">Firmy w Gminie Rybno</h3>
-                    <p className="text-[10px] text-slate-500">Lokalny katalog CEIDG</p>
-                </div>
+            <div className="flex items-center gap-2">
+                <Building2 size={14} className="text-emerald-400" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Katalog Firm</span>
             </div>
 
             {/* Search bar */}

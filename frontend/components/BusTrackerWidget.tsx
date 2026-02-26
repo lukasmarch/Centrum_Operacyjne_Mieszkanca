@@ -187,7 +187,7 @@ const BusTrackerWidget: React.FC = () => {
     if (statuses.dzaRyb.isActive && statuses.dzaRyb.activeBus) activeBuses.push(statuses.dzaRyb.activeBus);
 
     return (
-        <div className="glass-panel rounded-3xl shadow-sm p-5 flex flex-col gap-5 border border-white/10 overflow-hidden w-full">
+        <div className="bg-slate-900 rounded-3xl p-5 flex flex-col gap-5 border border-slate-800 overflow-hidden w-full">
             <div className="flex justify-between items-start px-1">
                 <div>
                     <div className="flex items-center gap-2.5 mb-1">

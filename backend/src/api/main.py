@@ -32,11 +32,14 @@ from src.api.endpoints.reports import router as reports_router
 # Push Notifications (Sprint 5C)
 from src.api.endpoints.push import router as push_router
 
+# Waste Schedule (Sprint 7 - Organizator.ai)
+from src.api.endpoints.waste import router as waste_router
+
 # AI Chat + Multi-Agent System (Sprint 6)
 from src.api.endpoints.chat import router as chat_router
 from src.ai.agents import (
     orchestrator, RedaktorAgent, UrzednikAgent,
-    GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent
+    GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent, OrganizatorAgent
 )
 
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
@@ -84,6 +87,9 @@ app.include_router(reports_router)  # /api/reports/*
 # Push Notifications routes (Sprint 5C)
 app.include_router(push_router)  # /api/push/*
 
+# Waste Schedule routes (Sprint 7) - /api/waste/towns, /api/waste/schedule
+app.include_router(waste_router)
+
 # AI Chat routes (Sprint 6) - /api/chat/message, /api/chat/history, /api/chat/agents
 app.include_router(chat_router)
 
@@ -92,7 +98,7 @@ async def startup_event():
     """Start scheduler and register AI agents on app startup"""
     start_scheduler()
     # Register all AI agents with the orchestrator
-    for agent_cls in [RedaktorAgent, UrzednikAgent, GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent]:
+    for agent_cls in [RedaktorAgent, UrzednikAgent, GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent, OrganizatorAgent]:
         orchestrator.register_agent(agent_cls())
 
 @app.get("/health")

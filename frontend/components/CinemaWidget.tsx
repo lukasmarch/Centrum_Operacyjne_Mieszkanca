@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Film, CalendarDays, MapPin, Star, Clock, Ticket } from 'lucide-react';
+import { Film, Clock, Ticket, MapPin, CalendarDays } from 'lucide-react';
 import { fetchCinemaRepertoire } from '../src/services/geminiService';
 import { CinemaRepertoire, CinemaLocation } from '../types';
 import { useDataCache } from '../src/context/DataCacheContext';
@@ -15,21 +15,17 @@ export const CinemaWidget: React.FC = () => {
 
     useEffect(() => {
         const loadData = async () => {
-            // Check cache first
             const cachedData = getCinema(activeTab);
             if (cachedData) {
                 setData(prev => ({ ...prev, [activeTab]: cachedData }));
                 return;
             }
-
-            // Fetch from API if not in cache
             setLoading(true);
             const rep = await fetchCinemaRepertoire(activeTab);
             setData(prev => ({ ...prev, [activeTab]: rep }));
-            setCinema(activeTab, rep); // Store in cache
+            setCinema(activeTab, rep);
             setLoading(false);
         };
-
         if (!data[activeTab]) {
             loadData();
         }
@@ -38,102 +34,91 @@ export const CinemaWidget: React.FC = () => {
     const currentRepertoire = data[activeTab];
 
     return (
-        <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
+        <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden h-full flex flex-col">
             {/* Header */}
-            <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5 backdrop-blur-md text-slate-100">
+            <div className="p-4 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <div className="p-2 bg-blue-500/20 rounded-lg backdrop-blur-sm text-blue-400">
-                        <Film size={18} />
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-sm">Kino & Kultura</h3>
-                        <p className="text-[10px] text-slate-400 opacity-90">Repertuar na dziś</p>
-                    </div>
+                    <Film size={14} className="text-purple-400" />
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Repertuar Kina</span>
                 </div>
-                <div className="flex bg-slate-950/50 rounded-lg p-1 gap-1">
-                    <button
-                        onClick={() => setActiveTab(CinemaLocation.DZIALDOWO)}
-                        className={`px-3 py-1 text-[10px] font-medium rounded-md transition-all ${activeTab === CinemaLocation.DZIALDOWO ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:text-slate-200'}`}
-                    >
-                        Działdowo
-                    </button>
-                    <button
-                        onClick={() => setActiveTab(CinemaLocation.LUBAWA)}
-                        className={`px-3 py-1 text-[10px] font-medium rounded-md transition-all ${activeTab === CinemaLocation.LUBAWA ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:text-slate-200'}`}
-                    >
-                        Lubawa
-                    </button>
+                <div className="flex bg-slate-800/80 rounded-lg p-0.5 gap-0.5">
+                    {[CinemaLocation.DZIALDOWO, CinemaLocation.LUBAWA].map(loc => (
+                        <button
+                            key={loc}
+                            onClick={() => setActiveTab(loc)}
+                            className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all ${activeTab === loc
+                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+                                    : 'text-slate-500 hover:text-slate-300'
+                                }`}
+                        >
+                            {loc === CinemaLocation.DZIALDOWO ? 'Działdowo' : 'Lubawa'}
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="p-4 min-h-[300px]">
+            {/* Date bar */}
+            <div className="px-4 pb-3 flex items-center justify-between text-[9px] text-slate-600">
+                <span className="flex items-center gap-1"><CalendarDays size={9} /> {currentRepertoire?.date || 'Dzisiaj'}</span>
+                <span className="flex items-center gap-1"><MapPin size={9} /> {currentRepertoire?.cinemaName || 'Kino'}</span>
+            </div>
+
+            {/* Movies */}
+            <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2 custom-scrollbar">
                 {loading && !currentRepertoire ? (
-                    <div className="flex flex-col items-center justify-center h-48 space-y-3">
-                        <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
-                        <p className="text-xs text-slate-400">Pobieranie repertuaru AI...</p>
+                    <div className="flex flex-col items-center justify-center h-40 space-y-2">
+                        <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+                        <p className="text-[9px] text-slate-500">Ładowanie repertuaru...</p>
                     </div>
+                ) : currentRepertoire?.movies?.length ? (
+                    currentRepertoire.movies.map((movie, idx) => (
+                        <div key={idx} className="flex gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer items-start">
+                            {/* Poster */}
+                            <div className="w-14 flex-shrink-0 rounded-lg overflow-hidden shadow-lg shadow-black/40 aspect-[2/3] border border-white/5">
+                                <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            </div>
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0 flex flex-col">
+                                <h4 className="text-[11px] font-bold text-slate-200 leading-tight group-hover:text-purple-300 transition-colors line-clamp-2">
+                                    {movie.title}
+                                </h4>
+                                <p className="text-[9px] text-slate-600 uppercase tracking-wide mt-0.5">{movie.genre}</p>
+
+                                {/* Showtimes */}
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {movie.time?.map((t, tIdx) => (
+                                        <span key={tIdx} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded text-[9px] font-semibold border border-slate-700/50 flex items-center gap-0.5">
+                                            <Clock size={7} className="text-purple-400" /> {t}
+                                        </span>
+                                    ))}
+                                </div>
+
+                                {/* Buy ticket */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (movie.link) window.open(movie.link, '_blank');
+                                    }}
+                                    className="mt-1.5 w-full py-1 bg-purple-600/15 hover:bg-purple-600/30 text-purple-300 border border-purple-500/20 text-[9px] font-semibold rounded-lg transition-all flex items-center justify-center gap-1"
+                                >
+                                    <Ticket size={9} /> Kup Bilet
+                                </button>
+                            </div>
+                        </div>
+                    ))
                 ) : (
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
-                            <span className="flex items-center gap-1"><CalendarDays size={12} /> {currentRepertoire?.date || 'Dzisiaj'}</span>
-                            <span className="flex items-center gap-1"><MapPin size={12} /> {currentRepertoire?.cinemaName || 'Kino'}</span>
-                        </div>
-
-                        <div className="space-y-3">
-                            {currentRepertoire?.movies?.map((movie, idx) => (
-                                <div key={idx} className="flex gap-3 group cursor-pointer hover:bg-white/5 p-2 rounded-lg -mx-2 transition-colors items-start">
-                                    <div className="relative w-16 flex-shrink-0 rounded-md overflow-hidden shadow-lg shadow-black/50 aspect-[2/3]">
-                                        <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="flex flex-col flex-1 min-h-full">
-                                        <div>
-                                            <h4 className="text-sm font-bold text-slate-200 leading-tight group-hover:text-blue-400 transition-colors">{movie.title}</h4>
-                                            <div className="flex flex-wrap items-center gap-x-2 mt-1">
-                                                <p className="text-[10px] text-slate-500 uppercase tracking-wide">{movie.genre}</p>
-                                                {movie.rating && movie.rating !== 'N/A' && (
-                                                    <span className="text-[9px] text-blue-400 font-medium bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
-                                                        {movie.rating}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
-                                            {movie.time?.map((t, tIdx) => (
-                                                <span key={tIdx} className="px-2 py-1 bg-slate-800 text-slate-300 rounded text-[10px] font-semibold border border-slate-700 flex items-center gap-1 hover:border-blue-500/50 hover:text-blue-400 transition-colors">
-                                                    <Clock size={8} /> {t}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (movie.link) {
-                                                    window.open(movie.link, '_blank');
-                                                } else {
-                                                    alert('Rezerwacja online niedostępna. Zapraszamy do kas kina.');
-                                                }
-                                            }}
-                                            className="mt-auto w-full py-1.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 text-[10px] font-medium rounded transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                                        >
-                                            <Ticket size={10} />
-                                            Kup Bilet
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            {(!currentRepertoire?.movies || currentRepertoire.movies.length === 0) && (
-                                <div className="text-center py-8 text-slate-500 text-xs">
-                                    Brak seansów na dziś lub błąd pobierania.
-                                </div>
-                            )}
-                        </div>
-
-                        <button className="w-full mt-2 py-2 text-xs font-medium text-slate-400 border border-slate-800 rounded-lg hover:bg-white/5 hover:text-slate-200 transition-colors">
-                            Zobacz pełny repertuar
-                        </button>
+                    <div className="text-center py-8 text-slate-600 text-[10px]">
+                        Brak seansów na dziś
                     </div>
                 )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2.5 border-t border-white/5">
+                <span className="text-[9px] text-purple-400 font-semibold cursor-pointer hover:text-purple-300 transition-colors flex items-center justify-center gap-1">
+                    Zobacz pełny repertuar →
+                </span>
             </div>
         </div>
     );

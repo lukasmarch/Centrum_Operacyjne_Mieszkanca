@@ -1,24 +1,15 @@
 import React from 'react';
-import { Wind, Droplets } from 'lucide-react';
+import { Wind, Droplets, Cloud } from 'lucide-react';
 import { useWeather } from '../src/hooks/useWeather';
 import { MOCK_WEATHER } from '../constants';
 
-const getGradient = (condition: string) => {
-  const c = condition.toLowerCase();
-  if (c.includes('rain') || c.includes('deszcz') || c.includes('drizzle')) return 'from-blue-900/50 to-slate-900/80';
-  if (c.includes('snow') || c.includes('śnieg'))   return 'from-slate-600/40 to-blue-900/60';
-  if (c.includes('cloud') || c.includes('chmur') || c.includes('overcast')) return 'from-slate-700/50 to-slate-900/70';
-  if (c.includes('storm') || c.includes('burza'))  return 'from-slate-800/60 to-purple-900/50';
-  return 'from-amber-900/30 to-slate-900/70'; // sunny default
-};
-
-const getEmoji = (condition: string) => {
+const getWeatherIcon = (condition: string) => {
   const c = condition.toLowerCase();
   if (c.includes('rain') || c.includes('deszcz') || c.includes('drizzle')) return '🌧️';
-  if (c.includes('snow') || c.includes('śnieg'))   return '❄️';
-  if (c.includes('storm') || c.includes('burza'))  return '⛈️';
+  if (c.includes('snow') || c.includes('śnieg')) return '❄️';
+  if (c.includes('storm') || c.includes('burza')) return '⛈️';
+  if (c.includes('fog') || c.includes('mgła')) return '🌫️';
   if (c.includes('cloud') || c.includes('chmur') || c.includes('overcast')) return '☁️';
-  if (c.includes('fog') || c.includes('mgła'))     return '🌫️';
   return '☀️';
 };
 
@@ -27,52 +18,55 @@ const WeatherTile: React.FC = () => {
   const data = weather || MOCK_WEATHER;
 
   return (
-    <div className={`h-full flex flex-col p-5 relative overflow-hidden bg-gradient-to-br ${getGradient(data.condition)}`}>
+    <div className="h-full flex flex-col p-5 relative overflow-hidden">
 
-      {/* Big decorative emoji */}
-      <div className="absolute -top-2 -right-2 text-7xl opacity-10 select-none pointer-events-none">
-        {getEmoji(data.condition)}
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-4">
+        <Cloud size={14} className="text-blue-400" />
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pogoda</p>
       </div>
 
-      <div className="relative z-10 flex flex-col justify-between h-full">
-        {/* Location label */}
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          Pogoda · Rybno
-        </p>
-
-        {/* Main temp */}
-        <div className="my-3">
-          <div className="flex items-end gap-2">
-            <p className="text-5xl font-black text-white leading-none">
-              {loading ? '–' : `${data.temp}°`}
-            </p>
-            {data.icon && (
-              <img
-                src={`https://openweathermap.org/img/wn/${data.icon}@2x.png`}
-                alt={data.condition}
-                className="w-12 h-12 object-contain"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            )}
-          </div>
-          <p className="text-sm text-slate-400 capitalize mt-1">{data.condition}</p>
+      {/* Main: temp + icon */}
+      <div className="flex-1 flex items-center justify-between">
+        <div>
+          <p className="text-5xl font-black text-white leading-none tracking-tight">
+            {loading ? '–' : `${data.temp}°C`}
+          </p>
+          <p className="text-sm text-slate-400 capitalize mt-2">{data.condition}</p>
         </div>
 
-        {/* Stats row */}
-        <div className="flex gap-4 pt-3 border-t border-white/5">
-          <div className="flex items-center gap-1.5 text-xs text-blue-300">
-            <Droplets size={12} />
-            <span>{data.humidity}%</span>
+        {/* Big blue icon box (matching screenshot) */}
+        {data.icon ? (
+          <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0">
+            <img
+              src={`https://openweathermap.org/img/wn/${data.icon}@2x.png`}
+              alt={data.condition}
+              className="w-12 h-12 object-contain"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-emerald-300">
-            <Wind size={12} />
-            <span>{data.windSpeed} km/h</span>
+        ) : (
+          <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0 text-3xl">
+            {getWeatherIcon(data.condition)}
           </div>
-          {data.lakeTemp && (
-            <div className="text-xs text-cyan-300">
-              Jez. {data.lakeTemp}°C
-            </div>
-          )}
+        )}
+      </div>
+
+      {/* Stats row in rounded boxes */}
+      <div className="flex gap-3 mt-auto pt-4">
+        <div className="flex-1 bg-slate-800/60 rounded-xl px-3 py-2.5 border border-white/5">
+          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Wilgotność</p>
+          <div className="flex items-center gap-1.5">
+            <Droplets size={12} className="text-blue-400" />
+            <span className="text-sm font-bold text-white">{data.humidity}%</span>
+          </div>
+        </div>
+        <div className="flex-1 bg-slate-800/60 rounded-xl px-3 py-2.5 border border-white/5">
+          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Wiatr</p>
+          <div className="flex items-center gap-1.5">
+            <Wind size={12} className="text-emerald-400" />
+            <span className="text-sm font-bold text-white">{data.windSpeed} km/h</span>
+          </div>
         </div>
       </div>
     </div>

@@ -42,7 +42,7 @@ const TrafficWidget: React.FC = () => {
     }, [loadTraffic]);
 
     return (
-        <div className="w-full glass-panel rounded-3xl p-5 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden text-slate-100">
+        <div className="w-full h-full flex flex-col glass-panel rounded-3xl p-5 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden text-slate-100">
 
             {/* Glow Effects */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/40 to-transparent"></div>

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import TrafficWidget from './TrafficWidget';
+import TrafficTile from './TrafficTile';
 import { CinemaWidget } from './CinemaWidget';
 import BusTrackerWidget from './BusTrackerWidget';
 import RegonSearchWidget from './RegonSearchWidget';
@@ -20,6 +20,8 @@ import AIBriefingTile from './AIBriefingTile';
 import WeatherTile from './WeatherTile';
 import EventsTile from './EventsTile';
 import NewsTile from './NewsTile';
+import AirlyTile from './AirlyTile';
+import GminaMonitoringTile from './GminaMonitoringTile';
 
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQuerySubmit?: (query: string) => void }> = ({ onNavigate, onQuerySubmit }) => {
   const { user, isPremium, userLocation } = useAuth();
@@ -57,50 +59,74 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
       {/* PromptBar - AI Assistant Hero */}
       <PromptBar onNavigate={onNavigate} onSubmit={onQuerySubmit} />
 
-      {/* Bento Grid */}
+      {/* ===== BENTO GRID ===== */}
+      {/*
+        Screenshot layout (4 columns):
+        Row 1: [AI Briefing col-span-2] [Pogoda col-span-1] [Ruch Drogowy col-span-1, row-span-2]
+        Row 2: [Wydarzenia col-span-1]  [Jakość Powietrza col-span-1] [— Traffic cont. —]
+        Row 3: [Wiadomości col-span-2]  [Monitoring Gminy col-span-2]
+      */}
       <BentoGrid>
-        {/* AI Daily Briefing - large 2x2 */}
-        <BentoTile variant="gradient" colSpan={2} rowSpan={2}>
+        {/* === ROW 1 === */}
+        {/* AI Daily Briefing - 2 cols */}
+        <BentoTile variant="gradient" colSpan={2}>
           <AIBriefingTile onNavigate={onNavigate} />
         </BentoTile>
 
-        {/* Weather */}
+        {/* Pogoda - 1 col */}
         <BentoTile variant="dark">
           <WeatherTile />
         </BentoTile>
 
-        {/* Upcoming Events */}
+        {/* Ruch Drogowy - 1 col, 2 rows tall */}
+        <BentoTile variant="dark" rowSpan={2}>
+          <TrafficTile />
+        </BentoTile>
+
+        {/* === ROW 2 === */}
+        {/* Wydarzenia - 1 col */}
         <BentoTile variant="glass">
           <EventsTile />
         </BentoTile>
 
-        {/* News horizontal scroll - full remaining width */}
-        <BentoTile variant="dark" colSpan={2}>
+        {/* Jakość Powietrza - 1 col */}
+        <BentoTile variant="dark">
+          <AirlyTile />
+        </BentoTile>
+
+        {/* Zgłoszenia24 - 1 col (fills empty slot under Pogoda) */}
+        <BentoTile variant="dark">
+          <GminaMonitoringTile />
+        </BentoTile>
+
+        {/* === ROW 3 === */}
+        {/* Najnowsze Wiadomości - full width */}
+        <BentoTile variant="dark" colSpan={4}>
           <NewsTile />
         </BentoTile>
       </BentoGrid>
 
-      {/* Existing Widgets - 3-col grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ===== BELOW GRID: Cinema + Firmy side by side ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Repertuar kina */}
+        <CinemaWidget />
 
-        {/* REGON Search */}
-        <div className="h-[400px]">
+        {/* Katalog Firm */}
+        <div className="h-[500px]">
           <RegonSearchWidget />
         </div>
-
-        {/* Right column: Waste + Traffic + Cinema + Bus */}
-        <div className="lg:col-span-2 space-y-6">
-          {isPremium
-            ? <WasteWidget events={wasteEvents} town={userLocation} />
-            : user
-              ? <WasteWidgetPaywall />
-              : null
-          }
-          <TrafficWidget />
-          <CinemaWidget />
-          <BusTrackerWidget />
-        </div>
       </div>
+
+      {/* ===== Bus Monitoring – full width ===== */}
+      <BusTrackerWidget />
+
+      {/* ===== Waste (premium) ===== */}
+      {isPremium
+        ? <WasteWidget events={wasteEvents} town={userLocation} />
+        : user
+          ? <WasteWidgetPaywall />
+          : null
+      }
 
     </div>
   );
