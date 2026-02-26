@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Column, JSON, ARRAY, String, Index
 from sqlalchemy.dialects.postgresql import JSONB
@@ -601,3 +601,18 @@ class PushSubscription(SQLModel, table=True):
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_used_at: Optional[datetime] = None
+
+
+# ======================
+# Waste Schedule (Sprint 7 - Organizator.ai)
+# ======================
+
+class WasteSchedule(SQLModel, table=True):
+    """Harmonogram wywozu śmieci dla miejscowości Gminy Rybno"""
+    __tablename__ = "waste_schedule"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    town: str = Field(index=True)
+    waste_type: str
+    collection_date: date = Field(index=True)
+    year: int = Field(index=True, default=0)

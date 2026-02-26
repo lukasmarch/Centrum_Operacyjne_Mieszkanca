@@ -40,6 +40,7 @@ class ChatResponse(BaseModel):
     conversation_id: int
     tokens_used: int
     agent_name: Optional[str] = None
+    chart_data: Optional[list] = None
 
 
 @router.post("/message")
@@ -132,6 +133,8 @@ async def send_message(
                     elif data["type"] == "sources":
                         sources = data["sources"]
                         yield f"data: {line}\n\n"
+                    elif data["type"] == "chart_data":
+                        yield f"data: {line}\n\n"
                     elif data["type"] == "done":
                         yield f"data: {line}\n\n"
 
@@ -188,7 +191,8 @@ async def send_message(
         sources=result["sources"],
         conversation_id=conversation.id,
         tokens_used=result["tokens_used"],
-        agent_name=request.agent_name
+        agent_name=request.agent_name,
+        chart_data=result.get("chart_data")
     )
 
 

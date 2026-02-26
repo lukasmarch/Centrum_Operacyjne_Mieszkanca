@@ -19,14 +19,16 @@ MAX_BATCH_SIZE = 50  # Max articles per run
 
 
 async def _embed_articles(session):
-    """Embed unembedded articles"""
-    # Get articles that haven't been embedded yet
+    """Embed unembedded articles scraped today"""
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
     result = await session.execute(
         select(Article, Source.name)
         .join(Source, Article.source_id == Source.id)
         .where(Article.embedded == False)
         .where(Article.processed == True)
-        .order_by(Article.published_at.desc().nulls_last())
+        .where(Article.scraped_at >= today_start)   # only today's articles
+        .order_by(Article.scraped_at.desc())
         .limit(MAX_BATCH_SIZE)
     )
 
@@ -40,31 +42,40 @@ async def _embed_articles(session):
 
     for article, source_name in articles:
         try:
-            # Chunk the article
-            chunks = chunker.chunk_article(
-                title=article.title,
-                content=article.content,
-                summary=article.summary,
-                source_name=source_name,
-                category=article.category or ""
-            )
+            # Detect BIP source by name (Source.type="html" for all HTML scrapers)
+            is_bip = "BIP" in source_name
+            actual_source_type = "bip" if is_bip else "article"
 
-            # Generate embeddings for all chunks
+            if is_bip:
+                chunks = chunker.chunk_bip_document(
+                    title=article.title,
+                    content=article.content,
+                    doc_type="dokument"
+                )
+            else:
+                chunks = chunker.chunk_article(
+                    title=article.title,
+                    content=article.content,
+                    summary=article.summary,
+                    source_name=source_name,
+                    category=article.category or ""
+                )
+
             texts = [c["text"] for c in chunks]
             embeddings = await embedding_service.embed_batch(texts)
 
-            # Store each chunk with its embedding
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 metadata = {
                     **chunk["metadata"],
                     "title": article.title,
                     "url": article.url,
-                    "published_at": article.published_at.isoformat() if article.published_at else ""
+                    "published_at": article.published_at.isoformat() if article.published_at else "",
+                    "source_name": source_name
                 }
 
                 await embedding_service.store_embedding(
                     session=session,
-                    source_type="article",
+                    source_type=actual_source_type,
                     source_id=article.id,
                     chunk_index=i,
                     chunk_text=chunk["text"],
@@ -72,10 +83,10 @@ async def _embed_articles(session):
                     metadata=metadata
                 )
 
-            # Mark article as embedded
             article.embedded = True
             session.add(article)
             embedded_count += 1
+            logger.info(f"Embedded {actual_source_type} article {article.id} ({source_name}): {len(chunks)} chunks")
 
         except Exception as e:
             logger.error(f"Failed to embed article {article.id}: {e}")

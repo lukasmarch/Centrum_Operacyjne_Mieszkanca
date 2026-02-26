@@ -8,6 +8,19 @@ export interface ChatSource {
   source_name?: string;
 }
 
+export interface ChartConfig {
+  chart_type: 'trend' | 'kpi';
+  title: string;
+  // trend
+  data?: Array<{ year: number; value: number }>;
+  // kpi
+  current_value?: number;
+  national_value?: number;
+  year?: number;
+  trend_pct?: number | null;
+  sparkline?: Array<{ year: number; value: number }>;
+}
+
 export interface ChatMessageData {
   id: string;
   role: 'user' | 'assistant';
@@ -15,6 +28,7 @@ export interface ChatMessageData {
   sources?: ChatSource[];
   agent_name?: string;
   isStreaming?: boolean;
+  chartData?: ChartConfig[];
 }
 
 interface UseChatOptions {
@@ -89,6 +103,10 @@ export function useChat(options: UseChatOptions = {}) {
             } else if (data.type === 'sources') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, sources: data.sources } : m
+              ));
+            } else if (data.type === 'chart_data') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, chartData: data.charts } : m
               ));
             } else if (data.type === 'done') {
               setMessages(prev => prev.map(m =>
