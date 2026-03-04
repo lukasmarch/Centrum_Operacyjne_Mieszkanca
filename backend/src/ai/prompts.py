@@ -6,7 +6,7 @@ Definiuje zachowanie i zadania dla każdego typu AI agenta
 
 CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomości z Powiatu Działdowskiego (Polska).
 
-**9 modułów tematycznych:**
+**10 modułów tematycznych:**
 0. **Awaria** - NAJWYŻSZY PRIORYTET: awarie infrastruktury, sytuacje kryzysowe, wypadki
    ✅ ZAWSZE TUTAJ:
    - awaria wodociągu / przerwa w dostawie wody / odcięcie wody
@@ -21,12 +21,16 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
 2. **Zdrowie** - służba zdrowia, apteki, szczepienia, komunikaty sanepidu, profilaktyka
 3. **Edukacja** - szkoły, przedszkola, zajęcia dodatkowe, rekrutacje, stypendia
 4. **Biznes** - lokalne firmy, oferty pracy, promocje, dotacje, nowe biznesy
-5. **Transport** - zaplanowane remonty dróg, PKS, utrudnienia komunikacyjne, parkingi
-6. **Kultura** - koncerty, wystawy, kino, teatr, biblioteki, muzea
-   ⚠️ NIE KLASYFIKUJ TUTAJ: sportu, turniejów, zawodów → to Rekreacja!
-7. **Nieruchomości** - ogłoszenia sprzedaży/wynajmu, przetargi, plany zagospodarowania
-8. **Rekreacja** - sport, turystyka, turnieje sportowe, zawody, plebiscyty sportowe, mecze, treningi, jeziora, przyroda, szlaki
-   ✅ ZAWSZE TUTAJ: wszelka aktywność sportowa, zawody, turnieje piłkarskie, biegi, plebiscyty sportowe
+5. **Transport** - zaplanowane remonty dróg, PKS, utrudnienia komunikacyjne, parkingi, przepisy drogowe
+6. **Kultura** - koncerty, wystawy, kino, teatr, biblioteki, muzea, orkiestry, festiwale kulturalne
+   ⚠️ NIE KLASYFIKUJ TUTAJ: sportu, turniejów, zawodów, gal sportowych → to Sport!
+7. **Sport** - zawody sportowe, turnieje, mecze, ligi, biegi, wyniki sportowe, plebiscyty sportowe, gale sportu, nagrody sportowe, sukcesy sportowców, drużyny, kluby sportowe, treningi, OSiR
+   ✅ ZAWSZE TUTAJ: wszelka aktywność sportowa i rywalizacja - piłka nożna, siatkówka, koszykówka, lekkoatletyka, pływanie, tenis, szachy, boks, zapasy, karate, biegi, zawody strażackie (sportowe), wędkarstwo zawodnicze
+   ✅ ZAWSZE TUTAJ: plebiscyty "Sportowiec Roku", "Sportowa Osobowość", gale sportowe, nagrody dla sportowców
+   ⚠️ NIE KLASYFIKUJ TUTAJ: turystyki, szlaków, ogólnego wypoczynku → to Rekreacja!
+8. **Rekreacja** - turystyka, szlaki piesze/rowerowe, jeziora, przyroda, wypoczynek, agroturystyka, parki
+   ⚠️ NIE KLASYFIKUJ TUTAJ: sportu wyczynowego, zawodów → to Sport!
+9. **Nieruchomości** - ogłoszenia sprzedaży/wynajmu, przetargi na nieruchomości, plany zagospodarowania
 
 **Lokalizacje w powiecie:**
 - Rybno, Działdowo, Lidzbark, Iłowo-Osada, Płośnica, Rzęgnowo, Napromek
@@ -41,12 +45,18 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
 
 **Zasady:**
 - Jeśli artykuł pasuje do wielu kategorii, wybierz tę GŁÓWNĄ
-- **AWARIA WODY/PRĄDU/GAZU/WYPADEK → zawsze Awaria (0), NIGDY Transport!**
-- **SPORT/TURNIEJE/ZAWODY → zawsze Rekreacja (8), NIE Kultura!**
-- **Koncerty/wystawy/kino → Kultura (6)**
-- **Akcje charytatywne z udziałem urzędu → Urząd (1)**
+- **AWARIA WODY/PRĄDU/GAZU/WYPADEK → zawsze Awaria, NIGDY Transport!**
+- **SPORT/ZAWODY/TURNIEJE/MECZE/WYNIKI/PLEBISCYTY SPORTOWE → zawsze Sport (7), NIE Kultura, NIE Rekreacja!**
+- **Koncerty/wystawy/kino/teatr → Kultura**
+- **Turystyka/szlaki/jeziora/wypoczynek → Rekreacja**
+- **Akcje charytatywne z udziałem urzędu → Urząd**
 - Lokalizacje tylko z Powiatu Działdowskiego
 - Podsumowanie w formie bezosobowej, obiektywne
+
+**KRYTYCZNE - dozwolone kategorie:**
+Używaj WYŁĄCZNIE jednej z tych 10 nazw: Awaria, Urząd, Zdrowie, Edukacja, Biznes, Transport, Kultura, Sport, Rekreacja, Nieruchomości
+NIE używaj: "Archiwum", "Stary", "Historia", "Turystyka", "Inne", "Brak" ani żadnej innej nazwy!
+Artykuły archiwalne/stare → kategoryzuj wg TEMATU treści (np. stara gala sportowa → Sport, stare ogłoszenie urzędu → Urząd)
 """
 
 EVENT_EXTRACTION_PROMPT = """Jesteś ekspertem od identyfikacji wydarzeń w lokalnych wiadomościach (Powiat Działdowski, Polska).

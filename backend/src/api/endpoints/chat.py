@@ -5,10 +5,10 @@ GET /api/chat/history - get conversation history
 GET /api/chat/suggestions - get context-aware suggestions
 """
 import json
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,12 +19,19 @@ from src.database.connection import async_session
 from src.database.vectors import Conversation, ChatMessage
 from src.ai.agents.orchestrator import orchestrator
 from src.auth.dependencies import get_optional_user
-from src.database.schema import User
+from src.database.schema import User, AnonymousChatUsage
 from src.utils.logger import setup_logger
 
 logger = setup_logger("ChatAPI")
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+DAILY_LIMITS = {
+    "anonymous": 3,
+    "free": 5,
+    "premium": 50,
+    "business": None,  # unlimited
+}
 
 
 class ChatRequest(BaseModel):
@@ -43,17 +50,64 @@ class ChatResponse(BaseModel):
     chart_data: Optional[list] = None
 
 
-@router.post("/message")
-async def send_message(
-    request: ChatRequest,
-    session: AsyncSession = Depends(get_session),
-    user: Optional[User] = Depends(get_optional_user)
-):
-    """Send a chat message and get AI response with RAG"""
-    user_id = user.id if user else None
+async def check_rate_limit(
+    http_request: Request,
+    session: AsyncSession,
+    user: Optional[User],
+    user_id: Optional[int],
+) -> None:
+    """Check rate limit. Raises HTTPException(429) with structured detail if exceeded."""
+    today = date.today()
+    reset_at = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    # Reset is next midnight UTC
+    from datetime import timedelta
+    reset_at = (reset_at + timedelta(days=1)).isoformat() + "Z"
 
-    # Rate limiting for free users
-    if user and user.tier == "free":
+    if user is None:
+        # Anonymous user - check by IP
+        ip = http_request.client.host if http_request.client else "unknown"
+        limit = DAILY_LIMITS["anonymous"]
+
+        result = await session.execute(
+            select(AnonymousChatUsage)
+            .where(AnonymousChatUsage.ip_address == ip)
+            .where(AnonymousChatUsage.usage_date == today)
+        )
+        usage = result.scalar_one_or_none()
+        used = usage.count if usage else 0
+
+        if used >= limit:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "limit_reached",
+                    "tier": "anonymous",
+                    "limit": limit,
+                    "used": used,
+                    "reset_at": reset_at,
+                }
+            )
+
+        # Increment counter
+        if usage:
+            usage.count += 1
+            session.add(usage)
+        else:
+            new_usage = AnonymousChatUsage(ip_address=ip, usage_date=today, count=1)
+            session.add(new_usage)
+        await session.commit()
+
+    elif user.tier == "business":
+        # Business tier: unlimited
+        return
+
+    else:
+        # Free or Premium - count today's messages
+        tier = user.tier if isinstance(user.tier, str) else user.tier.value
+        limit = DAILY_LIMITS.get(tier)
+        if limit is None:
+            return  # Safety fallback
+
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         count_result = await session.execute(
             select(ChatMessage)
@@ -63,11 +117,31 @@ async def send_message(
             .where(ChatMessage.created_at >= today_start)
         )
         daily_count = len(count_result.scalars().all())
-        if daily_count >= 10:
+
+        if daily_count >= limit:
             raise HTTPException(
                 status_code=429,
-                detail="Limit 10 pytan dziennie dla darmowego planu. Przejdz na Premium!"
+                detail={
+                    "error": "limit_reached",
+                    "tier": tier,
+                    "limit": limit,
+                    "used": daily_count,
+                    "reset_at": reset_at,
+                }
             )
+
+
+@router.post("/message")
+async def send_message(
+    request: ChatRequest,
+    http_request: Request,
+    session: AsyncSession = Depends(get_session),
+    user: Optional[User] = Depends(get_optional_user)
+):
+    """Send a chat message and get AI response with RAG"""
+    user_id = user.id if user else None
+
+    await check_rate_limit(http_request, session, user, user_id)
 
     # Get or create conversation
     if request.conversation_id:

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { getAccessToken } from '../services/authApi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -31,6 +32,13 @@ export interface ChatMessageData {
   chartData?: ChartConfig[];
 }
 
+export interface LimitInfo {
+  tier: 'anonymous' | 'free' | 'premium';
+  limit: number;
+  used: number;
+  reset_at: string;
+}
+
 interface UseChatOptions {
   agentName?: string;
 }
@@ -39,10 +47,12 @@ export function useChat(options: UseChatOptions = {}) {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
+  const [limitReached, setLimitReached] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isLoading) return;
+    if (!text.trim() || isLoading || limitReached) return;
 
     const userMsg: ChatMessageData = {
       id: Date.now().toString(),
@@ -63,9 +73,13 @@ export function useChat(options: UseChatOptions = {}) {
     abortRef.current = new AbortController();
 
     try {
+      const token = getAccessToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const response = await fetch(`${API_URL}/chat/message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           message: text,
           conversation_id: conversationId,
@@ -74,6 +88,25 @@ export function useChat(options: UseChatOptions = {}) {
         }),
         signal: abortRef.current.signal,
       });
+
+      if (response.status === 429) {
+        // Remove the optimistic assistant message
+        setMessages(prev => prev.filter(m => m.id !== assistantId));
+        try {
+          const errorData = await response.json();
+          const detail = errorData.detail || {};
+          setLimitInfo({
+            tier: detail.tier || 'free',
+            limit: detail.limit || 0,
+            used: detail.used || 0,
+            reset_at: detail.reset_at || '',
+          });
+        } catch {
+          setLimitInfo({ tier: 'free', limit: 0, used: 0, reset_at: '' });
+        }
+        setLimitReached(true);
+        return;
+      }
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -133,13 +166,15 @@ export function useChat(options: UseChatOptions = {}) {
         m.id === assistantId ? { ...m, isStreaming: false } : m
       ));
     }
-  }, [isLoading, conversationId, options.agentName]);
+  }, [isLoading, conversationId, options.agentName, limitReached]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
     setConversationId(null);
+    setLimitReached(false);
+    setLimitInfo(null);
     abortRef.current?.abort();
   }, []);
 
-  return { messages, isLoading, sendMessage, clearMessages, conversationId };
+  return { messages, isLoading, sendMessage, clearMessages, conversationId, limitReached, limitInfo };
 }

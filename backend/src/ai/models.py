@@ -4,15 +4,21 @@ Pydantic Models dla AI Agents
 Response models dla strukturyzowanych odpowiedzi z Pydantic AI
 """
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime
+
+# Dozwolone kategorie - Literal wymusza walidację przez Pydantic AI
+ArticleCategoryName = Literal[
+    'Awaria', 'Urząd', 'Zdrowie', 'Edukacja', 'Biznes',
+    'Transport', 'Kultura', 'Sport', 'Rekreacja', 'Nieruchomości'
+]
 
 
 class ArticleCategory(BaseModel):
     """Response z kategoryzacji artykułu"""
 
-    primary_category: str = Field(
-        description="Nazwa kategorii (NIE numer) z listy: Awaria, Urząd, Zdrowie, Edukacja, Biznes, Transport, Kultura, Nieruchomości, Rekreacja"
+    primary_category: ArticleCategoryName = Field(
+        description="JEDNA z dozwolonych kategorii: Awaria, Urząd, Zdrowie, Edukacja, Biznes, Transport, Kultura, Sport, Rekreacja, Nieruchomości. NIE używaj innych nazw."
     )
     confidence: float = Field(
         ge=0.0, le=1.0,
@@ -71,7 +77,6 @@ class DailySummary(BaseModel):
         description="Główny nagłówek dnia - chwytliwy, przyciągający uwagę"
     )
     highlights: str = Field(
-        min_length=200,
         max_length=800,
         description="Akapit opisowy (3-5 zdań) z najważniejszymi wiadomościami, pogodą i wydarzeniami. Najważniejsze info w **bold** (markdown)"
     )

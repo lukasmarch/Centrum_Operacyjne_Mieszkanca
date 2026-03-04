@@ -4,24 +4,28 @@ import { useArticles } from '../src/hooks/useArticles';
 
 const getCategoryBadge = (category: string) => {
   const cat = (category || '').toLowerCase();
+  // WAŻNE: 'transport' zawiera 'sport' jako substring (t-r-a-n-s-p-o-r-t),
+  // dlatego 'transport' musi być sprawdzany PRZED 'sport'
+  if (cat.includes('awari'))
+    return { label: 'AWARIA', color: 'text-red-400 bg-red-500/15 border-red-500/30', dot: 'bg-red-400' };
+  if (cat === 'transport' || cat.startsWith('transport'))
+    return { label: 'TRANSPORT', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30', dot: 'bg-emerald-400' };
   if (cat.includes('urząd') || cat.includes('urzad') || cat.includes('gmin'))
     return { label: 'URZĄD', color: 'text-blue-400 bg-blue-500/15 border-blue-500/30', dot: 'bg-blue-400' };
   if (cat.includes('kultur'))
     return { label: 'KULTURA', color: 'text-purple-400 bg-purple-500/15 border-purple-500/30', dot: 'bg-purple-400' };
   if (cat.includes('sport'))
     return { label: 'SPORT', color: 'text-amber-400 bg-amber-500/15 border-amber-500/30', dot: 'bg-amber-400' };
-  if (cat.includes('edukac'))
-    return { label: 'EDUKACJA', color: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/30', dot: 'bg-cyan-400' };
-  if (cat.includes('transport'))
-    return { label: 'TRANSPORT', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30', dot: 'bg-emerald-400' };
-  if (cat.includes('awari'))
-    return { label: 'AWARIA', color: 'text-red-400 bg-red-500/15 border-red-500/30', dot: 'bg-red-400' };
   if (cat.includes('rekr'))
     return { label: 'REKREACJA', color: 'text-teal-400 bg-teal-500/15 border-teal-500/30', dot: 'bg-teal-400' };
+  if (cat.includes('edukac'))
+    return { label: 'EDUKACJA', color: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/30', dot: 'bg-cyan-400' };
   if (cat.includes('zdrow'))
     return { label: 'ZDROWIE', color: 'text-green-400 bg-green-500/15 border-green-500/30', dot: 'bg-green-400' };
   if (cat.includes('biznes'))
     return { label: 'BIZNES', color: 'text-orange-400 bg-orange-500/15 border-orange-500/30', dot: 'bg-orange-400' };
+  if (cat.includes('nieruch'))
+    return { label: 'NIERUCHOMOŚCI', color: 'text-violet-400 bg-violet-500/15 border-violet-500/30', dot: 'bg-violet-400' };
   if (cat.includes('polity'))
     return { label: 'POLITYKA', color: 'text-rose-400 bg-rose-500/15 border-rose-500/30', dot: 'bg-rose-400' };
   return { label: category?.toUpperCase() || 'INFO', color: 'text-slate-400 bg-slate-500/15 border-slate-500/30', dot: 'bg-slate-400' };

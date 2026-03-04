@@ -2,9 +2,11 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Send, RotateCcw } from 'lucide-react';
 import { useChat } from '../src/hooks/useChat';
 import ChatMessage from './ChatMessage';
+import ChatLimitPrompt from './ChatLimitPrompt';
 
 interface ChatInterfaceProps {
   initialQuery?: string;
+  onNavigate?: (section: string) => void;
 }
 
 const AGENT_OPTIONS = [
@@ -16,10 +18,10 @@ const AGENT_OPTIONS = [
   { id: 'gus_analityk', label: 'GUS', icon: '📊' },
 ];
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery, onNavigate }) => {
   const [input, setInput] = useState('');
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const { messages, isLoading, sendMessage, clearMessages } = useChat({
+  const { messages, isLoading, sendMessage, clearMessages, limitReached, limitInfo } = useChat({
     agentName: selectedAgent || undefined,
   });
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -86,6 +88,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery }) => {
         {messages.map(msg => (
           <ChatMessage key={msg.id} message={msg} />
         ))}
+        {limitReached && limitInfo && (
+          <ChatLimitPrompt limitInfo={limitInfo} onNavigate={onNavigate} />
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -96,13 +101,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery }) => {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
-          placeholder="Zadaj pytanie..."
-          disabled={isLoading}
+          placeholder={limitReached ? 'Limit dzienny wyczerpany...' : 'Zadaj pytanie...'}
+          disabled={isLoading || limitReached}
           className="flex-1 bg-slate-900/80 border border-slate-700/60 rounded-2xl px-5 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all text-sm disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading || !input.trim() || limitReached}
           className="shrink-0 bg-gradient-to-br from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl px-5 py-3 font-medium transition-all shadow-lg shadow-blue-900/30 flex items-center gap-2 text-sm"
         >
           <Send size={15} />

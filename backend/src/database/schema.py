@@ -617,3 +617,20 @@ class WasteSchedule(SQLModel, table=True):
     waste_type: str
     collection_date: date = Field(index=True)
     year: int = Field(index=True, default=0)
+
+
+# ======================
+# Anonymous Chat Usage (Rate Limiting)
+# ======================
+
+class AnonymousChatUsage(SQLModel, table=True):
+    """Śledzenie użycia chatu przez anonimowych użytkowników (po IP)"""
+    __tablename__ = "anonymous_chat_usage"
+    __table_args__ = (
+        Index('idx_anon_ip_date', 'ip_address', 'usage_date', unique=True),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    ip_address: str = Field(index=True, max_length=50)
+    usage_date: date = Field(index=True)
+    count: int = Field(default=0)
