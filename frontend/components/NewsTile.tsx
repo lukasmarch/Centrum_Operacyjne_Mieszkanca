@@ -1,34 +1,15 @@
 import React from 'react';
-import { Newspaper, TrendingUp, ExternalLink } from 'lucide-react';
+import { Newspaper, TrendingUp, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
+import ArticleImage from './ArticleImage';
+import { AppSection } from '../types';
 
 const getCategoryBadge = (category: string) => {
   const cat = (category || '').toLowerCase();
-  // WAŻNE: 'transport' zawiera 'sport' jako substring (t-r-a-n-s-p-o-r-t),
-  // dlatego 'transport' musi być sprawdzany PRZED 'sport'
+  const label = category?.toUpperCase() || 'INFO';
   if (cat.includes('awari'))
     return { label: 'AWARIA', color: 'text-red-400 bg-red-500/15 border-red-500/30', dot: 'bg-red-400' };
-  if (cat === 'transport' || cat.startsWith('transport'))
-    return { label: 'TRANSPORT', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30', dot: 'bg-emerald-400' };
-  if (cat.includes('urząd') || cat.includes('urzad') || cat.includes('gmin'))
-    return { label: 'URZĄD', color: 'text-blue-400 bg-blue-500/15 border-blue-500/30', dot: 'bg-blue-400' };
-  if (cat.includes('kultur'))
-    return { label: 'KULTURA', color: 'text-purple-400 bg-purple-500/15 border-purple-500/30', dot: 'bg-purple-400' };
-  if (cat.includes('sport'))
-    return { label: 'SPORT', color: 'text-amber-400 bg-amber-500/15 border-amber-500/30', dot: 'bg-amber-400' };
-  if (cat.includes('rekr'))
-    return { label: 'REKREACJA', color: 'text-teal-400 bg-teal-500/15 border-teal-500/30', dot: 'bg-teal-400' };
-  if (cat.includes('edukac'))
-    return { label: 'EDUKACJA', color: 'text-cyan-400 bg-cyan-500/15 border-cyan-500/30', dot: 'bg-cyan-400' };
-  if (cat.includes('zdrow'))
-    return { label: 'ZDROWIE', color: 'text-green-400 bg-green-500/15 border-green-500/30', dot: 'bg-green-400' };
-  if (cat.includes('biznes'))
-    return { label: 'BIZNES', color: 'text-orange-400 bg-orange-500/15 border-orange-500/30', dot: 'bg-orange-400' };
-  if (cat.includes('nieruch'))
-    return { label: 'NIERUCHOMOŚCI', color: 'text-violet-400 bg-violet-500/15 border-violet-500/30', dot: 'bg-violet-400' };
-  if (cat.includes('polity'))
-    return { label: 'POLITYKA', color: 'text-rose-400 bg-rose-500/15 border-rose-500/30', dot: 'bg-rose-400' };
-  return { label: category?.toUpperCase() || 'INFO', color: 'text-slate-400 bg-slate-500/15 border-slate-500/30', dot: 'bg-slate-400' };
+  return { label, color: 'text-slate-400 bg-slate-500/10 border-slate-600/30', dot: 'bg-slate-500' };
 };
 
 const getTimeAgo = (timestamp: string) => {
@@ -43,7 +24,11 @@ const getTimeAgo = (timestamp: string) => {
   return `${diffD}d temu`;
 };
 
-const NewsTile: React.FC = () => {
+interface NewsTileProps {
+  onNavigate?: (section: AppSection) => void;
+}
+
+const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
   const { articles, loading } = useArticles({ limit: 20 });
 
   // Category stats from all articles
@@ -59,6 +44,8 @@ const NewsTile: React.FC = () => {
       .map(([cat, count]) => ({ category: cat, count, badge: getCategoryBadge(cat) }));
   }, [articles]);
 
+  // Awaria articles always featured first (backend already sorts them first)
+  const awaria = articles?.filter(a => (a.category || '').toLowerCase().includes('awari')) ?? [];
   const featured = articles?.[0];
   const restArticles = articles?.slice(1, 4);
 
@@ -74,6 +61,25 @@ const NewsTile: React.FC = () => {
           <span className="text-[9px] font-bold text-slate-500">{articles.length} artykułów</span>
         )}
       </div>
+
+      {/* Awaria alert banner */}
+      {awaria.length > 0 && !loading && (
+        <button
+          onClick={() => onNavigate?.('news')}
+          className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl bg-red-500/15 border border-red-500/30 hover:bg-red-500/25 transition-colors text-left w-full"
+        >
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+          </span>
+          <AlertTriangle size={11} className="text-red-400 shrink-0" />
+          <span className="text-[10px] font-bold text-red-300 flex-1 truncate">
+            {awaria.length === 1
+              ? `AWARIA: ${awaria[0].title}`
+              : `${awaria.length} awarie/ostrzeżenia – kliknij aby zobaczyć`}
+          </span>
+        </button>
+      )}
 
       {loading ? (
         <div className="flex-1 grid grid-cols-3 gap-4 animate-pulse">
@@ -100,15 +106,15 @@ const NewsTile: React.FC = () => {
                 className="relative rounded-xl overflow-hidden group cursor-pointer block"
                 style={{ minHeight: '140px' }}
               >
-                {featured.imageUrl ? (
-                  <img
-                    src={featured.imageUrl}
-                    alt=""
-                    className="w-full h-full min-h-[140px] max-h-[160px] object-cover group-hover:scale-105 transition-transform duration-500"
+                <div className="w-full min-h-[140px] max-h-[160px] overflow-hidden group-hover:[&_img]:scale-105">
+                  <ArticleImage
+                    imageUrl={featured.imageUrl}
+                    category={featured.category}
+                    source={featured.source}
+                    className="transition-transform duration-500"
+                    iconSize="lg"
                   />
-                ) : (
-                  <div className="w-full min-h-[140px] bg-gradient-to-br from-blue-900/40 to-slate-800" />
-                )}
+                </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
 
                 {/* Badge + title overlay */}
@@ -141,18 +147,15 @@ const NewsTile: React.FC = () => {
                     rel="noopener noreferrer"
                     className="flex gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors group items-center"
                   >
-                    {/* Larger thumbnail */}
-                    {article.imageUrl ? (
-                      <img
-                        src={article.imageUrl}
-                        alt=""
-                        className="w-16 h-16 rounded-lg object-cover shrink-0 border border-white/5"
+                    {/* Thumbnail */}
+                    <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-white/5">
+                      <ArticleImage
+                        imageUrl={article.imageUrl}
+                        category={article.category}
+                        source={article.source}
+                        iconSize="sm"
                       />
-                    ) : (
-                      <div className="w-16 h-16 rounded-lg bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center text-lg">
-                        📰
-                      </div>
-                    )}
+                    </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
@@ -196,9 +199,12 @@ const NewsTile: React.FC = () => {
             <div className="mt-auto pt-3 border-t border-white/5">
               <div className="flex items-center justify-between">
                 <span className="text-[9px] text-slate-600">Źródeł: {categoryStats.length}</span>
-                <span className="text-[9px] text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors">
+                <button
+                  onClick={() => onNavigate?.('news')}
+                  className="text-[9px] text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors"
+                >
                   Wszystkie →
-                </span>
+                </button>
               </div>
             </div>
           </div>
