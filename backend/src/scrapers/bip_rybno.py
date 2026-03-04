@@ -15,7 +15,7 @@ URL pattern news: https://bip.gminarybno.pl/112/{id}/{slug}/
 import asyncio
 import io
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from urllib.parse import urljoin
 
@@ -64,6 +64,7 @@ class BipRybnoScraper(BaseScraper):
         self.pdf_extraction = self.config.get("pdf_extraction", "pdfplumber")
         self.firecrawl_fallback = self.config.get("firecrawl_fallback", True)
         self.max_pages_per_run = self.config.get("max_pages_per_run", 3)
+        self.cutoff_days = self.config.get("cutoff_days", 2)
 
     async def __aenter__(self):
         """Nadpisuje base – używa pełnych nagłówków przeglądarki (BIP blokuje boty)."""
@@ -271,7 +272,7 @@ class BipRybnoScraper(BaseScraper):
         all_saved_ids = []
         page_num = 1
         previous_page_ids: set = set()
-        cutoff_date = datetime.utcnow() - timedelta(days=2)
+        cutoff_date = datetime.utcnow() - timedelta(days=self.cutoff_days)
 
         async with self:
             while page_num <= self.max_pages_per_run:

@@ -188,6 +188,7 @@ class Event(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     is_featured: bool = Field(default=False)
     views_count: int = Field(default=0)
+    embedded: bool = Field(default=False)  # True when RAG embeddings generated
 
 class Weather(SQLModel, table=True):
     __tablename__ = "weather"

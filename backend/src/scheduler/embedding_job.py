@@ -96,19 +96,19 @@ async def _embed_articles(session):
 
 
 async def _embed_events(session):
-    """Embed recent events"""
-    cutoff = datetime.utcnow() - timedelta(days=30)
-
+    """Embed unembedded events"""
     result = await session.execute(
         select(Event)
-        .where(Event.event_date >= cutoff)
+        .where(Event.embedded == False)
         .limit(MAX_BATCH_SIZE)
     )
     events = result.scalars().all()
 
     if not events:
+        logger.info("No new events to embed")
         return 0
 
+    logger.info(f"Embedding {len(events)} events...")
     embedded_count = 0
     for event in events:
         try:
@@ -140,7 +140,10 @@ async def _embed_events(session):
                     metadata=metadata
                 )
 
+            event.embedded = True
+            session.add(event)
             embedded_count += 1
+            logger.info(f"Embedded event {event.id}: {len(chunks)} chunks")
 
         except Exception as e:
             logger.error(f"Failed to embed event {event.id}: {e}")
