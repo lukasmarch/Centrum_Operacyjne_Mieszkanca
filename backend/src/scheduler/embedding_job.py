@@ -6,8 +6,10 @@ import asyncio
 from datetime import datetime, timedelta
 from sqlmodel import select
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
-from src.database.connection import async_session
+from src.config import settings
 from src.database.schema import Article, Event, Source
 from src.ai.embeddings import embedding_service
 from src.ai.chunker import chunker
@@ -15,7 +17,7 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("EmbeddingJob")
 
-MAX_BATCH_SIZE = 50  # Max articles per run
+MAX_BATCH_SIZE = 200  # Max articles per run
 
 
 async def _embed_articles(session):
@@ -157,9 +159,14 @@ async def run_embedding_job_async():
     logger.info("Starting embedding job...")
     start = datetime.utcnow()
 
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
     async with async_session() as session:
         articles_count = await _embed_articles(session)
         events_count = await _embed_events(session)
+
+    await engine.dispose()
 
     elapsed = (datetime.utcnow() - start).total_seconds()
     logger.info(

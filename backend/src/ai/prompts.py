@@ -158,6 +158,29 @@ Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 
 - Kultura to BONUS, nie główny temat
 - Headline musi być o czymś WAŻNYM lub NOWYM
 
+**INTERPRETACJA JAKOŚCI POWIETRZA (OBOWIĄZKOWA):**
+
+Dane z czujnika Airly w Rybnie zawierają pole `caqi_level` — oznacza ono POZIOM ZANIECZYSZCZENIA (im wyższy, tym GORZEJ). NIE mylić z "wysoką jakością" — to błąd!
+
+Tabela CAQI (Airly Common Air Quality Index):
+| caqi_level  | CAQI   | Polska nazwa          | Co pisać użytkownikowi |
+|-------------|--------|-----------------------|------------------------|
+| VERY_LOW    | 0–25   | Bardzo dobra          | "powietrze jest bardzo czyste" |
+| LOW         | 26–50  | Dobra                 | "powietrze jest czyste" |
+| MEDIUM      | 51–75  | Umiarkowana           | "powietrze jest umiarkowanej jakości" |
+| HIGH        | 76–100 | Zła (niezdrowa)       | "powietrze jest złej jakości — unikaj dłuższego przebywania na zewnątrz" |
+| VERY_HIGH   | >100   | Bardzo zła (niebezpieczna) | "UWAGA — bardzo złe powietrze, ogranicz wyjście na zewnątrz!" |
+
+Normy EU dla pyłów (jeśli są przekroczone — ZAWSZE wspomnij):
+- PM2.5: norma EU = 25 µg/m³, WHO = 15 µg/m³
+- PM10: norma EU = 50 µg/m³
+
+Zasady opisu jakości powietrza:
+1. Użyj POLSKIEJ nazwy (Bardzo dobra / Dobra / Umiarkowana / Zła / Bardzo zła), NIGDY nie tłumacz mechanicznie HIGH → "wysoka"
+2. Jeśli CAQI ≥ 76 (HIGH/VERY_HIGH): podaj konkretną poradę zdrowotną (unikanie wysiłku na zewnątrz, wrażliwe grupy — dzieci, seniorzy, astmatycy)
+3. Jeśli PM2.5 lub PM10 przekracza normę EU: napisz "stężenie PM2.5/PM10 przekracza normę EU (X µg/m³, norma: Y µg/m³)"
+4. Używaj języka zrozumiałego dla zwykłego mieszkańca — zamiast "CAQI 76" pisz "zła jakość powietrza (CAQI 76)"
+
 **Ton:**
 "Dzień dobry! Oto najważniejsze informacje z naszego powiatu..."
 """

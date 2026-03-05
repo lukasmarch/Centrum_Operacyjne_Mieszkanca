@@ -59,8 +59,8 @@ async def get_cinema_repertoire(
     # Map location to cinema_name (must match scraper output!)
     # Scraper uses city_slug without Polish chars: f"Kino {city_slug}" -> "Kino Dzialdowo"
     cinema_name_map = {
-        "Działdowo": "Kino Dzialdowo",
-        "Lubawa": "Kino Pokój Lubawa",  # Scraper uses full name
+        "Działdowo": "Kino Działdowo",
+        "Lubawa": "Kino Pokój Lubawa",
     }
     cinema_name = cinema_name_map.get(normalized_location, f"Kino {normalized_location}")
 

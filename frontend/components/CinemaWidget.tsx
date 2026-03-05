@@ -58,8 +58,8 @@ export const CinemaWidget: React.FC = () => {
             </div>
 
             {/* Date bar */}
-            <div className="px-4 pb-3 flex items-center justify-between text-[9px] text-slate-600">
-                <span className="flex items-center gap-1"><CalendarDays size={9} /> {currentRepertoire?.date || 'Dzisiaj'}</span>
+            <div className="px-4 pb-3 flex items-center justify-between text-[9px] text-slate-400">
+                <span className="flex items-center gap-1"><CalendarDays size={9} /> Repertuar tygodnia</span>
                 <span className="flex items-center gap-1"><MapPin size={9} /> {currentRepertoire?.cinemaName || 'Kino'}</span>
             </div>
 

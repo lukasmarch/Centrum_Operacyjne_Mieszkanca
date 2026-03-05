@@ -107,13 +107,13 @@ class CinemaScraper:
             movies = self._parse_biletyna_list(response.text, city_slug)
             
             return CinemaRepertoire(
-                cinemaName=f"Kino {city_slug}",
+                cinemaName="Kino Działdowo",
                 date=datetime.now().strftime('%d.%m.%Y'),
                 movies=movies
             )
         except Exception as e:
             logger.error(f"Error fetching Dzialdowo: {e}")
-            return CinemaRepertoire(cinemaName=f"Kino {city_slug} (Błąd)", date="", movies=[])
+            return CinemaRepertoire(cinemaName="Kino Działdowo (Błąd)", date="", movies=[])
 
     def _fetch_kino_lubawa_pl(self) -> CinemaRepertoire:
         url = "https://kino.lubawa.pl/"
@@ -140,13 +140,37 @@ class CinemaScraper:
                 info_node = item.select_one('h5')
                 info_text = info_node.get_text(separator=' ', strip=True) if info_node else ""
                 
-                # Extract time pattern: HH:MM
+                # Wyciągnij datę z info_text → "DD.MM"
+                # Obsługuje: "od 6 marca", "od 6 do 8 marca", "8 lutego"
+                MONTHS = {
+                    'stycznia': '01', 'lutego': '02', 'marca': '03', 'kwietnia': '04',
+                    'maja': '05', 'czerwca': '06', 'lipca': '07', 'sierpnia': '08',
+                    'września': '09', 'października': '10', 'listopada': '11', 'grudnia': '12'
+                }
+                date_label = ""
+                # Próbuj wzorce od najbardziej szczegółowego: "od D do D miesiąc", "od D miesiąc", "D miesiąc"
+                date_match = (
+                    re.search(r'od\s+(\d{1,2})\s+do\s+\d{1,2}\s+(\w+)', info_text) or
+                    re.search(r'od\s+(\d{1,2})\s+(\w+)', info_text) or
+                    re.search(r'(\d{1,2})\s+(\w+)', info_text)
+                )
+                if date_match:
+                    day = date_match.group(1).zfill(2)
+                    month_name = date_match.group(2).lower()
+                    month = MONTHS.get(month_name, '')
+                    if month:
+                        date_label = f"{day}.{month}"
+
+                # Extract time pattern: HH:MM, prefix with date if found
                 times_found = re.findall(r'(\d{2}:\d{2})', info_text)
-                times = sorted(list(set(times_found)))
-                
+                times = sorted(list(set(
+                    f"{date_label} {t}".strip() if date_label else t
+                    for t in times_found
+                )))
+
                 # Handling missing specific times or "Coming Soon"
                 if not times:
-                    times = ["Sprawdź godziny"]
+                    times = [date_label if date_label else "Sprawdź godziny"]
                     
                 # Store extra info in rating or similar if needed, 
                 # but currently UI only uses title, time, genre.
@@ -251,47 +275,61 @@ class CinemaScraper:
             if response.status_code != 200:
                 logger.warning(f"Status {response.status_code} for {url}")
                 return None
-                
+
             soup = BeautifulSoup(response.text, 'html.parser')
-            
+
             poster_url = ""
             og_image = soup.find('meta', property='og:image')
             if og_image:
                 poster_url = og_image.get('content')
-            
-            genre = "Film" 
+
+            genre = "Film"
             times = []
-            
-            today_formats = [ target_date, "Dzisiaj", "Dziś" ]
-            
+
+            # Zbuduj zestaw dat na najbliższe 7 dni (DD.MM.YYYY) + aliasy
+            from datetime import timedelta
+            base = datetime.strptime(target_date, '%d.%m.%Y')
+            next_7_days = {(base + timedelta(days=i)).strftime('%d.%m.%Y') for i in range(7)}
+            valid_formats = next_7_days | {"Dzisiaj", "Dziś"}
+
             date_blocks = soup.select('.event-date')
             if not date_blocks:
-                 potential_spans = soup.select('.table-important-text')
-                 date_blocks = []
-                 for s in potential_spans:
-                     if s.parent: date_blocks.append(s.parent)
-                     else: date_blocks.append(s)
+                potential_spans = soup.select('.table-important-text')
+                date_blocks = []
+                for s in potential_spans:
+                    if s.parent:
+                        date_blocks.append(s.parent)
+                    else:
+                        date_blocks.append(s)
 
             logger.debug(f"Found {len(date_blocks)} potential date blocks")
-            
+
             for block in date_blocks:
                 date_text = block.get_text(separator=' ', strip=True)
-                if any(fmt in date_text for fmt in today_formats):
-                    found_times = re.findall(r'godz\.\s*(\d{2}:\d{2})', date_text)
-                    if not found_times:
-                        found_times = re.findall(r'(?<!\d)(\d{2}:\d{2})(?!\d)', date_text)
-                    if found_times:
-                        times.extend(found_times)
-            
+                if not any(fmt in date_text for fmt in valid_formats):
+                    continue
+
+                # Wyciągnij etykietę daty (DD.MM) do wyświetlenia
+                date_match = re.search(r'(\d{2}\.\d{2})\.\d{4}', date_text)
+                date_label = date_match.group(1) if date_match else ""
+
+                found_times = re.findall(r'godz\.\s*(\d{2}:\d{2})', date_text)
+                if not found_times:
+                    found_times = re.findall(r'(?<!\d)(\d{2}:\d{2})(?!\d)', date_text)
+
+                for t in found_times:
+                    label = f"{date_label} {t}".strip() if date_label else t
+                    times.append(label)
+
             times = sorted(list(set(times)))
-            
+
             return {
                 'posterUrl': poster_url,
                 'genre': genre,
                 'times': times,
                 'rating': 'N/A'
             }
-            
+
         except Exception as e:
             logger.error(f"Error fetching details for {url}: {e}")
             return None
