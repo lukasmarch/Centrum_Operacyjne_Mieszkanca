@@ -190,7 +190,8 @@ async def send_message(
                     user_message=request.message,
                     agent_name=request.agent_name,
                     conversation_history=history,
-                    stream=True
+                    stream=True,
+                    user=user
                 )
 
                 # Send conversation_id first
@@ -245,7 +246,8 @@ async def send_message(
         user_message=request.message,
         agent_name=request.agent_name,
         conversation_history=history,
-        stream=False
+        stream=False,
+        user=user
     )
 
     # Save assistant message

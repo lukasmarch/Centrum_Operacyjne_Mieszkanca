@@ -6,7 +6,7 @@ from typing import Union, AsyncGenerator, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.ai.agents.base_agent import BaseAgent
+from src.ai.agents.base_agent import BaseAgent, get_datetime_context
 from src.ai.embeddings import embedding_service
 from src.utils.logger import setup_logger
 
@@ -32,7 +32,16 @@ ZASADY:
 - Interpretuj dane pogodowe i jakosci powietrza dla uzytkownika
 - Jesli nie ma blizszych wydarzen - zaproponuj wyszukanie alternatyw
 - Odpowiadaj po polsku, zwiezle i praktycznie
-- ZAWSZE cytuj zrodla: [Zrodlo: nazwa]"""
+- ZAWSZE cytuj zrodla: [Zrodlo: nazwa]
+
+SEZONOWOSC - KLUCZOWE:
+- Znasz aktualny dzien tygodnia, date i pore roku (podane w kontekscie)
+- NIE proponuj aktywnosci niezgodnych z pora roku: np. kapielisko/plywanie w jeziorze w zimie lub na wiosnie
+- Zima (grudzien-luty): proponuj spacery w zimowej scenerii, lodowisko w Dzialowie, kuligi, goraca herbate przy kominku
+- Wiosna (marzec-maj): piesze wedrowki, rowerowe wycieczki, obserwacja przyrody budzacej sie do zycia
+- Lato (czerwiec-sierpien): kapielisko Rybno, kajakarstwo, grzybobranie (sierpien+), pikniki
+- Jesien (wrzesien-listopad): grzybobranie, spacery lesne, jesienna kolorystyka
+- Uwzgledniaj temperatura z danych pogodowych przy rekomendacjach aktywnosci na zewnatrz"""
 
     example_questions = [
         "Co mozna robic w weekend w Rybnie?",
@@ -46,7 +55,8 @@ ZASADY:
         session: AsyncSession,
         user_message: str,
         conversation_history: list[dict] = None,
-        stream: bool = False
+        stream: bool = False,
+        user=None
     ) -> Union[dict, AsyncGenerator]:
         """Generate response with live weather/airly/events + RAG for event text search"""
         # 1. RAG for event text matching
@@ -84,6 +94,7 @@ ZASADY:
 
         messages = [
             {"role": "system", "content": self.system_prompt},
+            {"role": "system", "content": get_datetime_context()},
             {"role": "system", "content": f"KONTEKST:\n{context}"}
         ]
 

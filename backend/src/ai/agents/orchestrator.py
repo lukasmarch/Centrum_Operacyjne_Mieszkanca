@@ -71,7 +71,8 @@ class Orchestrator:
         user_message: str,
         agent_name: Optional[str] = None,
         conversation_history: list[dict] = None,
-        stream: bool = False
+        stream: bool = False,
+        user=None
     ) -> dict:
         """Route and handle a user query"""
         # Auto-route if no agent specified
@@ -86,7 +87,8 @@ class Orchestrator:
             session=session,
             user_message=user_message,
             conversation_history=conversation_history,
-            stream=stream
+            stream=stream,
+            user=user
         )
 
     def get_agents(self) -> list[dict]:

@@ -62,9 +62,11 @@ ZASADY:
         session: AsyncSession,
         user_message: str,
         conversation_history: list[dict] = None,
-        stream: bool = False
+        stream: bool = False,
+        user=None
     ) -> Union[dict, AsyncGenerator]:
         """Generate response using GUS DB data — no RAG, no embed_text call"""
+        from src.ai.agents.base_agent import get_datetime_context
         # 1. Classify query to GUS category
         category = await self._classify_gus_query(user_message)
         logger.info(f"GUS query classified as: {category}")
@@ -76,6 +78,7 @@ ZASADY:
 
         messages = [
             {"role": "system", "content": self.system_prompt},
+            {"role": "system", "content": get_datetime_context()},
             {"role": "system", "content": context}
         ]
 

@@ -7,7 +7,7 @@ from typing import Union, AsyncGenerator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.ai.agents.base_agent import BaseAgent
+from src.ai.agents.base_agent import BaseAgent, get_datetime_context
 from src.utils.logger import setup_logger
 
 logger = setup_logger("OrganizatorAgent")
@@ -65,16 +65,36 @@ class OrganizatorAgent(BaseAgent):
         user_message: str,
         conversation_history: list[dict] = None,
         stream: bool = False,
+        user=None,
     ) -> Union[dict, AsyncGenerator]:
         """Generate response from direct DB queries — no RAG"""
-        town = self._extract_town(user_message)
+        # Determine default town from user profile if logged in
+        default_town = "Rybno R1"
+        if user and getattr(user, "location", None):
+            # Normalize user.location to match KNOWN_TOWNS
+            user_loc = user.location.strip()
+            for t in KNOWN_TOWNS:
+                if t.lower() == user_loc.lower():
+                    default_town = t
+                    break
+            else:
+                # Partial match - e.g. "Rybno" → "Rybno R1"
+                if user_loc.lower() == "rybno":
+                    default_town = "Rybno R1"
+
+        town = self._extract_town(user_message, default_town=default_town)
         waste = await self._fetch_waste(session, town=town, days=30)
         cinema = await self._fetch_cinema(session)
 
         context = self._build_context(waste, cinema, town)
 
+        user_info = ""
+        if user:
+            user_info = f"Zalogowany użytkownik: {user.full_name} (miejscowość: {user.location})\n"
+
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": get_datetime_context() + (f"\n{user_info}" if user_info else "")},
             {"role": "system", "content": f"KONTEKST:\n{context}"},
         ]
 
@@ -102,8 +122,8 @@ class OrganizatorAgent(BaseAgent):
             "agent_name": self.name,
         }
 
-    def _extract_town(self, user_message: str) -> str:
-        """Heurystyka: szukaj nazwy miejscowości w treści wiadomości. Default: Rybno R1."""
+    def _extract_town(self, user_message: str, default_town: str = "Rybno R1") -> str:
+        """Heurystyka: szukaj nazwy miejscowości w treści wiadomości. Default z profilu użytkownika."""
         msg_lower = user_message.lower()
         for town in KNOWN_TOWNS:
             if town.lower() in msg_lower:
@@ -113,7 +133,7 @@ class OrganizatorAgent(BaseAgent):
                         return "Rybno R2"
                     return "Rybno R1"
                 return town
-        return "Rybno R1"
+        return default_town
 
     async def _fetch_waste(self, session: AsyncSession, town: str = "Rybno R1", days: int = 30) -> list[dict]:
         """Pobiera harmonogram śmieci dla danej miejscowości (najbliższe N dni)."""

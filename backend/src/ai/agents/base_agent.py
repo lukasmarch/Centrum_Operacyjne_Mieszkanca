@@ -3,6 +3,7 @@ BaseAgent - abstract base for all specialized AI agents
 """
 import json
 import openai
+from datetime import datetime, timezone
 from typing import Optional, AsyncGenerator, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,30 @@ from src.config import settings
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BaseAgent")
+
+_POLISH_DAYS = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
+_POLISH_MONTHS = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+                  "lipca", "sierpnia", "września", "października", "listopada", "grudnia"]
+
+
+def get_datetime_context() -> str:
+    """Return current date/time info in Polish for agent system messages."""
+    now = datetime.now()
+    day_name = _POLISH_DAYS[now.weekday()]
+    month_name = _POLISH_MONTHS[now.month - 1]
+    month = now.month
+    if month in (12, 1, 2):
+        season = "zima"
+    elif month in (3, 4, 5):
+        season = "wiosna"
+    elif month in (6, 7, 8):
+        season = "lato"
+    else:
+        season = "jesień"
+    return (
+        f"AKTUALNA DATA I CZAS: {day_name}, {now.day} {month_name} {now.year}, "
+        f"godz. {now.strftime('%H:%M')} | Pora roku: {season}"
+    )
 
 
 class BaseAgent:
@@ -35,7 +60,8 @@ class BaseAgent:
         session: AsyncSession,
         user_message: str,
         conversation_history: list[dict] = None,
-        stream: bool = False
+        stream: bool = False,
+        user=None
     ) -> Union[dict, AsyncGenerator]:
         """Generate a response using RAG context"""
         # 1. Retrieve context
@@ -73,6 +99,7 @@ class BaseAgent:
         # 3. Build messages
         messages = [
             {"role": "system", "content": self.system_prompt},
+            {"role": "system", "content": get_datetime_context()},
             {"role": "system", "content": f"KONTEKST:\n{context}"}
         ]
 
