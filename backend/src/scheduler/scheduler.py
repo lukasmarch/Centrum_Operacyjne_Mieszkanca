@@ -19,6 +19,7 @@ from src.scheduler.newsletter_job import run_weekly_newsletter, run_daily_newsle
 from src.scheduler.air_quality_job import run_air_quality_job
 from src.scheduler.ceidg_job import run_ceidg_job
 from src.scheduler.embedding_job import run_embedding_job
+from src.scheduler.places_job import run_places_job
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
@@ -86,7 +87,7 @@ def start_scheduler():
     # Article scraping once daily at 6:00 AM (STEP 1 of daily pipeline)
     scheduler.add_job(
         func=run_article_job,
-        trigger=CronTrigger(hour=6, minute=0),
+        trigger=CronTrigger(hour=19, minute=15),
         id='article_update',
         name='Update articles',
         replace_existing=True
@@ -97,7 +98,7 @@ def start_scheduler():
     # Previously ran every hour (IntervalTrigger) which caused timing issues
     scheduler.add_job(
         func=run_ai_job,
-        trigger=CronTrigger(hour=6, minute=15),
+        trigger=CronTrigger(hour=19, minute=35),
         id='ai_processing',
         name='AI article processing (batch=100)',
         replace_existing=True
@@ -106,7 +107,7 @@ def start_scheduler():
     # Embedding job at 6:20 AM (STEP 2.5 - after AI processing starts, embeds new articles)
     scheduler.add_job(
         func=run_embedding_job,
-        trigger=CronTrigger(hour=6, minute=20),
+        trigger=CronTrigger(hour=19, minute=50),
         id='embedding_update',
         name='Embed new articles for RAG (text-embedding-3-small)',
         replace_existing=True
@@ -118,7 +119,7 @@ def start_scheduler():
     # Moved from 6:45 to 7:00 to allow AI processing (batch=100, ~32 min) to complete
     scheduler.add_job(
         func=run_summary_job,
-        trigger=CronTrigger(hour=7, minute=0),
+        trigger=CronTrigger(hour=19, minute=48),
         id='daily_summary',
         name='Generate daily summary',
         replace_existing=True
@@ -150,6 +151,15 @@ def start_scheduler():
         trigger=CronTrigger(day_of_week='sun', hour=3, minute=0),
         id='ceidg_sync',
         name='Sync CEIDG businesses',
+        replace_existing=True
+    )
+
+    # Local Places update — weekly on Monday at 5:00 AM (Gemini Maps grounding)
+    scheduler.add_job(
+        func=run_places_job,
+        trigger=CronTrigger(day_of_week='mon', hour=5, minute=0),
+        id='places_update',
+        name='Update local places (Gemini Maps)',
         replace_existing=True
     )
 

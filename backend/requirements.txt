@@ -37,3 +37,6 @@ pywebpush>=2.0.0
 
 # BIP Scraper (Sprint 5D)
 pdfplumber>=0.11.0
+
+# Gemini Maps grounding (Sprint 8)
+google-genai>=1.47.0

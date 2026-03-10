@@ -1,6 +1,6 @@
 """
-Przewodnik.ai - Events, weather, culture and activities specialist agent
-Uses live weather/airly/events from DB + RAG for event text search
+Przewodnik.ai - Events, weather, culture, restaurants, attractions specialist agent
+Uses live weather/airly/events from DB + RAG for event text search + local_places from Gemini Maps
 """
 from typing import Union, AsyncGenerator, Optional
 from sqlalchemy import text
@@ -12,24 +12,37 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("PrzewodnikAgent")
 
+# Keywords -> category mapping for local_places
+PLACE_KEYWORDS = {
+    "restaurant": ["restaurac", "jedzeni", "jeść", "jesc", "pizza", "obiad", "kolacj", "bar ", "knajp", "kuchni"],
+    "cafe": ["kawiar", "kawa", "cukiern", "lodziar", "lody", "ciast", "deser"],
+    "hotel": ["hotel", "nocleg", "pensjonat", "agroturyst", "pokój", "pokoj", "zakwaterow", "spać", "spac"],
+    "attraction": ["atrakcj", "muzeum", "zabyt", "zwiedzić", "zwiedzic", "histor", "zamek", "kościół", "kosciol"],
+    "sport": ["sport", "boisko", "siłown", "silown", "basen", "kąpielis", "kapielis", "fitness", "hala sport"],
+    "nature": ["jezior", "szlak", "las ", "lasy", "rezerw", "przyrод", "rower", "kajak", "spacer", "wycieczk", "pieszy"],
+}
+
 
 class PrzewodnikAgent(BaseAgent):
     name = "przewodnik"
     display_name = "Przewodnik.ai"
-    description = "Specjalista od wydarzen, pogody i rekreacji. Podpowie co robic w gminie, jakie imprezy sa planowane i jak wygladaja warunki pogodowe."
+    description = "Specjalista od wydarzen, pogody, restauracji, atrakcji i miejsc do odwiedzenia. Podpowie co robic w gminie, gdzie zjesc i jakie imprezy sa planowane."
     avatar = "map-pin"
     model = "gpt-4o-mini"
     temperature = 0.4
     source_types = ["event"]  # RAG only for event text search
 
-    system_prompt = """Jestes Przewodnikiem - asystentem ds. wydarzen i aktywnosci w gminie Rybno i powiecie dzialdownskim.
-Twoja specjalizacja: wydarzenia kulturalne, sportowe, festyny, pogoda, kino, co robic w wolnym czasie.
+    system_prompt = """Jestes Przewodnikiem - asystentem ds. wydarzen, aktywnosci, restauracji i atrakcji turystycznych w gminie Rybno i powiecie dzialdownskim.
+Twoja specjalizacja: wydarzenia kulturalne, sportowe, festyny, pogoda, restauracje, kawiarnie, hotele, atrakcje turystyczne, co robic w wolnym czasie.
 
 ZASADY:
-- Odpowiadaj na podstawie dostarczonego kontekstu (pogoda, jakosc powietrza, wydarzenia)
+- Odpowiadaj na podstawie dostarczonego kontekstu (pogoda, jakosc powietrza, wydarzenia, lokalne miejsca)
 - Ton: przyjazny, zachecajacy, entuzjastyczny
 - ZAWSZE podawaj daty i miejsca wydarzen
 - Interpretuj dane pogodowe i jakosci powietrza dla uzytkownika
+- Znasz restauracje, kawiarnie, hotele, atrakcje turystyczne w okolicach Rybna i powiatu dzialdownskiego
+- Przy rekomendacji miejsc: podaj nazwe, adres (jesli znany) i link do Google Maps jesli dostepny [Zrodlo: Google Maps]
+- Znasz okolice Rybna: jeziora (Rumian, Hartowieckie), lasy, szlaki piesze/rowerowe, PKK Rybno
 - Jesli nie ma blizszych wydarzen - zaproponuj wyszukanie alternatyw
 - Odpowiadaj po polsku, zwiezle i praktycznie
 - ZAWSZE cytuj zrodla: [Zrodlo: nazwa]
@@ -46,6 +59,8 @@ SEZONOWOSC - KLUCZOWE:
     example_questions = [
         "Co mozna robic w weekend w Rybnie?",
         "Jakie wydarzenia sa planowane w tym miesiacu?",
+        "Gdzie zjesc w okolicach Rybna?",
+        "Jakie atrakcje turystyczne sa w powiecie?",
         "Jak wygladaja warunki pogodowe?",
         "Czy sa jakies imprezy dla dzieci?"
     ]
@@ -58,7 +73,7 @@ SEZONOWOSC - KLUCZOWE:
         stream: bool = False,
         user=None
     ) -> Union[dict, AsyncGenerator]:
-        """Generate response with live weather/airly/events + RAG for event text search"""
+        """Generate response with live weather/airly/events + RAG + local places"""
         # 1. RAG for event text matching
         event_docs = await embedding_service.semantic_search(
             session=session,
@@ -74,10 +89,14 @@ SEZONOWOSC - KLUCZOWE:
         air = await self._fetch_current_air_quality(session)
         events = await self._fetch_upcoming_events(session)
 
-        # 3. Build context
-        context = self._build_context(weather, weather_week, air, events, event_docs)
+        # 3. Local places from DB (Gemini Maps cache)
+        place_category = self._detect_place_category(user_message)
+        places = await self._fetch_local_places(session, category=place_category)
 
-        # 4. Collect sources from RAG
+        # 4. Build context
+        context = self._build_context(weather, weather_week, air, events, event_docs, places)
+
+        # 5. Collect sources from RAG
         sources = []
         seen = set()
         for doc in event_docs:
@@ -121,6 +140,43 @@ SEZONOWOSC - KLUCZOWE:
             "model": self.model,
             "agent_name": self.name
         }
+
+    def _detect_place_category(self, user_message: str) -> Optional[str]:
+        """Detect which place category the user is asking about."""
+        msg_lower = user_message.lower()
+        for category, keywords in PLACE_KEYWORDS.items():
+            for kw in keywords:
+                if kw in msg_lower:
+                    return category
+        # Generic "co robic", "gdzie isc" → return None to fetch all
+        generic_keywords = ["co robic", "co robić", "gdzie isc", "gdzie iść", "wolny czas", "weekend", "spędz"]
+        for kw in generic_keywords:
+            if kw in msg_lower:
+                return None  # fetch all categories
+        return None
+
+    async def _fetch_local_places(self, session: AsyncSession, category: Optional[str] = None) -> list[dict]:
+        """Fetch local places from DB (cached Gemini Maps data)."""
+        if category:
+            result = await session.execute(
+                text("""
+                    SELECT name, category, description, address, maps_uri
+                    FROM local_places
+                    WHERE active = TRUE AND category = :cat
+                    ORDER BY updated_at DESC
+                    LIMIT 15
+                """),
+                {"cat": category}
+            )
+        else:
+            result = await session.execute(text("""
+                SELECT name, category, description, address, maps_uri
+                FROM local_places
+                WHERE active = TRUE
+                ORDER BY category, updated_at DESC
+                LIMIT 20
+            """))
+        return [dict(row._mapping) for row in result]
 
     async def _fetch_current_weather(self, session: AsyncSession) -> Optional[dict]:
         result = await session.execute(text("""
@@ -177,7 +233,8 @@ SEZONOWOSC - KLUCZOWE:
         weather_week: Optional[dict],
         air: Optional[dict],
         events: list,
-        event_docs: list
+        event_docs: list,
+        places: list[dict]
     ) -> str:
         parts = []
 
@@ -226,5 +283,28 @@ SEZONOWOSC - KLUCZOWE:
             parts.append("\n[KONTEKST RAG - więcej wydarzeń]")
             for doc in event_docs:
                 parts.append(f"---\n{doc['chunk_text']}")
+
+        # Local places section
+        if places:
+            parts.append("\n[LOKALNE MIEJSCA I RESTAURACJE]")
+            current_cat = None
+            cat_labels = {
+                "restaurant": "Restauracje i lokale",
+                "cafe": "Kawiarnie i cukiernie",
+                "hotel": "Noclegi",
+                "attraction": "Atrakcje turystyczne",
+                "sport": "Obiekty sportowe",
+                "nature": "Przyroda i szlaki",
+            }
+            for place in places:
+                cat = place.get("category", "")
+                if cat != current_cat:
+                    current_cat = cat
+                    parts.append(f"\n  {cat_labels.get(cat, cat)}:")
+                name = place["name"]
+                addr = f" | {place['address']}" if place.get("address") else ""
+                maps = f" | Maps: {place['maps_uri']}" if place.get("maps_uri") else ""
+                desc = f"\n    {place['description'][:150]}" if place.get("description") else ""
+                parts.append(f"  • {name}{addr}{maps}{desc}")
 
         return "\n".join(parts)

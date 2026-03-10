@@ -620,6 +620,27 @@ class WasteSchedule(SQLModel, table=True):
 
 
 # ======================
+# Local Places (Gemini Maps grounding)
+# ======================
+
+class LocalPlace(SQLModel, table=True):
+    """Lokalne miejsca z Google Maps (restauracje, atrakcje, hotele itp.)"""
+    __tablename__ = "local_places"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    place_id: str = Field(max_length=200, unique=True, index=True)
+    name: str = Field(max_length=300)
+    category: str = Field(max_length=50, index=True)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    address: Optional[str] = Field(default=None, max_length=500)
+    maps_uri: Optional[str] = Field(default=None, max_length=500)
+    extra_data: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    active: bool = Field(default=True)
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ======================
 # Anonymous Chat Usage (Rate Limiting)
 # ======================
 
