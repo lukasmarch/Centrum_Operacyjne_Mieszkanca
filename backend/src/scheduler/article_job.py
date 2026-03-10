@@ -56,8 +56,12 @@ def filter_recent_articles(articles: list, days: int = 2) -> list:
     return filtered
 
 
-async def update_articles_job():
-    """Job to scrape and update articles from all active sources"""
+async def update_articles_job(source_filter: str = None):
+    """Job to scrape and update articles from all active sources.
+
+    Args:
+        source_filter: If provided, only scrape the source with this name.
+    """
     logger.info("=" * 60)
     logger.info("Starting article update job...")
     logger.info(f"Registered scrapers: {list_scrapers()}")
@@ -71,10 +75,11 @@ async def update_articles_job():
     failed_sources = []
 
     async with async_session() as session:
-        # Fetch all active sources and convert to dicts to avoid session issues
-        result = await session.execute(
-            select(Source).where(Source.status == "active")
-        )
+        # Fetch active sources (optionally filtered by name)
+        query = select(Source).where(Source.status == "active")
+        if source_filter:
+            query = query.where(Source.name == source_filter)
+        result = await session.execute(query)
         sources_orm = result.scalars().all()
 
         # Convert to list of dicts to avoid lazy loading issues

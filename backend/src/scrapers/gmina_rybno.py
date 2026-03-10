@@ -1,216 +1,150 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
 
 from src.scrapers.base import BaseScraper
 
+
 class GminaRybnoScraper(BaseScraper):
     """Scraper dla gminarybno.pl - oficjalny portal Gminy Rybno"""
 
-    async def parse(self, html: str, url: str) -> List[Dict]:
-        """
-        Parse HTML z gminarybno.pl do artykułów.
+    BASE_URL = "https://gminarybno.pl"
 
-        Struktura strony:
-        - Artykuły w <div class="aktualnosci-lista"> lub podobnych kontenerach
-        - Tytuł: <h2> lub <h3> w linku <a>
-        - Obrazek: <img> wewnątrz kontenera artykułu
-        - URL: względny link typu /aktualnosc/[id]/[slug]
-        """
+    def _build_url(self, href: str) -> str:
+        if href.startswith('http'):
+            return href
+        return f"{self.BASE_URL}{href}" if href.startswith('/') else f"{self.BASE_URL}/{href}"
+
+    def _parse_date(self, container) -> Optional[datetime]:
+        """Pobiera datę z <p class="meta">Opublikowano YYYY-MM-DD HH:MM:SS.</p>"""
+        meta = container.find('p', class_='meta')
+        if not meta:
+            return None
+        m = re.search(r'(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}', meta.get_text(strip=True))
+        if m:
+            try:
+                return datetime.strptime(m.group(1), '%Y-%m-%d')
+            except ValueError:
+                pass
+        return None
+
+    def _parse_external_id(self, href: str, full_url: str) -> str:
+        # Format: /aktualnosci/slug,ID.html → wyciągnij ID po przecinku
+        m = re.search(r',(\d+)\.html$', href)
+        if m:
+            return m.group(1)
+        # Fallback: dowolny numer w URL
+        m = re.search(r'/(\d+)/', href)
+        if m:
+            return m.group(1)
+        return f"gminarybno_{hash(full_url) & 0x7FFFFFFF}"
+
+    async def parse(self, html: str, url: str) -> List[Dict]:
         articles = []
         soup = BeautifulSoup(html, 'html.parser')
-
-        # Szukamy kontenerów z artykułami
-        # Struktura może być: div.aktualnosc-item, article, lub bezpośrednie linki
-        article_containers = soup.find_all(['article', 'div'], class_=re.compile(r'aktualn|news|post'))
-
-        # Jeśli nie ma kontenerów, szukamy bezpośrednio linków do aktualności
-        if not article_containers:
-            article_links = soup.find_all('a', href=re.compile(r'/aktualnosc|/news|/wiadomosc'))
-            article_containers = [link.parent for link in article_links if link.parent]
-
         seen_urls = set()
 
-        for container in article_containers:
+        containers = soup.find_all(['article', 'div'], class_=re.compile(r'aktualn|news|post'))
+        if not containers:
+            containers = [
+                link.parent
+                for link in soup.find_all('a', href=re.compile(r'/aktualnosc|/news|/wiadomosc'))
+                if link.parent
+            ]
+
+        for container in containers:
             try:
-                # Znajdź link do artykułu
-                link = container.find('a', href=re.compile(r'/aktualnosc|/news|/wiadomosc'))
+                # Data musi być na listingu — brak = artykuł stały z sidebaru, pomijamy
+                published_at = self._parse_date(container)
+                if not published_at:
+                    continue
+
+                link = container.find('a', href=re.compile(r'/aktualnosc|/news|/wiadomosc')) \
+                    or container.find('a', href=True)
                 if not link:
-                    # Spróbuj znaleźć dowolny link
-                    link = container.find('a', href=True)
-                    if not link:
-                        continue
-
-                href = link.get('href')
-                if not href or href in seen_urls:
                     continue
 
-                # Ignoruj linki do social media, js, anchors, external
+                href = link.get('href', '')
+                if not href:
+                    continue
+
                 if any(x in href.lower() for x in ['facebook.', 'twitter.', 'instagram.',
-                                                     'javascript:', '#', 'mailto:', 'nasza-klasa.',
-                                                     'wykop.', 'share.php', 'shout=']):
+                                                     'javascript:', '#', 'mailto:']):
                     continue
 
-                # Tylko linki z własnej domeny
-                if href.startswith('http') and 'gminarybno.pl' not in href.lower():
+                if href.startswith('http') and self.BASE_URL not in href:
                     continue
 
-                # Buduj pełny URL
-                if href.startswith('http'):
-                    full_url = href
-                elif href.startswith('/'):
-                    full_url = f"https://gminarybno.pl{href}"
-                else:
-                    full_url = f"https://gminarybno.pl/{href}"
-
-                # Deduplikacja
+                full_url = self._build_url(href)
                 if full_url in seen_urls:
                     continue
                 seen_urls.add(full_url)
 
-                # Tytuł - próbuj różne warianty
-                title = None
-
-                # 1. Z atrybutu title linku
-                title = link.get('title')
-
-                # 2. Z nagłówka wewnątrz linku
-                if not title:
-                    title_elem = link.find(['h1', 'h2', 'h3', 'h4'])
-                    if title_elem:
-                        title = title_elem.get_text(strip=True)
-
-                # 3. Z nagłówka w kontenerze
-                if not title:
-                    title_elem = container.find(['h1', 'h2', 'h3', 'h4'])
-                    if title_elem:
-                        title = title_elem.get_text(strip=True)
-
-                # 4. Z tekstu linku
-                if not title:
-                    title = link.get_text(strip=True)
-
-                # Ignoruj linki generyczne (nawigacja)
-                if title and title.lower() in ['aktualności', 'aktualnosci', 'strona główna', 'home',
-                                                 'dodaj do facebooka', 'udostępnij', 'share']:
-                    continue
-
+                # Tytuł
+                title = (
+                    link.get('title')
+                    or (h := link.find(['h1', 'h2', 'h3', 'h4'])) and h.get_text(strip=True)
+                    or (h := container.find(['h1', 'h2', 'h3', 'h4'])) and h.get_text(strip=True)
+                    or link.get_text(strip=True)
+                )
                 if not title or len(title) < 5:
-                    self.logger.warning(f"Brak tytułu dla URL: {full_url}")
+                    continue
+                if title.lower() in ['aktualności', 'aktualnosci', 'strona główna', 'home']:
                     continue
 
-                # Obrazek
+                # Obrazek z listingu
                 image_url = None
                 img = container.find('img')
                 if img:
-                    img_src = img.get('src') or img.get('data-src')
-                    if img_src:
-                        if img_src.startswith('http'):
-                            image_url = img_src
-                        elif img_src.startswith('/'):
-                            image_url = f"https://gminarybno.pl{img_src}"
-                        else:
-                            image_url = f"https://gminarybno.pl/{img_src}"
-
-                # External ID z URL - próbuj wyciągnąć ID
-                # Format: /aktualnosc/[ID]/slug lub /aktualnosc-[ID]-slug
-                external_id = None
-
-                # Wariant 1: /aktualnosc/[ID]/slug
-                id_match = re.search(r'/aktualnosc(?:sc)?/(\d+)/', href)
-                if id_match:
-                    external_id = id_match.group(1)
-                else:
-                    # Wariant 2: /aktualnosc-[ID]-slug
-                    id_match = re.search(r'/aktualnosc(?:sc)?-(\d+)[-/]', href)
-                    if id_match:
-                        external_id = id_match.group(1)
-                    else:
-                        # Wariant 3: dowolne ID w URL
-                        id_match = re.search(r'/(\d+)/', href)
-                        if id_match:
-                            external_id = id_match.group(1)
-
-                # Jeśli nadal brak external_id, użyj hash URL
-                if not external_id:
-                    external_id = f"gminarybno_{hash(full_url) & 0x7FFFFFFF}"
+                    src = img.get('src') or img.get('data-src')
+                    if src:
+                        image_url = self._build_url(src)
 
                 article_data = {
                     'title': title,
                     'url': full_url,
                     'image_url': image_url,
-                    'external_id': external_id,
+                    'external_id': self._parse_external_id(href, full_url),
+                    'published_at': published_at,
                 }
-                
-                # Deep Scraping: Fetch detail page to get content and date
+
+                # Deep scraping: content + lepszy obrazek ze strony detalu
                 try:
                     self.logger.info(f"Fetching details for: {full_url}")
                     detail_html = await self.fetch(full_url)
-                    detail_data = self._parse_detail(detail_html)
-                    article_data.update(detail_data)
+                    article_data.update(self._parse_detail(detail_html))
+                    # Data pochodzi z listingu — nie nadpisujemy
+                    article_data['published_at'] = published_at
                 except Exception as e:
                     self.logger.error(f"Error fetching details for {full_url}: {e}")
 
                 articles.append(article_data)
-                self.logger.debug(f"Znaleziono artykuł: {title[:50]}...")
 
-            except (AttributeError, KeyError, TypeError) as e:
-                self.logger.warning(f"Parse error dla kontenera: {e}")
+            except Exception as e:
+                self.logger.warning(f"Parse error: {e}")
                 continue
 
         self.logger.info(f"Znaleziono {len(articles)} artykułów na gminarybno.pl")
         return articles
 
     def _parse_detail(self, html: str) -> Dict:
-        """Parse detail page for content and date"""
+        """Pobiera content i główny obrazek ze strony detalu."""
         soup = BeautifulSoup(html, 'html.parser')
         data = {}
 
-        # Content - usually in #main or .entry-content
         content_div = soup.find('div', id='main') or soup.find('div', class_='entry-content')
         if content_div:
-            # Remove scripts, styles, ads
-            for tag in content_div(['script', 'style', 'div.ads', 'div.social-links', 'div.box-footer']):
+            for tag in content_div(['script', 'style']):
                 tag.decompose()
-            
             text = content_div.get_text(separator='\n', strip=True)
             if text:
                 data['content'] = text
 
-        # Date - try to find patterns
-        # 1. Look for specific date structures
-        date_elem = soup.find('span', class_='date') or soup.find('div', class_='date')
-        if date_elem:
-            date_str = date_elem.get_text(strip=True)
-            # Try parsing known formats
-            try:
-                # Example: 2024-05-12 or 12.05.2024
-                for fmt in ('%Y-%m-%d', '%d.%m.%Y'):
-                    try:
-                        data['published_at'] = datetime.strptime(date_str, fmt)
-                        break
-                    except ValueError:
-                        continue
-            except Exception:
-                pass
-        
-        # Fallback date search in text
-        if 'published_at' not in data:
-            # Search for YYYY-MM-DD or DD.MM.YYYY
-            text_content = soup.get_text()
-            date_match = re.search(r'(\d{4}-\d{2}-\d{2})|(\d{2}\.\d{2}\.\d{4})', text_content)
-            if date_match:
-                date_str = date_match.group(0)
-                try:
-                    # Try parsing known formats
-                    for fmt in ('%Y-%m-%d', '%d.%m.%Y'):
-                        try:
-                            data['published_at'] = datetime.strptime(date_str, fmt)
-                            break
-                        except ValueError:
-                            continue
-                except Exception:
-                    pass
+            img = content_div.find('img')
+            if img:
+                src = img.get('src') or img.get('data-src')
+                if src and not any(x in src for x in ['logo', 'icon', 'sprite', 'button']):
+                    data['image_url'] = self._build_url(src)
 
         return data

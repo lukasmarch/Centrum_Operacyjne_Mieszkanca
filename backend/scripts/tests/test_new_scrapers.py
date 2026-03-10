@@ -169,33 +169,42 @@ async def test_apify_facebook_mock():
         return 0
 
 
+SCRAPERS = {
+    'rybno': test_gmina_rybno,
+    'dzialdowo': test_mojedzialdowo,
+    'facebook': test_apify_facebook_mock,
+}
+
 async def main():
-    """Uruchom wszystkie testy"""
-    logger.info("Rozpoczynam testy nowych scraperów...\n")
+    selected = sys.argv[1:]
+
+    if not selected:
+        print("Użycie: python test_new_scrapers.py [rybno] [dzialdowo] [facebook]")
+        print(f"Dostępne: {', '.join(SCRAPERS.keys())}")
+        sys.exit(1)
+
+    unknown = [s for s in selected if s not in SCRAPERS]
+    if unknown:
+        print(f"Nieznane scrapery: {', '.join(unknown)}")
+        print(f"Dostępne: {', '.join(SCRAPERS.keys())}")
+        sys.exit(1)
+
+    logger.info(f"Uruchamiam: {', '.join(selected)}\n")
 
     results = {}
+    for name in selected:
+        results[name] = await SCRAPERS[name]()
 
-    # Test 1: Gmina Rybno
-    results['gmina_rybno'] = await test_gmina_rybno()
-
-    # Test 2: Moje Dzialdowo
-    results['mojedzialdowo'] = await test_mojedzialdowo()
-
-    # Test 3: Apify Facebook (mock)
-    results['apify_facebook'] = await test_apify_facebook_mock()
-
-    # Podsumowanie
     logger.info("\n" + "=" * 60)
-    logger.info("PODSUMOWANIE TESTÓW")
+    logger.info("PODSUMOWANIE")
     logger.info("=" * 60)
-    logger.info(f"GminaRybnoScraper: {results['gmina_rybno']} artykułów")
-    logger.info(f"MojeDzialdowoScraper: {results['mojedzialdowo']} artykułów")
-    logger.info(f"ApifyFacebookScraper (mock): {results['apify_facebook']} postów")
+    for name, count in results.items():
+        logger.info(f"{name}: {count} artykułów")
     logger.info("=" * 60)
 
     total = sum(results.values())
     if total > 0:
-        logger.info(f"SUCCESS: Łącznie {total} artykułów/postów")
+        logger.info(f"SUCCESS: Łącznie {total} artykułów")
     else:
         logger.error("FAILURE: Żaden scraper nie zwrócił wyników")
 
