@@ -1,16 +1,8 @@
 import React from 'react';
-import { Newspaper, TrendingUp, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Newspaper, ExternalLink } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
-import ArticleImage from './ArticleImage';
+import ArticleImage, { getCategoryTheme } from './ArticleImage';
 import { AppSection } from '../types';
-
-const getCategoryBadge = (category: string) => {
-  const cat = (category || '').toLowerCase();
-  const label = category?.toUpperCase() || 'INFO';
-  if (cat.includes('awari'))
-    return { label: 'AWARIA', color: 'text-red-400 bg-red-500/15 border-red-500/30', dot: 'bg-red-400' };
-  return { label, color: 'text-slate-400 bg-slate-500/10 border-slate-600/30', dot: 'bg-slate-500' };
-};
 
 const getTimeAgo = (timestamp: string) => {
   if (!timestamp) return '';
@@ -31,7 +23,6 @@ interface NewsTileProps {
 const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
   const { articles, loading } = useArticles({ limit: 20 });
 
-  // Category stats from all articles
   const categoryStats = React.useMemo(() => {
     if (!articles) return [];
     const counts: Record<string, number> = {};
@@ -41,72 +32,54 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
     });
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
-      .map(([cat, count]) => ({ category: cat, count, badge: getCategoryBadge(cat) }));
+      .map(([cat, count]) => ({ category: cat, count, theme: getCategoryTheme(cat) }));
   }, [articles]);
 
-  // Awaria articles always featured first (backend already sorts them first)
-  const awaria = articles?.filter(a => (a.category || '').toLowerCase().includes('awari')) ?? [];
   const featured = articles?.[0];
-  const restArticles = articles?.slice(1, 4);
+  const restArticles = articles?.slice(1, 5);
 
   return (
-    <div className="h-full flex flex-col p-5">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+    <div className="h-full flex flex-col p-4 sm:p-5">
+      {/* ── Header: simple title + single link ── */}
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Newspaper size={14} className="text-blue-400" />
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Najnowsze Wiadomości</span>
+          <Newspaper size={16} className="text-blue-400" />
+          <span className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-wider">
+            Najnowsze Wiadomości
+          </span>
         </div>
-        {articles && (
-          <span className="text-[9px] font-bold text-slate-500">{articles.length} artykułów</span>
-        )}
-      </div>
-
-      {/* Awaria alert banner */}
-      {awaria.length > 0 && !loading && (
         <button
           onClick={() => onNavigate?.('news')}
-          className="flex items-center gap-2 px-3 py-2 mb-3 rounded-xl bg-red-500/15 border border-red-500/30 hover:bg-red-500/25 transition-colors text-left w-full"
+          className="text-xs text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors whitespace-nowrap"
         >
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-          </span>
-          <AlertTriangle size={11} className="text-red-400 shrink-0" />
-          <span className="text-[10px] font-bold text-red-300 flex-1 truncate">
-            {awaria.length === 1
-              ? `AWARIA: ${awaria[0].title}`
-              : `${awaria.length} awarie/ostrzeżenia – kliknij aby zobaczyć`}
-          </span>
+          Wszystkie →
         </button>
-      )}
+      </div>
 
+      {/* ── Content ── */}
       {loading ? (
-        <div className="flex-1 grid grid-cols-3 gap-4 animate-pulse">
-          <div className="col-span-2 space-y-3">
-            <div className="h-40 bg-slate-800/50 rounded-xl" />
-            <div className="h-14 bg-slate-800/50 rounded-xl" />
-          </div>
-          <div className="space-y-2">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-8 bg-slate-800/50 rounded-lg" />
+        <div className="flex-1 flex flex-col gap-2 animate-pulse">
+          <div className="h-32 bg-slate-800/50 rounded-xl" />
+          <div className="space-y-1">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-12 bg-slate-800/50 rounded-lg" />
             ))}
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex gap-4">
-          {/* Left: Featured + list */}
-          <div className="flex-1 flex flex-col min-w-0 gap-3">
-            {/* Featured article - big image */}
-            {featured && (
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Featured article – hero card */}
+          {featured && (() => {
+            const theme = getCategoryTheme(featured.category);
+            const isAwaria = (featured.category || '').toLowerCase().includes('awari');
+            return (
               <a
                 href={featured.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="relative rounded-xl overflow-hidden group cursor-pointer block"
-                style={{ minHeight: '140px' }}
+                className={`relative rounded-xl overflow-hidden group cursor-pointer block flex-shrink-0 mb-2 ${isAwaria ? 'ring-1 ring-red-500/40' : ''}`}
               >
-                <div className="w-full min-h-[140px] max-h-[160px] overflow-hidden group-hover:[&_img]:scale-105">
+                <div className="w-full h-[120px] sm:h-[140px] overflow-hidden group-hover:[&_img]:scale-105">
                   <ArticleImage
                     imageUrl={featured.imageUrl}
                     category={featured.category}
@@ -117,95 +90,93 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
 
-                {/* Badge + title overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border ${getCategoryBadge(featured.category || featured.source).color}`}>
-                      {getCategoryBadge(featured.category || featured.source).label}
+                <div className="absolute bottom-0 left-0 right-0 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${theme.badge}`}>
+                      {(featured.category || 'INFO').toUpperCase()}
                     </span>
-                    <span className="text-[9px] text-slate-400">{getTimeAgo(featured.timestamp)}</span>
+                    <span className="text-[10px] text-slate-400">{getTimeAgo(featured.timestamp)}</span>
                   </div>
-                  <h4 className="text-sm font-bold text-white leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
+                  <h4 className="text-sm sm:text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                     {featured.title}
                   </h4>
                 </div>
-                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ExternalLink size={14} className="text-white/70" />
+                <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ExternalLink size={12} className="text-white/70" />
                 </div>
               </a>
-            )}
+            );
+          })()}
 
-            {/* Secondary articles */}
-            <div className="space-y-1">
-              {restArticles?.map(article => {
-                const badge = getCategoryBadge(article.category || article.source);
-                return (
-                  <a
-                    key={article.id}
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors group items-center"
-                  >
-                    {/* Thumbnail */}
-                    <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-white/5">
-                      <ArticleImage
-                        imageUrl={article.imageUrl}
-                        category={article.category}
-                        source={article.source}
-                        iconSize="sm"
-                      />
-                    </div>
+          {/* Secondary articles – compact rows with dividers */}
+          <div className="flex flex-col divide-y divide-white/5 flex-1">
+            {restArticles?.map(article => {
+              const theme = getCategoryTheme(article.category);
+              const isAwaria = (article.category || '').toLowerCase().includes('awari');
+              return (
+                <a
+                  key={article.id}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex gap-3 py-2 px-1 hover:bg-white/5 transition-colors group items-center ${isAwaria ? 'bg-red-500/5' : ''}`}
+                >
+                  {/* Thumbnail */}
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden shrink-0 border border-white/5">
+                    <ArticleImage
+                      imageUrl={article.imageUrl}
+                      category={article.category}
+                      source={article.source}
+                      iconSize="sm"
+                    />
+                  </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border ${badge.color}`}>
-                          {badge.label}
-                        </span>
-                        <span className="text-[9px] text-slate-500">{getTimeAgo(article.timestamp)}</span>
-                      </div>
-                      <p className="text-[11px] font-semibold text-slate-200 leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
-                        {article.title}
-                      </p>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className={`text-[8px] font-bold uppercase px-1 py-px rounded border whitespace-nowrap ${theme.badge}`}>
+                        {(article.category || 'INFO').toUpperCase()}
+                      </span>
+                      <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                        {getTimeAgo(article.timestamp)}
+                      </span>
                     </div>
-                  </a>
-                );
-              })}
-            </div>
+                    <p className="text-xs sm:text-sm font-semibold text-slate-200 leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
+                      {article.title}
+                    </p>
+                  </div>
+                </a>
+              );
+            })}
           </div>
 
-          {/* Right: Category statistics panel */}
-          <div className="w-48 shrink-0 flex flex-col">
-            <div className="flex items-center gap-1.5 mb-3">
-              <TrendingUp size={11} className="text-blue-400" />
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Kategorie</span>
-            </div>
+          {/* ── Footer: stats bar ── */}
+          <div className="flex items-center gap-3 pt-2.5 mt-1 border-t border-white/5 flex-wrap">
+            {/* Article count */}
+            {articles && (
+              <span className="text-[10px] sm:text-xs font-semibold text-slate-400">
+                {articles.length} artykułów
+              </span>
+            )}
+            <span className="text-slate-600">·</span>
+            <span className="text-[10px] sm:text-xs text-slate-400">
+              Źródeł: {categoryStats.length}
+            </span>
 
-            <div className="space-y-1.5 flex-1">
-              {categoryStats.map(({ category, count, badge }) => (
-                <div
+            {/* Category dots */}
+            <span className="text-slate-600 hidden sm:inline">·</span>
+            <div className="hidden sm:flex items-center gap-2.5">
+              {categoryStats.slice(0, 5).map(({ category, count, theme }) => (
+                <span
                   key={category}
-                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-slate-800/40 border border-white/5 hover:bg-slate-800/60 transition-colors"
+                  className="inline-flex items-center gap-1 text-[10px] text-slate-400"
+                  title={`${category}: ${count}`}
                 >
-                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${badge.dot}`} />
-                  <span className="text-[10px] font-medium text-slate-300 flex-1 truncate">{badge.label}</span>
-                  <span className="text-[10px] font-black text-slate-400">{count}</span>
-                </div>
+                  <span className={`w-2 h-2 rounded-full ${theme.dot}`} />
+                  <span className="font-medium uppercase">{category}</span>
+                  <span className="font-black text-slate-500">{count}</span>
+                </span>
               ))}
-            </div>
-
-            {/* Mini summary */}
-            <div className="mt-auto pt-3 border-t border-white/5">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] text-slate-600">Źródeł: {categoryStats.length}</span>
-                <button
-                  onClick={() => onNavigate?.('news')}
-                  className="text-[9px] text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors"
-                >
-                  Wszystkie →
-                </button>
-              </div>
             </div>
           </div>
         </div>

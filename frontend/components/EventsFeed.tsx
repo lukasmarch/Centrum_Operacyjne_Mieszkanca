@@ -1,229 +1,156 @@
 import React, { useState, useMemo } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEvents } from '../src/hooks/useEvents';
+import EventCalendar from './EventCalendar';
 
-const EventsFeed: React.FC = () => {
-    const { events, loading, error } = useEvents();
-    const [activeCategory, setActiveCategory] = useState<string>('Wszystkie');
-    const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+/* ── Category chip colors ───────────────────────────────────── */
 
-    // Group events categories
-    const categories = useMemo(() => {
-        if (!events) return [];
-        const cats = new Set(events.map(e => e.category).filter(Boolean));
-        return ['Wszystkie', ...Array.from(cats)];
+const CATEGORY_CHIP: Record<string, { active: string; dot: string }> = {
+    kultura: { active: 'bg-violet-600/20 text-violet-300 border-violet-500/30', dot: 'bg-violet-400' },
+    sport: { active: 'bg-orange-600/20 text-orange-300 border-orange-500/30', dot: 'bg-orange-400' },
+    rozrywka: { active: 'bg-pink-600/20 text-pink-300 border-pink-500/30', dot: 'bg-pink-400' },
+    społeczne: { active: 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30', dot: 'bg-emerald-400' },
+    edukacja: { active: 'bg-cyan-600/20 text-cyan-300 border-cyan-500/30', dot: 'bg-cyan-400' },
+    koncert: { active: 'bg-rose-600/20 text-rose-300 border-rose-500/30', dot: 'bg-rose-400' },
+};
+
+const DEFAULT_CHIP = { active: 'bg-blue-600/20 text-blue-300 border-blue-500/30', dot: 'bg-blue-400' };
+
+function getCategoryChip(cat: string) {
+    const key = cat.toLowerCase();
+    for (const [k, v] of Object.entries(CATEGORY_CHIP)) {
+        if (key.includes(k) || k.includes(key)) return v;
+    }
+    return DEFAULT_CHIP;
+}
+
+/* ── Main Component ──────────────────────────────────────────── */
+
+interface NewsFeedProps {
+    initialCategory?: string;
+}
+
+const VISIBLE_CHIPS = 5;
+
+const EventsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
+    const { events, loading, error } = useEvents(100);
+    const [activeCategory, setActiveCategory] = useState<string>(initialCategory || 'Wszystkie');
+    const [chipsExpanded, setChipsExpanded] = useState(false);
+
+    // Category counts
+    const categoryCounts = useMemo(() => {
+        if (!events) return {} as Record<string, number>;
+        const counts: Record<string, number> = {};
+        events.forEach(e => {
+            const cat = e.category || 'Inne';
+            counts[cat] = (counts[cat] || 0) + 1;
+        });
+        return counts;
     }, [events]);
 
-    // Filter and Deduplicate events
+    const sortedCategories = useMemo(() => {
+        return Object.entries(categoryCounts)
+            .sort((a, b) => (b[1] as number) - (a[1] as number))
+            .map(([cat]) => cat);
+    }, [categoryCounts]);
+
+    const visibleCategories = chipsExpanded ? sortedCategories : sortedCategories.slice(0, VISIBLE_CHIPS);
+    const overflowCount = Math.max(0, sortedCategories.length - VISIBLE_CHIPS);
+
+    // Filter & dedupe
     const filteredEvents = useMemo(() => {
         if (!events) return [];
-
         let filtered = events;
         if (activeCategory !== 'Wszystkie') {
             filtered = events.filter(e => e.category === activeCategory);
         }
-
-        // Deduplicate by title and date
-        const uniqueEvents = filtered.filter((event, index, self) =>
-            index === self.findIndex((t) => (
-                t.title === event.title &&
-                new Date(t.date).toDateString() === new Date(event.date).toDateString()
-            ))
+        // Deduplicate by title + date
+        return filtered.filter((ev, i, arr) =>
+            i === arr.findIndex(t =>
+                t.title === ev.title &&
+                new Date(t.date).toDateString() === new Date(ev.date).toDateString()
+            )
         );
-
-        return uniqueEvents;
     }, [events, activeCategory]);
 
-    // Generate Google Calendar URL
-    const generateGoogleCalendarUrl = (event: typeof events[0]) => {
-        const startDate = new Date(event.date);
-        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // +2 hours
+    if (loading) return (
+        <div className="space-y-6">
+            <div className="h-8 w-56 bg-slate-800/50 rounded-xl animate-pulse" />
+            <div className="h-10 bg-slate-800/30 rounded-xl animate-pulse" />
+            <div className="h-[380px] bg-slate-800/30 rounded-3xl animate-pulse" />
+        </div>
+    );
 
-        const formatDate = (date: Date) => {
-            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        };
-
-        const params = new URLSearchParams({
-            action: 'TEMPLATE',
-            text: event.title,
-            dates: `${formatDate(startDate)}/${formatDate(endDate)}`,
-            details: event.description || '',
-            location: event.location || ''
-        });
-
-        return `https://calendar.google.com/calendar/render?${params.toString()}`;
-    };
-
-    // Generate iCalendar file
-    const generateICalendar = (event: typeof events[0]) => {
-        const startDate = new Date(event.date);
-        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-
-        const formatDate = (date: Date) => {
-            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-        };
-
-        const icsContent = [
-            'BEGIN:VCALENDAR',
-            'VERSION:2.0',
-            'PRODID:-//Centrum Operacyjne Mieszkańca//PL',
-            'BEGIN:VEVENT',
-            `UID:${event.id}@centrumoperacyjne.pl`,
-            `DTSTAMP:${formatDate(new Date())}`,
-            `DTSTART:${formatDate(startDate)}`,
-            `DTEND:${formatDate(endDate)}`,
-            `SUMMARY:${event.title}`,
-            `DESCRIPTION:${event.description || ''}`,
-            `LOCATION:${event.location || ''}`,
-            'END:VEVENT',
-            'END:VCALENDAR'
-        ].join('\r\n');
-
-        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${event.title.replace(/[^a-z0-9]/gi, '_')}.ics`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
-
-    if (loading) return <div className="text-center p-8 text-slate-500 animate-pulse">Ładowanie wydarzeń...</div>;
     if (error) return <div className="text-center p-8 text-red-500">Błąd: {error}</div>;
     if (!events || events.length === 0) return <div className="text-center p-8 text-slate-500">Brak nadchodzących wydarzeń.</div>;
 
     return (
         <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-100">Nadchodzące Wydarzenia</h2>
+            {/* ── Title ── */}
+            <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                    Nadchodzące Wydarzenia
+                </h2>
+                <span className="text-xs font-bold text-slate-600 bg-slate-800/50 px-2 py-0.5 rounded-full">
+                    {events.length} events
+                </span>
+            </div>
 
-            {/* Categories */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {categories.map(cat => (
+            {/* ── Category Chips (above calendar) ── */}
+            <div className="flex flex-wrap gap-2 items-center">
+                <button
+                    onClick={() => setActiveCategory('Wszystkie')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${activeCategory === 'Wszystkie'
+                        ? 'bg-purple-600/20 text-purple-300 border-purple-500/30 shadow-lg shadow-purple-500/10'
+                        : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+                        }`}
+                >
+                    Wszystkie
+                    <span className="text-[10px] font-black bg-white/10 px-1.5 rounded">{events.length}</span>
+                </button>
+
+                {visibleCategories.map(cat => {
+                    const chip = getCategoryChip(cat);
+                    const count = categoryCounts[cat] || 0;
+                    return (
+                        <button
+                            key={cat}
+                            onClick={() => setActiveCategory(cat)}
+                            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${activeCategory === cat
+                                ? `${chip.active} shadow-lg`
+                                : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+                                }`}
+                        >
+                            <div className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
+                            {cat}
+                            <span className="text-[10px] font-black bg-white/10 px-1.5 rounded">{count}</span>
+                        </button>
+                    );
+                })}
+
+                {overflowCount > 0 && (
                     <button
-                        key={cat}
-                        onClick={() => setActiveCategory(cat)}
-                        className={`px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap ${activeCategory === cat
-                            ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
-                            : 'bg-white/5 text-slate-400 hover:bg-white/10 border border-white/5'
-                            }`}
+                        onClick={() => setChipsExpanded(p => !p)}
+                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-slate-400 border border-white/5 hover:bg-white/10 transition-all flex items-center gap-1"
                     >
-                        {cat}
+                        {chipsExpanded
+                            ? <>Ukryj <ChevronUp size={10} /></>
+                            : <>+{overflowCount} więcej <ChevronDown size={10} /></>
+                        }
                     </button>
-                ))}
+                )}
             </div>
 
-            {/* Events List */}
-            <div className="glass-panel rounded-3xl shadow-sm border border-white/10 overflow-hidden divide-y divide-white/5">
-                {filteredEvents.map((event) => (
-                    <div key={event.id} className="p-6 hover:bg-white/5 transition-colors group">
-                        <div className="flex flex-col md:flex-row gap-6">
-                            {/* Image Thumbnail */}
-                            {event.imageUrl && (
-                                <div className="flex-shrink-0 w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-800">
-                                    <img
-                                        src={event.imageUrl}
-                                        alt={event.title}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).style.display = 'none';
-                                        }}
-                                    />
-                                </div>
-                            )}
+            {/* ── Calendar ── */}
+            <EventCalendar events={filteredEvents} />
 
-                            {/* Date Badge (if no image) */}
-                            {!event.imageUrl && (
-                                <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 bg-white/5 rounded-2xl border border-white/10 group-hover:border-purple-500/30 group-hover:bg-purple-500/10 transition-colors">
-                                    <span className="text-xs font-bold text-slate-500 uppercase group-hover:text-purple-400">{new Date(event.date).toLocaleDateString('pl-PL', { month: 'short' })}</span>
-                                    <span className="text-2xl font-black text-slate-300 group-hover:text-purple-400">{new Date(event.date).getDate()}</span>
-                                </div>
-                            )}
-
-                            {/* Content */}
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
-                                        {event.category}
-                                    </span>
-                                    {event.isPromoted && (
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                                            ⭐ Promowane
-                                        </span>
-                                    )}
-                                </div>
-                                <h3 className="text-lg font-bold text-slate-200 mb-2 group-hover:text-purple-400 transition-colors">
-                                    {event.title}
-                                </h3>
-                                <div className="flex flex-col gap-1 text-sm text-slate-500 mb-3">
-                                    <span className="flex items-center gap-1">
-                                        📅 {new Date(event.date).toLocaleDateString('pl-PL', {
-                                            day: 'numeric',
-                                            month: 'long',
-                                            year: 'numeric'
-                                        })}
-                                    </span>
-                                    <span className="flex items-center gap-1">📍 {event.location}</span>
-                                </div>
-                                {event.description && (
-                                    <p className="text-sm text-slate-400 line-clamp-2 mb-3">{event.description}</p>
-                                )}
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex flex-col gap-2 items-start md:items-end">
-                                {/* External Link Button */}
-                                {event.externalUrl && (
-                                    <a
-                                        href={event.externalUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-4 py-2 rounded-xl border border-white/10 text-slate-400 font-bold text-sm hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-all"
-                                    >
-                                        Szczegóły
-                                    </a>
-                                )}
-
-                                {/* Calendar Export Dropdown */}
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setExpandedEventId(expandedEventId === event.id ? null : event.id)}
-                                        className="px-4 py-2 rounded-xl border border-purple-500/30 text-purple-400 font-bold text-sm hover:bg-purple-600 hover:text-white hover:border-purple-500 transition-all flex items-center gap-2 bg-purple-500/5"
-                                    >
-                                        📅 Zaplanuj
-                                        <span className="text-xs">{expandedEventId === event.id ? '▲' : '▼'}</span>
-                                    </button>
-
-                                    {expandedEventId === event.id && (
-                                        <div className="absolute right-0 mt-2 w-56 glass-panel-solid rounded-xl shadow-lg border border-white/10 overflow-hidden z-10 bg-slate-900">
-                                            <button
-                                                onClick={() => {
-                                                    window.open(generateGoogleCalendarUrl(event), '_blank');
-                                                    setExpandedEventId(null);
-                                                }}
-                                                className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-300 hover:bg-white/10 transition-colors flex items-center gap-3"
-                                            >
-                                                <span className="text-lg">📆</span>
-                                                <span>Google Calendar</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    generateICalendar(event);
-                                                    setExpandedEventId(null);
-                                                }}
-                                                className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-300 hover:bg-white/10 transition-colors flex items-center gap-3 border-t border-white/5"
-                                            >
-                                                <span className="text-lg">📥</span>
-                                                <span>Pobierz .ics (iCalendar)</span>
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            {/* Empty state */}
+            {filteredEvents.length === 0 && (
+                <div className="text-center py-16 text-slate-500">
+                    <div className="text-4xl mb-3">📅</div>
+                    Brak wydarzeń w kategorii „{activeCategory}".
+                </div>
+            )}
         </div>
     );
 };

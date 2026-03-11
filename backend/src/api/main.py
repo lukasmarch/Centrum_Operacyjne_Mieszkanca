@@ -127,7 +127,7 @@ async def get_articles(
         days: Only return articles from the last N days (default: 2)
     """
     from datetime import timedelta
-    from sqlalchemy import func, or_
+    from sqlalchemy import func, or_, case
     
     # Calculate cutoff date (2 days ago)
     cutoff_date = datetime.utcnow() - timedelta(days=days)
@@ -161,6 +161,7 @@ async def get_articles(
         .join(subquery, Article.id == subquery.c.id)
         .where(subquery.c.row_num <= per_source)
         .order_by(
+            case((Article.category == 'Awaria', 0), else_=1),
             Article.published_at.desc().nulls_last(),
             Article.scraped_at.desc()
         )

@@ -6,6 +6,7 @@ export interface Article {
   source: string;
   category: string;
   timestamp: string;
+  rawTimestamp: string;
   url: string;
   imageUrl?: string;
 }
@@ -300,10 +301,10 @@ export interface DailySummaryStats {
 export interface DailySummary {
   date: string;
   headline: string;
-  highlights: string[];
+  highlights: string;
   summary_by_category: Record<string, string>;
-  upcoming_events: DailySummaryEvent[];
-  weather_summary: string;
+  upcoming_events: string[];
+  air_quality_summary?: string;
   stats: DailySummaryStats;
 }
 

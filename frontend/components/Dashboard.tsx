@@ -102,7 +102,7 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
         {/* === ROW 3 === */}
         {/* Najnowsze Wiadomości - full width */}
         <BentoTile variant="dark" colSpan={4}>
-          <NewsTile />
+          <NewsTile onNavigate={onNavigate} />
         </BentoTile>
       </BentoGrid>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Report, ReportCategory, AppSection } from '../../types';
@@ -40,21 +40,36 @@ const ReportCard: React.FC<{
     const cat = CATEGORY_CONFIG[report.category] || CATEGORY_CONFIG.other;
     const status = STATUS_CONFIG[report.status] || STATUS_CONFIG.new;
     const severity = report.ai_severity ? SEVERITY_CONFIG[report.ai_severity] : null;
+    const [imgError, setImgError] = useState(false);
+    const [imgRetry, setImgRetry] = useState(0);
+
+    const handleImgError = () => {
+        if (imgRetry < 3) {
+            setTimeout(() => setImgRetry((r) => r + 1), 1500);
+        } else {
+            setImgError(true);
+        }
+    };
+
+    const imgSrc = report.image_url
+        ? `${getImageUrl(report.image_url)}${imgRetry ? `?t=${imgRetry}` : ''}`
+        : undefined;
 
     return (
         <div
-            className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-sm hover:shadow-lg hover:shadow-slate-900/20 transition-all duration-300 overflow-hidden cursor-pointer group"
+            className="bg-slate-900 rounded-3xl border border-slate-800 shadow-sm hover:shadow-xl hover:shadow-blue-900/10 hover:border-slate-700 transition-all duration-300 overflow-hidden cursor-pointer group"
             onClick={() => onView(report)}
         >
             {/* Image */}
-            {report.image_url && (
+            {report.image_url && !imgError && (
                 <div className="h-48 overflow-hidden relative">
                     <div className="absolute inset-0 bg-slate-800 animate-pulse" />
                     <img
-                        src={getImageUrl(report.image_url)}
+                        src={imgSrc}
                         alt={report.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 relative z-10"
                         loading="lazy"
+                        onError={handleImgError}
                     />
                     <div className="absolute top-3 left-3 flex gap-2 z-20">
                         <span
@@ -79,7 +94,7 @@ const ReportCard: React.FC<{
 
             <div className="p-5">
                 {/* Category tag if no image */}
-                {!report.image_url && (
+                {(!report.image_url || imgError) && (
                     <div className="flex gap-2 mb-3">
                         <span
                             className="px-2.5 py-1 rounded-full text-xs font-bold text-white"
@@ -98,7 +113,7 @@ const ReportCard: React.FC<{
                     </div>
                 )}
 
-                <h3 className="font-bold text-slate-100 text-lg leading-tight mb-2 line-clamp-2 group-hover:text-blue-400 transition-colors">
+                <h3 className="font-bold text-slate-100 text-lg leading-tight mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-violet-400 transition-all">
                     {report.title}
                 </h3>
 
@@ -115,10 +130,10 @@ const ReportCard: React.FC<{
                 )}
 
                 {/* Footer */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
                     <div className="flex items-center gap-3 text-xs text-slate-500">
                         <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border border-slate-700"
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border border-slate-700/60"
                             style={{ backgroundColor: `${status.color}15`, color: status.color }}
                         >
                             {status.label}
@@ -135,7 +150,7 @@ const ReportCard: React.FC<{
                                 e.stopPropagation();
                                 onUpvote(report.id);
                             }}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all text-xs font-bold"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-all text-xs font-bold"
                         >
                             👍 {report.upvotes}
                         </button>
@@ -156,6 +171,7 @@ const ReportDetail: React.FC<{
     const cat = CATEGORY_CONFIG[report.category] || CATEGORY_CONFIG.other;
     const status = STATUS_CONFIG[report.status] || STATUS_CONFIG.new;
     const severity = report.ai_severity ? SEVERITY_CONFIG[report.ai_severity] : null;
+    const [detailImgError, setDetailImgError] = useState(false);
 
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
@@ -172,12 +188,13 @@ const ReportDetail: React.FC<{
                 </button>
 
                 {/* Image */}
-                {report.image_url && (
+                {report.image_url && !detailImgError && (
                     <div className="h-64 overflow-hidden rounded-t-3xl relative">
                         <img
                             src={getImageUrl(report.image_url)}
                             alt={report.title}
                             className="w-full h-full object-cover"
+                            onError={() => setDetailImgError(true)}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-50"></div>
                     </div>
@@ -254,7 +271,7 @@ const ReportDetail: React.FC<{
                     <div className="flex items-center justify-between pt-6 border-t border-slate-800">
                         <button
                             onClick={() => onUpvote(report.id)}
-                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-400 border border-red-500/20 transition-all font-bold group"
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 border border-blue-500/20 transition-all font-bold group"
                         >
                             <span className="group-hover:scale-110 transition-transform">👍</span> Potwierdź ({report.upvotes})
                         </button>
@@ -658,7 +675,7 @@ const ReportFormModal: React.FC<{
                         <button
                             type="submit"
                             disabled={submitting || !title.trim() || !description.trim()}
-                            className="w-full py-4 bg-gradient-to-r from-red-600 to-orange-600 text-white font-black text-lg rounded-xl hover:from-red-500 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-900/20 border border-red-500/20"
+                            className="w-full py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black text-lg rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-900/30 border border-blue-500/20"
                         >
                             {submitting ? (
                                 <span className="flex items-center justify-center gap-2">
@@ -683,17 +700,24 @@ const AlertMap: React.FC<{
     reports: ReportMapItem[];
     onSelectReport: (id: number) => void;
 }> = ({ reports, onSelectReport }) => {
-    // Calculate map center from reports or use Rybno default
-    const center = useMemo<[number, number]>(() => {
-        if (!reports.length) return RYBNO_CENTER;
-        const avgLat = reports.reduce((s, r) => s + r.latitude, 0) / reports.length;
-        const avgLng = reports.reduce((s, r) => s + r.longitude, 0) / reports.length;
-        return [avgLat, avgLng];
+    // Auto-fit map to show all markers
+    const bounds = useMemo(() => {
+        if (!reports.length) return null;
+        return L.latLngBounds(reports.map((r) => [r.latitude, r.longitude]));
     }, [reports]);
+
+    // FitBounds helper component
+    const FitBounds: React.FC<{ bounds: L.LatLngBounds }> = ({ bounds: b }) => {
+        const map = useMap();
+        useEffect(() => {
+            map.fitBounds(b, { padding: [40, 40], maxZoom: 15 });
+        }, [b, map]);
+        return null;
+    };
 
     if (!reports.length) {
         return (
-            <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-sm overflow-hidden">
+            <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-slate-800">
                     <h3 className="font-bold text-slate-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
                     <p className="text-xs text-slate-400 mt-1">Brak zgłoszeń z lokalizacją GPS</p>
@@ -701,9 +725,8 @@ const AlertMap: React.FC<{
                 <div style={{ height: 350 }}>
                     <MapContainer center={RYBNO_CENTER} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
                         <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            className="map-tiles-dark" // Assuming global CSS handles dark mode tiles, or we use a dark tile provider
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+                            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                         />
                     </MapContainer>
                 </div>
@@ -711,26 +734,30 @@ const AlertMap: React.FC<{
         );
     }
 
-    // Create a colored pin icon
-    const createPinIcon = (color: string, emoji: string, size: number) => {
+    // Create a clean dot marker
+    const createPinIcon = (color: string, _emoji: string, size: number) => {
+        const dotSize = Math.round(Math.max(size * 0.5, 14));
         return L.divIcon({
             className: '',
-            iconSize: [size, size * 1.35],
-            iconAnchor: [size / 2, size * 1.35],
-            popupAnchor: [0, -size * 1.1],
+            iconSize: [dotSize, dotSize],
+            iconAnchor: [dotSize / 2, dotSize / 2],
+            popupAnchor: [0, -dotSize / 2 - 4],
             html: `
-                <div style="position:relative;width:${size}px;height:${size * 1.35}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
-                    <svg viewBox="0 0 40 54" width="${size}" height="${size * 1.35}">
-                        <path d="M20 0C9 0 0 9 0 20c0 15 20 34 20 34s20-19 20-34C40 9 31 0 20 0z" fill="${color}" stroke="#1e293b" stroke-width="2"/>
-                    </svg>
-                    <span style="position:absolute;top:${size * 0.15}px;left:0;width:${size}px;text-align:center;font-size:${size * 0.42}px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,0.5)">${emoji}</span>
-                </div>
+                <div style="
+                    width:${dotSize}px;
+                    height:${dotSize}px;
+                    background:${color};
+                    border-radius:50%;
+                    border:3px solid #fff;
+                    box-shadow:0 0 0 2px ${color}, 0 2px 6px rgba(0,0,0,0.4);
+                    cursor:pointer;
+                "></div>
             `,
         });
     };
 
     return (
-        <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800 shadow-sm overflow-hidden">
+        <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
                 <div>
                     <h3 className="font-bold text-slate-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
@@ -747,10 +774,11 @@ const AlertMap: React.FC<{
 
             {/* Leaflet Map */}
             <div style={{ height: 500 }}>
-                <MapContainer center={center} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
+                <MapContainer center={RYBNO_CENTER} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
+                    {bounds && <FitBounds bounds={bounds} />}
                     <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" // Dark mode tiles
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                     />
                     {reports.map((r) => {
                         const cat = CATEGORY_CONFIG[r.category] || CATEGORY_CONFIG.other;
@@ -817,7 +845,6 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [category, setCategory] = useState<ReportCategory | undefined>();
-    const [sort, setSort] = useState<'newest' | 'popular'>('newest');
     const [showForm, setShowForm] = useState(false);
     const [selectedReport, setSelectedReport] = useState<Report | null>(null);
     const [showMap, setShowMap] = useState(true);
@@ -829,7 +856,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                 page: pageNum,
                 limit: 12,
                 category,
-                sort,
+                sort: 'newest',
             });
             setReports((prev) => (reset ? data.reports : [...prev, ...data.reports]));
             setTotal(data.total);
@@ -838,7 +865,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
         } finally {
             setLoading(false);
         }
-    }, [category, sort]);
+    }, [category]);
 
     const loadMapReports = useCallback(async () => {
         try {
@@ -853,7 +880,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
         setPage(1);
         loadReports(1, true);
         loadMapReports();
-    }, [category, sort, loadReports, loadMapReports]);
+    }, [category, loadReports, loadMapReports]);
 
     const handleUpvote = async (id: number) => {
         try {
@@ -903,51 +930,52 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
     return (
         <div className="space-y-8 pb-12">
             {/* Header */}
-            <header className="bg-gradient-to-r from-red-600 to-orange-600 rounded-3xl p-8 text-white shadow-lg shadow-red-900/20 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
+            <header className="bg-gradient-to-br from-blue-900/40 via-slate-900/80 to-violet-900/40 rounded-3xl p-8 text-white shadow-lg shadow-blue-900/20 relative overflow-hidden border border-white/10">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl -ml-16 -mb-16"></div>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
                     <div>
-                        <h2 className="text-3xl font-black tracking-tight">🚨 Zgłoszenie24</h2>
-                        <p className="text-white/80 mt-2 font-medium">Centrum Powiadamiania o Zdarzeniach – zgłoś problem w Twojej okolicy</p>
+                        <h2 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">🚨 Zgłoszenie24</h2>
+                        <p className="text-slate-400 mt-2 font-medium">Centrum Powiadamiania o Zdarzeniach – zgłoś problem w Twojej okolicy</p>
                     </div>
                     <button
                         onClick={() => setShowForm(true)}
-                        className="px-8 py-4 bg-white text-red-600 font-black rounded-2xl hover:bg-slate-50 transition-colors shadow-lg text-lg transform hover:scale-105 duration-200"
+                        className="px-8 py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-2xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30 text-lg transform hover:scale-105 duration-200 border border-blue-500/20"
                     >
                         + Nowe zgłoszenie
                     </button>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 relative z-10">
-                    <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-white/70 font-bold uppercase tracking-wider mb-1">Wszystkie</p>
-                        <p className="text-2xl font-black">{total}</p>
+                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Wszystkie</p>
+                        <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">{total}</p>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-white/70 font-bold uppercase tracking-wider mb-1">🚨 Alarm</p>
-                        <p className="text-2xl font-black">{reports.filter(r => r.category === 'emergency').length}</p>
+                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">🚨 Alarm</p>
+                        <p className="text-2xl font-black text-red-400">{reports.filter(r => r.category === 'emergency').length}</p>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-white/70 font-bold uppercase tracking-wider mb-1">🔥 Pożar</p>
-                        <p className="text-2xl font-black">{reports.filter(r => r.category === 'fire').length}</p>
+                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">🔥 Pożar</p>
+                        <p className="text-2xl font-black text-orange-400">{reports.filter(r => r.category === 'fire').length}</p>
                     </div>
-                    <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-white/70 font-bold uppercase tracking-wider mb-1">🗺️ Na mapie</p>
-                        <p className="text-2xl font-black">{mapReports.length}</p>
+                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">🗺️ Na mapie</p>
+                        <p className="text-2xl font-black text-blue-400">{mapReports.length}</p>
                     </div>
                 </div>
             </header>
 
-            {/* Filters */}
+            {/* Controls bar above map */}
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                 <div className="flex flex-wrap gap-2">
                     {categories.map((cat) => (
                         <button
                             key={cat.label}
                             onClick={() => setCategory(cat.value)}
-                            className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${category === cat.value
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                                : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800 border border-slate-700 hover:text-slate-200'
+                            className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${category === cat.value
+                                ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20 border border-blue-500/30'
+                                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 hover:text-slate-200 hover:border-slate-700'
                                 }`}
                         >
                             {cat.emoji} {cat.label}
@@ -955,38 +983,15 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     ))}
                 </div>
 
-                <div className="flex gap-2">
-                    <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-800">
-                        <button
-                            onClick={() => setSort('newest')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all ${sort === 'newest'
-                                ? 'bg-slate-700 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200'
-                                }`}
-                        >
-                            🕐 Najnowsze
-                        </button>
-                        <button
-                            onClick={() => setSort('popular')}
-                            className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all ${sort === 'popular'
-                                ? 'bg-slate-700 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-200'
-                                }`}
-                        >
-                            🔥 Popularne
-                        </button>
-                    </div>
-
-                    <button
-                        onClick={() => setShowMap(!showMap)}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors border ${showMap
-                            ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                            : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:bg-slate-800'
-                            }`}
-                    >
-                        🗺️ Mapa
-                    </button>
-                </div>
+                <button
+                    onClick={() => setShowMap(!showMap)}
+                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all border ${showMap
+                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-sm shadow-blue-500/10'
+                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                        }`}
+                >
+                    🗺️ {showMap ? 'Ukryj mapę' : 'Pokaż mapę'}
+                </button>
             </div>
 
             {/* Map */}
@@ -999,20 +1004,26 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     <p className="text-slate-400 font-medium">Ładowanie zgłoszeń...</p>
                 </div>
             ) : reports.length === 0 ? (
-                <div className="text-center py-16 bg-slate-900/50 backdrop-blur-sm rounded-3xl border border-slate-800">
+                <div className="text-center py-16 bg-slate-900 rounded-3xl border border-slate-800">
                     <span className="text-6xl block mb-4">📭</span>
-                    <h3 className="text-xl font-bold text-slate-200 mb-2">Brak zgłoszeń</h3>
+                    <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400 mb-2">Brak zgłoszeń</h3>
                     <p className="text-slate-400 mb-6">Bądź pierwszy – zgłoś problem w swojej okolicy!</p>
                     <button
                         onClick={() => setShowForm(true)}
-                        className="px-8 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-xl hover:from-red-500 hover:to-orange-500 transition-all shadow-lg shadow-red-900/20"
+                        className="px-8 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold rounded-xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30 border border-blue-500/20"
                     >
                         + Dodaj zgłoszenie
                     </button>
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Section heading */}
+                    <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Zgłoszenia mieszkańców</h3>
+                        <span className="text-xs text-slate-500 font-medium px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700">{total} łącznie</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {reports.map((report) => (
                             <ReportCard
                                 key={report.id}
@@ -1032,7 +1043,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                                     loadReports(next);
                                 }}
                                 disabled={loading}
-                                className="px-8 py-3 bg-slate-800 border border-slate-700 text-slate-300 rounded-xl font-bold hover:bg-slate-700 hover:text-white transition-all disabled:opacity-50 shadow-sm"
+                                className="px-8 py-3 bg-slate-900 border border-slate-800 text-slate-300 rounded-full font-bold hover:bg-slate-800 hover:text-white hover:border-slate-700 transition-all disabled:opacity-50 shadow-sm"
                             >
                                 {loading ? 'Ładowanie...' : 'Pokaż więcej'}
                             </button>

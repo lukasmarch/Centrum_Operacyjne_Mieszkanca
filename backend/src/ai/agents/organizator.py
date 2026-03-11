@@ -86,7 +86,9 @@ class OrganizatorAgent(BaseAgent):
 
         user_info = ""
         if user:
-            user_info = f"Zalogowany użytkownik: {user.full_name} (miejscowość: {user.location})\n"
+            safe_name = self._sanitize_for_prompt(user.full_name or "")
+            safe_location = self._sanitize_for_prompt(user.location or "")
+            user_info = f"Zalogowany użytkownik: {safe_name} (miejscowość: {safe_location})\n"
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -117,6 +119,11 @@ class OrganizatorAgent(BaseAgent):
             "model": self.model,
             "agent_name": self.name,
         }
+
+    @staticmethod
+    def _sanitize_for_prompt(value: str, max_len: int = 100) -> str:
+        """Strip control characters and newlines to prevent prompt injection."""
+        return "".join(ch for ch in value if ch >= " ").strip()[:max_len]
 
     def _extract_town(self, user_message: str, default_town: str = "Rybno R1") -> str:
         """Heurystyka: szukaj nazwy miejscowości w treści wiadomości. Default z profilu użytkownika."""

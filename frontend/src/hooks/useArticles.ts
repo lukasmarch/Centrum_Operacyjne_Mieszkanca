@@ -75,6 +75,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
           source: item.source_name || 'Nieznane źródło',
           category: item.category || 'Wiadomości',
           timestamp: formatTimestamp(item.published_at || item.scraped_at),
+          rawTimestamp: item.published_at || item.scraped_at,
           url: item.url,
           imageUrl: item.image_url || undefined
         }));

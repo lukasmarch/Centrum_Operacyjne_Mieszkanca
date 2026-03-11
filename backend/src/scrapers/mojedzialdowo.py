@@ -94,12 +94,21 @@ class MojeDzialdowoScraper(BaseScraper):
             if text:
                 data['content'] = text
 
-        # Image (try to find main image in detail if not in list)
-        if 'image_url' not in data:
-            # Look for video container or main image
-            img = soup.find('img', class_='responsive-image') # Generic fallback
-            # Better specific check?
-            pass
+        # Image - extract main article image from detail page
+        content_div = soup.find('div', itemprop='articleBody') or soup.find('div', class_=re.compile(r'article|content|tresc'))
+        if content_div:
+            img = content_div.find('img')
+            if not img:
+                img = soup.find('img', class_=re.compile(r'responsive|article|main|featured'))
+            if img:
+                img_src = img.get('src') or img.get('data-src')
+                if img_src and not any(skip in img_src for skip in ['logo', 'icon', 'sprite', 'reklama']):
+                    if img_src.startswith('http'):
+                        data['image_url'] = img_src
+                    elif img_src.startswith('/'):
+                        data['image_url'] = f"https://mojedzialdowo.pl{img_src}"
+                    else:
+                        data['image_url'] = f"https://mojedzialdowo.pl/{img_src}"
 
         # Date
         # Format: <div class="c-light-grey text-2"> 04.01.2026 </div>

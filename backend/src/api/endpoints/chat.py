@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -35,7 +35,7 @@ DAILY_LIMITS = {
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=2000)
     conversation_id: Optional[int] = None
     agent_name: Optional[str] = None  # Route to specific agent
     stream: bool = True
@@ -145,8 +145,13 @@ async def send_message(
 
     # Get or create conversation
     if request.conversation_id:
+        if user_id is None:
+            # Anonymous users cannot resume specific conversations
+            raise HTTPException(status_code=403, detail="Forbidden")
         conv_result = await session.execute(
-            select(Conversation).where(Conversation.id == request.conversation_id)
+            select(Conversation)
+            .where(Conversation.id == request.conversation_id)
+            .where(Conversation.user_id == user_id)
         )
         conversation = conv_result.scalar_one_or_none()
         if not conversation:
@@ -227,8 +232,8 @@ async def send_message(
                     await save_session.commit()
 
             except Exception as e:
-                logger.error(f"Chat stream error: {e}")
-                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+                logger.error(f"Chat stream error: {e}", exc_info=True)
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Wystąpił błąd wewnętrzny. Spróbuj ponownie.'})}\n\n"
 
         return StreamingResponse(
             event_stream(),
@@ -283,7 +288,16 @@ async def get_chat_history(
     user_id = user.id if user else None
 
     if conversation_id:
-        # Get specific conversation
+        # Verify ownership before returning messages
+        conv_result = await session.execute(
+            select(Conversation).where(Conversation.id == conversation_id)
+        )
+        conv = conv_result.scalar_one_or_none()
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        if conv.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
         result = await session.execute(
             select(ChatMessage)
             .where(ChatMessage.conversation_id == conversation_id)

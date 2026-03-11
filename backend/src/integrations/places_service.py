@@ -16,14 +16,28 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("PlacesService")
 
-# Kategorie zapytań i prompty
+# Precyzyjny kontekst lokalizacji — używany w batch job (CATEGORY_PROMPTS) i live search
+LOCATION_CONTEXT = (
+    "Lokalizacja: Gmina Rybno, powiat działdowski, "
+    "województwo warmińsko-mazurskie, Polska (53.3456°N, 19.9012°E). "
+    "Uwzględniaj WYŁĄCZNIE miejsca w gminie Rybno lub max 10 km od centrum Rybna "
+    "(Rybno, Hartowiec, Rumian, okolice Jez. Rumian). "
+    "NIE uwzględniaj miejsc z Działdowa, Iławy, Olsztyna, Ostródy ani dalszych miast."
+)
+
+LIVE_LOCATION_ANCHOR = (
+    "Rybno, gmina Rybno, powiat działdowski, "
+    "województwo warmińsko-mazurskie, Polska (53.3456°N, 19.9012°E)"
+)
+
+# Kategorie zapytań i prompty — każdy poprzedzony precyzyjnym kontekstem lokalizacji
 CATEGORY_PROMPTS = {
-    "restaurant": "Restauracje, pizzerie, bary, lokale gastronomiczne w okolicach Rybna i powiatu działdowskiego. Podaj nazwy, adresy i krótkie opisy.",
-    "cafe": "Kawiarnie, cukiernie, lodziarnie w okolicach Rybna i powiatu działdowskiego. Podaj nazwy, adresy i krótkie opisy.",
-    "hotel": "Hotele, pensjonaty, agroturystyki, noclegi w okolicach Rybna i powiatu działdowskiego. Podaj nazwy, adresy i krótkie opisy.",
-    "attraction": "Atrakcje turystyczne, muzea, zabytki, miejsca historyczne w okolicach Rybna i powiatu działdowskiego. Podaj nazwy, adresy i krótkie opisy.",
-    "sport": "Obiekty sportowe, boiska, siłownie, baseny, kąpieliska w okolicach Rybna i powiatu działdowskiego. Podaj nazwy, adresy i krótkie opisy.",
-    "nature": "Jeziora, szlaki piesze i rowerowe, lasy, rezerwaty przyrody w okolicach Rybna i powiatu działdowskiego. Podaj nazwy i krótkie opisy.",
+    "restaurant": f"{LOCATION_CONTEXT} Restauracje, pizzerie, bary, lokale gastronomiczne. Podaj nazwy, adresy i krótkie opisy.",
+    "cafe": f"{LOCATION_CONTEXT} Kawiarnie, cukiernie, lodziarnie. Podaj nazwy, adresy i krótkie opisy.",
+    "hotel": f"{LOCATION_CONTEXT} Hotele, pensjonaty, agroturystyki, noclegi. Podaj nazwy, adresy i krótkie opisy.",
+    "attraction": f"{LOCATION_CONTEXT} Atrakcje turystyczne, muzea, zabytki, miejsca historyczne. Podaj nazwy, adresy i krótkie opisy.",
+    "sport": f"{LOCATION_CONTEXT} Obiekty sportowe, boiska, siłownie, baseny, kąpieliska. Podaj nazwy, adresy i krótkie opisy.",
+    "nature": f"{LOCATION_CONTEXT} Jeziora (Rumian, Hartowieckie), szlaki piesze i rowerowe, lasy, rezerwaty przyrody, spływy kajakowe, wypożyczalnie kajaków (rzeka Wel). Podaj nazwy, adresy i krótkie opisy.",
 }
 
 # Rybno coordinates
@@ -167,6 +181,35 @@ class PlacesService:
                 "maps_uri": None,
             })
         return places
+
+    async def search_live(self, user_query: str, category: Optional[str] = None) -> list[dict]:
+        """Live Gemini Maps search per request — dla Premium/Business users."""
+        if not self.client:
+            return []
+        logger.info(f"Live places search: '{user_query[:80]}'")
+        prompt = (
+            f"Użytkownik pyta: \"{user_query}\"\n\n"
+            f"Lokalizacja: {LIVE_LOCATION_ANCHOR}\n\n"
+            "Użyj Google Maps aby znaleźć konkretne miejsca odpowiadające temu pytaniu. "
+            "Ogranicz wyniki do gminy Rybno i okolicy (max 15 km). "
+            "NIE sugeruj miejsc w Działdowie, Iławie ani dalszych miastach.\n"
+            "Dla każdego miejsca podaj: nazwę, adres, krótki opis, godziny otwarcia jeśli dostępne."
+        )
+        try:
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(google_maps=types.GoogleMaps())],
+                    response_modalities=["TEXT"],
+                )
+            )
+            places = self._extract_places(response, category or "general")
+            logger.info(f"Live search returned {len(places)} places")
+            return places
+        except Exception as e:
+            logger.error(f"Live places search error: {e}")
+            return []
 
 
 # Singleton

@@ -32,7 +32,8 @@ class SummaryGenerator:
         self.agent = Agent(
             'openai:gpt-4o',
             output_type=DailySummaryModel,
-            system_prompt=DAILY_SUMMARY_PROMPT
+            system_prompt=DAILY_SUMMARY_PROMPT,
+            output_retries=3
         )
         self.logger = logger
 

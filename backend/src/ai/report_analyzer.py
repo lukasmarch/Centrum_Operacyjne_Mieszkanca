@@ -34,11 +34,13 @@ KONTEKST TERENU:
 Opis zgłoszenia od mieszkańca:
 "{description}"
 
+{location_instruction}
+
 Twoim zadaniem jest:
 1. Określić kategorię problemu (BARDZO WAŻNE – wybierz precyzyjnie)
 2. Wykryć obiekty na zdjęciu (jeśli dołączono)
 3. Ocenić stan / wagę problemu i przydzielić priorytet
-4. Wygenerować krótkie streszczenie zgłoszenia (1-2 zdania)
+4. Wygenerować krótkie streszczenie zgłoszenia (1-2 zdania) – JEŚLI DOŁĄCZONO ZDJĘCIE, streszczenie MUSI zawierać krótki opis tego co widać na zdjęciu (np. "Na zdjęciu widać dużą dziurę w asfalcie...", "Zdjęcie przedstawia powalone drzewo blokujące jezdnię...")
 5. Sprawdzić czy zgłoszenie nie jest spamem lub nie zawiera treści obraźliwych
 
 Odpowiedz WYŁĄCZNIE w formacie JSON (bez markdown, bez komentarzy):
@@ -46,7 +48,7 @@ Odpowiedz WYŁĄCZNIE w formacie JSON (bez markdown, bez komentarzy):
   "category": "emergency|fire|infrastructure|water|safety|waste|greenery|other",
   "detected_objects": ["obiekt1", "obiekt2"],
   "condition": "opis stanu problemu i ocena zagrożenia",
-  "summary": "Krótkie streszczenie zgłoszenia po polsku (1-2 zdania)",
+  "summary": "Krótkie streszczenie po polsku (1-2 zdania). Jeśli jest zdjęcie – zacznij od opisu tego co na nim widać, potem połącz z opisem tekstowym mieszkańca.",
   "severity": "low|medium|high|critical",
   "is_spam": false,
   "spam_reason": null,
@@ -152,7 +154,8 @@ WAŻNE ZASADY:
 async def analyze_report(
     description: str,
     image_bytes: Optional[bytes] = None,
-    image_mime_type: str = "image/jpeg"
+    image_mime_type: str = "image/jpeg",
+    location_info: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Analyze a citizen report using Gemini Vision API.
@@ -161,6 +164,7 @@ async def analyze_report(
         description: Text description from the user
         image_bytes: Optional image data
         image_mime_type: MIME type of the image
+        location_info: Optional location string (address, coords)
     
     Returns:
         Dict with analysis results (category, objects, condition, summary, severity, is_spam)
@@ -168,13 +172,19 @@ async def analyze_report(
     model = _get_model()
     
     if image_bytes:
-        image_instruction = "Zdjęcie zostało dołączone do zgłoszenia. Przeanalizuj je dokładnie – szukaj zagrożeń, uszkodzeń, obiektów."
+        image_instruction = "Zdjęcie zostało dołączone do zgłoszenia. Przeanalizuj je dokładnie – szukaj zagrożeń, uszkodzeń, obiektów. W polu 'summary' KONIECZNIE opisz krótko co widać na zdjęciu i połącz to z opisem tekstowym mieszkańca."
     else:
         image_instruction = "Brak zdjęcia – analizuj wyłącznie na podstawie opisu tekstowego. Bądź szczególnie wyczulony na słowa kluczowe wskazujące na zagrożenie."
     
+    if location_info:
+        location_instruction = f"Lokalizacja zdarzenia: {location_info}"
+    else:
+        location_instruction = "Lokalizacja: nie podano."
+    
     prompt = ANALYSIS_PROMPT.format(
         description=description,
-        image_instruction=image_instruction
+        image_instruction=image_instruction,
+        location_instruction=location_instruction,
     )
     
     try:

@@ -38,6 +38,50 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
+# ==================== Geocoding Helper ====================
+
+async def geocode_address(address: str, location_name: str = None) -> tuple:
+    """
+    Geocode address using Nominatim. Returns (lat, lon) or (None, None).
+    First checks local LOCALITY_COORDS, then falls back to Nominatim API.
+    """
+    import httpx
+
+    # First try local lookup
+    if location_name and location_name in LOCALITY_COORDS:
+        coords = LOCALITY_COORDS[location_name]
+        logger.info(f"Geocoded '{location_name}' from local lookup: {coords}")
+        return coords
+
+    # Try Nominatim
+    search_query = f"{address}, gmina Rybno, Polska" if address else None
+    if not search_query:
+        return (None, None)
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": search_query,
+                    "format": "json",
+                    "limit": 1,
+                    "accept-language": "pl",
+                },
+                headers={"User-Agent": "CentrumOperacyjneMieszkanca/1.0"},
+            )
+            data = resp.json()
+            if data:
+                lat = float(data[0]["lat"])
+                lon = float(data[0]["lon"])
+                logger.info(f"Geocoded '{search_query}' via Nominatim: ({lat}, {lon})")
+                return (lat, lon)
+    except Exception as e:
+        logger.warning(f"Nominatim geocoding failed for '{search_query}': {e}")
+
+    return (None, None)
+
+
 # ==================== Response Models ====================
 
 class ReportResponse(BaseModel):
@@ -246,6 +290,35 @@ async def create_report(
         image_mime = image.content_type or "image/jpeg"
         logger.info(f"Image saved: {filepath}")
 
+    # Geocode for precise street-level position
+    # Always try Nominatim when address has a street name, even if locality GPS was sent
+    if address and address.strip():
+        full_address = address.strip()
+        if location_name:
+            full_address = f"{full_address}, {location_name}"
+        geo_lat, geo_lon = await geocode_address(full_address, None)  # skip local lookup, go to Nominatim
+        if geo_lat is not None:
+            latitude = geo_lat
+            longitude = geo_lon
+            logger.info(f"Geocoded street address: '{full_address}' -> ({latitude}, {longitude})")
+    
+    # Fallback: if still no GPS, try locality lookup
+    if (latitude is None or longitude is None) and location_name:
+        geo_lat, geo_lon = await geocode_address("", location_name)
+        if geo_lat is not None:
+            latitude = geo_lat
+            longitude = geo_lon
+            logger.info(f"Geocoded from locality: '{location_name}' -> ({latitude}, {longitude})")
+
+    # Build location context for AI
+    location_context = ""
+    if address:
+        location_context += f"Adres: {address}"
+    if location_name:
+        location_context += f", Miejscowość: {location_name}"
+    if latitude and longitude:
+        location_context += f" (GPS: {latitude:.5f}, {longitude:.5f})"
+
     # AI Analysis
     ai_result = {
         "category": "other",
@@ -264,6 +337,7 @@ async def create_report(
             description=description,
             image_bytes=image_bytes,
             image_mime_type=image_mime,
+            location_info=location_context or None,
         )
         logger.info(f"AI analysis complete: category={ai_result.get('category')}, spam={ai_result.get('is_spam')}")
     except Exception as e:

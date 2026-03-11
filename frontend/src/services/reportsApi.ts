@@ -124,7 +124,10 @@ export async function fetchReportsStats(): Promise<{
 export function getImageUrl(path: string | undefined): string | undefined {
     if (!path) return undefined;
     if (path.startsWith('http')) return path;
-    return `${API_BASE}${path}`;
+    // API_BASE may end with /api (e.g. http://localhost:8000/api)
+    // but uploads are served at /uploads, not /api/uploads
+    const base = API_BASE.replace(/\/api\/?$/, '');
+    return `${base}${path}`;
 }
 
 /**

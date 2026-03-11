@@ -1,13 +1,12 @@
 """
 Przewodnik.ai - Events, weather, culture, restaurants, attractions specialist agent
-Uses live weather/airly/events from DB + RAG for event text search + local_places from Gemini Maps
+Uses live weather/airly/events from DB + local_places from Gemini Maps (DB cache / live per-request)
 """
 from typing import Union, AsyncGenerator, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.agents.base_agent import BaseAgent, get_datetime_context
-from src.ai.embeddings import embedding_service
 from src.utils.logger import setup_logger
 
 logger = setup_logger("PrzewodnikAgent")
@@ -19,7 +18,7 @@ PLACE_KEYWORDS = {
     "hotel": ["hotel", "nocleg", "pensjonat", "agroturyst", "pokój", "pokoj", "zakwaterow", "spać", "spac"],
     "attraction": ["atrakcj", "muzeum", "zabyt", "zwiedzić", "zwiedzic", "histor", "zamek", "kościół", "kosciol"],
     "sport": ["sport", "boisko", "siłown", "silown", "basen", "kąpielis", "kapielis", "fitness", "hala sport"],
-    "nature": ["jezior", "szlak", "las ", "lasy", "rezerw", "przyrод", "rower", "kajak", "spacer", "wycieczk", "pieszy"],
+    "nature": ["jezior", "szlak", "las ", "lasy", "rezerw", "przyrод", "rower", "kajak", "spływ", "splyw", "spacer", "wycieczk", "pieszy", "wel ", "rzek"],
 }
 
 
@@ -30,7 +29,6 @@ class PrzewodnikAgent(BaseAgent):
     avatar = "map-pin"
     model = "gpt-4o-mini"
     temperature = 0.4
-    source_types = ["event"]  # RAG only for event text search
 
     system_prompt = """Jestes Przewodnikiem - asystentem ds. wydarzen, aktywnosci, restauracji i atrakcji turystycznych w gminie Rybno i powiecie dzialdownskim.
 Twoja specjalizacja: wydarzenia kulturalne, sportowe, festyny, pogoda, restauracje, kawiarnie, hotele, atrakcje turystyczne, co robic w wolnym czasie.
@@ -54,7 +52,12 @@ SEZONOWOSC - KLUCZOWE:
 - Wiosna (marzec-maj): piesze wedrowki, rowerowe wycieczki, obserwacja przyrody budzacej sie do zycia
 - Lato (czerwiec-sierpien): kapielisko Rybno, kajakarstwo, grzybobranie (sierpien+), pikniki
 - Jesien (wrzesien-listopad): grzybobranie, spacery lesne, jesienna kolorystyka
-- Uwzgledniaj temperatura z danych pogodowych przy rekomendacjach aktywnosci na zewnatrz"""
+- Uwzgledniaj temperatura z danych pogodowych przy rekomendacjach aktywnosci na zewnatrz
+
+WYNIKI NA ZYWO (Premium):
+- Jesli kontekst zawiera "[LOKALNE MIEJSCA — WYNIKI NA ZYWO]" — zacznij od "Znalazlem aktualne informacje:"
+- Zawsze formatuj link Maps jako [Otworz w Mapach](url)
+- Jesli w Rybnie nie ma szukanego miejsca — powiedz to wprost i zaproponuj w promieniu 15 km"""
 
     example_questions = [
         "Co mozna robic w weekend w Rybnie?",
@@ -65,6 +68,15 @@ SEZONOWOSC - KLUCZOWE:
         "Czy sa jakies imprezy dla dzieci?"
     ]
 
+    def _is_place_query(self, user_message: str) -> bool:
+        """Czy zapytanie dotyczy konkretnego miejsca? (nie ogólnego 'co robić')"""
+        msg_lower = user_message.lower()
+        return any(
+            kw in msg_lower
+            for keywords in PLACE_KEYWORDS.values()
+            for kw in keywords
+        )
+
     async def respond(
         self,
         session: AsyncSession,
@@ -73,48 +85,38 @@ SEZONOWOSC - KLUCZOWE:
         stream: bool = False,
         user=None
     ) -> Union[dict, AsyncGenerator]:
-        """Generate response with live weather/airly/events + RAG + local places"""
-        # 1. RAG for event text matching
-        event_docs = await embedding_service.semantic_search(
-            session=session,
-            query=user_message,
-            top_k=4,
-            source_types=["event"],
-            similarity_threshold=0.25
-        )
-
-        # 2. Live structured data from DB
+        """Generate response with live weather/airly/events + local places (live for Premium)"""
+        # 1. Live structured data from DB
         weather = await self._fetch_current_weather(session)
         weather_week = await self._fetch_weekly_weather_summary(session)
         air = await self._fetch_current_air_quality(session)
         events = await self._fetch_upcoming_events(session)
 
-        # 3. Local places from DB (Gemini Maps cache)
+        # 2. Local places — live Gemini search for Premium, DB cache for Free
         place_category = self._detect_place_category(user_message)
-        places = await self._fetch_local_places(session, category=place_category)
+        is_live_search = False
+        is_premium = user and getattr(user, "tier", "free") in ("premium", "business")
 
-        # 4. Build context
-        context = self._build_context(weather, weather_week, air, events, event_docs, places)
+        if is_premium and self._is_place_query(user_message):
+            from src.integrations.places_service import places_service
+            places = await places_service.search_live(user_message, category=place_category)
+            if places:
+                is_live_search = True
+            else:
+                logger.warning("Live search failed, falling back to DB cache")
+                places = await self._fetch_local_places(session, category=place_category)
+        else:
+            places = await self._fetch_local_places(session, category=place_category)
 
-        # 5. Collect sources from RAG
+        # 3. Build context
+        context = self._build_context(weather, weather_week, air, events, places, is_live=is_live_search)
+
         sources = []
-        seen = set()
-        for doc in event_docs:
-            key = f"{doc['source_type']}:{doc['source_id']}"
-            if key not in seen:
-                seen.add(key)
-                sources.append({
-                    "type": doc["source_type"],
-                    "id": doc["source_id"],
-                    "title": doc["metadata"].get("title", ""),
-                    "url": doc["metadata"].get("url", ""),
-                    "similarity": doc["similarity"]
-                })
 
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "system", "content": get_datetime_context()},
-            {"role": "system", "content": f"KONTEKST:\n{context}"}
+            {"role": "system", "content": f"KONTEKST:\n{context}"},
         ]
 
         if conversation_history:
@@ -233,8 +235,8 @@ SEZONOWOSC - KLUCZOWE:
         weather_week: Optional[dict],
         air: Optional[dict],
         events: list,
-        event_docs: list,
-        places: list[dict]
+        places: list[dict],
+        is_live: bool = False,
     ) -> str:
         parts = []
 
@@ -279,14 +281,11 @@ SEZONOWOSC - KLUCZOWE:
         else:
             parts.append("• Brak zaplanowanych wydarzeń w ciągu 14 dni")
 
-        if event_docs:
-            parts.append("\n[KONTEKST RAG - więcej wydarzeń]")
-            for doc in event_docs:
-                parts.append(f"---\n{doc['chunk_text']}")
-
         # Local places section
         if places:
-            parts.append("\n[LOKALNE MIEJSCA I RESTAURACJE]")
+            header = "[LOKALNE MIEJSCA — WYNIKI NA ZYWO (Google Maps)]" if is_live \
+                     else "[LOKALNE MIEJSCA I RESTAURACJE]"
+            parts.append(f"\n{header}")
             current_cat = None
             cat_labels = {
                 "restaurant": "Restauracje i lokale",

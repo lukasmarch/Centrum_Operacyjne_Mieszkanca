@@ -70,10 +70,25 @@ function renderMarkdown(text: string): React.ReactNode {
 }
 
 function inlineMarkdown(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  // Split on **bold** and [text](url) links
+  const parts = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)]+\))/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+    }
+    const linkMatch = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+    if (linkMatch) {
+      return (
+        <a
+          key={i}
+          href={linkMatch[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 underline hover:text-blue-300 transition-colors"
+        >
+          {linkMatch[1]}
+        </a>
+      );
     }
     return part;
   });
