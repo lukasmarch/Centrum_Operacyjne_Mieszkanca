@@ -26,7 +26,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Dodaj backend do path
-backend_dir = Path(__file__).parent.parent.parent
+backend_dir = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(backend_dir))
 
 # Load environment variables (backend/.env)
@@ -66,6 +66,13 @@ FACEBOOK_SOURCES = [
         "display_name": "Urząd Miasta Działdowo",
         "url": "https://www.facebook.com/UrzadMiastaDzialdowo",
         "description": "Urząd Miasta Działdowo - informacje urzędowe",
+        "status": "inactive",
+    },
+    {
+        "name": "Facebook - Panorama Regionu",
+        "display_name": "Panorama Regionu",
+        "url": "https://www.facebook.com/profile.php?id=61561360253251",
+        "description": "Oficjalna strona Gminy Rybno",
         "status": "inactive",
     },
     # Dodaj więcej kont tutaj (max 10-15)

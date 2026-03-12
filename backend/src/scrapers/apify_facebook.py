@@ -64,6 +64,8 @@ class ApifyFacebookScraper(BaseScraper):
         self.caption_text = self.config.get('caption_text', False)
         # UWAGA: Apify API wymaga ~ zamiast / w nazwie actora
         self.actor_id = self.config.get('actor_id', 'apify~facebook-posts-scraper')
+        # Pobieraj tylko posty nowsze niż N dni (domyślnie 2 dni)
+        self.only_newer_than_days = self.config.get('only_newer_than_days', 2)
 
         if not self.apify_api_key:
             raise ValueError("Missing 'apify_api_key' in scraper config")
@@ -81,12 +83,18 @@ class ApifyFacebookScraper(BaseScraper):
         self.logger.info(f"Starting Apify actor for Facebook page: {self.facebook_page_url}")
 
         try:
+            # Data graniczna - pobieraj tylko posty nowsze niż N dni
+            from datetime import timedelta
+            since_date = (datetime.now() - timedelta(days=self.only_newer_than_days)).strftime("%Y-%m-%d")
+
             # Konfiguracja Apify actor run dla facebook-posts-scraper
             actor_input = {
                 "startUrls": [{"url": self.facebook_page_url}],
                 "resultsLimit": self.results_limit,
                 "captionText": self.caption_text,
+                "onlyPostsNewerThan": since_date,  # filtruj po dacie - brak duplikatów
             }
+            self.logger.info(f"Fetching posts newer than: {since_date}")
 
             # Uruchom actor
             async with httpx.AsyncClient(timeout=300) as client:
@@ -205,8 +213,36 @@ class ApifyFacebookScraper(BaseScraper):
                         # Fallback: generuj URL z post ID
                         post_url = f"https://facebook.com/{post_id}"
 
-                    # Obrazek
-                    image_url = post.get('imageUrl') or post.get('image') or post.get('picture')
+                    # Obrazek - szukaj bezpośredniego URL do pliku graficznego
+                    # Odrzucaj linki do stron FB (facebook.com/photo/) - nie działają jako <img src>
+                    def is_direct_image_url(url: str) -> bool:
+                        if not url:
+                            return False
+                        # Akceptuj tylko bezpośrednie linki do plików (CDN, nie strony FB)
+                        blocked = ['facebook.com/photo', 'facebook.com/video', 'fb.com/photo']
+                        return not any(b in url for b in blocked)
+
+                    image_url = None
+                    # Sprawdź media array - aktor może zwrócić bezpośredni CDN URL
+                    media = post.get('media', [])
+                    if isinstance(media, list) and media:
+                        for m in media:
+                            candidate = m.get('url') or m.get('thumbnailUrl') or m.get('imageUrl')
+                            if is_direct_image_url(candidate):
+                                image_url = candidate
+                                break
+                    elif isinstance(media, dict):
+                        candidate = media.get('url') or media.get('thumbnailUrl')
+                        if is_direct_image_url(candidate):
+                            image_url = candidate
+
+                    # Fallback do innych pól jeśli nadal brak
+                    if not image_url:
+                        for field in ['thumbnail', 'picture', 'image', 'imageUrl']:
+                            candidate = post.get(field)
+                            if is_direct_image_url(candidate):
+                                image_url = candidate
+                                break
 
                     # Data publikacji
                     published_at = None
