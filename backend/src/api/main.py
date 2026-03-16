@@ -35,6 +35,9 @@ from src.api.endpoints.push import router as push_router
 # Waste Schedule (Sprint 7 - Organizator.ai)
 from src.api.endpoints.waste import router as waste_router
 
+# Health Module (Clinic Schedules + Pharmacy Duties)
+from src.api.endpoints.health import router as health_router
+
 # AI Chat + Multi-Agent System (Sprint 6)
 from src.api.endpoints.chat import router as chat_router
 from src.ai.agents import (
@@ -89,6 +92,9 @@ app.include_router(push_router)  # /api/push/*
 
 # Waste Schedule routes (Sprint 7) - /api/waste/towns, /api/waste/schedule
 app.include_router(waste_router)
+
+# Health routes - /api/health/today, /api/health/clinics
+app.include_router(health_router)
 
 # AI Chat routes (Sprint 6) - /api/chat/message, /api/chat/history, /api/chat/agents
 app.include_router(chat_router)

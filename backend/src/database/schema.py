@@ -644,6 +644,48 @@ class LocalPlace(SQLModel, table=True):
 # Anonymous Chat Usage (Rate Limiting)
 # ======================
 
+# ======================
+# Health Module (Clinic Schedules + Pharmacy Duty)
+# ======================
+
+class ClinicSchedule(SQLModel, table=True):
+    """Harmonogram przyjęć poradni SPGZOZ Rybno"""
+    __tablename__ = "clinic_schedules"
+    __table_args__ = (
+        Index('idx_clinic_day', 'clinic_name', 'day_of_week'),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    clinic_name: str = Field(max_length=100, index=True)  # "POZ", "Stomatologiczna", etc.
+    doctor_name: Optional[str] = Field(default=None, max_length=200)
+    doctor_role: Optional[str] = Field(default=None, max_length=100)
+    day_of_week: Optional[int] = None  # 0=Pon ... 6=Nd (for weekly schedules)
+    specific_date: Optional[date] = None  # for USG (specific dates)
+    hours_from: str = Field(max_length=10)  # "08:00"
+    hours_to: str = Field(max_length=10)  # "18:00"
+    notes: Optional[str] = Field(default=None, max_length=500)
+    source_url: str = Field(max_length=500)
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PharmacyDuty(SQLModel, table=True):
+    """Dyżury aptek w powiecie działdowskim"""
+    __tablename__ = "pharmacy_duties"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pharmacy_name: str = Field(max_length=200, index=True)
+    address: str = Field(max_length=300)
+    phone: Optional[str] = Field(default=None, max_length=50)
+    duty_type: str = Field(max_length=20)  # "weekday", "weekend", "holiday"
+    day_of_week: Optional[int] = None  # 0-6 for regular duties
+    specific_dates: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAY(String)))
+    hours_from: str = Field(max_length=10)
+    hours_to: str = Field(max_length=10)
+    valid_year: int
+    notes: Optional[str] = Field(default=None, max_length=500)
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class AnonymousChatUsage(SQLModel, table=True):
     """Śledzenie użycia chatu przez anonimowych użytkowników (po IP)"""
     __tablename__ = "anonymous_chat_usage"

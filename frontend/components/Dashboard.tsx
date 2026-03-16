@@ -22,6 +22,7 @@ import EventsTile from './EventsTile';
 import NewsTile from './NewsTile';
 import AirlyTile from './AirlyTile';
 import GminaMonitoringTile from './GminaMonitoringTile';
+import HealthTile from './HealthTile';
 
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQuerySubmit?: (query: string) => void }> = ({ onNavigate, onQuerySubmit }) => {
   const { user, isPremium, userLocation } = useAuth();
@@ -106,10 +107,13 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
         </BentoTile>
       </BentoGrid>
 
-      {/* ===== BELOW GRID: Cinema + Firmy side by side ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* ===== BELOW GRID: Cinema + Health + Firmy (3 columns) ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Repertuar kina */}
         <CinemaWidget />
+
+        {/* Twoje Zdrowie */}
+        <HealthTile />
 
         {/* Katalog Firm */}
         <div className="h-[500px]">

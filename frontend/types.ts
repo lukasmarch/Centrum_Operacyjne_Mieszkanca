@@ -426,6 +426,34 @@ export const AVAILABLE_LOCATIONS = [
 
 export type AvailableLocation = typeof AVAILABLE_LOCATIONS[number];
 
+// Health Widget Types
+export interface ClinicDoctor {
+  name: string | null;
+  role: string | null;
+  hours: string;
+  notes?: string;
+}
+
+export interface ClinicToday {
+  clinic_name: string;
+  doctors: ClinicDoctor[];
+}
+
+export interface PharmacyToday {
+  name: string;
+  address: string;
+  phone?: string;
+  hours: string;
+  duty_type: string;
+}
+
+export interface HealthTodayResponse {
+  date: string;
+  day_name: string;
+  clinics: ClinicToday[];
+  pharmacies: PharmacyToday[];
+}
+
 // Waste Widget Types
 export interface WasteEvent {
   type: string;

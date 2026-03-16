@@ -20,6 +20,7 @@ from src.scheduler.air_quality_job import run_air_quality_job
 from src.scheduler.ceidg_job import run_ceidg_job
 from src.scheduler.embedding_job import run_embedding_job
 from src.scheduler.places_job import run_places_job
+from src.scheduler.health_job import run_health_job
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
@@ -160,6 +161,15 @@ def start_scheduler():
         trigger=CronTrigger(day_of_week='mon', hour=5, minute=0),
         id='places_update',
         name='Update local places (Gemini Maps)',
+        replace_existing=True
+    )
+
+    # Health schedules update — weekly on Monday at 6:30 AM
+    scheduler.add_job(
+        func=run_health_job,
+        trigger=CronTrigger(day_of_week='mon', hour=6, minute=30),
+        id='health_update',
+        name='Update health schedules (clinics + pharmacies)',
         replace_existing=True
     )
 
