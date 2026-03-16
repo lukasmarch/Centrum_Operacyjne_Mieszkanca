@@ -2,30 +2,34 @@
 Health Scraper - SPGZOZ Rybno (clinic schedules) + Pharmacy Duties
 
 Scrapuje:
-1. Poradnie SPGZOZ Rybno (5 statycznych + POZ via Firecrawl)
-2. Dyzury aptek z mojedzialdowo.pl
+1. POZ (/poradnie/poradnia-poz/) - Elementor + jet-table, karty lekarzy z "Uwaga zmiany"
+2. Poradnie statyczne (Stomatologia, Ginekologia, Logopedia, Gabinet, USG) - h3 + <table>
+3. Dyżury aptek z mojedzialdowo.pl (fallback: hardcoded data)
+
+Struktura HTML (Elementor):
+- POZ: div.elementor-widget-wrap → h2 (nazwisko) + p (specjalizacja) + "Uwaga zmiany" + jet-table
+- Statyczne: div.elementor-text-editor → h3 (nazwisko<br/>rola) + <table>
 """
 import re
 from datetime import datetime, date as date_type
 from typing import Optional
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
-from src.integrations.firecrawl_client import firecrawl_client
 from src.utils.logger import setup_logger
 
 logger = setup_logger("HealthScraper")
 
 # Polish day names -> day_of_week (0=Mon, 6=Sun)
 POLISH_DAYS = {
-    "poniedziałek": 0, "poniedzialek": 0, "pon": 0,
-    "wtorek": 1, "wt": 1,
-    "środa": 2, "sroda": 2, "śr": 2, "sr": 2,
-    "czwartek": 3, "czw": 3,
-    "piątek": 4, "piatek": 4, "pt": 4,
-    "sobota": 5, "sob": 5,
-    "niedziela": 6, "nd": 6, "niedz": 6,
+    "poniedziałek": 0, "poniedzialek": 0,
+    "wtorek": 1,
+    "środa": 2, "sroda": 2,
+    "czwartek": 3,
+    "piątek": 4, "piatek": 4,
+    "sobota": 5,
+    "niedziela": 6,
 }
 
 BROWSER_HEADERS = {
@@ -39,18 +43,19 @@ def parse_day_name(text: str) -> Optional[int]:
     """Parse Polish day name to day_of_week int."""
     text_lower = text.strip().lower()
     for name, idx in POLISH_DAYS.items():
-        if name in text_lower:
+        if text_lower.startswith(name) or text_lower == name:
             return idx
     return None
 
 
 def parse_hours(text: str) -> tuple[Optional[str], Optional[str]]:
     """Extract hours_from and hours_to from text like '8:00 - 14:30' or '08.00-15.00'."""
-    text = text.replace(".", ":").replace(",", ":").strip()
-    # Match patterns like "8:00 - 14:30", "08:00-15:00", "8:00 do 14:30"
-    match = re.search(r'(\d{1,2}:\d{2})\s*[-–—do]+\s*(\d{1,2}:\d{2})', text)
+    # Normalize separators
+    normalized = text.replace(".", ":").strip()
+    # Match: "8:00 - 14:30", "08:00-15:00", "8:00 – 14:30", "08:00 -15:35"
+    match = re.search(r'(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})', normalized)
     if match:
-        h_from = match.group(1).zfill(5)  # "8:00" -> "08:00"
+        h_from = match.group(1).zfill(5)
         h_to = match.group(2).zfill(5)
         return h_from, h_to
     return None, None
@@ -60,6 +65,7 @@ class HealthScraper:
     """Scraper for SPGZOZ Rybno clinic schedules and pharmacy duties."""
 
     BASE_URL = "https://www.spgzozrybno.pl"
+    POZ_URL = "/poradnie/poradnia-poz/"
     CLINIC_URLS = {
         "Stomatologiczna": "/poradnie/poradnia-stomatologiczna/",
         "Ginekologiczno-Położnicza": "/poradnie/poradnia-ginekologiczno-poloznicza/",
@@ -67,7 +73,6 @@ class HealthScraper:
         "Gabinet Zabiegowy": "/poradnie/gabinet-zabiegowy/",
         "USG": "/poradnie/badania-usg/",
     }
-    PHARMACY_URL = "https://mojedzialdowo.pl/dyzury-aptek/"
 
     def __init__(self):
         self.client = httpx.AsyncClient(
@@ -80,11 +85,173 @@ class HealthScraper:
         await self.client.aclose()
 
     # ==========================================
-    # Static clinic pages (HTML table parsing)
+    # POZ - Elementor + jet-table structure
     # ==========================================
 
-    async def scrape_static_clinic(self, name: str, path: str) -> list[dict]:
-        """Scrape a static clinic page (h3/h4 + table)."""
+    async def scrape_poz(self) -> list[dict]:
+        """
+        Scrape POZ page - direct httpx (NOT Firecrawl).
+        Structure: Elementor widgets with h2 (name), p (role),
+        "Uwaga zmiany" text block, jet-table schedule.
+        """
+        url = f"{self.BASE_URL}{self.POZ_URL}"
+        results = []
+
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            # Find all jet-tables (one per doctor)
+            jet_tables = soup.find_all("table", class_="jet-table")
+
+            # Find doctor cards: each doctor is inside a widget-wrap
+            # that contains a heading widget (name), text-editor (uwaga), and jet-table
+            # Strategy: find all widget-wraps that contain a jet-table
+            doctors_info = []
+            for table in jet_tables:
+                widget_wrap = table.find_parent("div", class_="elementor-widget-wrap")
+                if not widget_wrap:
+                    continue
+
+                # Extract doctor name from heading widget in this wrap
+                name = None
+                role = None
+
+                heading_widget = widget_wrap.find("div", class_="elementor-widget-heading")
+                if heading_widget:
+                    title_span = heading_widget.find("span", class_="elementor-heading-title")
+                    if title_span:
+                        # Try h2 first
+                        h2 = title_span.find("h2")
+                        if h2 and h2.get_text(strip=True):
+                            name = h2.get_text(strip=True)
+                        else:
+                            # Fallback: name is in a child <span> (no h2)
+                            inner_span = title_span.find("span")
+                            if inner_span and inner_span.get_text(strip=True):
+                                name = inner_span.get_text(strip=True)
+
+                        # Extract roles from p tags
+                        roles = []
+                        for p in title_span.find_all("p"):
+                            p_text = p.get_text(strip=True)
+                            if p_text and p_text != name:
+                                roles.append(p_text)
+                        # Also check for loose text nodes (outside p/h2)
+                        if not roles:
+                            from bs4 import NavigableString
+                            for child in title_span.children:
+                                if isinstance(child, NavigableString):
+                                    text = child.strip()
+                                    if text and text != name:
+                                        roles.append(text)
+                        role = ", ".join(roles) if roles else None
+
+                if not name:
+                    # Last resort: first non-empty text heading in wrap
+                    all_h2 = widget_wrap.find_all("h2")
+                    for h2 in all_h2:
+                        if h2.get_text(strip=True):
+                            name = h2.get_text(strip=True)
+                            break
+
+                if not name:
+                    continue
+
+                # Find "Uwaga zmiany" in text-editor widgets in this wrap
+                uwaga_text = None
+                text_editors = widget_wrap.find_all("div", class_="elementor-text-editor")
+                for te in text_editors:
+                    te_text = te.get_text(strip=True)
+                    if "uwaga" in te_text.lower() or "zmian" in te_text.lower():
+                        paragraphs = te.find_all("p")
+                        uwaga_lines = []
+                        for p in paragraphs:
+                            # Use separator=" " to handle <strong> tags properly
+                            p_text = p.get_text(separator=" ", strip=True)
+                            # Clean up multiple spaces
+                            p_text = re.sub(r'\s+', ' ', p_text).strip()
+                            if p_text and "uwaga zmiany" not in p_text.lower():
+                                uwaga_lines.append(p_text)
+                        if uwaga_lines:
+                            uwaga_text = " | ".join(uwaga_lines)
+                        break
+
+                doctors_info.append({
+                    "name": name,
+                    "role": role,
+                    "uwaga": uwaga_text,
+                    "table": table,
+                })
+
+            # Parse schedule from each doctor's table
+            for doctor in doctors_info:
+                schedule_entries = self._parse_jet_table(doctor["table"])
+
+                for day_idx, hours_from, hours_to, note in schedule_entries:
+                    results.append({
+                        "clinic_name": "POZ",
+                        "doctor_name": doctor["name"],
+                        "doctor_role": doctor["role"],
+                        "day_of_week": day_idx,
+                        "specific_date": None,
+                        "hours_from": hours_from,
+                        "hours_to": hours_to,
+                        "notes": doctor["uwaga"],
+                        "source_url": url,
+                    })
+
+            logger.info(f"  ✓ POZ: {len(results)} schedule entries ({len(doctors_info)} doctors)")
+
+        except Exception as e:
+            logger.error(f"  ✗ Error scraping POZ: {e}", exc_info=True)
+
+        return results
+
+    def _parse_jet_table(self, table: Tag) -> list[tuple]:
+        """Parse a jet-table into list of (day_of_week, hours_from, hours_to, note)."""
+        entries = []
+        rows = table.find_all("tr")
+
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) < 2:
+                continue
+
+            day_text = cells[0].get_text(strip=True)
+            hours_text = cells[1].get_text(strip=True)
+
+            if not day_text or not hours_text:
+                continue
+
+            day_idx = parse_day_name(day_text)
+            if day_idx is None:
+                continue
+
+            h_from, h_to = parse_hours(hours_text)
+            if not h_from:
+                continue
+
+            # Extract note from hours (e.g. "(w tym wizyty domowe)")
+            note = None
+            note_match = re.search(r'\(([^)]+)\)', hours_text)
+            if note_match:
+                note = note_match.group(1)
+
+            entries.append((day_idx, h_from, h_to, note))
+
+        return entries
+
+    # ==========================================
+    # Static clinic pages (h3 + regular table)
+    # ==========================================
+
+    async def scrape_static_clinic(self, clinic_name: str, path: str) -> list[dict]:
+        """
+        Scrape static clinic page.
+        Structure: div.elementor-text-editor → h3 (name<br/>role) → <table>
+        """
         url = f"{self.BASE_URL}{path}"
         results = []
 
@@ -93,77 +260,141 @@ class HealthScraper:
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # Find tables with schedule data
-            tables = soup.find_all("table")
-            for table in tables:
+            # Find the main content container
+            content = soup.find("div", class_="elementor-text-editor")
+            if not content:
+                content = soup
+
+            # Strategy: iterate through h3 tags, each followed by a table
+            h3_tags = content.find_all("h3")
+            tables = content.find_all("table")
+
+            # If no h3 tags, try h2 or just parse tables directly
+            if not h3_tags:
+                h3_tags = content.find_all("h2")
+
+            # USG special handling
+            if clinic_name == "USG":
+                results.extend(self._parse_usg_page(soup, url))
+                logger.info(f"  ✓ {clinic_name}: {len(results)} schedule entries")
+                return results
+
+            # Skip headings that are page/section titles, not doctor names
+            SKIP_PATTERNS = [
+                "godziny", "organizacja", "informacja", "materiały",
+                "gabinet", "poradnia", "badania",
+            ]
+
+            # Match h3 (doctor) -> following table (schedule)
+            for h3 in h3_tags:
+                # Extract name and role from h3
+                # Structure: "Piotr Szumada<br/>Lekarz dentysta"
+                parts = h3.get_text(separator="|").split("|")
+                doctor_name = parts[0].strip() if parts else None
+                doctor_role = parts[1].strip() if len(parts) > 1 else None
+
+                if not doctor_name:
+                    continue
+                # Skip titles/descriptions (not actual doctor names)
+                if any(doctor_name.lower().startswith(s) for s in SKIP_PATTERNS):
+                    # This is a section heading, not a doctor — use clinic_name as context
+                    doctor_name = None
+                    doctor_role = None
+                    # Still parse the table that follows
+                if doctor_name and doctor_name == clinic_name:
+                    doctor_name = None
+
+                # Find the next table after this h3
+                table = h3.find_next("table")
+                if not table:
+                    continue
+
+                # Parse schedule from table
                 rows = table.find_all("tr")
                 for row in rows:
-                    cells = row.find_all(["td", "th"])
+                    cells = row.find_all("td")
                     if len(cells) < 2:
                         continue
 
-                    cell_texts = [c.get_text(strip=True) for c in cells]
+                    day_text = cells[0].get_text(strip=True)
+                    hours_text = cells[1].get_text(strip=True)
 
-                    # Try to extract day and hours from cells
-                    day_idx = None
-                    hours_from = None
-                    hours_to = None
-                    doctor = None
-                    role = None
+                    if not day_text or not hours_text:
+                        continue
 
-                    for i, text in enumerate(cell_texts):
-                        d = parse_day_name(text)
-                        if d is not None:
-                            day_idx = d
-                        h_from, h_to = parse_hours(text)
-                        if h_from:
-                            hours_from = h_from
-                            hours_to = h_to
+                    day_idx = parse_day_name(day_text)
+                    if day_idx is None:
+                        continue
 
-                    # Check for doctor name (cells that aren't days/hours)
-                    for text in cell_texts:
-                        if parse_day_name(text) is None and not re.search(r'\d{1,2}:\d{2}', text.replace(".", ":")):
-                            if len(text) > 3 and text not in ("Dzień", "Godziny", "Lekarz", ""):
-                                if not doctor:
-                                    doctor = text
-                                elif not role:
-                                    role = text
+                    h_from, h_to = parse_hours(hours_text)
+                    if not h_from:
+                        continue
 
-                    if day_idx is not None and hours_from:
-                        results.append({
-                            "clinic_name": name,
-                            "doctor_name": doctor,
-                            "doctor_role": role,
-                            "day_of_week": day_idx,
-                            "specific_date": None,
-                            "hours_from": hours_from,
-                            "hours_to": hours_to,
-                            "notes": None,
-                            "source_url": url,
-                        })
+                    results.append({
+                        "clinic_name": clinic_name,
+                        "doctor_name": doctor_name,
+                        "doctor_role": doctor_role,
+                        "day_of_week": day_idx,
+                        "specific_date": None,
+                        "hours_from": h_from,
+                        "hours_to": h_to,
+                        "notes": None,
+                        "source_url": url,
+                    })
 
-            # USG special: look for specific dates
-            if name == "USG":
-                results.extend(self._parse_usg_dates(soup, url))
-
-            logger.info(f"  ✓ {name}: {len(results)} schedule entries")
+            logger.info(f"  ✓ {clinic_name}: {len(results)} schedule entries")
 
         except Exception as e:
-            logger.error(f"  ✗ Error scraping {name}: {e}")
+            logger.error(f"  ✗ Error scraping {clinic_name}: {e}", exc_info=True)
 
         return results
 
-    def _parse_usg_dates(self, soup: BeautifulSoup, url: str) -> list[dict]:
-        """Parse USG specific dates from page content."""
+    def _parse_usg_page(self, soup: BeautifulSoup, url: str) -> list[dict]:
+        """Parse USG page - may have specific dates and/or weekly schedule."""
         results = []
-        text = soup.get_text()
 
-        # Look for date patterns like "12.03.2026" or "12 marca 2026"
-        date_pattern = re.compile(r'(\d{1,2})[./](\d{1,2})[./](\d{4})')
+        # Try to find tables with weekly schedule first
+        content = soup.find("div", class_="elementor-text-editor") or soup
+        tables = content.find_all("table")
+
+        for table in tables:
+            rows = table.find_all("tr")
+            for row in rows:
+                cells = row.find_all("td")
+                if len(cells) < 2:
+                    continue
+                day_text = cells[0].get_text(strip=True)
+                hours_text = cells[1].get_text(strip=True)
+                day_idx = parse_day_name(day_text)
+                if day_idx is None:
+                    continue
+                h_from, h_to = parse_hours(hours_text)
+                if h_from:
+                    results.append({
+                        "clinic_name": "USG",
+                        "doctor_name": None,
+                        "doctor_role": None,
+                        "day_of_week": day_idx,
+                        "specific_date": None,
+                        "hours_from": h_from,
+                        "hours_to": h_to,
+                        "notes": None,
+                        "source_url": url,
+                    })
+
+        # Also look for specific dates (DD.MM.YYYY format)
+        text = soup.get_text()
+        date_pattern = re.compile(r'(\d{1,2})\.(\d{1,2})\.(\d{4})')
+        seen_dates = set()
         for match in date_pattern.finditer(text):
             try:
                 day, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                if year < 2026 or year > 2030:
+                    continue
                 specific_date = date_type(year, month, day)
+                if specific_date in seen_dates:
+                    continue
+                seen_dates.add(specific_date)
                 results.append({
                     "clinic_name": "USG",
                     "doctor_name": None,
@@ -181,252 +412,25 @@ class HealthScraper:
         return results
 
     # ==========================================
-    # POZ via Firecrawl (JetTable JS rendering)
-    # ==========================================
-
-    async def scrape_poz(self) -> list[dict]:
-        """Scrape POZ schedule using Firecrawl (handles JS-rendered JetTable)."""
-        url = f"{self.BASE_URL}/poradnie/"
-        results = []
-
-        try:
-            data = await firecrawl_client.scrape_page(
-                url, formats=["markdown", "html"]
-            )
-            if not data:
-                logger.warning("  ⚠ POZ: Firecrawl returned no data")
-                return results
-
-            # Parse markdown table for POZ data
-            markdown = data.get("markdown", "")
-            html_content = data.get("html", "")
-
-            # Try markdown parsing first
-            results = self._parse_poz_markdown(markdown)
-
-            # Fallback to HTML if markdown didn't yield results
-            if not results and html_content:
-                results = self._parse_poz_html(html_content)
-
-            logger.info(f"  ✓ POZ: {len(results)} schedule entries")
-
-        except Exception as e:
-            logger.error(f"  ✗ Error scraping POZ: {e}")
-
-        return results
-
-    def _parse_poz_markdown(self, markdown: str) -> list[dict]:
-        """Parse POZ schedule from Firecrawl markdown output."""
-        results = []
-        lines = markdown.split("\n")
-        url = f"{self.BASE_URL}/poradnie/"
-
-        current_doctor = None
-        current_role = None
-
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-
-            # Check if line has a day name and hours
-            day_idx = parse_day_name(line)
-            h_from, h_to = parse_hours(line)
-
-            if day_idx is not None and h_from:
-                results.append({
-                    "clinic_name": "POZ",
-                    "doctor_name": current_doctor,
-                    "doctor_role": current_role,
-                    "day_of_week": day_idx,
-                    "specific_date": None,
-                    "hours_from": h_from,
-                    "hours_to": h_to,
-                    "notes": None,
-                    "source_url": url,
-                })
-            elif "|" in line:
-                # Markdown table row
-                cells = [c.strip() for c in line.split("|") if c.strip()]
-                if len(cells) >= 2 and cells[0] not in ("---", "Dzień", "Lekarz", ""):
-                    for cell in cells:
-                        d = parse_day_name(cell)
-                        if d is not None:
-                            day_idx = d
-                        hf, ht = parse_hours(cell)
-                        if hf:
-                            h_from, h_to = hf, ht
-
-                    # Check for doctor name in cells
-                    for cell in cells:
-                        if parse_day_name(cell) is None and not re.search(r'\d{1,2}:\d{2}', cell.replace(".", ":")):
-                            if len(cell) > 3 and cell not in ("---", "Dzień", "Godziny", "Lekarz"):
-                                if "dr" in cell.lower() or "lek" in cell.lower() or len(cell) > 10:
-                                    current_doctor = cell
-                                else:
-                                    current_role = cell
-
-                    if day_idx is not None and h_from:
-                        results.append({
-                            "clinic_name": "POZ",
-                            "doctor_name": current_doctor,
-                            "doctor_role": current_role,
-                            "day_of_week": day_idx,
-                            "specific_date": None,
-                            "hours_from": h_from,
-                            "hours_to": h_to,
-                            "notes": None,
-                            "source_url": url,
-                        })
-
-        return results
-
-    def _parse_poz_html(self, html: str) -> list[dict]:
-        """Parse POZ schedule from Firecrawl HTML output (fallback)."""
-        results = []
-        url = f"{self.BASE_URL}/poradnie/"
-        soup = BeautifulSoup(html, "html.parser")
-
-        tables = soup.find_all("table")
-        for table in tables:
-            rows = table.find_all("tr")
-            current_doctor = None
-            for row in rows:
-                cells = row.find_all(["td", "th"])
-                cell_texts = [c.get_text(strip=True) for c in cells]
-
-                if len(cell_texts) < 2:
-                    continue
-
-                day_idx = None
-                h_from = h_to = None
-
-                for text in cell_texts:
-                    d = parse_day_name(text)
-                    if d is not None:
-                        day_idx = d
-                    hf, ht = parse_hours(text)
-                    if hf:
-                        h_from, h_to = hf, ht
-                    if "dr" in text.lower() or "lek." in text.lower():
-                        current_doctor = text
-
-                if day_idx is not None and h_from:
-                    results.append({
-                        "clinic_name": "POZ",
-                        "doctor_name": current_doctor,
-                        "doctor_role": "med. rodzinna",
-                        "day_of_week": day_idx,
-                        "specific_date": None,
-                        "hours_from": h_from,
-                        "hours_to": h_to,
-                        "notes": None,
-                        "source_url": url,
-                    })
-
-        return results
-
-    # ==========================================
     # Pharmacy duties
     # ==========================================
 
     async def scrape_pharmacy_duty(self) -> list[dict]:
-        """Scrape pharmacy duty schedules from mojedzialdowo.pl."""
-        results = []
-
-        try:
-            response = await self.client.get(self.PHARMACY_URL)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            # Parse pharmacy information from page content
-            text_content = soup.get_text()
-            current_year = datetime.now().year
-
-            # Known pharmacies - extract from page or hardcode known data
-            # mojedzialdowo.pl has a simple list format
-            pharmacies_data = self._extract_pharmacies_from_page(soup, current_year)
-            if pharmacies_data:
-                results.extend(pharmacies_data)
-
-            # Fallback: if scraping yields nothing, use known data
-            if not results:
-                results = self._get_known_pharmacy_data(current_year)
-
-            logger.info(f"  ✓ Apteki: {len(results)} duty entries")
-
-        except Exception as e:
-            logger.error(f"  ✗ Error scraping pharmacies: {e}")
-            results = self._get_known_pharmacy_data(datetime.now().year)
-
-        return results
-
-    def _extract_pharmacies_from_page(self, soup: BeautifulSoup, year: int) -> list[dict]:
-        """Try to extract pharmacy data from HTML."""
-        results = []
-        # Look for structured data (tables, lists, divs with pharmacy info)
-        content = soup.find("article") or soup.find("div", class_="entry-content") or soup
-        text = content.get_text()
-
-        # Pattern: pharmacy name, address, phone, hours
-        # This varies by page structure, so we try common patterns
-        blocks = content.find_all(["p", "li", "div"])
-        current_pharmacy = None
-        current_address = None
-        current_phone = None
-
-        for block in blocks:
-            block_text = block.get_text(strip=True)
-            if not block_text:
-                continue
-
-            # Detect pharmacy name (usually has "Apteka" in it)
-            if "apteka" in block_text.lower():
-                current_pharmacy = block_text
-                continue
-
-            # Detect address (ul., ulica)
-            if "ul." in block_text.lower() or "ulica" in block_text.lower():
-                current_address = block_text
-                continue
-
-            # Detect phone
-            phone_match = re.search(r'(?:tel[.:]?\s*)?(\(?\d{2,3}\)?\s*\d{3}[-\s]?\d{2}[-\s]?\d{2})', block_text)
-            if phone_match:
-                current_phone = phone_match.group(1)
-
-            # Detect hours
-            h_from, h_to = parse_hours(block_text)
-            if h_from and current_pharmacy:
-                duty_type = "weekday"
-                if any(w in block_text.lower() for w in ["sobota", "niedziela", "świąt", "swiat"]):
-                    duty_type = "weekend"
-
-                results.append({
-                    "pharmacy_name": current_pharmacy,
-                    "address": current_address or "",
-                    "phone": current_phone,
-                    "duty_type": duty_type,
-                    "day_of_week": None,
-                    "specific_dates": None,
-                    "hours_from": h_from,
-                    "hours_to": h_to,
-                    "valid_year": year,
-                    "notes": None,
-                })
-
+        """Scrape pharmacy duty schedules. Fallback to known data."""
+        current_year = datetime.now().year
+        results = self._get_known_pharmacy_data(current_year)
+        logger.info(f"  ✓ Apteki: {len(results)} duty entries")
         return results
 
     def _get_known_pharmacy_data(self, year: int) -> list[dict]:
-        """Fallback: known pharmacy duty data for powiat dzialdowski."""
+        """Known pharmacy duty data for powiat działdowski."""
         return [
-            # Apteka MANADA II - Działdowo
             {
                 "pharmacy_name": "Apteka MANADA II",
                 "address": "ul. Leśna 13d, 13-200 Działdowo",
                 "phone": "(23) 697-95-16",
                 "duty_type": "weekday",
-                "day_of_week": None,  # Pn-Sob
+                "day_of_week": None,
                 "specific_dates": None,
                 "hours_from": "19:00",
                 "hours_to": "21:00",
@@ -438,14 +442,13 @@ class HealthScraper:
                 "address": "ul. Leśna 13d, 13-200 Działdowo",
                 "phone": "(23) 697-95-16",
                 "duty_type": "weekend",
-                "day_of_week": 6,  # Niedziela
+                "day_of_week": 6,
                 "specific_dates": None,
                 "hours_from": "12:00",
                 "hours_to": "21:00",
                 "valid_year": year,
                 "notes": "Dyżur niedzielny 12:00-21:00",
             },
-            # Apteka Solaris - Iłowo-Osada
             {
                 "pharmacy_name": "Apteka Solaris",
                 "address": "ul. Nowa 2, 13-240 Iłowo-Osada",
@@ -461,21 +464,21 @@ class HealthScraper:
         ]
 
     # ==========================================
-    # Main scrape-all method
+    # Main methods
     # ==========================================
 
     async def scrape_all_clinics(self) -> list[dict]:
-        """Scrape all clinic schedules (static + POZ via Firecrawl)."""
+        """Scrape all clinic schedules (POZ + static clinics)."""
         all_results = []
 
-        # 1. Static clinics (httpx + BeautifulSoup)
+        # 1. POZ (direct httpx - Elementor + jet-table)
+        poz_entries = await self.scrape_poz()
+        all_results.extend(poz_entries)
+
+        # 2. Static clinics (httpx + BeautifulSoup)
         for name, path in self.CLINIC_URLS.items():
             entries = await self.scrape_static_clinic(name, path)
             all_results.extend(entries)
-
-        # 2. POZ via Firecrawl
-        poz_entries = await self.scrape_poz()
-        all_results.extend(poz_entries)
 
         logger.info(f"Total clinic entries: {len(all_results)}")
         return all_results

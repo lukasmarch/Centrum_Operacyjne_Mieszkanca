@@ -33,6 +33,18 @@ async def run_health_job_async():
             await session.execute(text("DELETE FROM clinic_schedules"))
             clinic_count = 0
             for entry in clinics:
+                # Truncate fields to fit DB constraints
+                if entry.get("doctor_name") and len(entry["doctor_name"]) > 200:
+                    entry["doctor_name"] = entry["doctor_name"][:200]
+                if entry.get("doctor_role") and len(entry["doctor_role"]) > 100:
+                    # Move overflow to notes
+                    overflow = entry["doctor_role"]
+                    entry["doctor_role"] = overflow[:100]
+                    if not entry.get("notes"):
+                        entry["notes"] = overflow
+                if entry.get("notes") and len(entry["notes"]) > 500:
+                    entry["notes"] = entry["notes"][:500]
+
                 await session.execute(
                     text("""
                         INSERT INTO clinic_schedules
