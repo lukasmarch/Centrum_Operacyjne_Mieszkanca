@@ -5,6 +5,7 @@ User service - CRUD operations for users
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 from sqlmodel import select
 
 from src.database import User, Subscription, UserTier, SubscriptionStatus
@@ -44,10 +45,12 @@ class UserService:
         if location is not None:
             user.location = location
         if preferences is not None:
-            # Merge preferences
-            current_prefs = user.preferences or {}
+            # Create a new dict to ensure SQLAlchemy detects the change
+            # (in-place mutation of the same dict object is not tracked by SQLAlchemy JSONB)
+            current_prefs = dict(user.preferences or {})
             current_prefs.update(preferences)
             user.preferences = current_prefs
+            flag_modified(user, 'preferences')
 
         await session.commit()
         await session.refresh(user)

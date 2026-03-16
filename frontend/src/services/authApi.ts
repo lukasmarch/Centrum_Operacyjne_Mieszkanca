@@ -55,18 +55,43 @@ const authFetch = async (
   url: string,
   options: RequestInit = {}
 ): Promise<Response> => {
-  const token = getAccessToken();
-
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...options.headers,
+  const makeRequest = (token: string | null): Promise<Response> => {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    if (token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+    return fetch(url, { ...options, headers });
   };
 
-  if (token) {
-    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  let response = await makeRequest(getAccessToken());
+
+  // Auto-refresh on 401 (expired access token)
+  if (response.status === 401) {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (refreshResponse.ok) {
+          const result = await refreshResponse.json();
+          storeTokens(result.access_token, result.refresh_token);
+          response = await makeRequest(result.access_token);
+        } else {
+          clearTokens();
+        }
+      } catch {
+        clearTokens();
+      }
+    }
   }
 
-  return fetch(url, { ...options, headers });
+  return response;
 };
 
 /**

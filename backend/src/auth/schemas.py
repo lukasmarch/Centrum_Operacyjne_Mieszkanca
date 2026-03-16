@@ -56,6 +56,7 @@ class UserPreferences(BaseModel):
     categories: Optional[List[str]] = None  # Preferred news categories
     notifications: Optional[dict] = None  # Notification settings
     newsletter_frequency: Optional[str] = None  # "none", "weekly", "daily"
+    dashboard_layout: Optional[str] = None  # Dashboard layout preset ID
 
 
 class UserUpdate(BaseModel):

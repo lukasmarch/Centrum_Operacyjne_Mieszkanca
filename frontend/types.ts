@@ -1,4 +1,6 @@
 
+import type { DashboardLayoutId } from './src/config/dashboardLayouts';
+
 export interface Article {
   id: string;
   title: string;
@@ -411,6 +413,7 @@ export interface UserUpdateData {
     categories?: string[];
     notifications?: Record<string, boolean>;
     newsletter_frequency?: 'none' | 'weekly' | 'daily';
+    dashboard_layout?: DashboardLayoutId;
   };
 }
 

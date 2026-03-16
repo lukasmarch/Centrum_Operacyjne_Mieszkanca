@@ -24,13 +24,38 @@ import AirlyTile from './AirlyTile';
 import GminaMonitoringTile from './GminaMonitoringTile';
 import HealthTile from './HealthTile';
 
+import { DASHBOARD_LAYOUTS, TileId } from '../src/config/dashboardLayouts';
+
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQuerySubmit?: (query: string) => void }> = ({ onNavigate, onQuerySubmit }) => {
-  const { user, isPremium, userLocation } = useAuth();
+  const { user, isPremium, userLocation, dashboardLayout } = useAuth();
   const wasteEvents = useWasteSchedule(userLocation);
 
   const today = new Date();
   const holiday = getHoliday(today);
   const nameDays = getNameDays(today);
+
+  const activeLayout = DASHBOARD_LAYOUTS[dashboardLayout];
+
+  const renderTile = (tileId: TileId): React.ReactNode => {
+    switch (tileId) {
+      case 'ai_briefing':
+        return <AIBriefingTile onNavigate={onNavigate} />;
+      case 'weather':
+        return <WeatherTile />;
+      case 'traffic':
+        return <TrafficTile />;
+      case 'events':
+        return <EventsTile />;
+      case 'airly':
+        return <AirlyTile />;
+      case 'gmina':
+        return <GminaMonitoringTile />;
+      case 'news':
+        return <NewsTile onNavigate={onNavigate} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -60,57 +85,26 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
       {/* PromptBar - AI Assistant Hero */}
       <PromptBar onNavigate={onNavigate} onSubmit={onQuerySubmit} />
 
-      {/* ===== BENTO GRID ===== */}
-      {/*
-        Screenshot layout (4 columns):
-        Row 1: [AI Briefing col-span-2] [Pogoda col-span-1] [Ruch Drogowy col-span-1, row-span-2]
-        Row 2: [Wydarzenia col-span-1]  [Jakość Powietrza col-span-1] [— Traffic cont. —]
-        Row 3: [Wiadomości col-span-2]  [Monitoring Gminy col-span-2]
-      */}
+      {/* ===== BENTO GRID (data-driven by layout preset) ===== */}
       <BentoGrid>
-        {/* === ROW 1 === */}
-        {/* AI Daily Briefing - 2 cols */}
-        <BentoTile variant="gradient" colSpan={2}>
-          <AIBriefingTile onNavigate={onNavigate} />
-        </BentoTile>
-
-        {/* Pogoda - 1 col */}
-        <BentoTile variant="dark">
-          <WeatherTile />
-        </BentoTile>
-
-        {/* Ruch Drogowy - 1 col, 2 rows tall */}
-        <BentoTile variant="dark" rowSpan={2}>
-          <TrafficTile />
-        </BentoTile>
-
-        {/* === ROW 2 === */}
-        {/* Wydarzenia - 1 col */}
-        <BentoTile variant="glass">
-          <EventsTile />
-        </BentoTile>
-
-        {/* Jakość Powietrza - 1 col */}
-        <BentoTile variant="dark">
-          <AirlyTile />
-        </BentoTile>
-
-        {/* Zgłoszenia24 - 1 col (fills empty slot under Pogoda) */}
-        <BentoTile variant="dark">
-          <GminaMonitoringTile />
-        </BentoTile>
-
-        {/* === ROW 3 === */}
-        {/* Najnowsze Wiadomości - full width */}
-        <BentoTile variant="dark" colSpan={4}>
-          <NewsTile onNavigate={onNavigate} />
-        </BentoTile>
+        {activeLayout.tiles.map((tile) => (
+          <BentoTile
+            key={tile.id}
+            variant={tile.variant}
+            colSpan={tile.colSpan}
+            rowSpan={tile.rowSpan}
+          >
+            {renderTile(tile.id)}
+          </BentoTile>
+        ))}
       </BentoGrid>
 
       {/* ===== BELOW GRID: Cinema + Health + Firmy (3 columns) ===== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Repertuar kina */}
-        <CinemaWidget />
+        <div className="h-[500px]">
+          <CinemaWidget />
+        </div>
 
         {/* Twoje Zdrowie */}
         <HealthTile />

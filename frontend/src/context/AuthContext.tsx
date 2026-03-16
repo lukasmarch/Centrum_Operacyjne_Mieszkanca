@@ -18,6 +18,7 @@ import {
   UserUpdateData,
 } from '../../types';
 import * as authApi from '../services/authApi';
+import { DashboardLayoutId, getUserDashboardLayout } from '../config/dashboardLayouts';
 
 interface AuthContextType {
   // State
@@ -37,6 +38,7 @@ interface AuthContextType {
   // Helpers
   isPremium: boolean;
   userLocation: string;
+  dashboardLayout: DashboardLayoutId;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,6 +57,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Get user's location (default to Rybno)
   const userLocation = user?.location || 'Rybno';
+
+  // Get user's dashboard layout preference
+  const dashboardLayout = getUserDashboardLayout(user?.preferences ?? null);
 
   /**
    * Initialize auth state on mount
@@ -198,6 +203,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     clearError,
     isPremium,
     userLocation,
+    dashboardLayout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
