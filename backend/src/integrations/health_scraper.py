@@ -6,7 +6,7 @@ Scrapuje:
 2. Dyzury aptek z mojedzialdowo.pl
 """
 import re
-from datetime import datetime
+from datetime import datetime, date as date_type
 from typing import Optional
 
 import httpx
@@ -163,7 +163,7 @@ class HealthScraper:
         for match in date_pattern.finditer(text):
             try:
                 day, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
-                specific_date = f"{year}-{month:02d}-{day:02d}"
+                specific_date = date_type(year, month, day)
                 results.append({
                     "clinic_name": "USG",
                     "doctor_name": None,
