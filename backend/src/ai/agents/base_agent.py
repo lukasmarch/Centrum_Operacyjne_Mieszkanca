@@ -52,6 +52,12 @@ class BaseAgent:
     source_types: list[str] = []  # RAG filter
     example_questions: list[str] = []
 
+    # RAG parameters (per-agent overrides)
+    rag_top_k: int = 5
+    rag_threshold: float = 0.50
+    rag_semantic_weight: float = 0.70
+    rag_recency_boost: float = 0.0
+
     def __init__(self):
         self.client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -65,13 +71,25 @@ class BaseAgent:
     ) -> Union[dict, AsyncGenerator]:
         """Generate a response using RAG context"""
         # 1. Retrieve context
-        context_docs = await embedding_service.semantic_search(
+        context_docs = await embedding_service.hybrid_search(
             session=session,
             query=user_message,
-            top_k=6,
+            top_k=self.rag_top_k,
             source_types=self.source_types or None,
-            similarity_threshold=0.25
+            similarity_threshold=self.rag_threshold,
+            semantic_weight=self.rag_semantic_weight,
+            recency_boost=self.rag_recency_boost
         )
+
+        # Log RAG metrics
+        if context_docs:
+            scores = [d['similarity'] for d in context_docs]
+            logger.info(
+                f"RAG[{self.name}] docs={len(context_docs)} "
+                f"sim: min={min(scores):.3f} max={max(scores):.3f} avg={sum(scores)/len(scores):.3f}"
+            )
+        else:
+            logger.warning(f"RAG[{self.name}] NO RESULTS for query='{user_message[:60]}'")
 
         # 2. Build context
         context_parts = []
@@ -79,9 +97,20 @@ class BaseAgent:
         seen = set()
 
         for doc in context_docs:
+            meta = doc['metadata']
+            published_raw = meta.get('published_at', '') or meta.get('event_date', '')
+            date_str = ""
+            if published_raw:
+                try:
+                    dt = datetime.fromisoformat(published_raw.replace('Z', '+00:00'))
+                    date_str = f" | Data: {dt.strftime('%d.%m.%Y')}"
+                except Exception:
+                    date_str = f" | Data: {published_raw[:10]}"
+
             context_parts.append(
                 f"---\n{doc['chunk_text']}\n"
-                f"[Zrodlo: {doc['metadata'].get('source_name', doc['source_type'])}]"
+                f"[Zrodlo: {meta.get('source_name', doc['source_type'])}"
+                f"{date_str} | Trafnosc: {doc['similarity']:.2f}]"
             )
             key = f"{doc['source_type']}:{doc['source_id']}"
             if key not in seen:
@@ -89,8 +118,8 @@ class BaseAgent:
                 sources.append({
                     "type": doc["source_type"],
                     "id": doc["source_id"],
-                    "title": doc["metadata"].get("title", ""),
-                    "url": doc["metadata"].get("url", ""),
+                    "title": meta.get("title", ""),
+                    "url": meta.get("url", ""),
                     "similarity": doc["similarity"]
                 })
 

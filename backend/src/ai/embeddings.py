@@ -3,6 +3,7 @@ EmbeddingService - generates and searches vector embeddings using OpenAI text-em
 """
 import json
 import openai
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -137,6 +138,120 @@ class EmbeddingService:
             }
             for row in rows
         ]
+
+
+    async def hybrid_search(
+        self,
+        session: AsyncSession,
+        query: str,
+        top_k: int = 5,
+        source_types: Optional[list[str]] = None,
+        similarity_threshold: float = 0.50,
+        semantic_weight: float = 0.70,
+        recency_boost: float = 0.0,
+        rrf_k: int = 60
+    ) -> list[dict]:
+        """Hybrid: pgvector semantic + tsvector BM25 with RRF fusion.
+        Falls back to semantic-only if tsvector column doesn't exist.
+        """
+        query_embedding = await self.embed_text(query)
+        embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+
+        candidate_limit = max(top_k * 6, 40)
+        filter_clause = ""
+        params: dict = {"candidate_limit": candidate_limit, "threshold": similarity_threshold}
+
+        if source_types:
+            placeholders = ", ".join(f":st_{i}" for i in range(len(source_types)))
+            filter_clause = f"AND source_type IN ({placeholders})"
+            for i, st in enumerate(source_types):
+                params[f"st_{i}"] = st
+
+        # Semantic candidates
+        sem_sql = f"""
+            SELECT id, chunk_text, source_type, source_id, metadata,
+                   1 - (embedding <=> '{embedding_str}'::vector) AS score,
+                   ROW_NUMBER() OVER (ORDER BY embedding <=> '{embedding_str}'::vector) AS rank
+            FROM document_embeddings
+            WHERE 1 - (embedding <=> '{embedding_str}'::vector) > :threshold
+            {filter_clause}
+            ORDER BY embedding <=> '{embedding_str}'::vector
+            LIMIT :candidate_limit
+        """
+
+        sem_result = await session.execute(text(sem_sql), params)
+        sem_rows = {row[0]: row for row in sem_result.fetchall()}
+
+        # BM25 candidates (tsvector) — graceful fallback if column missing
+        bm25_rows: dict = {}
+        bm25_query_str = " | ".join(w.strip() for w in query.split() if len(w.strip()) > 2)
+        if bm25_query_str:
+            params_bm25 = {**params, "bm25_query": bm25_query_str}
+            bm25_sql = f"""
+                SELECT id, chunk_text, source_type, source_id, metadata,
+                       ts_rank_cd(search_vector, to_tsquery('simple', unaccent(:bm25_query))) AS score,
+                       ROW_NUMBER() OVER (
+                           ORDER BY ts_rank_cd(search_vector, to_tsquery('simple', unaccent(:bm25_query))) DESC
+                       ) AS rank
+                FROM document_embeddings
+                WHERE search_vector IS NOT NULL
+                  AND search_vector @@ to_tsquery('simple', unaccent(:bm25_query))
+                {filter_clause}
+                ORDER BY score DESC
+                LIMIT :candidate_limit
+            """
+            try:
+                bm25_result = await session.execute(text(bm25_sql), params_bm25)
+                bm25_rows = {row[0]: row for row in bm25_result.fetchall()}
+            except Exception as e:
+                logger.warning(f"BM25 search failed (tsvector not ready?): {e}")
+
+        # RRF Fusion
+        all_ids = set(sem_rows) | set(bm25_rows)
+        if not all_ids:
+            return []
+
+        rrf_scores: dict = {}
+        for doc_id in all_ids:
+            sem_rank = sem_rows[doc_id][6] if doc_id in sem_rows else (candidate_limit + 1)
+            bm25_rank = bm25_rows[doc_id][6] if doc_id in bm25_rows else (candidate_limit + 1)
+            rrf_scores[doc_id] = (
+                semantic_weight * (1.0 / (rrf_k + sem_rank)) +
+                (1 - semantic_weight) * (1.0 / (rrf_k + bm25_rank))
+            )
+
+        # Recency boost (optional)
+        if recency_boost > 0:
+            now = datetime.now(timezone.utc)
+            HALF_LIFE_DAYS = 90
+            for doc_id in all_ids:
+                row = sem_rows.get(doc_id) or bm25_rows.get(doc_id)
+                meta = row[4] or {}
+                pub_raw = meta.get('published_at', '') or meta.get('event_date', '')
+                if pub_raw:
+                    try:
+                        dt = datetime.fromisoformat(pub_raw.replace('Z', '+00:00'))
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        age_days = (now - dt).days
+                        decay = 2 ** (-age_days / HALF_LIFE_DAYS)
+                        rrf_scores[doc_id] *= (1.0 + recency_boost * decay)
+                    except Exception:
+                        pass
+
+        top_ids = sorted(rrf_scores, key=lambda x: rrf_scores[x], reverse=True)[:top_k]
+
+        results = []
+        for doc_id in top_ids:
+            row = sem_rows.get(doc_id) or bm25_rows.get(doc_id)
+            results.append({
+                "chunk_text": row[1],
+                "source_type": row[2],
+                "source_id": row[3],
+                "metadata": row[4] or {},
+                "similarity": round(rrf_scores[doc_id], 6),
+            })
+        return results
 
 
 # Singleton

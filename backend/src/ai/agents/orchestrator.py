@@ -12,15 +12,36 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("Orchestrator")
 
-ROUTING_PROMPT = """Jestes routerem zapytan. Przeanalizuj pytanie uzytkownika i zwroc TYLKO nazwe agenta, ktory powinien odpowiedziec.
+ROUTING_PROMPT = """Jestes routerem zapytan. Przeanalizuj INTENCJE pytania i zwroc TYLKO nazwe agenta.
 
-Dostepni agenci:
-- redaktor: wiadomosci, artykuly, aktualnosci lokalne, co nowego, podsumowania newsow
-- urzednik: BIP, uchwaly, przetargi, regulacje, sprawy urzedowe, dokumenty gminy
-- gus_analityk: statystyki GUS, demografia, rynek pracy, finanse gminy, dane liczbowe, porownania
-- przewodnik: pogoda, wydarzenia kulturalne, imprezy, co sie dzieje, sport, restauracje, kawiarnie, gdzie jesc, atrakcje turystyczne, co robic, miejsca do odwiedzenia, hotele, noclegi, jeziora, szlaki, rekreacja
-- straznik: zgloszenia, awarie, usterki, bezpieczenstwo, problemy w gminie
-- organizator: harmonogram smieci, wywoz odpadow, repertuar kina, co gra w kinie
+ZASADA KLUCZOWA: kieruj sie tym CO UZYTKOWNIK CHCE ZROBIC, nie slowami kluczowymi.
+
+Dostepni agenci i ich INTENCJE:
+
+- redaktor: szuka AKTUALNYCH INFORMACJI z lokalnych mediow
+  Przykladowe pytania: "co nowego?", "jakie sa oferty pracy w firmach?", "czy jest przetarg na droge?",
+  "co sie wydarzylo?", "jakie firmy szukaja pracownikow?", "aktualnosci z gminy"
+  UWAGA: oferty pracy, ogloszenia o zatrudnienie, rekrutacja w firmach -> redaktor (nie gus_analityk!)
+
+- urzednik: szuka DOKUMENTOW URZEDOWYCH lub FORMALNYCH PROCEDUR
+  Przykladowe pytania: "jaka jest uchwala w sprawie...", "gdzie zlozym wniosek o...", "przetarg nr...",
+  "kiedy wchodzi w zycie regulamin...", "co mowi BIP o..."
+
+- gus_analityk: chce STATYSTYK HISTORYCZNYCH I DANYCH LICZBOWYCH z GUS
+  Przykladowe pytania: "ile wynosi bezrobocie w powiecie?", "jaki jest PKB gminy?",
+  "ile ludzi pracuje na 1000 mieszkancow?", "jak zmienila sie demografia?", "dane o finansach gminy"
+  UWAGA: pytania o konkretne oferty pracy lub firmy szukajace pracownikow -> redaktor, NIE tutaj!
+
+- przewodnik: pyta o MIEJSCA, WYDARZENIA lub POGODE
+  Przykladowe pytania: "co robic w weekend?", "gdzie zjesc?", "jaka bedzie pogoda?",
+  "jakie imprezy sa w gminie?", "gdzie mozna poplywac?"
+
+- straznik: ZGLASZA PROBLEM lub pyta o BEZPIECZENSTWO I AWARIE
+  Przykladowe pytania: "jest awaria wody na ulicy...", "gdzie zglasza sie usterke?",
+  "czy sa jakies ostrzezenia?", "wypadek na drodze..."
+
+- organizator: pyta o HARMONOGRAMY ODBIORU SMIECI lub REPERTUAR KINA
+  Przykladowe pytania: "kiedy wywoz smieci?", "co gra w kinie?", "harmonogram odpadow dla..."
 
 Odpowiedz TYLKO jedna nazwa agenta (np. "redaktor"). Nic wiecej."""
 
