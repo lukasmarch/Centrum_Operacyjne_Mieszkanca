@@ -259,6 +259,8 @@ export interface ReportMapItem {
 
 export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'business' | 'reports' | 'premium' | 'assistant' | 'login' | 'register' | 'profile';
 
+export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'profil';
+
 // New Traffic Widget Types
 export enum TrafficCondition {
   FLUID = 'Płynnie',

@@ -19,7 +19,7 @@ const CATEGORY_DOT_COLORS: Record<string, string> = {
     festiwal: 'bg-fuchsia-400',
     targi: 'bg-amber-400',
     urząd: 'bg-blue-400',
-    inne: 'bg-slate-400',
+    inne: 'bg-neutral-400',
 };
 
 const CATEGORY_BADGE_COLORS: Record<string, string> = {
@@ -32,7 +32,7 @@ const CATEGORY_BADGE_COLORS: Record<string, string> = {
     festiwal: 'bg-fuchsia-600/30 text-fuchsia-300 border-fuchsia-500/30',
     targi: 'bg-amber-600/30 text-amber-300 border-amber-500/30',
     urząd: 'bg-blue-600/30 text-blue-300 border-blue-500/30',
-    inne: 'bg-slate-600/30 text-slate-300 border-slate-500/30',
+    inne: 'bg-neutral-600/30 text-neutral-300 border-neutral-500/30',
 };
 
 const getCategoryDotColor = (category?: string): string => {
@@ -210,10 +210,10 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
             {/* ── Header: Month navigation ── */}
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
                 <div className="flex items-center gap-3">
-                    <h3 className="text-2xl font-black text-slate-100 tracking-tight">
+                    <h3 className="text-2xl font-black text-neutral-100 tracking-tight">
                         {MONTH_NAMES[viewMonth]}
                     </h3>
-                    <span className="text-lg font-bold text-slate-500">{viewYear}</span>
+                    <span className="text-lg font-bold text-neutral-500">{viewYear}</span>
                 </div>
                 <div className="flex items-center gap-1">
                     <button
@@ -224,13 +224,13 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
                     </button>
                     <button
                         onClick={goPrev}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
                     >
                         <ChevronLeft size={18} />
                     </button>
                     <button
                         onClick={goNext}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
                     >
                         <ChevronRight size={18} />
                     </button>
@@ -241,7 +241,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
             <div className="grid grid-cols-7 px-4">
                 {WEEKDAY_LABELS.map(label => (
                     <div key={label} className="text-center py-2">
-                        <span className={`text-[11px] font-bold uppercase tracking-wider ${label === 'So' || label === 'Nd' ? 'text-slate-600' : 'text-slate-500'
+                        <span className={`text-[11px] font-bold uppercase tracking-wider ${label === 'So' || label === 'Nd' ? 'text-neutral-600' : 'text-neutral-500'
                             }`}>
                             {label}
                         </span>
@@ -285,10 +285,10 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
                                     : isSelected
                                         ? 'text-blue-300'
                                         : isWeekend && cell.inMonth
-                                            ? 'text-slate-500'
+                                            ? 'text-neutral-500'
                                             : cell.inMonth
-                                                ? 'text-slate-300'
-                                                : 'text-slate-700'
+                                                ? 'text-neutral-300'
+                                                : 'text-gray-700'
                                 }`}>
                                 {cell.day}
                             </span>
@@ -318,10 +318,10 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
                         {/* Day header */}
                         <div className="flex items-center gap-2 mb-1">
                             <Calendar size={14} className="text-blue-400" />
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                            <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
                                 {selectedDate.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
                             </span>
-                            <span className="text-[10px] text-slate-600 ml-auto">
+                            <span className="text-[10px] text-neutral-600 ml-auto">
                                 {selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'wydarzenie' : selectedDayEvents.length < 5 ? 'wydarzenia' : 'wydarzeń'}
                             </span>
                         </div>
@@ -336,17 +336,17 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
                             return (
                                 <div
                                     key={event.id}
-                                    className="flex gap-4 p-4 rounded-2xl bg-slate-800/40 border border-white/5 hover:bg-slate-800/60 transition-colors group"
+                                    className="flex gap-4 p-4 rounded-2xl bg-gray-900/40 border border-white/5 hover:bg-gray-900/60 transition-colors group"
                                 >
                                     {/* Date badge */}
                                     <div className="shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-xl bg-white/5 border border-white/10 group-hover:border-blue-500/30 group-hover:bg-blue-500/10 transition-colors">
-                                        <span className="text-[8px] text-slate-500 font-bold uppercase leading-none">
+                                        <span className="text-[8px] text-neutral-500 font-bold uppercase leading-none">
                                             {eventDate.toLocaleDateString('pl-PL', { month: 'short' }).replace('.', '')}
                                         </span>
-                                        <span className="text-lg font-black text-slate-200 leading-none group-hover:text-blue-300">
+                                        <span className="text-lg font-black text-neutral-200 leading-none group-hover:text-blue-300">
                                             {eventDate.getDate()}
                                         </span>
-                                        <span className="text-[7px] text-slate-600 font-medium">
+                                        <span className="text-[7px] text-neutral-600 font-medium">
                                             {eventDate.toLocaleDateString('pl-PL', { weekday: 'short' })}
                                         </span>
                                     </div>
@@ -370,10 +370,10 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
                                                 {event.category}
                                             </span>
                                         </div>
-                                        <h4 className="text-sm font-bold text-slate-200 group-hover:text-blue-300 transition-colors leading-snug mb-1">
+                                        <h4 className="text-sm font-bold text-neutral-200 group-hover:text-blue-300 transition-colors leading-snug mb-1">
                                             {event.title}
                                         </h4>
-                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
                                             <span className="flex items-center gap-1">
                                                 <Clock size={10} className="shrink-0" />
                                                 {time}
@@ -386,7 +386,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
                                             )}
                                         </div>
                                         {event.description && (
-                                            <p className="text-xs text-slate-500 mt-1.5 line-clamp-2">{event.description}</p>
+                                            <p className="text-xs text-neutral-500 mt-1.5 line-clamp-2">{event.description}</p>
                                         )}
                                     </div>
 
@@ -402,7 +402,7 @@ const EventCalendar: React.FC<EventCalendarProps> = ({ events }) => {
                                         </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); downloadICalendar(event); }}
-                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-slate-400 bg-white/5 border border-white/5 hover:bg-white/10 transition-colors whitespace-nowrap"
+                                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-neutral-400 bg-white/5 border border-white/5 hover:bg-white/10 transition-colors whitespace-nowrap"
                                             title="Pobierz plik .ics"
                                         >
                                             <Download size={10} />

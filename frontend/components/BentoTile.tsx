@@ -12,9 +12,9 @@ interface BentoTileProps {
 
 const variantClasses: Record<TileVariant, string> = {
   glass:     'glass-panel',
-  gradient:  'bg-gradient-to-br from-blue-900/30 via-slate-900/80 to-purple-900/30 border border-white/10',
+  gradient:  'bg-gradient-to-br from-blue-900/30 via-black to-purple-900/30 border border-white/10',
   highlight: 'bg-gradient-to-br from-blue-600/20 via-indigo-600/10 to-purple-600/20 border border-blue-500/20',
-  dark:      'bg-slate-900 border border-slate-800',
+  dark:      'bg-gray-950 border border-gray-800/50',
 };
 
 // On mobile always col-span-1; tablet (sm) max 2; desktop (lg) full colSpan

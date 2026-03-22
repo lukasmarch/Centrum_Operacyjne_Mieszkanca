@@ -13,7 +13,7 @@ const TrafficItem: React.FC<TrafficItemProps> = ({ road, isLast }) => {
             case TrafficCondition.FLUID: return 'text-emerald-400';
             case TrafficCondition.DIFFICULTIES: return 'text-orange-400';
             case TrafficCondition.JAM: return 'text-rose-400';
-            default: return 'text-slate-400';
+            default: return 'text-neutral-400';
         }
     };
 
@@ -27,7 +27,7 @@ const TrafficItem: React.FC<TrafficItemProps> = ({ road, isLast }) => {
     };
 
     return (
-        <div className={`py-2 ${!isLast ? 'border-b border-slate-800/40' : ''}`}>
+        <div className={`py-2 ${!isLast ? 'border-b border-gray-800/50/40' : ''}`}>
             <div className="flex flex-col gap-2">
                 {/* Header: Route and Time */}
                 <div className="flex justify-between items-start">
@@ -50,14 +50,14 @@ const TrafficItem: React.FC<TrafficItemProps> = ({ road, isLast }) => {
 
                     <div className="text-right">
                         <div className="text-xl font-black text-white leading-none">{road.travelTime}</div>
-                        <div className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Aktualny czas</div>
+                        <div className="text-[10px] text-neutral-500 font-bold uppercase mt-1 tracking-widest">Aktualny czas</div>
                     </div>
                 </div>
 
                 {/* Detailed Description */}
                 {road.description && (
                     <div className="bg-[#1e293b]/30 rounded-2xl p-4 border border-white/[0.03] backdrop-blur-sm">
-                        <p className="text-slate-300 text-xs leading-relaxed">
+                        <p className="text-neutral-300 text-xs leading-relaxed">
                             <span className="text-blue-400/80 mr-1">●</span> {road.description}
                         </p>
                     </div>

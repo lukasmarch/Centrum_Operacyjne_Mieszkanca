@@ -37,17 +37,17 @@ function renderMarkdown(text: string): React.ReactNode {
       if (headingMatch) {
         flushList();
         nodes.push(
-          <p key={`h-${pi}-${li}`} className="font-bold text-slate-100 mt-2 mb-0.5">
+          <p key={`h-${pi}-${li}`} className="font-bold text-neutral-100 mt-2 mb-0.5">
             {inlineMarkdown(headingMatch[2])}
           </p>
         );
       } else if (listMatch) {
         listItems.push(
-          <li key={`li-${pi}-${li}`} className="text-slate-200">{inlineMarkdown(listMatch[1])}</li>
+          <li key={`li-${pi}-${li}`} className="text-neutral-200">{inlineMarkdown(listMatch[1])}</li>
         );
       } else if (numberedMatch) {
         listItems.push(
-          <li key={`li-${pi}-${li}`} className="text-slate-200">{inlineMarkdown(numberedMatch[1])}</li>
+          <li key={`li-${pi}-${li}`} className="text-neutral-200">{inlineMarkdown(numberedMatch[1])}</li>
         );
       } else if (line.trim()) {
         flushList();
@@ -95,9 +95,9 @@ function inlineMarkdown(text: string): React.ReactNode {
 }
 
 const MiniKPI: React.FC<{ chart: ChartConfig }> = ({ chart }) => (
-  <div className="bg-slate-700/50 rounded-xl p-3 flex items-center justify-between gap-4">
+  <div className="bg-gray-700/50 rounded-xl p-3 flex items-center justify-between gap-4">
     <div className="min-w-0">
-      <p className="text-xs text-slate-400 mb-1 truncate">{chart.title}</p>
+      <p className="text-xs text-neutral-400 mb-1 truncate">{chart.title}</p>
       <p className="text-2xl font-bold text-white leading-none">
         {chart.current_value?.toLocaleString('pl-PL') ?? '—'}
       </p>
@@ -109,9 +109,9 @@ const MiniKPI: React.FC<{ chart: ChartConfig }> = ({ chart }) => (
     </div>
     {chart.national_value !== undefined && (
       <div className="text-right shrink-0">
-        <p className="text-xs text-slate-500">Śr. krajowa</p>
-        <p className="text-sm text-slate-300">{chart.national_value?.toLocaleString('pl-PL')}</p>
-        <p className="text-xs text-slate-500">{chart.year}</p>
+        <p className="text-xs text-neutral-500">Śr. krajowa</p>
+        <p className="text-sm text-neutral-300">{chart.national_value?.toLocaleString('pl-PL')}</p>
+        <p className="text-xs text-neutral-500">{chart.year}</p>
       </div>
     )}
   </div>
@@ -137,11 +137,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       </div>
       <div className="flex-1 min-w-0">
         {message.agent_name && (
-          <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-widest font-bold">
+          <p className="text-[10px] text-neutral-500 mb-1 uppercase tracking-widest font-bold">
             {message.agent_name.replace('_', '-')}.ai
           </p>
         )}
-        <div className="bg-slate-800/60 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-200 leading-relaxed">
+        <div className="bg-gray-900/60 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-neutral-200 leading-relaxed">
           {message.content ? (
             <>
               <div>{renderMarkdown(message.content)}</div>
@@ -161,7 +161,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         {hasCharts && (
           <div className="mt-3 space-y-3">
             {message.chartData!.map((chart, i) => (
-              <div key={i} className="bg-slate-800/60 border border-white/5 rounded-2xl px-4 py-3 overflow-hidden">
+              <div key={i} className="bg-gray-900/60 border border-white/5 rounded-2xl px-4 py-3 overflow-hidden">
                 {chart.chart_type === 'trend' && chart.data && chart.data.length >= 2 && (
                   <TrendChart
                     data={chart.data}

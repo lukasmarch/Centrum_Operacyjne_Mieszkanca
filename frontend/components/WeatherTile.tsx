@@ -23,7 +23,7 @@ const WeatherTile: React.FC = () => {
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Cloud size={14} className="text-blue-400" />
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pogoda</p>
+        <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Pogoda</p>
       </div>
 
       {/* Main: temp + icon */}
@@ -32,7 +32,7 @@ const WeatherTile: React.FC = () => {
           <p className="text-5xl font-black text-white leading-none tracking-tight">
             {loading ? '–' : `${data.temp}°C`}
           </p>
-          <p className="text-sm text-slate-400 capitalize mt-2">{data.condition}</p>
+          <p className="text-sm text-neutral-400 capitalize mt-2">{data.condition}</p>
         </div>
 
         {/* Big blue icon box (matching screenshot) */}
@@ -54,15 +54,15 @@ const WeatherTile: React.FC = () => {
 
       {/* Stats row in rounded boxes */}
       <div className="flex gap-3 mt-auto pt-4">
-        <div className="flex-1 bg-slate-800/60 rounded-xl px-3 py-2.5 border border-white/5">
-          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Wilgotność</p>
+        <div className="flex-1 bg-gray-900/60 rounded-xl px-3 py-2.5 border border-white/5">
+          <p className="text-[8px] font-bold text-neutral-500 uppercase tracking-wider mb-0.5">Wilgotność</p>
           <div className="flex items-center gap-1.5">
             <Droplets size={12} className="text-blue-400" />
             <span className="text-sm font-bold text-white">{data.humidity}%</span>
           </div>
         </div>
-        <div className="flex-1 bg-slate-800/60 rounded-xl px-3 py-2.5 border border-white/5">
-          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Wiatr</p>
+        <div className="flex-1 bg-gray-900/60 rounded-xl px-3 py-2.5 border border-white/5">
+          <p className="text-[8px] font-bold text-neutral-500 uppercase tracking-wider mb-0.5">Wiatr</p>
           <div className="flex items-center gap-1.5">
             <Wind size={12} className="text-emerald-400" />
             <span className="text-sm font-bold text-white">{data.windSpeed} km/h</span>

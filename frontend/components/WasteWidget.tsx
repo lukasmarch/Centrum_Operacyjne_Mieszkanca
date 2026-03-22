@@ -21,12 +21,12 @@ const getWasteIcon = (type: string) => {
 
 const getWasteStyles = (type: string) => {
     const lower = type.toLowerCase();
-    if (lower.includes('zmieszane')) return 'bg-slate-700/30 text-slate-300 border-slate-600/30';
+    if (lower.includes('zmieszane')) return 'bg-slate-700/30 text-neutral-300 border-slate-600/30';
     if (lower.includes('bio')) return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
     if (lower.includes('metale')) return 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20';
     if (lower.includes('papier')) return 'bg-blue-500/10 text-blue-300 border-blue-500/20';
     if (lower.includes('szkło')) return 'bg-green-500/10 text-green-300 border-green-500/20';
-    if (lower.includes('popiół')) return 'bg-slate-500/20 text-slate-400 border-slate-500/20';
+    if (lower.includes('popiół')) return 'bg-slate-500/20 text-neutral-400 border-slate-500/20';
     return 'bg-purple-500/10 text-purple-300 border-purple-500/20';
 };
 
@@ -38,12 +38,12 @@ const WasteWidget: React.FC<WasteWidgetProps> = ({ events, town }) => {
         <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
             <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5 backdrop-blur-md">
                 <div>
-                    <h2 className="font-bold text-slate-100 text-lg flex items-center gap-2">
+                    <h2 className="font-bold text-neutral-100 text-lg flex items-center gap-2">
                         <Truck className="text-emerald-400" size={22} />
                         Harmonogram Odbioru
                     </h2>
-                    <p className="text-sm text-slate-400 mt-1">
-                        Najbliższe wywozy dla miejscowości: <span className="font-semibold text-slate-200">{town}</span>
+                    <p className="text-sm text-neutral-400 mt-1">
+                        Najbliższe wywozy dla miejscowości: <span className="font-semibold text-neutral-200">{town}</span>
                     </p>
                 </div>
                 <button className="text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 transition-colors">
@@ -83,13 +83,13 @@ const WasteWidget: React.FC<WasteWidgetProps> = ({ events, town }) => {
                         })}
                     </div>
                 ) : (
-                    <div className="text-center py-8 text-slate-500">
+                    <div className="text-center py-8 text-neutral-500">
                         <p>Brak zaplanowanych odbiorów w najbliższym czasie.</p>
                     </div>
                 )}
             </div>
 
-            <div className="bg-white/5 px-5 py-3 text-xs text-slate-500 flex justify-between items-center border-t border-white/5">
+            <div className="bg-white/5 px-5 py-3 text-xs text-neutral-500 flex justify-between items-center border-t border-white/5">
                 <span>Dane na rok 2026</span>
                 <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>

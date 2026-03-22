@@ -67,7 +67,7 @@ const KPICard: React.FC<KPICardProps> = ({
   };
 
   const getTrendBgColor = () => {
-    if (!trend || trend === 0) return 'bg-slate-800';
+    if (!trend || trend === 0) return 'bg-gray-900';
     return trend > 0 ? 'bg-green-500/10' : 'bg-red-500/10';
   };
 
@@ -78,7 +78,7 @@ const KPICard: React.FC<KPICardProps> = ({
 
   return (
     <div
-      className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-5 hover:border-slate-700 transition-all relative overflow-hidden min-w-0 ${className}`}
+      className={`bg-gray-950 rounded-xl shadow-sm border border-gray-800/50 p-5 hover:border-gray-700/50 transition-all relative overflow-hidden min-w-0 ${className}`}
     >
       {/* Level Badge (if powiat) */}
       {level === 'powiat' && (
@@ -90,14 +90,14 @@ const KPICard: React.FC<KPICardProps> = ({
       {/* Header with icon and label */}
       <div className="flex items-start justify-between mb-3 mt-1">
         <div className="flex-1 pr-4">
-          <p className="text-sm text-slate-400 font-medium mb-1 line-clamp-2 min-h-[40px]" title={label}>{label}</p>
+          <p className="text-sm text-neutral-400 font-medium mb-1 line-clamp-2 min-h-[40px]" title={label}>{label}</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-100">{formatValue(value)}</span>
-            <span className="text-sm text-slate-500 font-medium">{unit}</span>
+            <span className="text-2xl font-bold text-neutral-100">{formatValue(value)}</span>
+            <span className="text-sm text-neutral-500 font-medium">{unit}</span>
           </div>
         </div>
         {Icon && (
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-2.5 rounded-lg flex-shrink-0 border border-slate-700">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-2.5 rounded-lg flex-shrink-0 border border-gray-700/50">
             <Icon className="text-blue-400" size={20} />
           </div>
         )}
@@ -112,7 +112,7 @@ const KPICard: React.FC<KPICardProps> = ({
             {getTrendIcon()}
             {Math.abs(trend).toFixed(2)}%
           </span>
-          <span className="text-xs text-slate-500">rok do roku</span>
+          <span className="text-xs text-neutral-500">rok do roku</span>
         </div>
       )}
 

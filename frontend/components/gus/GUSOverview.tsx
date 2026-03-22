@@ -82,18 +82,18 @@ const GUSOverview: React.FC = () => {
       <div className="mb-8">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-100 mb-2">
+            <h1 className="text-3xl font-bold text-neutral-100 mb-2">
               Statystyki GUS - Gmina Rybno
             </h1>
-            <p className="text-slate-400">
+            <p className="text-neutral-400">
               Dane historyczne z Banku Danych Lokalnych GUS (1995-{latest_year})
             </p>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-neutral-500 mt-1">
               Pokazujemy TYLKO dane gminy Rybno • 8 wskaźników • {user_tier === 'free' ? 'Free tier' : user_tier}
             </p>
           </div>
           {user_tier && (
-            <span className="px-4 py-2 rounded-full text-sm font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">
+            <span className="px-4 py-2 rounded-full text-sm font-bold uppercase bg-gray-900 text-neutral-300 border border-gray-700/50">
               {user_tier === 'free' ? 'FREE (8 wskaźników)' : user_tier}
             </span>
           )}
@@ -220,8 +220,8 @@ const GUSOverview: React.FC = () => {
       {/* Historical Trend Charts Section */}
       <div className="mb-8">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-slate-100 mb-2">Trendy historyczne (10 lat)</h2>
-          <p className="text-slate-400">
+          <h2 className="text-2xl font-bold text-neutral-100 mb-2">Trendy historyczne (10 lat)</h2>
+          <p className="text-neutral-400">
             Wykresy pokazują jak wskaźniki zmieniały się w czasie • Dane od {latest_year - 9} do {latest_year}
           </p>
         </div>
@@ -229,10 +229,10 @@ const GUSOverview: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
           {/* Population Trend */}
           {population && population.historical && population.historical.length > 0 && (
-            <div className="bg-slate-900 rounded-xl p-6 min-w-0 border border-slate-800">
+            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-slate-100 mb-1">Ludność gminy</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-lg font-bold text-neutral-100 mb-1">Ludność gminy</h3>
+                <p className="text-sm text-neutral-500">
                   Trend: {population.trend_pct && population.trend_pct > 0 ? '▲' : '▼'}{' '}
                   {Math.abs(population.trend_pct || 0).toFixed(2)}% rok do roku
                 </p>
@@ -250,10 +250,10 @@ const GUSOverview: React.FC = () => {
 
           {/* Births Trend */}
           {births && births.historical && births.historical.length > 0 && (
-            <div className="bg-slate-900 rounded-xl p-6 min-w-0 border border-slate-800">
+            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-slate-100 mb-1">Urodzenia żywe</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-lg font-bold text-neutral-100 mb-1">Urodzenia żywe</h3>
+                <p className="text-sm text-neutral-500">
                   Trend: {births.trend_pct && births.trend_pct > 0 ? '▲' : '▼'}{' '}
                   {Math.abs(births.trend_pct || 0).toFixed(2)}% rok do roku
                 </p>
@@ -271,10 +271,10 @@ const GUSOverview: React.FC = () => {
 
           {/* Migration Balance Trend */}
           {migration && migration.historical && migration.historical.length > 0 && (
-            <div className="bg-slate-900 rounded-xl p-6 min-w-0 border border-slate-800">
+            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-slate-100 mb-1">Saldo migracji na 1000 ludności</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-lg font-bold text-neutral-100 mb-1">Saldo migracji na 1000 ludności</h3>
+                <p className="text-sm text-neutral-500">
                   Trend: {migration.trend_pct && migration.trend_pct > 0 ? '▲' : '▼'}{' '}
                   {Math.abs(migration.trend_pct || 0).toFixed(2)}% zmiana YoY
                 </p>
@@ -292,10 +292,10 @@ const GUSOverview: React.FC = () => {
 
           {/* Business Dynamics - Entity Registrations */}
           {entities && entities.historical && entities.historical.length > 0 && (
-            <div className="bg-slate-900 rounded-xl p-6 min-w-0 border border-slate-800">
+            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-slate-100 mb-1">Podmioty REGON na 10k</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-lg font-bold text-neutral-100 mb-1">Podmioty REGON na 10k</h3>
+                <p className="text-sm text-neutral-500">
                   Trend: {entities.trend_pct && entities.trend_pct > 0 ? '▲' : '▼'}{' '}
                   {Math.abs(entities.trend_pct || 0).toFixed(2)}% rok do roku
                 </p>
@@ -313,10 +313,10 @@ const GUSOverview: React.FC = () => {
 
           {/* Revenue Per Capita Trend */}
           {revenue && revenue.historical && revenue.historical.length > 0 && (
-            <div className="bg-slate-900 rounded-xl p-6 min-w-0 border border-slate-800">
+            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-slate-100 mb-1">Dochody gminy per capita</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-lg font-bold text-neutral-100 mb-1">Dochody gminy per capita</h3>
+                <p className="text-sm text-neutral-500">
                   Trend: {revenue.trend_pct && revenue.trend_pct > 0 ? '▲' : '▼'}{' '}
                   {Math.abs(revenue.trend_pct || 0).toFixed(2)}% rok do roku
                 </p>
@@ -334,10 +334,10 @@ const GUSOverview: React.FC = () => {
 
           {/* Expenditure Per Capita Trend */}
           {expenditure && expenditure.historical && expenditure.historical.length > 0 && (
-            <div className="bg-slate-900 rounded-xl p-6 min-w-0 border border-slate-800">
+            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-slate-100 mb-1">Wydatki gminy per capita</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-lg font-bold text-neutral-100 mb-1">Wydatki gminy per capita</h3>
+                <p className="text-sm text-neutral-500">
                   Trend: {expenditure.trend_pct && expenditure.trend_pct > 0 ? '▲' : '▼'}{' '}
                   {Math.abs(expenditure.trend_pct || 0).toFixed(2)}% rok do roku
                 </p>
@@ -362,30 +362,30 @@ const GUSOverview: React.FC = () => {
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
 
           <div className="flex items-start gap-6 relative z-10">
-            <div className="p-4 bg-slate-900 rounded-lg shadow-sm border border-slate-800">
+            <div className="p-4 bg-gray-950 rounded-lg shadow-sm border border-gray-800/50">
               <TrendingUp className="text-indigo-400" size={32} />
             </div>
             <div className="flex-1">
-              <h3 className="text-2xl font-bold text-slate-100 mb-2">
+              <h3 className="text-2xl font-bold text-neutral-100 mb-2">
                 Odblokuj Premium - 47 dodatkowych wskaźników
               </h3>
-              <p className="text-slate-400 mb-4 leading-relaxed">
+              <p className="text-neutral-400 mb-4 leading-relaxed">
                 Uzyskaj dostęp do pełnej analizy gminy:
               </p>
               <ul className="space-y-2 mb-6">
-                <li className="flex items-center gap-2 text-slate-300">
+                <li className="flex items-center gap-2 text-neutral-300">
                   <ArrowUpRight className="text-indigo-400" size={18} />
                   <span>7 kategorii danych (Demografia, Finanse, Przedsiębiorczość, Edukacja, Zdrowie, Rynek Pracy, Mieszkalnictwo)</span>
                 </li>
-                <li className="flex items-center gap-2 text-slate-300">
+                <li className="flex items-center gap-2 text-neutral-300">
                   <ArrowUpRight className="text-indigo-400" size={18} />
                   <span>Porównania gmina vs powiat Działdowski</span>
                 </li>
-                <li className="flex items-center gap-2 text-slate-300">
+                <li className="flex items-center gap-2 text-neutral-300">
                   <ArrowUpRight className="text-indigo-400" size={18} />
                   <span>Dane historyczne od 1995 roku</span>
                 </li>
-                <li className="flex items-center gap-2 text-slate-300">
+                <li className="flex items-center gap-2 text-neutral-300">
                   <ArrowUpRight className="text-indigo-400" size={18} />
                   <span>Export danych do CSV/Excel</span>
                 </li>

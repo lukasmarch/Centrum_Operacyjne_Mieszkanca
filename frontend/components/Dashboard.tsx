@@ -15,7 +15,7 @@ import { getHoliday, getNameDays } from '../src/utils/calendarUtils';
 
 import BentoGrid from './BentoGrid';
 import BentoTile from './BentoTile';
-import PromptBar from './PromptBar';
+import HeroSection from './hero/HeroSection';
 import AIBriefingTile from './AIBriefingTile';
 import WeatherTile from './WeatherTile';
 import EventsTile from './EventsTile';
@@ -66,24 +66,24 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
           <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">
             {user ? `Witaj, ${user.full_name.split(' ')[0]}! 👋` : 'Witaj, mieszkańcu! 👋'}
           </h2>
-          <p className="text-slate-400">Centrum Dowodzenia RybnoLive gotowe do działania.</p>
+          <p className="text-neutral-400">Centrum Dowodzenia RybnoLive gotowe do działania.</p>
         </div>
-        <div className="hidden md:flex items-center gap-4 text-slate-300/80">
+        <div className="hidden md:flex items-center gap-4 text-neutral-300/80">
           <div className="text-right">
             <p className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">
               {today.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
             {holiday && <p className="text-sm font-medium text-blue-400 mt-0.5">🎉 {holiday}</p>}
-            {nameDays && <p className="text-xs text-slate-500 mt-0.5">Imieniny: {nameDays}</p>}
+            {nameDays && <p className="text-xs text-neutral-500 mt-0.5">Imieniny: {nameDays}</p>}
           </div>
-          <div className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl shadow-inner">
+          <div className="w-11 h-11 rounded-xl bg-gray-900 border border-gray-800/50 flex items-center justify-center text-xl shadow-inner">
             📅
           </div>
         </div>
       </header>
 
-      {/* PromptBar - AI Assistant Hero */}
-      <PromptBar onNavigate={onNavigate} onSubmit={onQuerySubmit} />
+      {/* Hero Section - AI Assistant with Spline 3D */}
+      <HeroSection onNavigate={onNavigate} onSubmit={onQuerySubmit} />
 
       {/* ===== BENTO GRID (data-driven by layout preset) ===== */}
       <BentoGrid>

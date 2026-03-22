@@ -116,13 +116,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
         );
       case 'business':
         return (
-          <span className="px-3 py-1 bg-slate-800 text-white rounded-full text-sm font-bold">
+          <span className="px-3 py-1 bg-gray-900 text-white rounded-full text-sm font-bold">
             Business
           </span>
         );
       default:
         return (
-          <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-sm font-medium">
+          <span className="px-3 py-1 bg-gray-950 text-neutral-600 rounded-full text-sm font-medium">
             Free
           </span>
         );
@@ -142,7 +142,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-black mb-2">Ustawienia konta</h1>
-        <p className="text-slate-500">Zarządzaj swoim profilem i preferencjami</p>
+        <p className="text-neutral-500">Zarządzaj swoim profilem i preferencjami</p>
       </div>
 
       {/* Success message */}
@@ -162,14 +162,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Sidebar */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 sticky top-24">
+          <div className="bg-gray-950 rounded-2xl p-6 border border-gray-800/50 sticky top-24">
             {/* User info */}
             <div className="text-center mb-6">
               <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-2xl mx-auto mb-3">
                 {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
               </div>
               <h3 className="font-bold text-lg">{user.full_name}</h3>
-              <p className="text-slate-400 text-sm">{user.email}</p>
+              <p className="text-neutral-400 text-sm">{user.email}</p>
               <div className="mt-2">{getTierBadge(user.tier as UserTier)}</div>
             </div>
 
@@ -180,7 +180,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                 className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
                   activeTab === 'profile'
                     ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-slate-600 hover:bg-slate-50'
+                    : 'text-neutral-600 hover:bg-gray-950'
                 }`}
               >
                 Profil
@@ -190,7 +190,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                 className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
                   activeTab === 'password'
                     ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-slate-600 hover:bg-slate-50'
+                    : 'text-neutral-600 hover:bg-gray-950'
                 }`}
               >
                 Hasło
@@ -200,14 +200,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                 className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
                   activeTab === 'preferences'
                     ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-slate-600 hover:bg-slate-50'
+                    : 'text-neutral-600 hover:bg-gray-950'
                 }`}
               >
                 Preferencje
               </button>
             </nav>
 
-            <hr className="my-4 border-slate-100" />
+            <hr className="my-4 border-gray-800/50" />
 
             {/* Logout */}
             <button
@@ -223,12 +223,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
         <div className="lg:col-span-3">
           {/* Profile Tab */}
           {activeTab === 'profile' && (
-            <div className="bg-white rounded-2xl p-8 border border-slate-100">
+            <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
               <h2 className="text-xl font-bold mb-6">Dane profilu</h2>
 
               <form onSubmit={handleProfileSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
                     Imię i nazwisko
                   </label>
                   <input
@@ -237,28 +237,28 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setProfileData((p) => ({ ...p, full_name: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     disabled={isLoading}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
                     Email
                   </label>
                   <input
                     type="email"
                     value={user.email}
                     disabled
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-500"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-950 text-neutral-500"
                   />
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-neutral-400 mt-1">
                     Email nie może być zmieniony
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
                     Miejscowość
                   </label>
                   <select
@@ -266,7 +266,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setProfileData((p) => ({ ...p, location: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-gray-950"
                     disabled={isLoading}
                   >
                     {AVAILABLE_LOCATIONS.map((loc) => (
@@ -275,7 +275,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-neutral-400 mt-1">
                     Twoja lokalizacja wpływa na spersonalizowane informacje (pogoda,
                     wydarzenia, wywóz śmieci)
                   </p>
@@ -294,12 +294,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
 
           {/* Password Tab */}
           {activeTab === 'password' && (
-            <div className="bg-white rounded-2xl p-8 border border-slate-100">
+            <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
               <h2 className="text-xl font-bold mb-6">Zmiana hasła</h2>
 
               <form onSubmit={handlePasswordSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
                     Aktualne hasło
                   </label>
                   <input
@@ -308,13 +308,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, currentPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     disabled={isLoading}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
                     Nowe hasło
                   </label>
                   <input
@@ -323,16 +323,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, newPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     disabled={isLoading}
                   />
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-neutral-400 mt-1">
                     Min. 8 znaków, wielka litera i cyfra
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
                     Potwierdź nowe hasło
                   </label>
                   <input
@@ -341,7 +341,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, confirmPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     disabled={isLoading}
                   />
                 </div>
@@ -361,15 +361,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
           {activeTab === 'preferences' && (
             <div className="space-y-6">
               {/* Subscription */}
-              <div className="bg-white rounded-2xl p-8 border border-slate-100">
+              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
                 <h2 className="text-xl font-bold mb-4">Subskrypcja</h2>
 
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                <div className="flex items-center justify-between p-4 bg-gray-950 rounded-xl">
                   <div>
                     <p className="font-semibold">
                       Plan: {getTierBadge(user.tier as UserTier)}
                     </p>
-                    <p className="text-sm text-slate-500 mt-1">
+                    <p className="text-sm text-neutral-500 mt-1">
                       {isPremium
                         ? 'Masz dostęp do wszystkich funkcji Premium'
                         : 'Uaktualnij do Premium, aby odblokować więcej funkcji'}
@@ -387,9 +387,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               </div>
 
               {/* Dashboard Layout Presets */}
-              <div className="bg-white rounded-2xl p-8 border border-slate-100">
+              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
                 <h2 className="text-xl font-bold mb-2">Układ dashboardu</h2>
-                <p className="text-sm text-slate-500 mb-6">
+                <p className="text-sm text-neutral-500 mb-6">
                   Wybierz układ kafelków na stronie głównej
                 </p>
 
@@ -403,7 +403,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                         events:      'bg-violet-400',
                         airly:       'bg-emerald-400',
                         gmina:       'bg-rose-400',
-                        news:        'bg-slate-400',
+                        news:        'bg-gray-400',
                       };
 
                       const MiniGridPreview = () => (
@@ -432,12 +432,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                           className={`text-left p-4 rounded-xl border-2 transition-all disabled:opacity-60 ${
                             isActive
                               ? 'border-blue-500 bg-blue-50'
-                              : 'border-slate-200 hover:border-slate-300 bg-slate-50'
+                              : 'border-gray-800/50 hover:border-gray-700 bg-gray-950'
                           }`}
                         >
                           <MiniGridPreview />
-                          <p className="font-semibold text-sm text-slate-800">{layout.name}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{layout.description}</p>
+                          <p className="font-semibold text-sm text-neutral-200">{layout.name}</p>
+                          <p className="text-xs text-neutral-500 mt-0.5">{layout.description}</p>
                           {isActive && (
                             <p className="text-xs text-blue-600 font-semibold mt-1">
                               {layoutSaving ? 'Zapisywanie...' : 'Aktywny'}
@@ -453,25 +453,25 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                       {(Object.values(DASHBOARD_LAYOUTS) as typeof DASHBOARD_LAYOUTS[DashboardLayoutId][]).map((layout) => (
                         <div
                           key={layout.id}
-                          className="p-4 rounded-xl border-2 border-slate-200 bg-slate-50"
+                          className="p-4 rounded-xl border-2 border-gray-800/50 bg-gray-950"
                         >
                           <div className="grid grid-cols-4 gap-0.5 h-12 mb-3">
                             {layout.tiles.map((tile) => (
                               <div
                                 key={tile.id}
                                 style={{ gridColumn: `span ${Math.min(tile.colSpan, 4)}` }}
-                                className="rounded-sm bg-slate-300"
+                                className="rounded-sm bg-gray-300"
                               />
                             ))}
                           </div>
-                          <p className="font-semibold text-sm text-slate-800">{layout.name}</p>
+                          <p className="font-semibold text-sm text-neutral-200">{layout.name}</p>
                         </div>
                       ))}
                     </div>
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                      <div className="text-center bg-white/90 px-6 py-4 rounded-2xl shadow-sm border border-slate-100">
-                        <p className="text-slate-700 font-semibold mb-1">Funkcja Premium</p>
-                        <p className="text-slate-500 text-sm mb-3">
+                      <div className="text-center bg-gray-950/90 px-6 py-4 rounded-2xl shadow-sm border border-gray-800/50">
+                        <p className="text-neutral-300 font-semibold mb-1">Funkcja Premium</p>
+                        <p className="text-neutral-500 text-sm mb-3">
                           Wybierz układ dashboardu z planem Premium
                         </p>
                         <button
@@ -487,14 +487,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               </div>
 
               {/* Newsletter */}
-              <div className="bg-white rounded-2xl p-8 border border-slate-100">
+              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
                 <h2 className="text-xl font-bold mb-4">Newsletter</h2>
 
                 <div className="space-y-4">
-                  <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer">
+                  <label className="flex items-center justify-between p-4 bg-gray-950 rounded-xl cursor-pointer">
                     <div>
                       <p className="font-semibold">Newsletter tygodniowy</p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-neutral-500">
                         Podsumowanie tygodnia co sobotę
                       </p>
                     </div>
@@ -508,8 +508,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                   <label
                     className={`flex items-center justify-between p-4 rounded-xl ${
                       isPremium
-                        ? 'bg-slate-50 cursor-pointer'
-                        : 'bg-slate-100/50 cursor-not-allowed'
+                        ? 'bg-gray-950 cursor-pointer'
+                        : 'bg-gray-950/50 cursor-not-allowed'
                     }`}
                   >
                     <div>
@@ -521,7 +521,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                           </span>
                         )}
                       </p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-neutral-500">
                         Poranny briefing pon-pt o 6:30
                       </p>
                     </div>
@@ -535,11 +535,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               </div>
 
               {/* Push Notifications */}
-              <div className="bg-white rounded-2xl p-8 border border-slate-100">
+              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
                 <h2 className="text-xl font-bold mb-4">Powiadomienia push</h2>
 
                 {!pushSupported ? (
-                  <div className="p-4 bg-slate-50 rounded-xl text-slate-500 text-sm">
+                  <div className="p-4 bg-gray-950 rounded-xl text-neutral-500 text-sm">
                     Twoja przeglądarka nie obsługuje powiadomień push.
                   </div>
                 ) : pushStatus === 'denied' ? (
@@ -549,10 +549,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <label className="flex items-center justify-between p-4 bg-slate-50 rounded-xl cursor-pointer">
+                    <label className="flex items-center justify-between p-4 bg-gray-950 rounded-xl cursor-pointer">
                       <div>
                         <p className="font-semibold">Alerty bezpieczeństwa</p>
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-neutral-500">
                           Pożary, wypadki – natychmiastowe powiadomienia
                         </p>
                         <p className="text-xs text-green-600 mt-0.5">Dostępne bezpłatnie</p>
@@ -569,7 +569,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                         }}
                         disabled={pushLoading || pushStatus === 'loading'}
                         className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          pushSubscribed ? 'bg-blue-600' : 'bg-slate-200'
+                          pushSubscribed ? 'bg-blue-600' : 'bg-gray-200'
                         } disabled:opacity-50`}
                         role="switch"
                         aria-checked={pushSubscribed}
@@ -583,7 +583,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     </label>
 
                     {pushSubscribed && (
-                      <p className="text-xs text-slate-500 px-1">
+                      <p className="text-xs text-neutral-500 px-1">
                         Powiadomienia włączone. Otrzymasz alerty o pożarach, wypadkach, smogu i dziennym podsumowaniu.
                       </p>
                     )}
@@ -592,18 +592,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               </div>
 
               {/* Account info */}
-              <div className="bg-white rounded-2xl p-8 border border-slate-100">
+              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
                 <h2 className="text-xl font-bold mb-4">Informacje o koncie</h2>
 
                 <dl className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Data rejestracji</dt>
+                    <dt className="text-neutral-500">Data rejestracji</dt>
                     <dd className="font-medium">
                       {new Date(user.created_at).toLocaleDateString('pl-PL')}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Ostatnie logowanie</dt>
+                    <dt className="text-neutral-500">Ostatnie logowanie</dt>
                     <dd className="font-medium">
                       {user.last_login
                         ? new Date(user.last_login).toLocaleString('pl-PL')
@@ -611,7 +611,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Email zweryfikowany</dt>
+                    <dt className="text-neutral-500">Email zweryfikowany</dt>
                     <dd className="font-medium">
                       {user.email_verified ? (
                         <span className="text-green-600">Tak</span>

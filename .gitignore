@@ -52,3 +52,4 @@ temp_opady_widget
 # Logs (keep .gitkeep)
 backend/logs/*.log
 
+!frontend/lib/

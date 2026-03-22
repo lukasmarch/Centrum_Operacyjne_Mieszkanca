@@ -48,7 +48,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <RefreshCw className="animate-spin text-blue-400 mx-auto mb-4" size={48} />
-          <p className="text-slate-400 text-lg font-medium">Ładowanie sekcji...</p>
+          <p className="text-neutral-400 text-lg font-medium">Ładowanie sekcji...</p>
         </div>
       </div>
     );
@@ -101,8 +101,8 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
     return (
       <div className="max-w-2xl mx-auto mt-12 p-8 bg-amber-900/20 border border-amber-500/30 rounded-xl text-center">
         <AlertCircle className="text-amber-400 mx-auto mb-4" size={32} />
-        <h3 className="text-xl font-bold text-slate-100 mb-2">Brak danych dla tej sekcji</h3>
-        <p className="text-slate-400 mb-4">
+        <h3 className="text-xl font-bold text-neutral-100 mb-2">Brak danych dla tej sekcji</h3>
+        <p className="text-neutral-400 mb-4">
           Sekcja nie zawiera jeszcze danych dla Gminy Rybno.
         </p>
         <button
@@ -143,8 +143,8 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-100 mb-2">{section_name}</h1>
-            <p className="text-slate-400">
+            <h1 className="text-3xl font-bold text-neutral-100 mb-2">{section_name}</h1>
+            <p className="text-neutral-400">
               Szczegółowe statystyki dla Gminy Rybno · {variableKeys.length} wskaźników
             </p>
           </div>
@@ -158,7 +158,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
       {/* KPI Cards Row (all variables in section) */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-slate-100 mb-4">Kluczowe wskaźniki</h2>
+        <h2 className="text-xl font-bold text-neutral-100 mb-4">Kluczowe wskaźniki</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-w-0">
           {variableKeys.map(varKey => {
             const variable = variables[varKey];
@@ -217,8 +217,8 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
         {/* Gmina vs Powiat Comparison (Only for Gmina-level variables) */}
         {primaryVariable.current.metadata.level === 'gmina' && primaryVariable.powiat_comparison && (
-          <div className="bg-slate-800/60 rounded-xl border border-white/5 p-5 min-w-0">
-            <h3 className="text-lg font-bold text-slate-100 mb-4">Gmina vs Powiat</h3>
+          <div className="bg-gray-900/60 rounded-xl border border-white/5 p-5 min-w-0">
+            <h3 className="text-lg font-bold text-neutral-100 mb-4">Gmina vs Powiat</h3>
             <div style={{ width: '100%', height: '320px', minWidth: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -251,7 +251,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 p-3 bg-blue-900/20 rounded-lg text-sm text-slate-300 text-center border border-blue-500/20">
+            <div className="mt-4 p-3 bg-blue-900/20 rounded-lg text-sm text-neutral-300 text-center border border-blue-500/20">
               Gmina stanowi <strong className="text-blue-400">{primaryVariable.powiat_comparison.percentage_of_powiat}%</strong> wartości powiatu.
             </div>
           </div>
@@ -259,19 +259,19 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
         {/* Powiat Level Information (Fallback for missing gmina data) */}
         {primaryVariable.current.metadata.level === 'powiat' && (
-          <div className="bg-slate-800/60 rounded-xl border border-white/5 p-5 flex flex-col justify-center items-center text-center h-full min-h-[400px] min-w-0">
+          <div className="bg-gray-900/60 rounded-xl border border-white/5 p-5 flex flex-col justify-center items-center text-center h-full min-h-[400px] min-w-0">
             <div className="bg-amber-900/20 p-4 rounded-full mb-4">
               <Info className="text-amber-400" size={32} />
             </div>
-            <h3 className="text-lg font-bold text-slate-100 mb-2">Dane na poziomie powiatu</h3>
-            <p className="text-slate-400 max-w-sm">
+            <h3 className="text-lg font-bold text-neutral-100 mb-2">Dane na poziomie powiatu</h3>
+            <p className="text-neutral-400 max-w-sm">
               Dla tego wskaźnika szczegółowe dane dla Gminy Rybno nie są dostępne w Banku Danych Lokalnych GUS.
             </p>
-            <div className="mt-6 p-4 bg-slate-700/50 rounded-lg border border-white/10">
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1">
+            <div className="mt-6 p-4 bg-gray-800/50 rounded-lg border border-white/10">
+              <p className="text-xs text-neutral-500 uppercase tracking-wide font-semibold mb-1">
                 Wartość dla Powiatu Działdowskiego
               </p>
-              <p className="text-2xl font-bold text-slate-100">
+              <p className="text-2xl font-bold text-neutral-100">
                 {primaryVariable.current.value.toLocaleString('pl-PL')} {primaryVariable.current.metadata.unit}
               </p>
             </div>
@@ -279,16 +279,16 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
         )}
 
         {/* Additional metrics - placeholder for future donut/bar charts */}
-        <div className="bg-slate-800/60 rounded-xl border border-white/5 p-5 min-w-0">
-          <h3 className="text-lg font-bold text-slate-100 mb-4">Dodatkowe metryki</h3>
+        <div className="bg-gray-900/60 rounded-xl border border-white/5 p-5 min-w-0">
+          <h3 className="text-lg font-bold text-neutral-100 mb-4">Dodatkowe metryki</h3>
           <div className="space-y-3">
             {variableKeys.slice(0, 5).map(varKey => {
               const variable = variables[varKey];
               return (
                 <div key={varKey} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300 font-medium">{variable.current.metadata.name}</span>
+                  <span className="text-neutral-300 font-medium">{variable.current.metadata.name}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-100 font-bold">
+                    <span className="text-neutral-100 font-bold">
                       {variable.current.value.toLocaleString('pl-PL')} {variable.current.metadata.unit}
                     </span>
                     {variable.current.trend_pct != null && (
@@ -308,24 +308,24 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
         {/* Quick stats summary */}
         <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 rounded-xl border border-blue-500/20 p-5">
-          <h3 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-neutral-100 mb-4 flex items-center gap-2">
             <TrendingUp className="text-blue-400" size={20} />
             Podsumowanie
           </h3>
           <div className="space-y-3 text-sm">
             <div>
-              <p className="text-slate-400 mb-1">Liczba wskaźników w sekcji</p>
-              <p className="text-2xl font-bold text-slate-100">{variableKeys.length}</p>
+              <p className="text-neutral-400 mb-1">Liczba wskaźników w sekcji</p>
+              <p className="text-2xl font-bold text-neutral-100">{variableKeys.length}</p>
             </div>
             <div>
-              <p className="text-slate-400 mb-1">Ostatnia aktualizacja</p>
-              <p className="text-lg font-semibold text-slate-100">
+              <p className="text-neutral-400 mb-1">Ostatnia aktualizacja</p>
+              <p className="text-lg font-semibold text-neutral-100">
                 {new Date(last_refresh).toLocaleDateString('pl-PL')}
               </p>
             </div>
             <div>
-              <p className="text-slate-400 mb-1">Zakres danych</p>
-              <p className="text-lg font-semibold text-slate-100">
+              <p className="text-neutral-400 mb-1">Zakres danych</p>
+              <p className="text-lg font-semibold text-neutral-100">
                 {trendData.length > 0
                   ? `${trendData[0].year} - ${trendData[trendData.length - 1].year}`
                   : 'Brak danych'}
@@ -336,24 +336,24 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
       </div>
 
       {/* Data Table (all variables with YoY change) */}
-      <div className="mb-8 bg-slate-800/60 rounded-xl border border-white/5 overflow-hidden">
+      <div className="mb-8 bg-gray-900/60 rounded-xl border border-white/5 overflow-hidden">
         <div className="p-5 border-b border-white/5">
-          <h2 className="text-xl font-bold text-slate-100">Wszystkie wskaźniki</h2>
+          <h2 className="text-xl font-bold text-neutral-100">Wszystkie wskaźniki</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-700/40 border-b border-white/5">
+            <thead className="bg-gray-800/40 border-b border-white/5">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-5 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">
                   Wskaźnik
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-5 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider">
                   Wartość (2024)
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-5 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider">
                   Zmiana r/r
                 </th>
-                <th className="px-5 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-5 py-3 text-center text-xs font-semibold text-neutral-400 uppercase tracking-wider">
                   Poziom
                 </th>
               </tr>
@@ -362,11 +362,11 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
               {variableKeys.map(varKey => {
                 const variable = variables[varKey];
                 return (
-                  <tr key={varKey} className="hover:bg-slate-700/30 transition-colors">
-                    <td className="px-5 py-4 text-sm font-medium text-slate-200">
+                  <tr key={varKey} className="hover:bg-gray-800/30 transition-colors">
+                    <td className="px-5 py-4 text-sm font-medium text-neutral-200">
                       {variable.current.metadata.name}
                     </td>
-                    <td className="px-5 py-4 text-sm text-right text-slate-100 font-semibold">
+                    <td className="px-5 py-4 text-sm text-right text-neutral-100 font-semibold">
                       {variable.current.value.toLocaleString('pl-PL')} {variable.current.metadata.unit}
                     </td>
                     <td className="px-5 py-4 text-sm text-right">
@@ -381,11 +381,11 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
                           {variable.current.trend_pct.toFixed(2)}%
                         </span>
                       ) : (
-                        <span className="text-slate-600">—</span>
+                        <span className="text-neutral-600">—</span>
                       )}
                     </td>
                     <td className="px-5 py-4 text-center">
-                      <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-slate-700 text-slate-400">
+                      <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-gray-800 text-neutral-400">
                         {variable.current.metadata.level === 'gmina' ? 'Gmina' : 'Powiat'}
                       </span>
                     </td>
@@ -409,10 +409,10 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
       )}
 
       {/* Data freshness footer */}
-      <div className="mt-8 p-4 bg-slate-800/40 rounded-lg border border-white/5 text-sm text-slate-400 text-center">
+      <div className="mt-8 p-4 bg-gray-900/40 rounded-lg border border-white/5 text-sm text-neutral-400 text-center">
         <RefreshCw size={16} className="inline mr-2" />
         Ostatnia aktualizacja danych:{' '}
-        <strong className="text-slate-100">
+        <strong className="text-neutral-100">
           {new Date(last_refresh).toLocaleDateString('pl-PL', {
             year: 'numeric',
             month: 'long',

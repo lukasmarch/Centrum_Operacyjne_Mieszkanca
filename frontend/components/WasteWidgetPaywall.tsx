@@ -7,11 +7,11 @@ const WasteWidgetPaywall: React.FC = () => {
       {/* Header - identyczny jak WasteWidget */}
       <div className="p-5 border-b border-white/10 flex justify-between items-center bg-emerald-500/5 backdrop-blur-md">
         <div>
-          <h2 className="font-bold text-slate-100 text-lg flex items-center gap-2">
+          <h2 className="font-bold text-neutral-100 text-lg flex items-center gap-2">
             <Truck className="text-emerald-400" size={22} />
             Harmonogram Odbioru Śmieci
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-neutral-400 mt-1">
             Funkcja dostępna w planie Premium
           </p>
         </div>
@@ -19,7 +19,7 @@ const WasteWidgetPaywall: React.FC = () => {
 
       {/* Paywall - wzorowany na Enhanced GUS */}
       <div className="p-8">
-        <div className="bg-gradient-to-r from-emerald-600/20 to-green-600/20 rounded-2xl p-6 text-slate-100 shadow-xl border border-emerald-500/30">
+        <div className="bg-gradient-to-r from-emerald-600/20 to-green-600/20 rounded-2xl p-6 text-neutral-100 shadow-xl border border-emerald-500/30">
           <div className="flex items-start gap-4">
             <div className="text-4xl">🔓</div>
             <div className="flex-1">

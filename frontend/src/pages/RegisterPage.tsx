@@ -86,11 +86,11 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
             D
           </div>
           <h1 className="text-3xl font-black mb-2">Dołącz do nas!</h1>
-          <p className="text-slate-500">Stwórz konto w Centrum Operacyjnym</p>
+          <p className="text-neutral-500">Stwórz konto w Centrum Operacyjnym</p>
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+        <div className="bg-gray-950 rounded-3xl p-8 shadow-sm border border-gray-800/50">
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Error message */}
             {(error || localError) && (
@@ -101,7 +101,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
 
             {/* Full name */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-sm font-semibold text-neutral-300 mb-2">
                 Imię i nazwisko *
               </label>
               <input
@@ -110,14 +110,14 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 value={formData.full_name}
                 onChange={handleChange}
                 placeholder="Jan Kowalski"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-sm font-semibold text-neutral-300 mb-2">
                 Email *
               </label>
               <input
@@ -126,21 +126,21 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="twoj@email.pl"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
             </div>
 
             {/* Location */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-sm font-semibold text-neutral-300 mb-2">
                 Miejscowość
               </label>
               <select
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-gray-950"
                 disabled={isLoading}
               >
                 {AVAILABLE_LOCATIONS.map((loc) => (
@@ -149,14 +149,14 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-neutral-400 mt-1">
                 Wybierz swoją miejscowość, aby otrzymywać spersonalizowane informacje
               </p>
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-sm font-semibold text-neutral-300 mb-2">
                 Hasło *
               </label>
               <input
@@ -165,17 +165,17 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-neutral-400 mt-1">
                 Min. 8 znaków, wielka litera i cyfra
               </p>
             </div>
 
             {/* Confirm password */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-sm font-semibold text-neutral-300 mb-2">
                 Potwierdź hasło *
               </label>
               <input
@@ -184,7 +184,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
             </div>
@@ -224,15 +224,15 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
           {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
+              <div className="w-full border-t border-gray-800/50"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-slate-400">lub</span>
+              <span className="px-4 bg-gray-950 text-neutral-400">lub</span>
             </div>
           </div>
 
           {/* Login link */}
-          <p className="text-center text-slate-600">
+          <p className="text-center text-neutral-600">
             Masz już konto?{' '}
             <button
               onClick={() => onNavigate('login')}

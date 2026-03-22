@@ -81,21 +81,21 @@ const SectionNav: React.FC<SectionNavProps> = ({
   const getTierBadgeColor = (tier: UserTier): string => {
     switch (tier) {
       case 'free':
-        return 'bg-slate-800 text-slate-400 border border-slate-700';
+        return 'bg-gray-900 text-neutral-400 border border-gray-700/50';
       case 'premium':
         return 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
       case 'business':
         return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
       default:
-        return 'bg-slate-800 text-slate-400';
+        return 'bg-gray-900 text-neutral-400';
     }
   };
 
   return (
-    <div className={`bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-4 ${className}`}>
+    <div className={`bg-gray-950 rounded-xl shadow-sm border border-gray-800/50 p-4 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-slate-100">Kategorie Statystyk</h3>
+        <h3 className="text-lg font-bold text-neutral-100">Kategorie Statystyk</h3>
         {userTier && (
           <span
             className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getTierBadgeColor(userTier as UserTier)}`}
@@ -128,8 +128,8 @@ const SectionNav: React.FC<SectionNavProps> = ({
                 ${isActive
                   ? 'border-blue-500/50 bg-blue-500/10 shadow-lg shadow-blue-500/10'
                   : isAccessible
-                    ? 'border-slate-800 bg-slate-800/30 hover:border-slate-600 hover:bg-slate-800'
-                    : 'border-slate-800/50 bg-slate-900 opacity-40 cursor-not-allowed grayscale'
+                    ? 'border-gray-800/50 bg-gray-900/30 hover:border-gray-600 hover:bg-gray-900'
+                    : 'border-gray-800/50/50 bg-gray-950 opacity-40 cursor-not-allowed grayscale'
                 }
               `}
             >
@@ -147,8 +147,8 @@ const SectionNav: React.FC<SectionNavProps> = ({
                   ${isActive
                     ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
                     : isAccessible
-                      ? 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-200'
-                      : 'bg-slate-800/50 text-slate-600'
+                      ? 'bg-gray-900 text-neutral-400 group-hover:bg-gray-700 group-hover:text-neutral-200'
+                      : 'bg-gray-900/50 text-neutral-600'
                   }
                 `}
               >
@@ -162,8 +162,8 @@ const SectionNav: React.FC<SectionNavProps> = ({
                   ${isActive
                     ? 'text-blue-400'
                     : isAccessible
-                      ? 'text-slate-400 group-hover:text-slate-200'
-                      : 'text-slate-600'
+                      ? 'text-neutral-400 group-hover:text-neutral-200'
+                      : 'text-neutral-600'
                   }
                 `}
               >

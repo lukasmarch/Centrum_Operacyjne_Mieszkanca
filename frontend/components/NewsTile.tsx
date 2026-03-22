@@ -44,7 +44,7 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Newspaper size={16} className="text-blue-400" />
-          <span className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-wider">
+          <span className="text-xs sm:text-sm font-bold text-neutral-300 uppercase tracking-wider">
             Najnowsze Wiadomości
           </span>
         </div>
@@ -59,10 +59,10 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
       {/* ── Content ── */}
       {loading ? (
         <div className="flex-1 flex flex-col gap-2 animate-pulse">
-          <div className="h-32 bg-slate-800/50 rounded-xl" />
+          <div className="h-32 bg-gray-900/50 rounded-xl" />
           <div className="space-y-1">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-12 bg-slate-800/50 rounded-lg" />
+              <div key={i} className="h-12 bg-gray-900/50 rounded-lg" />
             ))}
           </div>
         </div>
@@ -95,7 +95,7 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                     <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${theme.badge}`}>
                       {(featured.category || 'INFO').toUpperCase()}
                     </span>
-                    <span className="text-[10px] text-slate-400">{getTimeAgo(featured.timestamp)}</span>
+                    <span className="text-[10px] text-neutral-400">{getTimeAgo(featured.timestamp)}</span>
                   </div>
                   <h4 className="text-sm sm:text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                     {featured.title}
@@ -137,11 +137,11 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                       <span className={`text-[8px] font-bold uppercase px-1 py-px rounded border whitespace-nowrap ${theme.badge}`}>
                         {(article.category || 'INFO').toUpperCase()}
                       </span>
-                      <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                      <span className="text-[9px] text-neutral-400 whitespace-nowrap">
                         {getTimeAgo(article.timestamp)}
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm font-semibold text-slate-200 leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
+                    <p className="text-xs sm:text-sm font-semibold text-neutral-200 leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                       {article.title}
                     </p>
                   </div>
@@ -154,27 +154,27 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
           <div className="flex items-center gap-3 pt-2.5 mt-1 border-t border-white/5 flex-wrap">
             {/* Article count */}
             {articles && (
-              <span className="text-[10px] sm:text-xs font-semibold text-slate-400">
+              <span className="text-[10px] sm:text-xs font-semibold text-neutral-400">
                 {articles.length} artykułów
               </span>
             )}
-            <span className="text-slate-600">·</span>
-            <span className="text-[10px] sm:text-xs text-slate-400">
+            <span className="text-neutral-600">·</span>
+            <span className="text-[10px] sm:text-xs text-neutral-400">
               Źródeł: {categoryStats.length}
             </span>
 
             {/* Category dots */}
-            <span className="text-slate-600 hidden sm:inline">·</span>
+            <span className="text-neutral-600 hidden sm:inline">·</span>
             <div className="hidden sm:flex items-center gap-2.5">
               {categoryStats.slice(0, 5).map(({ category, count, theme }) => (
                 <span
                   key={category}
-                  className="inline-flex items-center gap-1 text-[10px] text-slate-400"
+                  className="inline-flex items-center gap-1 text-[10px] text-neutral-400"
                   title={`${category}: ${count}`}
                 >
                   <span className={`w-2 h-2 rounded-full ${theme.dot}`} />
                   <span className="font-medium uppercase">{category}</span>
-                  <span className="font-black text-slate-500">{count}</span>
+                  <span className="font-black text-neutral-500">{count}</span>
                 </span>
               ))}
             </div>

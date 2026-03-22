@@ -42,12 +42,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-3xl text-white mx-auto mb-4 shadow-lg shadow-blue-500/30">
             D
           </div>
-          <h1 className="text-3xl font-black mb-2 text-slate-100">Witaj ponownie!</h1>
-          <p className="text-slate-400">Zaloguj się do Centrum Operacyjnego</p>
+          <h1 className="text-3xl font-black mb-2 text-neutral-100">Witaj ponownie!</h1>
+          <p className="text-neutral-400">Zaloguj się do Centrum Operacyjnego</p>
         </div>
 
         {/* Form */}
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-slate-800">
+        <div className="bg-gray-950/50 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-gray-800/50">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Error message */}
             {(error || localError) && (
@@ -58,7 +58,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-neutral-300 mb-2">
                 Email
               </label>
               <input
@@ -66,14 +66,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="twoj@email.pl"
-                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-gray-700/50 text-neutral-100 placeholder-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-neutral-300 mb-2">
                 Hasło
               </label>
               <input
@@ -81,7 +81,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-gray-700/50 text-neutral-100 placeholder-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
             </div>
@@ -131,15 +131,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
           {/* Divider */}
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-800"></div>
+              <div className="w-full border-t border-gray-800/50"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900 text-slate-500 rounded-full">lub</span>
+              <span className="px-4 bg-gray-950 text-neutral-500 rounded-full">lub</span>
             </div>
           </div>
 
           {/* Register link */}
-          <p className="text-center text-slate-400">
+          <p className="text-center text-neutral-400">
             Nie masz jeszcze konta?{' '}
             <button
               onClick={() => onNavigate('register')}
@@ -151,7 +151,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-slate-500 text-sm mt-6">
+        <p className="text-center text-neutral-500 text-sm mt-6">
           Logując się, akceptujesz{' '}
           <a href="#" className="text-blue-400 hover:underline">
             Regulamin

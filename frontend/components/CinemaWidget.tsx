@@ -34,21 +34,21 @@ export const CinemaWidget: React.FC = () => {
     const currentRepertoire = data[activeTab];
 
     return (
-        <div className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden h-full flex flex-col">
+        <div className="bg-gray-950 rounded-3xl border border-gray-800/50 overflow-hidden h-full flex flex-col">
             {/* Header */}
             <div className="p-4 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Film size={14} className="text-purple-400" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Repertuar Kina</span>
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Repertuar Kina</span>
                 </div>
-                <div className="flex bg-slate-800/80 rounded-lg p-0.5 gap-0.5">
+                <div className="flex bg-gray-900/80 rounded-lg p-0.5 gap-0.5">
                     {[CinemaLocation.DZIALDOWO, CinemaLocation.LUBAWA].map(loc => (
                         <button
                             key={loc}
                             onClick={() => setActiveTab(loc)}
                             className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all ${activeTab === loc
                                     ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
-                                    : 'text-slate-500 hover:text-slate-300'
+                                    : 'text-neutral-500 hover:text-neutral-300'
                                 }`}
                         >
                             {loc === CinemaLocation.DZIALDOWO ? 'Działdowo' : 'Lubawa'}
@@ -58,7 +58,7 @@ export const CinemaWidget: React.FC = () => {
             </div>
 
             {/* Date bar */}
-            <div className="px-4 pb-3 flex items-center justify-between text-[9px] text-slate-400">
+            <div className="px-4 pb-3 flex items-center justify-between text-[9px] text-neutral-400">
                 <span className="flex items-center gap-1"><CalendarDays size={9} /> Repertuar tygodnia</span>
                 <span className="flex items-center gap-1"><MapPin size={9} /> {currentRepertoire?.cinemaName || 'Kino'}</span>
             </div>
@@ -68,7 +68,7 @@ export const CinemaWidget: React.FC = () => {
                 {loading && !currentRepertoire ? (
                     <div className="flex flex-col items-center justify-center h-40 space-y-2">
                         <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
-                        <p className="text-[9px] text-slate-500">Ładowanie repertuaru...</p>
+                        <p className="text-[9px] text-neutral-500">Ładowanie repertuaru...</p>
                     </div>
                 ) : currentRepertoire?.movies?.length ? (
                     currentRepertoire.movies.map((movie, idx) => (
@@ -80,15 +80,15 @@ export const CinemaWidget: React.FC = () => {
 
                             {/* Info */}
                             <div className="flex-1 min-w-0 flex flex-col">
-                                <h4 className="text-[11px] font-bold text-slate-200 leading-tight group-hover:text-purple-300 transition-colors line-clamp-2">
+                                <h4 className="text-[11px] font-bold text-neutral-200 leading-tight group-hover:text-purple-300 transition-colors line-clamp-2">
                                     {movie.title}
                                 </h4>
-                                <p className="text-[9px] text-slate-600 uppercase tracking-wide mt-0.5">{movie.genre}</p>
+                                <p className="text-[9px] text-neutral-600 uppercase tracking-wide mt-0.5">{movie.genre}</p>
 
                                 {/* Showtimes */}
                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                     {movie.time?.map((t, tIdx) => (
-                                        <span key={tIdx} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded text-[9px] font-semibold border border-slate-700/50 flex items-center gap-0.5">
+                                        <span key={tIdx} className="px-1.5 py-0.5 bg-gray-900 text-neutral-300 rounded text-[9px] font-semibold border border-gray-700/50/50 flex items-center gap-0.5">
                                             <Clock size={7} className="text-purple-400" /> {t}
                                         </span>
                                     ))}
@@ -108,7 +108,7 @@ export const CinemaWidget: React.FC = () => {
                         </div>
                     ))
                 ) : (
-                    <div className="text-center py-8 text-slate-600 text-[10px]">
+                    <div className="text-center py-8 text-neutral-600 text-[10px]">
                         Brak seansów na dziś
                     </div>
                 )}

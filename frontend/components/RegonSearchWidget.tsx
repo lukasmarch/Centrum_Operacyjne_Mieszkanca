@@ -54,17 +54,17 @@ const BusinessCard: React.FC<{ item: LocalBusiness; onClose: () => void }> = ({ 
         .filter(Boolean).join(' ') || item.miasto;
 
     return (
-        <div className="rounded-2xl border border-blue-500/30 bg-gradient-to-br from-slate-900 to-slate-800/80 overflow-hidden shadow-xl">
+        <div className="rounded-2xl border border-blue-500/30 bg-gradient-to-br from-gray-950 to-gray-900/80 overflow-hidden shadow-xl">
             {/* Card header */}
-            <div className="px-4 pt-4 pb-3 border-b border-slate-700/50 flex items-start justify-between gap-3">
+            <div className="px-4 pt-4 pb-3 border-b border-gray-700/50/50 flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                     <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-xs font-black text-blue-400 shrink-0">
                         {item.nazwa.substring(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                        <h4 className="text-sm font-bold text-slate-100 leading-tight">{item.nazwa}</h4>
+                        <h4 className="text-sm font-bold text-neutral-100 leading-tight">{item.nazwa}</h4>
                         {item.wlasciciel_imie && (
-                            <p className="text-[11px] text-slate-500 mt-0.5">
+                            <p className="text-[11px] text-neutral-500 mt-0.5">
                                 {item.wlasciciel_imie} {item.wlasciciel_nazwisko}
                             </p>
                         )}
@@ -73,11 +73,11 @@ const BusinessCard: React.FC<{ item: LocalBusiness; onClose: () => void }> = ({ 
                 <div className="flex items-center gap-2 shrink-0">
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'AKTYWNY'
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-                        : 'bg-slate-700 text-slate-400 border border-slate-600'
+                        : 'bg-gray-700 text-neutral-400 border border-gray-600'
                         }`}>
                         {item.status === 'AKTYWNY' ? '● aktywna' : item.status.toLowerCase()}
                     </span>
-                    <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors">
+                    <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300 transition-colors">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -88,7 +88,7 @@ const BusinessCard: React.FC<{ item: LocalBusiness; onClose: () => void }> = ({ 
                 {/* Category */}
                 {item.branza && (
                     <div className="flex items-center gap-2">
-                        <span className="text-slate-500 w-4 text-center text-sm">{CATEGORY_ICONS[item.branza] ?? '📌'}</span>
+                        <span className="text-neutral-500 w-4 text-center text-sm">{CATEGORY_ICONS[item.branza] ?? '📌'}</span>
                         <span className="text-[11px] font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
                             {item.branza}
                         </span>
@@ -96,8 +96,8 @@ const BusinessCard: React.FC<{ item: LocalBusiness; onClose: () => void }> = ({ 
                 )}
 
                 {/* Address */}
-                <div className="flex items-start gap-2 text-xs text-slate-400">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500 mt-0.5 shrink-0" />
+                <div className="flex items-start gap-2 text-xs text-neutral-400">
+                    <MapPin className="w-3.5 h-3.5 text-neutral-500 mt-0.5 shrink-0" />
                     <span className="leading-snug">
                         {addressLine}
                         {item.kod_pocztowy && <>, {item.kod_pocztowy}</>} {item.miasto}
@@ -106,7 +106,7 @@ const BusinessCard: React.FC<{ item: LocalBusiness; onClose: () => void }> = ({ 
 
                 {/* Year founded */}
                 {yearFounded && (
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <div className="flex items-center gap-2 text-xs text-neutral-500">
                         <CalendarDays className="w-3.5 h-3.5 shrink-0" />
                         <span>Założona w {yearFounded} r.</span>
                     </div>
@@ -145,20 +145,20 @@ const ResultRow: React.FC<{ item: LocalBusiness; isSelected: boolean; onClick: (
     <button
         onClick={onClick}
         className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 ${isSelected
-            ? 'bg-blue-500/10 border-blue-500/30 text-slate-100'
-            : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.07] hover:border-white/10 text-slate-300'
+            ? 'bg-blue-500/10 border-blue-500/30 text-neutral-100'
+            : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.07] hover:border-white/10 text-neutral-300'
             }`}
     >
         <div className="min-w-0">
             <p className="text-xs font-bold leading-tight truncate">{item.nazwa}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+            <p className="text-[10px] text-neutral-500 mt-0.5 flex items-center gap-1">
                 <MapPin className="w-2.5 h-2.5 inline" /> {item.miasto}
                 {item.branza && <> · <span className="text-indigo-400">{CATEGORY_ICONS[item.branza] ?? '📌'} {item.branza}</span></>}
             </p>
         </div>
         {isSelected
             ? <ChevronUp className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            : <ChevronDown className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+            : <ChevronDown className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
         }
     </button>
 );
@@ -215,23 +215,23 @@ const BusinessSearchWidget: React.FC = () => {
     const selectedItem = results.find(r => r.id === selectedId) ?? null;
 
     return (
-        <div className="bg-slate-900 rounded-3xl p-5 border border-slate-800 h-full flex flex-col gap-4">
+        <div className="bg-gray-950 rounded-3xl p-5 border border-gray-800/50 h-full flex flex-col gap-4">
             {/* Header */}
             <div className="flex items-center gap-2">
                 <Building2 size={14} className="text-emerald-400" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Katalog Firm</span>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Katalog Firm</span>
             </div>
 
             {/* Search bar */}
             <form onSubmit={handleSubmit} className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" />
                 <input
                     ref={inputRef}
                     type="text"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder="Szukaj firmy po nazwie…"
-                    className="w-full pl-9 pr-20 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                    className="w-full pl-9 pr-20 py-2.5 rounded-xl bg-black/60 border border-gray-700/50 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
                 />
                 <button
                     type="submit"
@@ -245,13 +245,13 @@ const BusinessSearchWidget: React.FC = () => {
             {/* Quick-category chips */}
             {!searched && !loading && (
                 <div>
-                    <p className="text-[10px] text-slate-600 uppercase tracking-wider font-bold mb-2">Popularne kategorie</p>
+                    <p className="text-[10px] text-neutral-600 uppercase tracking-wider font-bold mb-2">Popularne kategorie</p>
                     <div className="flex flex-wrap gap-1.5">
                         {QUICK_CATEGORIES.map(cat => (
                             <button
                                 key={cat.label}
                                 onClick={() => handleChip(cat.query)}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/70 border border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-200 hover:border-slate-600 transition-all text-xs font-medium"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900/70 border border-gray-700/50 text-neutral-400 hover:bg-gray-700 hover:text-neutral-200 hover:border-gray-600 transition-all text-xs font-medium"
                             >
                                 <span>{cat.icon}</span>
                                 {cat.label}
@@ -270,7 +270,7 @@ const BusinessSearchWidget: React.FC = () => {
                 )}
 
                 {searched && results.length === 0 && !error && (
-                    <div className="text-center py-8 text-slate-500 text-xs">
+                    <div className="text-center py-8 text-neutral-500 text-xs">
                         Brak firm pasujących do „{query}"
                     </div>
                 )}
@@ -291,7 +291,7 @@ const BusinessSearchWidget: React.FC = () => {
                 ))}
 
                 {results.length > 0 && !selectedId && (
-                    <p className="text-[10px] text-slate-600 text-center pt-1">
+                    <p className="text-[10px] text-neutral-600 text-center pt-1">
                         Kliknij firmę, aby zobaczyć szczegóły
                     </p>
                 )}

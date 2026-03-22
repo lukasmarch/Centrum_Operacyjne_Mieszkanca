@@ -22,8 +22,8 @@ const getDateGroup = (rawTimestamp: string): 'today' | 'yesterday' | 'older' => 
 
 const DATE_GROUP_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
   today: { label: 'Dzisiaj', icon: <Sparkles size={12} className="text-blue-400" /> },
-  yesterday: { label: 'Wczoraj', icon: <Clock size={12} className="text-slate-500" /> },
-  older: { label: 'Starsze', icon: <Clock size={12} className="text-slate-600" /> },
+  yesterday: { label: 'Wczoraj', icon: <Clock size={12} className="text-neutral-500" /> },
+  older: { label: 'Starsze', icon: <Clock size={12} className="text-neutral-600" /> },
 };
 
 const getTimeAgo = (timestamp: string) => {
@@ -56,13 +56,13 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
         />
         {/* Category badge overlay */}
         <div className="absolute top-3 left-3">
-          <span className={`backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-slate-900/70 ${theme.badge}`}>
+          <span className={`backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-gray-950/70 ${theme.badge}`}>
             {article.category || 'INFO'}
           </span>
         </div>
         {/* Time badge */}
         <div className="absolute top-3 right-3">
-          <span className="backdrop-blur-md bg-slate-900/70 text-slate-300 px-2 py-1 rounded-lg text-[9px] font-medium border border-white/10">
+          <span className="backdrop-blur-md bg-gray-950/70 text-neutral-300 px-2 py-1 rounded-lg text-[9px] font-medium border border-white/10">
             {getTimeAgo(article.rawTimestamp || article.timestamp)}
           </span>
         </div>
@@ -71,13 +71,13 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
       {/* Content */}
       <div className="flex-1 flex flex-col p-4">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{article.source}</span>
+          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wide">{article.source}</span>
         </div>
-        <h3 className="text-base font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors leading-snug line-clamp-2">
+        <h3 className="text-base font-bold text-neutral-200 mb-2 group-hover:text-blue-400 transition-colors leading-snug line-clamp-2">
           {article.title}
         </h3>
         {article.summary && article.summary !== 'Brak opisu' && (
-          <p className="text-sm text-slate-400 line-clamp-3 mb-4 flex-1">
+          <p className="text-sm text-neutral-400 line-clamp-3 mb-4 flex-1">
             {article.summary}
           </p>
         )}
@@ -85,7 +85,7 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
           href={article.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full py-2.5 rounded-xl bg-white/5 text-slate-300 font-bold text-sm hover:bg-blue-600 hover:text-white transition-all text-center border border-white/5 mt-auto"
+          className="w-full py-2.5 rounded-xl bg-white/5 text-neutral-300 font-bold text-sm hover:bg-blue-600 hover:text-white transition-all text-center border border-white/5 mt-auto"
         >
           Czytaj więcej
         </a>
@@ -160,27 +160,27 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
 
   if (loading) return (
     <div className="space-y-6">
-      <div className="h-8 w-40 bg-slate-800/50 rounded-xl animate-pulse" />
+      <div className="h-8 w-40 bg-gray-900/50 rounded-xl animate-pulse" />
       <div className="flex gap-2">
-        {[1, 2, 3, 4].map(i => <div key={i} className="h-8 w-24 bg-slate-800/50 rounded-full animate-pulse" />)}
+        {[1, 2, 3, 4].map(i => <div key={i} className="h-8 w-24 bg-gray-900/50 rounded-full animate-pulse" />)}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[1, 2, 3, 4, 5, 6].map(i => (
-          <div key={i} className="h-72 bg-slate-800/30 rounded-2xl animate-pulse" />
+          <div key={i} className="h-72 bg-gray-900/30 rounded-2xl animate-pulse" />
         ))}
       </div>
     </div>
   );
 
   if (error) return <div className="text-center p-8 text-red-500">Błąd: {error}</div>;
-  if (!articles || articles.length === 0) return <div className="text-center p-8 text-slate-500">Brak wiadomości.</div>;
+  if (!articles || articles.length === 0) return <div className="text-center p-8 text-neutral-500">Brak wiadomości.</div>;
 
   return (
     <div className="space-y-6">
       {/* Title */}
       <div className="flex items-center gap-3">
         <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Aktualności</h2>
-        <span className="text-xs font-bold text-slate-600 bg-slate-800/50 px-2 py-0.5 rounded-full">{articles.length} artykułów</span>
+        <span className="text-xs font-bold text-neutral-600 bg-gray-900/50 px-2 py-0.5 rounded-full">{articles.length} artykułów</span>
       </div>
 
       {/* Categories – compact chips with overflow */}
@@ -190,7 +190,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
           onClick={() => setActiveCategory('Wszystkie')}
           className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${activeCategory === 'Wszystkie'
               ? 'bg-blue-600/20 text-blue-300 border-blue-500/30 shadow-lg shadow-blue-500/10'
-              : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+              : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10'
             }`}
         >
           Wszystkie
@@ -208,7 +208,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
               onClick={() => setActiveCategory(cat)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${activeCategory === cat
                   ? `${theme.badge} shadow-lg`
-                  : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+                  : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10'
                 }`}
             >
               {isAwaria && <AlertTriangle size={10} />}
@@ -223,7 +223,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
         {overflowCount > 0 && (
           <button
             onClick={() => setChipsExpanded(prev => !prev)}
-            className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-slate-400 border border-white/5 hover:bg-white/10 transition-all flex items-center gap-1"
+            className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-neutral-400 border border-white/5 hover:bg-white/10 transition-all flex items-center gap-1"
           >
             {chipsExpanded ? (
               <>Ukryj <ChevronUp size={10} /></>
@@ -241,11 +241,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
         const groupInfo = DATE_GROUP_LABELS[group];
         return (
           <div key={group} className="space-y-4">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+            <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
               <span className="h-px flex-1 bg-white/5" />
               {groupInfo.icon}
               {groupInfo.label}
-              <span className="text-slate-600 font-medium">({groupArticles.length})</span>
+              <span className="text-neutral-600 font-medium">({groupArticles.length})</span>
               <span className="h-px flex-1 bg-white/5" />
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -258,7 +258,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
       })}
 
       {filteredArticles.length === 0 && (
-        <div className="text-center py-16 text-slate-500">
+        <div className="text-center py-16 text-neutral-500">
           <div className="text-4xl mb-3">📰</div>
           Brak artykułów w kategorii „{activeCategory}".
         </div>

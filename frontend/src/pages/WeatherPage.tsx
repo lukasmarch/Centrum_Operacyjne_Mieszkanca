@@ -156,14 +156,14 @@ const WeatherPage: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-100 tracking-tight">Pogoda i Jakość Powietrza</h1>
-                    <p className="text-slate-400">Analityka historyczna warunków atmosferycznych w Gminie Rybno.</p>
+                    <h1 className="text-3xl font-black text-neutral-100 tracking-tight">Pogoda i Jakość Powietrza</h1>
+                    <p className="text-neutral-400">Analityka historyczna warunków atmosferycznych w Gminie Rybno.</p>
                 </div>
                 <div className="flex items-center gap-4">
                     <select
                         value={selectedDays}
                         onChange={(e) => setSelectedDays(Number(e.target.value))}
-                        className="px-4 py-2 border border-slate-700 rounded-xl bg-slate-800 text-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-4 py-2 border border-gray-700/50 rounded-xl bg-gray-900 text-neutral-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value={1}>Ostatni dzień</option>
                         <option value={3}>Ostatnie 3 dni</option>
@@ -171,8 +171,8 @@ const WeatherPage: React.FC = () => {
                         <option value={14}>Ostatnie 2 tygodnie</option>
                     </select>
                     <div className="text-right hidden sm:block">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">PUNKTÓW DANYCH</div>
-                        <div className="font-mono text-slate-300 font-bold">{weatherHistory.length}</div>
+                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider">PUNKTÓW DANYCH</div>
+                        <div className="font-mono text-neutral-300 font-bold">{weatherHistory.length}</div>
                     </div>
                 </div>
             </div>
@@ -218,14 +218,14 @@ const WeatherPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                 {/* Temperature Range Chart */}
-                <div className="bg-slate-900/50 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-sm relative overflow-hidden group">
+                <div className="bg-gray-950/50 backdrop-blur-xl p-6 rounded-3xl border border-gray-800/50 shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -z-10 transition-opacity opacity-50 group-hover:opacity-100"></div>
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">
+                        <h3 className="font-bold text-lg text-neutral-100 flex items-center gap-2">
                             <span className="p-1.5 bg-blue-500/20 rounded-lg text-blue-400">🌡️</span>
                             Temperatura
                         </h3>
-                        <span className="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-1 rounded-full font-bold">
+                        <span className="text-xs bg-gray-900 text-neutral-400 border border-gray-700/50 px-2 py-1 rounded-full font-bold">
                             Min / Max / Aktualna
                         </span>
                     </div>
@@ -290,14 +290,14 @@ const WeatherPage: React.FC = () => {
                 </div>
 
                 {/* Wind Chart */}
-                <div className="bg-slate-900/50 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-sm relative overflow-hidden group">
+                <div className="bg-gray-950/50 backdrop-blur-xl p-6 rounded-3xl border border-gray-800/50 shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full blur-3xl -z-10 transition-opacity opacity-50 group-hover:opacity-100"></div>
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">
+                        <h3 className="font-bold text-lg text-neutral-100 flex items-center gap-2">
                             <span className="p-1.5 bg-teal-500/20 rounded-lg text-teal-400">💨</span>
                             Prędkość wiatru
                         </h3>
-                        <span className="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-1 rounded-full font-bold">m/s</span>
+                        <span className="text-xs bg-gray-900 text-neutral-400 border border-gray-700/50 px-2 py-1 rounded-full font-bold">m/s</span>
                     </div>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -350,14 +350,14 @@ const WeatherPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                 {/* Humidity & Clouds Chart */}
-                <div className="bg-slate-900/50 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-sm relative overflow-hidden group">
+                <div className="bg-gray-950/50 backdrop-blur-xl p-6 rounded-3xl border border-gray-800/50 shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl -z-10 transition-opacity opacity-50 group-hover:opacity-100"></div>
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">
+                        <h3 className="font-bold text-lg text-neutral-100 flex items-center gap-2">
                             <span className="p-1.5 bg-indigo-500/20 rounded-lg text-indigo-400">💧</span>
                             Wilgotność i Zachmurzenie
                         </h3>
-                        <span className="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-1 rounded-full font-bold">%</span>
+                        <span className="text-xs bg-gray-900 text-neutral-400 border border-gray-700/50 px-2 py-1 rounded-full font-bold">%</span>
                     </div>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -405,14 +405,14 @@ const WeatherPage: React.FC = () => {
                 </div>
 
                 {/* Pressure Chart */}
-                <div className="bg-slate-900/50 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-sm relative overflow-hidden group">
+                <div className="bg-gray-950/50 backdrop-blur-xl p-6 rounded-3xl border border-gray-800/50 shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl -z-10 transition-opacity opacity-50 group-hover:opacity-100"></div>
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">
+                        <h3 className="font-bold text-lg text-neutral-100 flex items-center gap-2">
                             <span className="p-1.5 bg-purple-500/20 rounded-lg text-purple-400">🔵</span>
                             Ciśnienie atmosferyczne
                         </h3>
-                        <span className="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-1 rounded-full font-bold">hPa</span>
+                        <span className="text-xs bg-gray-900 text-neutral-400 border border-gray-700/50 px-2 py-1 rounded-full font-bold">hPa</span>
                     </div>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -459,14 +459,14 @@ const WeatherPage: React.FC = () => {
             </div>
 
             {/* Air Quality Chart */}
-            <div className="bg-slate-900/50 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-slate-500/5 rounded-full blur-3xl -z-10"></div>
+            <div className="bg-gray-950/50 backdrop-blur-xl p-6 rounded-3xl border border-gray-800/50 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gray-500/5 rounded-full blur-3xl -z-10"></div>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">
-                        <span className="p-1.5 bg-slate-800 rounded-lg text-slate-400">🌫️</span>
+                    <h3 className="font-bold text-lg text-neutral-100 flex items-center gap-2">
+                        <span className="p-1.5 bg-gray-900 rounded-lg text-neutral-400">🌫️</span>
                         Zanieczyszczenie PM (Pyły zawieszone)
                     </h3>
-                    <span className="text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2 py-1 rounded-full font-bold">µg/m³</span>
+                    <span className="text-xs bg-gray-900 text-neutral-400 border border-gray-700/50 px-2 py-1 rounded-full font-bold">µg/m³</span>
                 </div>
                 <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -498,27 +498,27 @@ const WeatherPage: React.FC = () => {
             </div>
 
             {/* Info Box */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
+            <div className="bg-gray-950/80 border border-gray-800/50 rounded-2xl p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -z-10"></div>
-                <h4 className="font-bold text-slate-100 mb-3 text-lg flex items-center gap-2">
+                <h4 className="font-bold text-neutral-100 mb-3 text-lg flex items-center gap-2">
                     <span className="text-blue-400">📊</span> O analizie danych pogodowych
                 </h4>
-                <div className="grid md:grid-cols-2 gap-6 text-sm text-slate-400 leading-relaxed">
+                <div className="grid md:grid-cols-2 gap-6 text-sm text-neutral-400 leading-relaxed">
                     <div>
-                        <strong className="text-slate-200 block mb-1">Temperatura:</strong>
+                        <strong className="text-neutral-200 block mb-1">Temperatura:</strong>
                         Wykres pokazuje zakres temperatur (min/max) oraz aktualną temperaturę.
                         Różnica między nimi wskazuje na dobowe wahania termiczne.
                     </div>
                     <div>
-                        <strong className="text-slate-200 block mb-1">Wiatr:</strong>
+                        <strong className="text-neutral-200 block mb-1">Wiatr:</strong>
                         Prędkość wiatru w metrach na sekundę. Wartości powyżej 10 m/s oznaczają silny wiatr.
                     </div>
                     <div>
-                        <strong className="text-slate-200 block mb-1">Wilgotność:</strong>
+                        <strong className="text-neutral-200 block mb-1">Wilgotność:</strong>
                         Poziom wilgotności powietrza (%). Optymalna wilgotność to 40-60%.
                     </div>
                     <div>
-                        <strong className="text-slate-200 block mb-1">Ciśnienie:</strong>
+                        <strong className="text-neutral-200 block mb-1">Ciśnienie:</strong>
                         Wahania ciśnienia atmosferycznego wpływają na samopoczucie.
                         Nagłe spadki często zwiastują zmianę pogody.
                     </div>

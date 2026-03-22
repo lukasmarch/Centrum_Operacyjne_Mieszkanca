@@ -56,8 +56,8 @@ const AirlyWidget: React.FC<AirlyWidgetProps> = ({ data, loading, error }) => {
 
     if (loading) {
         return (
-            <div className="w-full h-96 bg-slate-900 rounded-3xl flex items-center justify-center animate-pulse">
-                <div className="text-center text-slate-400">
+            <div className="w-full h-96 bg-gray-950 rounded-3xl flex items-center justify-center animate-pulse">
+                <div className="text-center text-neutral-400">
                     <div className="text-4xl mb-4">🌪️</div>
                     <p>Pobieranie danych o jakości powietrza...</p>
                 </div>
@@ -67,7 +67,7 @@ const AirlyWidget: React.FC<AirlyWidgetProps> = ({ data, loading, error }) => {
 
     if (error || !data) {
         return (
-            <div className="w-full h-96 bg-slate-900 rounded-3xl flex items-center justify-center">
+            <div className="w-full h-96 bg-gray-950 rounded-3xl flex items-center justify-center">
                 <div className="text-center text-red-400">
                     <p>⚠️ Nie udało się pobrać danych</p>
                     <p className="text-sm mt-2">{error}</p>
@@ -96,13 +96,13 @@ const AirlyWidget: React.FC<AirlyWidgetProps> = ({ data, loading, error }) => {
                     <h2 className="text-5xl font-black mb-2 flex items-center gap-4 justify-center md:justify-start">
                         <span className="text-8xl">{Math.round(data.caqi)}</span>
                         <div className="flex flex-col text-left">
-                            <span className="text-lg font-medium text-slate-400">CAQI</span>
-                            <span className={`text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400`}>
+                            <span className="text-lg font-medium text-neutral-400">CAQI</span>
+                            <span className={`text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400`}>
                                 {getLevelText(data.caqi_level)}
                             </span>
                         </div>
                     </h2>
-                    <p className="text-slate-400 mt-6 leading-relaxed max-w-sm">
+                    <p className="text-neutral-400 mt-6 leading-relaxed max-w-sm">
                         {getAdvice(data.caqi_level)}
                     </p>
                 </div>
@@ -114,10 +114,10 @@ const AirlyWidget: React.FC<AirlyWidgetProps> = ({ data, loading, error }) => {
                     <div className="space-y-4">
                         <div>
                             <div className="flex justify-between text-sm mb-1.5">
-                                <span className="text-slate-300">PM 2.5</span>
+                                <span className="text-neutral-300">PM 2.5</span>
                                 <span className="font-mono">{Math.round(data.pm25)} µg/m³ ({Math.round(pm25Percent)}%)</span>
                             </div>
-                            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-2 bg-gray-900 rounded-full overflow-hidden">
                                 <div
                                     className={`h-full rounded-full transition-all duration-1000 ${pm25Percent > 100 ? 'bg-red-500' : 'bg-blue-400'}`}
                                     style={{ width: `${pm25Percent}%` }}
@@ -127,10 +127,10 @@ const AirlyWidget: React.FC<AirlyWidgetProps> = ({ data, loading, error }) => {
 
                         <div>
                             <div className="flex justify-between text-sm mb-1.5">
-                                <span className="text-slate-300">PM 10</span>
+                                <span className="text-neutral-300">PM 10</span>
                                 <span className="font-mono">{Math.round(data.pm10)} µg/m³ ({Math.round(pm10Percent)}%)</span>
                             </div>
-                            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-2 bg-gray-900 rounded-full overflow-hidden">
                                 <div
                                     className={`h-full rounded-full transition-all duration-1000 ${pm10Percent > 100 ? 'bg-red-500' : 'bg-blue-400'}`}
                                     style={{ width: `${pm10Percent}%` }}
@@ -143,17 +143,17 @@ const AirlyWidget: React.FC<AirlyWidgetProps> = ({ data, loading, error }) => {
                     <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/10">
                         <div className="text-center p-2 rounded-xl bg-white/5">
                             <div className="text-xl mb-1">🌡️</div>
-                            <div className="text-sm text-slate-400">Temp</div>
+                            <div className="text-sm text-neutral-400">Temp</div>
                             <div className="font-bold">{data.temperature?.toFixed(1)}°C</div>
                         </div>
                         <div className="text-center p-2 rounded-xl bg-white/5">
                             <div className="text-xl mb-1">💧</div>
-                            <div className="text-sm text-slate-400">Wilgoć</div>
+                            <div className="text-sm text-neutral-400">Wilgoć</div>
                             <div className="font-bold">{data.humidity?.toFixed(0)}%</div>
                         </div>
                         <div className="text-center p-2 rounded-xl bg-white/5">
                             <div className="text-xl mb-1">⏲️</div>
-                            <div className="text-sm text-slate-400">Ciśnienie</div>
+                            <div className="text-sm text-neutral-400">Ciśnienie</div>
                             <div className="font-bold">{data.pressure?.toFixed(0)} hPa</div>
                         </div>
                     </div>

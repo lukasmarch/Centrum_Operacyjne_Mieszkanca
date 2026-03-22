@@ -49,7 +49,7 @@ const AIBriefingTile: React.FC<AIBriefingTileProps> = ({ onNavigate }) => {
             <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
           </div>
           {lastUpdated && (
-            <span className="text-[10px] text-slate-500 font-mono">
+            <span className="text-[10px] text-neutral-500 font-mono">
               {formatTimeAgo(lastUpdated)}
             </span>
           )}
@@ -58,11 +58,11 @@ const AIBriefingTile: React.FC<AIBriefingTileProps> = ({ onNavigate }) => {
         {/* Content */}
         {loading ? (
           <div className="space-y-3 animate-pulse flex-1">
-            <div className="h-6 bg-slate-800/80 rounded-lg w-3/4" />
-            <div className="h-4 bg-slate-800/80 rounded w-full" />
-            <div className="h-4 bg-slate-800/80 rounded w-5/6" />
-            <div className="h-4 bg-slate-800/80 rounded w-4/5" />
-            <div className="h-4 bg-slate-800/80 rounded w-3/4" />
+            <div className="h-6 bg-gray-900/80 rounded-lg w-3/4" />
+            <div className="h-4 bg-gray-900/80 rounded w-full" />
+            <div className="h-4 bg-gray-900/80 rounded w-5/6" />
+            <div className="h-4 bg-gray-900/80 rounded w-4/5" />
+            <div className="h-4 bg-gray-900/80 rounded w-3/4" />
           </div>
         ) : summary ? (
           <>
@@ -73,7 +73,7 @@ const AIBriefingTile: React.FC<AIBriefingTileProps> = ({ onNavigate }) => {
 
             {/* Highlights – akapit z markdown bold */}
             {summary.highlights && (
-              <p className="text-sm text-slate-300 leading-relaxed mb-4">
+              <p className="text-sm text-neutral-300 leading-relaxed mb-4">
                 {renderMarkdown(summary.highlights)}
               </p>
             )}
@@ -84,23 +84,23 @@ const AIBriefingTile: React.FC<AIBriefingTileProps> = ({ onNavigate }) => {
               <div className="flex items-center gap-4 mt-auto pt-3 border-t border-white/5">
                 <div>
                   <p className="text-xl font-black text-blue-400 leading-none">{summary.stats.total_articles}</p>
-                  <p className="text-[10px] text-slate-500 uppercase mt-0.5">artykułów</p>
+                  <p className="text-[10px] text-neutral-500 uppercase mt-0.5">artykułów</p>
                 </div>
                 <div className="w-px h-7 bg-white/5" />
                 <div>
                   <p className="text-xl font-black text-purple-400 leading-none">{summary.stats.events_count}</p>
-                  <p className="text-[10px] text-slate-500 uppercase mt-0.5">wydarzeń</p>
+                  <p className="text-[10px] text-neutral-500 uppercase mt-0.5">wydarzeń</p>
                 </div>
                 <div className="w-px h-7 bg-white/5" />
                 <div>
                   <p className="text-xl font-black text-emerald-400 leading-none">{summary.stats.categories_count}</p>
-                  <p className="text-[10px] text-slate-500 uppercase mt-0.5">kategorii</p>
+                  <p className="text-[10px] text-neutral-500 uppercase mt-0.5">kategorii</p>
                 </div>
               </div>
             )}
           </>
         ) : (
-          <p className="text-sm text-slate-500 italic flex-1">
+          <p className="text-sm text-neutral-500 italic flex-1">
             Briefing generowany codziennie o 7:00...
           </p>
         )}

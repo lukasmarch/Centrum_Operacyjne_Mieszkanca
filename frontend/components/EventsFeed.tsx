@@ -75,14 +75,14 @@ const EventsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
 
     if (loading) return (
         <div className="space-y-6">
-            <div className="h-8 w-56 bg-slate-800/50 rounded-xl animate-pulse" />
-            <div className="h-10 bg-slate-800/30 rounded-xl animate-pulse" />
-            <div className="h-[380px] bg-slate-800/30 rounded-3xl animate-pulse" />
+            <div className="h-8 w-56 bg-gray-900/50 rounded-xl animate-pulse" />
+            <div className="h-10 bg-gray-900/30 rounded-xl animate-pulse" />
+            <div className="h-[380px] bg-gray-900/30 rounded-3xl animate-pulse" />
         </div>
     );
 
     if (error) return <div className="text-center p-8 text-red-500">Błąd: {error}</div>;
-    if (!events || events.length === 0) return <div className="text-center p-8 text-slate-500">Brak nadchodzących wydarzeń.</div>;
+    if (!events || events.length === 0) return <div className="text-center p-8 text-neutral-500">Brak nadchodzących wydarzeń.</div>;
 
     return (
         <div className="space-y-6">
@@ -91,7 +91,7 @@ const EventsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
                 <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
                     Nadchodzące Wydarzenia
                 </h2>
-                <span className="text-xs font-bold text-slate-600 bg-slate-800/50 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-bold text-neutral-600 bg-gray-900/50 px-2 py-0.5 rounded-full">
                     {events.length} events
                 </span>
             </div>
@@ -102,7 +102,7 @@ const EventsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
                     onClick={() => setActiveCategory('Wszystkie')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${activeCategory === 'Wszystkie'
                         ? 'bg-purple-600/20 text-purple-300 border-purple-500/30 shadow-lg shadow-purple-500/10'
-                        : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+                        : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10'
                         }`}
                 >
                     Wszystkie
@@ -118,7 +118,7 @@ const EventsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
                             onClick={() => setActiveCategory(cat)}
                             className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${activeCategory === cat
                                 ? `${chip.active} shadow-lg`
-                                : 'bg-white/5 text-slate-400 border-white/5 hover:bg-white/10'
+                                : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10'
                                 }`}
                         >
                             <div className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
@@ -131,7 +131,7 @@ const EventsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
                 {overflowCount > 0 && (
                     <button
                         onClick={() => setChipsExpanded(p => !p)}
-                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-slate-400 border border-white/5 hover:bg-white/10 transition-all flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-neutral-400 border border-white/5 hover:bg-white/10 transition-all flex items-center gap-1"
                     >
                         {chipsExpanded
                             ? <>Ukryj <ChevronUp size={10} /></>
@@ -146,7 +146,7 @@ const EventsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
 
             {/* Empty state */}
             {filteredEvents.length === 0 && (
-                <div className="text-center py-16 text-slate-500">
+                <div className="text-center py-16 text-neutral-500">
                     <div className="text-4xl mb-3">📅</div>
                     Brak wydarzeń w kategorii „{activeCategory}".
                 </div>

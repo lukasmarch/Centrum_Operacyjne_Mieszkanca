@@ -90,7 +90,7 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
   };
 
   return (
-    <div className={`relative bg-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-700 p-8 ${className}`}>
+    <div className={`relative bg-gray-950/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8 ${className}`}>
       {/* Lock icon overlay */}
       <div className="absolute top-4 right-4">
         <div className={`p-3 rounded-full bg-gradient-to-br ${content.badgeColor} shadow-lg shadow-purple-500/20`}>
@@ -108,10 +108,10 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
       </div>
 
       {/* Title and description */}
-      <h3 className="text-2xl font-bold text-slate-100 mb-2">
+      <h3 className="text-2xl font-bold text-neutral-100 mb-2">
         {content.title}
       </h3>
-      <p className="text-slate-400 mb-4">
+      <p className="text-neutral-400 mb-4">
         {content.description}
       </p>
 
@@ -127,7 +127,7 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
       {/* Features list */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3">
         {content.features.map((feature, index) => (
-          <div key={index} className="flex items-center gap-3 text-slate-300">
+          <div key={index} className="flex items-center gap-3 text-neutral-300">
             <div className={`p-2 rounded-lg bg-gradient-to-br ${content.badgeColor} bg-opacity-10`}>
               {feature.icon}
             </div>
@@ -137,10 +137,10 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
       </div>
 
       {/* Pricing and CTA */}
-      <div className="flex items-center justify-between pt-6 border-t border-slate-700/50">
+      <div className="flex items-center justify-between pt-6 border-t border-gray-700/50/50">
         <div>
-          <p className="text-sm text-slate-500 mb-1">Cena</p>
-          <p className="text-3xl font-bold text-slate-100">{content.price}</p>
+          <p className="text-sm text-neutral-500 mb-1">Cena</p>
+          <p className="text-3xl font-bold text-neutral-100">{content.price}</p>
         </div>
         <button
           className={`px-8 py-3 rounded-lg text-white font-bold shadow-lg transition-all transform hover:scale-105 ${content.buttonColor}`}
@@ -155,8 +155,8 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
 
       {/* Current tier info (if logged in) */}
       {currentTier !== 'free' && (
-        <div className="mt-4 p-3 bg-slate-800 rounded-lg text-sm text-slate-400 text-center">
-          Twój obecny plan: <strong className="text-slate-200 capitalize">{currentTier}</strong>
+        <div className="mt-4 p-3 bg-gray-900 rounded-lg text-sm text-neutral-400 text-center">
+          Twój obecny plan: <strong className="text-neutral-200 capitalize">{currentTier}</strong>
         </div>
       )}
     </div>

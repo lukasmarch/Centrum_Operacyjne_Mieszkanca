@@ -44,10 +44,10 @@ export const CATEGORY_THEME: Record<
 };
 
 const DEFAULT_THEME = {
-  gradient: 'from-slate-700/80 to-slate-900',
+  gradient: 'from-gray-700/80 to-gray-950',
   Icon: Newspaper,
-  badge: 'text-slate-300 bg-slate-500/20 border-slate-400/30',
-  dot: 'bg-slate-400',
+  badge: 'text-neutral-300 bg-gray-500/20 border-neutral-400/30',
+  dot: 'bg-neutral-400',
 };
 
 export function getCategoryTheme(category?: string) {

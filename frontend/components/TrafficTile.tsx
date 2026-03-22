@@ -39,10 +39,10 @@ const TrafficTile: React.FC = () => {
 
     const getIndicatorColor = (status: TrafficCondition) => {
         switch (status) {
-            case TrafficCondition.FLUID: return 'border-slate-500';
+            case TrafficCondition.FLUID: return 'border-neutral-500';
             case TrafficCondition.DIFFICULTIES: return 'border-amber-500 bg-amber-500';
             case TrafficCondition.JAM: return 'border-rose-500 bg-rose-500';
-            default: return 'border-slate-600';
+            default: return 'border-gray-600';
         }
     };
 
@@ -60,7 +60,7 @@ const TrafficTile: React.FC = () => {
             case TrafficCondition.FLUID: return 'text-emerald-400';
             case TrafficCondition.DIFFICULTIES: return 'text-amber-400';
             case TrafficCondition.JAM: return 'text-rose-400';
-            default: return 'text-slate-500';
+            default: return 'text-neutral-500';
         }
     };
 
@@ -84,8 +84,8 @@ const TrafficTile: React.FC = () => {
                     <div className="space-y-5 animate-pulse">
                         {[1, 2, 3].map(i => (
                             <div key={i}>
-                                <div className="h-5 bg-slate-800/40 rounded w-2/3 mb-2" />
-                                <div className="h-3 bg-slate-800/30 rounded w-full" />
+                                <div className="h-5 bg-gray-900/40 rounded w-2/3 mb-2" />
+                                <div className="h-3 bg-gray-900/30 rounded w-full" />
                             </div>
                         ))}
                     </div>
@@ -127,7 +127,7 @@ const TrafficTile: React.FC = () => {
                                         </div>
                                     ) : (
                                         /* Simple gray text for normal routes */
-                                        <p className="mt-1.5 text-[11px] text-slate-500 leading-relaxed">
+                                        <p className="mt-1.5 text-[11px] text-neutral-500 leading-relaxed">
                                             {road.description}
                                         </p>
                                     )
@@ -139,7 +139,7 @@ const TrafficTile: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <button className="mt-3 pt-3 border-t border-white/5 flex items-center justify-center gap-2 text-[12px] text-slate-400 hover:text-blue-400 transition-colors font-medium w-full py-2 rounded-xl hover:bg-white/5">
+            <button className="mt-3 pt-3 border-t border-white/5 flex items-center justify-center gap-2 text-[12px] text-neutral-400 hover:text-blue-400 transition-colors font-medium w-full py-2 rounded-xl hover:bg-white/5">
                 <span>✏️</span>
                 <span>Zobacz mapę na żywo</span>
             </button>

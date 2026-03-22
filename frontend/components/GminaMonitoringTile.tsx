@@ -83,10 +83,10 @@ const GminaMonitoringTile: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <Activity size={14} className="text-blue-400" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Zgłoszenia24</span>
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Zgłoszenia24</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold text-slate-500">{total} łącznie</span>
+                    <span className="text-[9px] font-bold text-neutral-500">{total} łącznie</span>
                     <div className={`w-2 h-2 rounded-full ${activeCount > 0 ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
                 </div>
             </div>
@@ -95,7 +95,7 @@ const GminaMonitoringTile: React.FC = () => {
             {loading ? (
                 <div className="space-y-3 flex-1 animate-pulse">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="h-14 bg-slate-800/50 rounded-xl" />
+                        <div key={i} className="h-14 bg-gray-900/50 rounded-xl" />
                     ))}
                 </div>
             ) : reports.length > 0 ? (
@@ -103,7 +103,7 @@ const GminaMonitoringTile: React.FC = () => {
                     {reports.map(report => {
                         const catConfig = CATEGORY_CONFIG[report.category];
                         return (
-                            <div key={report.id} className="flex gap-3 items-start p-2.5 rounded-xl bg-slate-800/30 border border-white/5 hover:bg-slate-800/50 transition-colors cursor-default">
+                            <div key={report.id} className="flex gap-3 items-start p-2.5 rounded-xl bg-gray-900/30 border border-white/5 hover:bg-gray-900/50 transition-colors cursor-default">
                                 {/* Severity dot + category emoji */}
                                 <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0">
                                     <div className={`w-2 h-2 rounded-full ${getSeverityDot(report.ai_severity)}`} />
@@ -113,10 +113,10 @@ const GminaMonitoringTile: React.FC = () => {
                                 {/* Content */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <p className="text-[11px] font-semibold text-slate-200 truncate">{report.title}</p>
+                                        <p className="text-[11px] font-semibold text-neutral-200 truncate">{report.title}</p>
                                         {getStatusBadge(report.status)}
                                     </div>
-                                    <div className="flex items-center gap-2 text-[9px] text-slate-500">
+                                    <div className="flex items-center gap-2 text-[9px] text-neutral-500">
                                         {report.location_name && (
                                             <span className="flex items-center gap-0.5 truncate">
                                                 <MapPin size={7} className="shrink-0" />
@@ -134,14 +134,14 @@ const GminaMonitoringTile: React.FC = () => {
                     })}
                 </div>
             ) : (
-                <p className="text-xs text-slate-500 italic flex-1 flex items-center">Brak aktywnych zgłoszeń</p>
+                <p className="text-xs text-neutral-500 italic flex-1 flex items-center">Brak aktywnych zgłoszeń</p>
             )}
 
             {/* Footer */}
             <div className="flex items-center justify-between pt-2 mt-auto border-t border-white/5">
                 <div className="flex items-center gap-1.5">
                     <AlertTriangle size={10} className="text-amber-400" />
-                    <span className="text-[9px] font-bold text-slate-500">
+                    <span className="text-[9px] font-bold text-neutral-500">
                         {activeCount} aktywn{activeCount === 1 ? 'e' : 'ych'}
                     </span>
                 </div>

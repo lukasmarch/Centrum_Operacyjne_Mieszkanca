@@ -66,8 +66,8 @@ const TrendChart: React.FC<TrendChartProps> = ({
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-900 px-4 py-3 rounded-lg shadow-lg border border-slate-700">
-          <p className="text-sm font-semibold text-slate-200">
+        <div className="bg-gray-950 px-4 py-3 rounded-lg shadow-lg border border-gray-700/50">
+          <p className="text-sm font-semibold text-neutral-200">
             Rok {payload[0].payload.year}
           </p>
           <p className="text-lg font-bold text-blue-400 mt-1">
@@ -82,7 +82,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
   return (
     <div className="bg-transparent rounded-xl min-w-0">
       {title && (
-        <h3 className="text-lg font-bold text-slate-100 mb-4">{title}</h3>
+        <h3 className="text-lg font-bold text-neutral-100 mb-4">{title}</h3>
       )}
 
       <div style={{ width: '100%', height: `${height}px`, minWidth: 0 }}>
@@ -138,21 +138,21 @@ const TrendChart: React.FC<TrendChartProps> = ({
 
       {/* Stats summary below chart */}
       {data.length > 1 && (
-        <div className="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between text-sm">
+        <div className="mt-4 pt-4 border-t border-gray-800/50 flex items-center justify-between text-sm">
           <div>
-            <span className="text-slate-500">Najwcześniejszy: </span>
-            <span className="font-semibold text-slate-200">
+            <span className="text-neutral-500">Najwcześniejszy: </span>
+            <span className="font-semibold text-neutral-200">
               {formatValue(data[0].value)} {unit} ({data[0].year})
             </span>
           </div>
           <div>
-            <span className="text-slate-500">Najnowszy: </span>
-            <span className="font-semibold text-slate-200">
+            <span className="text-neutral-500">Najnowszy: </span>
+            <span className="font-semibold text-neutral-200">
               {formatValue(data[data.length - 1].value)} {unit} ({data[data.length - 1].year})
             </span>
           </div>
           <div>
-            <span className="text-slate-500">Zmiana: </span>
+            <span className="text-neutral-500">Zmiana: </span>
             <span
               className={`font-semibold ${data[data.length - 1].value >= data[0].value
                 ? 'text-green-600'

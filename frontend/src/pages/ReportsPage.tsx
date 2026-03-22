@@ -57,13 +57,13 @@ const ReportCard: React.FC<{
 
     return (
         <div
-            className="bg-slate-900 rounded-3xl border border-slate-800 shadow-sm hover:shadow-xl hover:shadow-blue-900/10 hover:border-slate-700 transition-all duration-300 overflow-hidden cursor-pointer group"
+            className="bg-gray-950 rounded-3xl border border-gray-800/50 shadow-sm hover:shadow-xl hover:shadow-blue-900/10 hover:border-gray-700/50 transition-all duration-300 overflow-hidden cursor-pointer group"
             onClick={() => onView(report)}
         >
             {/* Image */}
             {report.image_url && !imgError && (
                 <div className="h-48 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-slate-800 animate-pulse" />
+                    <div className="absolute inset-0 bg-gray-900 animate-pulse" />
                     <img
                         src={imgSrc}
                         alt={report.title}
@@ -113,27 +113,27 @@ const ReportCard: React.FC<{
                     </div>
                 )}
 
-                <h3 className="font-bold text-slate-100 text-lg leading-tight mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-violet-400 transition-all">
+                <h3 className="font-bold text-neutral-100 text-lg leading-tight mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-violet-400 transition-all">
                     {report.title}
                 </h3>
 
-                <p className="text-slate-400 text-sm mb-4 line-clamp-2">
+                <p className="text-neutral-400 text-sm mb-4 line-clamp-2">
                     {report.ai_summary || report.description}
                 </p>
 
                 {/* Location */}
                 {report.address && (
-                    <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+                    <p className="text-xs text-neutral-500 mb-3 flex items-center gap-1">
                         <span>📍</span>
                         <span className="truncate">{report.address}</span>
                     </p>
                 )}
 
                 {/* Footer */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-800/60">
-                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                <div className="flex items-center justify-between pt-3 border-t border-gray-800/50/60">
+                    <div className="flex items-center gap-3 text-xs text-neutral-500">
                         <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border border-slate-700/60"
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border border-gray-700/50/60"
                             style={{ backgroundColor: `${status.color}15`, color: status.color }}
                         >
                             {status.label}
@@ -142,8 +142,8 @@ const ReportCard: React.FC<{
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-500 flex items-center gap-1">
-                            <span className="text-slate-600">👁</span> {report.views_count}
+                        <span className="text-xs text-neutral-500 flex items-center gap-1">
+                            <span className="text-neutral-600">👁</span> {report.views_count}
                         </span>
                         <button
                             onClick={(e) => {
@@ -176,7 +176,7 @@ const ReportDetail: React.FC<{
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
             <div
-                className="bg-slate-900 rounded-3xl border border-slate-800 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative"
+                className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Close Button Mobile */}
@@ -196,7 +196,7 @@ const ReportDetail: React.FC<{
                             className="w-full h-full object-cover"
                             onError={() => setDetailImgError(true)}
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-50"></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 to-transparent opacity-50"></div>
                     </div>
                 )}
 
@@ -206,7 +206,7 @@ const ReportDetail: React.FC<{
                         <span className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg" style={{ backgroundColor: cat.color }}>
                             {cat.emoji} {cat.label}
                         </span>
-                        <span className="px-3 py-1 rounded-full text-xs font-bold border border-slate-700" style={{ backgroundColor: `${status.color}15`, color: status.color }}>
+                        <span className="px-3 py-1 rounded-full text-xs font-bold border border-gray-700/50" style={{ backgroundColor: `${status.color}15`, color: status.color }}>
                             {status.label}
                         </span>
                         {severity && (
@@ -216,9 +216,9 @@ const ReportDetail: React.FC<{
                         )}
                     </div>
 
-                    <h2 className="text-2xl font-black text-slate-100 mb-2">{report.title}</h2>
+                    <h2 className="text-2xl font-black text-neutral-100 mb-2">{report.title}</h2>
 
-                    <div className="flex items-center gap-4 text-sm text-slate-400 mb-6 border-b border-slate-800 pb-6">
+                    <div className="flex items-center gap-4 text-sm text-neutral-400 mb-6 border-b border-gray-800/50 pb-6">
                         <span className="flex items-center gap-1">🕐 {timeAgo(report.created_at)}</span>
                         {report.author_name && <span className="flex items-center gap-1">👤 {report.author_name}</span>}
                         <span className="flex items-center gap-1">👁 {report.views_count} wyświetleń</span>
@@ -226,10 +226,10 @@ const ReportDetail: React.FC<{
 
                     {/* Description */}
                     <div className="mb-8">
-                        <h3 className="font-bold text-slate-300 mb-3 flex items-center gap-2">
+                        <h3 className="font-bold text-neutral-300 mb-3 flex items-center gap-2">
                             📄 Opis zgłoszenia
                         </h3>
-                        <p className="text-slate-400 whitespace-pre-wrap leading-relaxed">{report.description}</p>
+                        <p className="text-neutral-400 whitespace-pre-wrap leading-relaxed">{report.description}</p>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-4 mb-8">
@@ -256,19 +256,19 @@ const ReportDetail: React.FC<{
 
                     {/* Location */}
                     {report.address && (
-                        <div className="mb-8 p-5 bg-slate-950/50 rounded-2xl border border-slate-800">
-                            <h3 className="font-bold text-slate-300 mb-2 flex items-center gap-2">
+                        <div className="mb-8 p-5 bg-black/50 rounded-2xl border border-gray-800/50">
+                            <h3 className="font-bold text-neutral-300 mb-2 flex items-center gap-2">
                                 📍 Lokalizacja
                             </h3>
-                            <p className="text-slate-400">{report.address}</p>
+                            <p className="text-neutral-400">{report.address}</p>
                             {report.location_name && (
-                                <p className="text-sm text-slate-500 mt-1">{report.location_name}</p>
+                                <p className="text-sm text-neutral-500 mt-1">{report.location_name}</p>
                             )}
                         </div>
                     )}
 
                     {/* Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t border-slate-800">
+                    <div className="flex items-center justify-between pt-6 border-t border-gray-800/50">
                         <button
                             onClick={() => onUpvote(report.id)}
                             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 border border-blue-500/20 transition-all font-bold group"
@@ -277,7 +277,7 @@ const ReportDetail: React.FC<{
                         </button>
                         <button
                             onClick={onClose}
-                            className="px-6 py-3 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors font-bold border border-slate-700"
+                            className="px-6 py-3 rounded-xl bg-gray-900 text-neutral-300 hover:bg-gray-800 transition-colors font-bold border border-gray-700/50"
                         >
                             Zamknij
                         </button>
@@ -434,11 +434,11 @@ const ReportFormModal: React.FC<{
     if (success) {
         return (
             <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center max-w-md w-full shadow-2xl relative overflow-hidden">
+                <div className="bg-gray-950 border border-gray-800/50 rounded-3xl p-12 text-center max-w-md w-full shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-3xl -z-10"></div>
                     <div className="text-6xl mb-4">✅</div>
-                    <h2 className="text-2xl font-black text-slate-100 mb-2">Zgłoszenie wysłane!</h2>
-                    <p className="text-slate-400">Zgłoszenie jest analizowane...</p>
+                    <h2 className="text-2xl font-black text-neutral-100 mb-2">Zgłoszenie wysłane!</h2>
+                    <p className="text-neutral-400">Zgłoszenie jest analizowane...</p>
                 </div>
             </div>
         );
@@ -447,13 +447,13 @@ const ReportFormModal: React.FC<{
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
             <div
-                className="bg-slate-900 rounded-3xl border border-slate-800 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl relative"
+                className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl relative"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="p-8">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-2xl font-black text-slate-100">🚨 Nowe Zgłoszenie</h2>
-                        <button onClick={onClose} className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-slate-700 transition-colors border border-slate-700">
+                        <h2 className="text-2xl font-black text-neutral-100">🚨 Nowe Zgłoszenie</h2>
+                        <button onClick={onClose} className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 transition-colors border border-gray-700/50">
                             ✕
                         </button>
                     </div>
@@ -461,7 +461,7 @@ const ReportFormModal: React.FC<{
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Photo */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-300 mb-2">📸 Zdjęcie (opcjonalne)</label>
+                            <label className="block text-sm font-bold text-neutral-300 mb-2">📸 Zdjęcie (opcjonalne)</label>
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -472,7 +472,7 @@ const ReportFormModal: React.FC<{
                             />
                             {imagePreview ? (
                                 <div className="relative group">
-                                    <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded-xl border border-slate-700" />
+                                    <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded-xl border border-gray-700/50" />
                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
                                         <button
                                             type="button"
@@ -490,7 +490,7 @@ const ReportFormModal: React.FC<{
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-full h-32 border-2 border-dashed border-slate-700 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:border-blue-500 hover:text-blue-400 hover:bg-slate-800/50 transition-all group"
+                                    className="w-full h-32 border-2 border-dashed border-gray-700/50 rounded-xl flex flex-col items-center justify-center text-neutral-400 hover:border-blue-500 hover:text-blue-400 hover:bg-gray-900/50 transition-all group"
                                 >
                                     <span className="text-3xl mb-1 group-hover:scale-110 transition-transform">📷</span>
                                     <span className="text-sm font-medium">Zrób zdjęcie lub wybierz z galerii</span>
@@ -500,13 +500,13 @@ const ReportFormModal: React.FC<{
 
                         {/* Title */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-300 mb-2">Tytuł zgłoszenia *</label>
+                            <label className="block text-sm font-bold text-neutral-300 mb-2">Tytuł zgłoszenia *</label>
                             <input
                                 type="text"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 placeholder="np. Dziura w drodze na ul. Głównej"
-                                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-500"
+                                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-gray-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-neutral-100 placeholder:text-neutral-500"
                                 required
                                 maxLength={200}
                             />
@@ -514,21 +514,21 @@ const ReportFormModal: React.FC<{
 
                         {/* Description */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-300 mb-2">Opis problemu *</label>
+                            <label className="block text-sm font-bold text-neutral-300 mb-2">Opis problemu *</label>
                             <textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 placeholder="Opisz problem jak najdokładniej..."
                                 rows={4}
-                                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-500 resize-none"
+                                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-gray-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-neutral-100 placeholder:text-neutral-500 resize-none"
                                 required
                             />
                         </div>
 
                         {/* Geolocation */}
-                        <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800 space-y-3">
+                        <div className="p-4 bg-black/50 rounded-xl border border-gray-800/50 space-y-3">
                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-slate-300">📍 Lokalizacja zdarzenia *</span>
+                                <span className="text-sm font-bold text-neutral-300">📍 Lokalizacja zdarzenia *</span>
                                 {geoStatus === 'loading' && (
                                     <span className="text-xs text-blue-400 animate-pulse px-2 py-0.5 bg-blue-500/10 rounded-full border border-blue-500/20">📡 Pobieranie GPS...</span>
                                 )}
@@ -540,11 +540,11 @@ const ReportFormModal: React.FC<{
                                 )}
                             </div>
 
-                            <p className="text-xs text-slate-500">Podaj dokładne miejsce, by służby mogły szybko dotrzeć na miejsce zdarzenia</p>
+                            <p className="text-xs text-neutral-500">Podaj dokładne miejsce, by służby mogły szybko dotrzeć na miejsce zdarzenia</p>
 
                             {/* Locality selector */}
                             <div>
-                                <label className="block text-xs font-semibold text-slate-500 mb-1">Miejscowość</label>
+                                <label className="block text-xs font-semibold text-neutral-500 mb-1">Miejscowość</label>
                                 <div className="relative">
                                     <select
                                         value={locationName}
@@ -561,10 +561,10 @@ const ReportFormModal: React.FC<{
                                                 }
                                             }
                                         }}
-                                        className="w-full px-3 py-2.5 rounded-lg border border-slate-700 text-sm text-slate-200 bg-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none"
+                                        className="w-full px-3 py-2.5 rounded-lg border border-gray-700/50 text-sm text-neutral-200 bg-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none"
                                     >
                                         <option value="">— Wybierz miejscowość —</option>
-                                        <optgroup label="Gmina Rybno" className="bg-slate-800">
+                                        <optgroup label="Gmina Rybno" className="bg-gray-900">
                                             <option value="Rybno">Rybno</option>
                                             <option value="Hartowiec">Hartowiec</option>
                                             <option value="Rumian">Rumian</option>
@@ -589,18 +589,18 @@ const ReportFormModal: React.FC<{
                                             <option value="Trzonki">Trzonki</option>
                                             <option value="Zwiniarz">Zwiniarz</option>
                                         </optgroup>
-                                        <optgroup label="Okolice" className="bg-slate-800">
+                                        <optgroup label="Okolice" className="bg-gray-900">
                                             <option value="Działdowo">Działdowo</option>
                                             <option value="Lidzbark">Lidzbark</option>
                                             <option value="Iłowo-Osada">Iłowo-Osada</option>
                                             <option value="Płośnica">Płośnica</option>
                                             <option value="Kozłowo">Kozłowo</option>
                                         </optgroup>
-                                        <optgroup label="Inne" className="bg-slate-800">
+                                        <optgroup label="Inne" className="bg-gray-900">
                                             <option value="__custom">✏️ Inna miejscowość...</option>
                                         </optgroup>
                                     </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-neutral-400">
                                         <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
                                     </div>
                                 </div>
@@ -608,7 +608,7 @@ const ReportFormModal: React.FC<{
                                     <input
                                         type="text"
                                         placeholder="Wpisz nazwę miejscowości"
-                                        className="w-full mt-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-slate-500"
+                                        className="w-full mt-2 px-3 py-2 rounded-lg bg-gray-900 border border-gray-700/50 text-sm text-neutral-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-neutral-500"
                                         onChange={(e) => {
                                             if (e.target.value.trim()) {
                                                 setLocationName(e.target.value.trim());
@@ -621,22 +621,22 @@ const ReportFormModal: React.FC<{
 
                             {/* Street / address */}
                             <div>
-                                <label className="block text-xs font-semibold text-slate-500 mb-1">Ulica / nr domu / punkt orientacyjny</label>
+                                <label className="block text-xs font-semibold text-neutral-500 mb-1">Ulica / nr domu / punkt orientacyjny</label>
                                 <input
                                     type="text"
                                     value={address}
                                     onChange={(e) => setAddress(e.target.value)}
                                     placeholder="np. ul. Główna 15, przy sklepie Biedronka, droga do szkoły"
-                                    className="w-full px-3 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-slate-500"
+                                    className="w-full px-3 py-2.5 rounded-lg bg-gray-900 border border-gray-700/50 text-sm text-neutral-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-neutral-500"
                                 />
-                                <p className="text-[11px] text-slate-500 mt-1">
+                                <p className="text-[11px] text-neutral-500 mt-1">
                                     Wpisz ulicę z numerem lub opisz miejsce tak, by łatwo je odnaleźć
                                 </p>
                             </div>
 
                             {/* GPS coords preview */}
                             {latitude && longitude && (
-                                <div className="flex items-center gap-2 text-[11px] text-slate-400 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 font-mono">
+                                <div className="flex items-center gap-2 text-[11px] text-neutral-400 bg-gray-950 px-3 py-2 rounded-lg border border-gray-800/50 font-mono">
                                     <span>🛰️</span>
                                     <span>GPS: {latitude.toFixed(5)}, {longitude.toFixed(5)}</span>
                                 </div>
@@ -645,21 +645,21 @@ const ReportFormModal: React.FC<{
 
                         {/* Author info (anonymous by default) */}
                         <div className="space-y-3">
-                            <p className="text-xs text-slate-500">Podaj dane kontaktowe (opcjonalnie – zgłoszenie może być anonimowe)</p>
+                            <p className="text-xs text-neutral-500">Podaj dane kontaktowe (opcjonalnie – zgłoszenie może być anonimowe)</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <input
                                     type="text"
                                     value={authorName}
                                     onChange={(e) => setAuthorName(e.target.value)}
                                     placeholder="Twoje imię"
-                                    className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-200 placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                    className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700/50 text-sm text-neutral-200 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                                 />
                                 <input
                                     type="email"
                                     value={authorEmail}
                                     onChange={(e) => setAuthorEmail(e.target.value)}
                                     placeholder="Email"
-                                    className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-200 placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                    className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700/50 text-sm text-neutral-200 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                                 />
                             </div>
                         </div>
@@ -717,10 +717,10 @@ const AlertMap: React.FC<{
 
     if (!reports.length) {
         return (
-            <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-800">
-                    <h3 className="font-bold text-slate-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
-                    <p className="text-xs text-slate-400 mt-1">Brak zgłoszeń z lokalizacją GPS</p>
+            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-800/50">
+                    <h3 className="font-bold text-neutral-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
+                    <p className="text-xs text-neutral-400 mt-1">Brak zgłoszeń z lokalizacją GPS</p>
                 </div>
                 <div style={{ height: 350 }}>
                     <MapContainer center={RYBNO_CENTER} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
@@ -757,14 +757,14 @@ const AlertMap: React.FC<{
     };
 
     return (
-        <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div className="bg-gray-950 rounded-3xl border border-gray-800/50 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-800/50 flex items-center justify-between">
                 <div>
-                    <h3 className="font-bold text-slate-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
-                    <p className="text-xs text-slate-400 mt-1">{reports.length} zgłoszeń z lokalizacją GPS</p>
+                    <h3 className="font-bold text-neutral-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
+                    <p className="text-xs text-neutral-400 mt-1">{reports.length} zgłoszeń z lokalizacją GPS</p>
                 </div>
                 {/* Legend */}
-                <div className="flex gap-3 text-[10px] text-slate-400">
+                <div className="flex gap-3 text-[10px] text-neutral-400">
                     <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#e74c3c] inline-block shadow-sm shadow-red-500/50"></span>Krytyczny</span>
                     <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#e67e22] inline-block shadow-sm shadow-orange-500/50"></span>Wysoki</span>
                     <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#f39c12] inline-block shadow-sm shadow-amber-500/50"></span>Średni</span>
@@ -930,13 +930,13 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
     return (
         <div className="space-y-8 pb-12">
             {/* Header */}
-            <header className="bg-gradient-to-br from-blue-900/40 via-slate-900/80 to-violet-900/40 rounded-3xl p-8 text-white shadow-lg shadow-blue-900/20 relative overflow-hidden border border-white/10">
+            <header className="bg-gradient-to-br from-blue-900/40 via-black/80 to-violet-900/40 rounded-3xl p-8 text-white shadow-lg shadow-blue-900/20 relative overflow-hidden border border-white/10">
                 <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl -ml-16 -mb-16"></div>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
                     <div>
                         <h2 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">🚨 Zgłoszenie24</h2>
-                        <p className="text-slate-400 mt-2 font-medium">Centrum Powiadamiania o Zdarzeniach – zgłoś problem w Twojej okolicy</p>
+                        <p className="text-neutral-400 mt-2 font-medium">Centrum Powiadamiania o Zdarzeniach – zgłoś problem w Twojej okolicy</p>
                     </div>
                     <button
                         onClick={() => setShowForm(true)}
@@ -948,19 +948,19 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 relative z-10">
                     <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Wszystkie</p>
+                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">Wszystkie</p>
                         <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">{total}</p>
                     </div>
                     <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">🚨 Alarm</p>
+                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">🚨 Alarm</p>
                         <p className="text-2xl font-black text-red-400">{reports.filter(r => r.category === 'emergency').length}</p>
                     </div>
                     <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">🔥 Pożar</p>
+                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">🔥 Pożar</p>
                         <p className="text-2xl font-black text-orange-400">{reports.filter(r => r.category === 'fire').length}</p>
                     </div>
                     <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">🗺️ Na mapie</p>
+                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">🗺️ Na mapie</p>
                         <p className="text-2xl font-black text-blue-400">{mapReports.length}</p>
                     </div>
                 </div>
@@ -975,7 +975,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                             onClick={() => setCategory(cat.value)}
                             className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${category === cat.value
                                 ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20 border border-blue-500/30'
-                                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 hover:text-slate-200 hover:border-slate-700'
+                                : 'bg-gray-950 text-neutral-400 hover:bg-gray-900 border border-gray-800/50 hover:text-neutral-200 hover:border-gray-700/50'
                                 }`}
                         >
                             {cat.emoji} {cat.label}
@@ -987,7 +987,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     onClick={() => setShowMap(!showMap)}
                     className={`px-4 py-2 rounded-full text-sm font-bold transition-all border ${showMap
                         ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-sm shadow-blue-500/10'
-                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                        : 'bg-gray-950 text-neutral-400 border-gray-800/50 hover:bg-gray-900 hover:text-neutral-200'
                         }`}
                 >
                     🗺️ {showMap ? 'Ukryj mapę' : 'Pokaż mapę'}
@@ -1001,13 +1001,13 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
             {loading && reports.length === 0 ? (
                 <div className="text-center py-12">
                     <span className="text-4xl animate-bounce block mb-4">🔍</span>
-                    <p className="text-slate-400 font-medium">Ładowanie zgłoszeń...</p>
+                    <p className="text-neutral-400 font-medium">Ładowanie zgłoszeń...</p>
                 </div>
             ) : reports.length === 0 ? (
-                <div className="text-center py-16 bg-slate-900 rounded-3xl border border-slate-800">
+                <div className="text-center py-16 bg-gray-950 rounded-3xl border border-gray-800/50">
                     <span className="text-6xl block mb-4">📭</span>
                     <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400 mb-2">Brak zgłoszeń</h3>
-                    <p className="text-slate-400 mb-6">Bądź pierwszy – zgłoś problem w swojej okolicy!</p>
+                    <p className="text-neutral-400 mb-6">Bądź pierwszy – zgłoś problem w swojej okolicy!</p>
                     <button
                         onClick={() => setShowForm(true)}
                         className="px-8 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold rounded-xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30 border border-blue-500/20"
@@ -1020,7 +1020,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     {/* Section heading */}
                     <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Zgłoszenia mieszkańców</h3>
-                        <span className="text-xs text-slate-500 font-medium px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700">{total} łącznie</span>
+                        <span className="text-xs text-neutral-500 font-medium px-2.5 py-0.5 rounded-full bg-gray-900 border border-gray-700/50">{total} łącznie</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1043,7 +1043,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                                     loadReports(next);
                                 }}
                                 disabled={loading}
-                                className="px-8 py-3 bg-slate-900 border border-slate-800 text-slate-300 rounded-full font-bold hover:bg-slate-800 hover:text-white hover:border-slate-700 transition-all disabled:opacity-50 shadow-sm"
+                                className="px-8 py-3 bg-gray-950 border border-gray-800/50 text-neutral-300 rounded-full font-bold hover:bg-gray-900 hover:text-white hover:border-gray-700/50 transition-all disabled:opacity-50 shadow-sm"
                             >
                                 {loading ? 'Ładowanie...' : 'Pokaż więcej'}
                             </button>

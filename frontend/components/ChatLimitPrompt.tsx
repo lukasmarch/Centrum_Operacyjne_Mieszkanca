@@ -22,17 +22,17 @@ const ChatLimitPrompt: React.FC<ChatLimitPromptProps> = ({ limitInfo, onNavigate
 
   return (
     <div className="mx-auto max-w-xl w-full mt-2">
-      <div className="bg-slate-800/60 border border-amber-500/30 rounded-2xl p-5 backdrop-blur-sm">
+      <div className="bg-gray-900/60 border border-amber-500/30 rounded-2xl p-5 backdrop-blur-sm">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/20">
             <AlertTriangle size={18} className="text-amber-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-100">
+            <p className="text-sm font-semibold text-neutral-100">
               Limit {limitInfo.limit} {limitInfo.limit === 1 ? 'pytania' : 'pytań'} wyczerpany
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-neutral-500">
               Limit odnowi się {formatResetTime(limitInfo.reset_at)}
             </p>
           </div>
@@ -61,8 +61,8 @@ const ChatLimitPrompt: React.FC<ChatLimitPromptProps> = ({ limitInfo, onNavigate
               <Zap size={14} className="text-indigo-400" />
               <span className="text-xs font-bold text-indigo-300 uppercase tracking-wide">Premium</span>
             </div>
-            <p className="text-2xl font-bold text-slate-100 mb-0.5">50</p>
-            <p className="text-xs text-slate-400 mb-3">pytań / dzień</p>
+            <p className="text-2xl font-bold text-neutral-100 mb-0.5">50</p>
+            <p className="text-xs text-neutral-400 mb-3">pytań / dzień</p>
             <p className="text-xs font-semibold text-indigo-300">19 zł / mies.</p>
           </div>
 
@@ -72,15 +72,15 @@ const ChatLimitPrompt: React.FC<ChatLimitPromptProps> = ({ limitInfo, onNavigate
               <Infinity size={14} className="text-amber-400" />
               <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">Business</span>
             </div>
-            <p className="text-2xl font-bold text-slate-100 mb-0.5">∞</p>
-            <p className="text-xs text-slate-400 mb-3">bez limitu</p>
+            <p className="text-2xl font-bold text-neutral-100 mb-0.5">∞</p>
+            <p className="text-xs text-neutral-400 mb-3">bez limitu</p>
             <p className="text-xs font-semibold text-amber-300">99 zł / mies.</p>
           </div>
         </div>
 
         {/* CTA */}
         <button
-          onClick={() => onNavigate?.('profile')}
+          onClick={() => onNavigate?.('premium')}
           className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-900/30"
         >
           Wybierz plan i pisz dalej →

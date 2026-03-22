@@ -45,7 +45,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery, onNavigate 
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-280px)] min-h-[460px]">
+    <div className="flex flex-col h-[calc(100dvh-200px)] min-h-[460px]">
       {/* Agent selector */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
         {AGENT_OPTIONS.map(agent => (
@@ -55,7 +55,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery, onNavigate 
             className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-all shrink-0 ${
               selectedAgent === agent.id
                 ? 'bg-blue-600 border-blue-500 text-white'
-                : 'bg-slate-800/60 border-white/5 text-slate-400 hover:border-blue-500/40 hover:text-blue-400'
+                : 'bg-gray-900/60 border-white/5 text-neutral-400 hover:border-blue-500/40 hover:text-blue-400'
             }`}
           >
             <span>{agent.icon}</span>
@@ -65,7 +65,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery, onNavigate 
         {messages.length > 0 && (
           <button
             onClick={clearMessages}
-            className="ml-auto flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-400 px-3 py-1.5 rounded-full border border-white/5 hover:border-red-500/30 transition-all shrink-0"
+            className="ml-auto flex items-center gap-1.5 text-xs text-neutral-500 hover:text-red-400 px-3 py-1.5 rounded-full border border-white/5 hover:border-red-500/30 transition-all shrink-0"
           >
             <RotateCcw size={12} />
             Wyczyść
@@ -80,7 +80,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery, onNavigate 
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-3xl mb-4 shadow-xl shadow-blue-500/20">
               🤖
             </div>
-            <p className="text-slate-400 text-sm max-w-xs">
+            <p className="text-neutral-400 text-sm max-w-xs">
               Zadaj pytanie o gminę Rybno — wiadomości, urzędy, statystyki lub wydarzenia.
             </p>
           </div>
@@ -103,7 +103,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ initialQuery, onNavigate 
           onKeyDown={e => e.key === 'Enter' && handleSend()}
           placeholder={limitReached ? 'Limit dzienny wyczerpany...' : 'Zadaj pytanie...'}
           disabled={isLoading || limitReached}
-          className="flex-1 bg-slate-900/80 border border-slate-700/60 rounded-2xl px-5 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all text-sm disabled:opacity-50"
+          className="flex-1 bg-gray-950/80 border border-gray-700/50/60 rounded-2xl px-5 py-3 text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all text-sm disabled:opacity-50"
         />
         <button
           onClick={handleSend}

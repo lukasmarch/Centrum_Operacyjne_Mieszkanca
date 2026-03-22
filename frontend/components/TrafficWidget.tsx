@@ -42,7 +42,7 @@ const TrafficWidget: React.FC = () => {
     }, [loadTraffic]);
 
     return (
-        <div className="w-full h-full flex flex-col glass-panel rounded-3xl p-5 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden text-slate-100">
+        <div className="w-full h-full flex flex-col glass-panel rounded-3xl p-5 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden text-neutral-100">
 
             {/* Glow Effects */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/40 to-transparent"></div>
@@ -57,7 +57,7 @@ const TrafficWidget: React.FC = () => {
                                 <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${loading ? 'bg-blue-400' : 'bg-emerald-400'} opacity-75`}></span>
                                 <span className={`relative inline-flex rounded-full h-2 w-2 ${loading ? 'bg-blue-500' : 'bg-emerald-500'}`}></span>
                             </span>
-                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">
+                            <span className="text-[10px] text-neutral-400 font-black uppercase tracking-[0.2em]">
                                 {loading ? 'Skanowanie...' : 'Monitoring aktywny'}
                             </span>
                         </div>
@@ -67,7 +67,7 @@ const TrafficWidget: React.FC = () => {
                         disabled={loading}
                         className="group p-3 bg-white/5 hover:bg-white/10 active:scale-95 transition-all rounded-xl border border-white/10 shadow-lg"
                     >
-                        <svg className={`h-5 w-5 text-slate-300 group-hover:text-white ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className={`h-5 w-5 text-neutral-300 group-hover:text-white ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </button>
@@ -92,7 +92,7 @@ const TrafficWidget: React.FC = () => {
                                         <div className="h-6 bg-slate-700/40 rounded-full w-48"></div>
                                         <div className="h-8 bg-slate-700/40 rounded-xl w-16"></div>
                                     </div>
-                                    <div className="h-16 bg-slate-800/30 rounded-2xl w-full"></div>
+                                    <div className="h-16 bg-gray-900/30 rounded-2xl w-full"></div>
                                 </div>
                             ))}
                         </div>
@@ -102,7 +102,7 @@ const TrafficWidget: React.FC = () => {
                 {/* Sources Section */}
                 {data?.sources && data.sources.length > 0 && (
                     <div className="mt-8 pt-6 border-t border-white/5">
-                        <h3 className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-4">Weryfikacja źródeł:</h3>
+                        <h3 className="text-[10px] text-neutral-500 font-black uppercase tracking-widest mb-4">Weryfikacja źródeł:</h3>
                         <div className="flex flex-wrap gap-2">
                             {data.sources.map((source, idx) => (
                                 <a
@@ -120,9 +120,9 @@ const TrafficWidget: React.FC = () => {
                     </div>
                 )}
 
-                <footer className="mt-8 flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
+                <footer className="mt-8 flex justify-between items-center text-[10px] text-neutral-500 font-bold uppercase tracking-tighter">
                     <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         Skan: {data?.lastUpdated ? data.lastUpdated.toLocaleTimeString('pl-PL') : '--:--'}

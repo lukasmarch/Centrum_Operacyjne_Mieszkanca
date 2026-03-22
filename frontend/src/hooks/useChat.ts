@@ -82,7 +82,7 @@ export function useChat(options: UseChatOptions = {}) {
         headers,
         body: JSON.stringify({
           message: text,
-          conversation_id: conversationId,
+          conversation_id: token ? conversationId : null,
           agent_name: options.agentName || null,
           stream: true,
         }),
