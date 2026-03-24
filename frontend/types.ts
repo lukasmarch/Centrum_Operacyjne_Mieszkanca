@@ -257,11 +257,16 @@ export interface ReportMapItem {
   created_at: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'traffic' | 'stats' | 'business' | 'reports' | 'premium' | 'assistant' | 'login' | 'register' | 'profile';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'stats' | 'business' | 'reports' | 'premium' | 'assistant' | 'login' | 'register' | 'profile';
 
-export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'profil';
+export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'zgloszenia';
 
-// New Traffic Widget Types
+export interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
+// Traffic Widget Types
 export enum TrafficCondition {
   FLUID = 'Płynnie',
   DIFFICULTIES = 'Utrudnienia',
@@ -269,17 +274,12 @@ export enum TrafficCondition {
   UNKNOWN = 'Brak danych'
 }
 
-export interface GroundingSource {
-  title: string;
-  uri: string;
-}
-
 export interface RoadStatus {
   id: string;
   name: string;
   status: TrafficCondition;
   delayMinutes: number;
-  travelTime: string; // e.g., "25 min"
+  travelTime: string;
   description?: string;
 }
 
@@ -431,13 +431,30 @@ export interface UserUpdateData {
 }
 
 export const AVAILABLE_LOCATIONS = [
-  'Rybno',
-  'Działdowo',
-  'Lubawa',
-  'Lidzbark',
-  'Iłowo-Osada',
-  'Płośnica',
-  'Kozłowo'
+  'Rybno R1',
+  'Rybno R2',
+  'Dębień',
+  'Domki letniskowe',
+  'Grabacz',
+  'Gralewo Stacja',
+  'Gronowo',
+  'Groszki',
+  'Grądy',
+  'Hartowiec',
+  'Jeglia',
+  'Kopaniarze',
+  'Koszelewki',
+  'Koszelewy',
+  'Naguszewo',
+  'Nowa Wieś',
+  'Prusy',
+  'Rapaty',
+  'Rumian',
+  'Szczupliny',
+  'Truszczyny',
+  'Tuczki',
+  'Wery',
+  'Żabiny',
 ] as const;
 
 export type AvailableLocation = typeof AVAILABLE_LOCATIONS[number];

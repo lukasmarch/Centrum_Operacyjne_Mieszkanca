@@ -23,8 +23,6 @@ const MIASTO_ITEMS = [
     { id: 'news', label: 'Wiadomości' },
     { id: 'events', label: 'Wydarzenia' },
     { id: 'weather', label: 'Pogoda' },
-    { id: 'traffic', label: 'Ruch' },
-    { id: 'reports', label: 'Zgłoszenia' },
 ];
 
 const DANE_ITEMS = [
@@ -39,14 +37,13 @@ const SECTION_TO_TAB: Record<AppSection, TabId> = {
     news: 'miasto',
     events: 'miasto',
     weather: 'miasto',
-    traffic: 'miasto',
-    reports: 'miasto',
+    reports: 'zgloszenia',
     stats: 'dane',
     business: 'dane',
-    premium: 'profil',
-    profile: 'profil',
-    login: 'profil',
-    register: 'profil',
+    premium: 'home',
+    profile: 'home',
+    login: 'home',
+    register: 'home',
 };
 
 // Default section for each tab
@@ -55,7 +52,7 @@ const TAB_DEFAULT_SECTION: Record<TabId, AppSection> = {
     assistant: 'assistant',
     miasto: 'news',
     dane: 'stats',
-    profil: 'profile',
+    zgloszenia: 'reports',
 };
 
 const AppContent: React.FC = () => {
@@ -64,12 +61,23 @@ const AppContent: React.FC = () => {
     const [initialQuery, setInitialQuery] = useState<string>('');
     const { user, isAuthenticated, isLoading, logout } = useAuth();
 
-    const handleNavigate = useCallback((section: AppSection | 'logout') => {
+    const [profileInitialTab, setProfileInitialTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | undefined>(undefined);
+
+    const handleNavigate = useCallback((section: AppSection | 'logout' | 'preferences' | 'subscription') => {
         if (section === 'logout') {
             logout();
             setActiveSection('dashboard');
             setActiveTab('home');
+        } else if (section === 'preferences') {
+            setProfileInitialTab('preferences');
+            setActiveSection('profile');
+            setActiveTab(SECTION_TO_TAB['profile']);
+        } else if (section === 'subscription') {
+            setProfileInitialTab('subscription');
+            setActiveSection('profile');
+            setActiveTab(SECTION_TO_TAB['profile']);
         } else {
+            setProfileInitialTab(undefined);
             setActiveSection(section);
             setActiveTab(SECTION_TO_TAB[section]);
         }
@@ -77,12 +85,8 @@ const AppContent: React.FC = () => {
 
     const handleTabChange = useCallback((tab: TabId) => {
         setActiveTab(tab);
-        if (tab === 'profil') {
-            setActiveSection(isAuthenticated ? 'profile' : 'login');
-        } else {
-            setActiveSection(TAB_DEFAULT_SECTION[tab]);
-        }
-    }, [isAuthenticated]);
+        setActiveSection(TAB_DEFAULT_SECTION[tab]);
+    }, []);
 
     const handleSubNavChange = useCallback((id: string) => {
         setActiveSection(id as AppSection);
@@ -103,7 +107,7 @@ const AppContent: React.FC = () => {
                 handleNavigate('login');
                 return null;
             }
-            return <ProfilePage onNavigate={handleNavigate} />;
+            return <ProfilePage onNavigate={handleNavigate} initialTab={profileInitialTab} />;
         }
 
         switch (activeSection) {

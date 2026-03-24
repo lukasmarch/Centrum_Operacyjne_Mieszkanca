@@ -8,17 +8,19 @@ import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { DASHBOARD_LAYOUTS, DashboardLayoutId, TileId, getUserDashboardLayout } from '../config/dashboardLayouts';
+import PricingCards from '../../components/PricingCards';
 
 interface ProfilePageProps {
   onNavigate: (section: 'dashboard' | 'premium') => void;
+  initialTab?: 'profile' | 'password' | 'preferences' | 'subscription';
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => {
   const { user, updateProfile, changePassword, logout, isLoading, error, clearError, isPremium } = useAuth();
   const { status: pushStatus, isSubscribed: pushSubscribed, isSupported: pushSupported, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const [pushLoading, setPushLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences' | 'subscription'>(initialTab ?? 'profile');
   const [successMessage, setSuccessMessage] = useState('');
 
   // Profile form
@@ -156,7 +158,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className={activeTab === 'subscription' ? 'max-w-6xl mx-auto' : 'max-w-4xl mx-auto'}>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-black mb-2">Ustawienia konta</h1>
@@ -177,7 +179,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className={`grid grid-cols-1 gap-8 ${activeTab === 'subscription' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
         {/* Sidebar */}
         <div className="lg:col-span-1">
           <div className="bg-gray-950 rounded-2xl p-6 border border-gray-800/50 sticky top-24">
@@ -227,6 +229,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               >
                 Preferencje
               </button>
+              <button
+                onClick={() => setActiveTab('subscription')}
+                className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
+                  activeTab === 'subscription'
+                    ? 'bg-blue-50 text-blue-600 font-semibold'
+                    : 'text-neutral-600 hover:bg-gray-950'
+                }`}
+              >
+                Subskrypcja
+              </button>
             </nav>
 
             <hr className="my-4 border-gray-800/50" />
@@ -242,7 +254,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
         </div>
 
         {/* Content */}
-        <div className="lg:col-span-3">
+        <div className={activeTab === 'subscription' ? 'lg:col-span-4' : 'lg:col-span-3'}>
           {/* Profile Tab */}
           {activeTab === 'profile' && (
             <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
@@ -285,7 +297,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setProfileData((p) => ({ ...p, full_name: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     disabled={isLoading}
                   />
                 </div>
@@ -356,7 +368,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, currentPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     disabled={isLoading}
                   />
                 </div>
@@ -371,7 +383,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, newPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     disabled={isLoading}
                   />
                   <p className="text-xs text-neutral-400 mt-1">
@@ -389,7 +401,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, confirmPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                     disabled={isLoading}
                   />
                 </div>
@@ -405,35 +417,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
             </div>
           )}
 
+          {/* Subscription Tab */}
+          {activeTab === 'subscription' && (
+            <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
+              <h2 className="text-xl font-bold mb-2">Subskrypcja</h2>
+              <p className="text-sm text-neutral-500 mb-6">
+                Aktualny plan: {getTierBadge(user.tier as UserTier)}
+              </p>
+              <PricingCards
+                currentTier={user.tier}
+                onSelect={() => {}}
+              />
+            </div>
+          )}
+
           {/* Preferences Tab */}
           {activeTab === 'preferences' && (
             <div className="space-y-6">
-              {/* Subscription */}
-              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-                <h2 className="text-xl font-bold mb-4">Subskrypcja</h2>
-
-                <div className="flex items-center justify-between p-4 bg-gray-950 rounded-xl">
-                  <div>
-                    <p className="font-semibold">
-                      Plan: {getTierBadge(user.tier as UserTier)}
-                    </p>
-                    <p className="text-sm text-neutral-500 mt-1">
-                      {isPremium
-                        ? 'Masz dostęp do wszystkich funkcji Premium'
-                        : 'Uaktualnij do Premium, aby odblokować więcej funkcji'}
-                    </p>
-                  </div>
-                  {!isPremium && (
-                    <button
-                      onClick={() => onNavigate('premium')}
-                      className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors"
-                    >
-                      Ulepsz
-                    </button>
-                  )}
-                </div>
-              </div>
-
               {/* Dashboard Layout Presets */}
               <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
                 <h2 className="text-xl font-bold mb-2">Układ dashboardu</h2>
