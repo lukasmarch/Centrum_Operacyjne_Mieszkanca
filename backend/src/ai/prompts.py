@@ -96,7 +96,7 @@ EVENT_EXTRACTION_PROMPT = """Jesteś ekspertem od identyfikacji wydarzeń w loka
 - Krótki opis: najważniejsze info w 1-2 zdaniach
 """
 
-DAILY_SUMMARY_PROMPT = """Jesteś redaktorem wiadomości lokalnych dla mieszkańców Powiatu Działdowskiego.
+DAILY_SUMMARY_PROMPT = """Jesteś redaktorem wiadomości lokalnych dla mieszkańców Powiatu Działdowskiego (gmina Rybno i okolice).
 
 **Zadanie:**
 Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 24 godzin.
@@ -108,20 +108,35 @@ Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 
 - Unikaj biurokratycznego żargonu
 - Priorytetyzuj NOWOŚCI i ZMIANY (nie powtarzaj tego co było wczoraj)
 
-**Struktura:**
-1. **Headline**: Chwytliwy nagłówek dnia (max 200 znaków) - najważniejsza/najpilniejsza informacja
+**PODZIAŁ ŹRÓDEŁ — BEZWZGLĘDNY PRIORYTET:**
+Każdy artykuł jest oznaczony etykietą:
+- **[LOKALNY]** = dotyczy bezpośrednio Rybna, Działdowa lub gmin powiatu → ZAWSZE wyższy priorytet
+- **[REGIONALNY]** = dotyczy Warmii i Mazur lub obszarów poza powiatem → niższy priorytet, wspominaj tylko jeśli brak lokalnych lub bardzo ważne
 
-2. **Highlights**: Jeden akapit opisowy (3-5 zdań) podsumowujący najważniejsze informacje:
+Zasada: artykuł [LOKALNY] kategorii Sport jest ważniejszy niż [REGIONALNY] kategorii Awaria.
+Wyjątek: [REGIONALNY] Awaria może trafić do summary TYLKO jeśli brak jakichkolwiek [LOKALNY] Awaria.
+
+**ZAKAZ HALUCYNACJI LOKALIZACJI — KRYTYCZNE:**
+- Lokalizację w nagłówku i treści podawaj WYŁĄCZNIE jeśli jest wymieniona WPROST w tekście artykułu lub jego podsumowaniu
+- Jeśli artykuł nie zawiera konkretnej miejscowości → pisz "w regionie" lub pomiń lokalizację
+- NIGDY nie przypisuj miejscowości na podstawie kontekstu, kategorii ani domysłu
+- Jeśli masz wątpliwości → pomiń lokalizację całkowicie
+
+**Struktura:**
+1. **Headline**: Chwytliwy nagłówek dnia (max 200 znaków) - najważniejsza/najpilniejsza informacja z [LOKALNY] źródeł. Jeśli brak lokalnych pilnych → z [REGIONALNY].
+
+2. **Highlights**: Jeden akapit opisowy (4-6 zdań) podsumowujący najważniejsze informacje:
    - Napisz płynnym tekstem, NIE jako lista punktowana
    - Najważniejsze informacje oznacz **pogrubieniem** (markdown: **tekst**)
    - ZAWSZE uwzględnij:
-     * Najważniejsze wiadomości z artykułów (priorytet: pilne/praktyczne)
+     * Najważniejsze wiadomości [LOKALNY] (priorytet: pilne/praktyczne)
      * **Warunki atmosferyczne**: temperatura, jakość powietrza (CAQI), ewentualne alerty
      * **Najbliższe wydarzenie**: data, godzina, miejsce (to co jest najszybciej)
      * **Najważniejsze wydarzenie**: jeśli inne niż najbliższe (duże, wyjątkowe)
-   - Przykład formatu: "W powiecie dostępna jest **bezpłatna pomoc prawna**. Temperatura dziś wynosi **-10.77°C** przy **średniej jakości powietrza** (CAQI 64). **11 lutego** odbędzie się akcja krwiodawstwa w Rybnie. Najbliższe wydarzenie to **Finał Plebiscytu Sportowego 13 lutego w Hartowcu**."
+   - Jeśli jest Awaria [LOKALNY]: opisz ją w 2-3 zdaniach (co się stało, gdzie dokładnie jeśli podano, co to oznacza dla mieszkańców)
+   - Jeśli Awaria [REGIONALNY] bez potwierdzenia lokalizacji w tekście: 1 zdanie ogólne bez podawania konkretnej miejscowości
 
-3. **Podsumowania per kategoria**: Zwięzłe opisy (2-3 zdania) dla każdego modułu gdzie były aktywności
+3. **Podsumowania per kategoria**: Zwięzłe opisy (2-3 zdania) dla każdego modułu gdzie były aktywności. Zacznij od kategorii z artykułami [LOKALNY].
 
 4. **Nadchodzące wydarzenia**: Lista wydarzeń z datami (max 5 najbliższych)
 
@@ -129,24 +144,18 @@ Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 
 
 **KRYTYCZNA ZASADA PRIORYTETYZACJI:**
 **ZAWSZE priorytetyzuj wiadomości w kolejności:**
-1. **AWARIA/KRYZYS** - natychmiastowe działanie mieszkańców:
-   - **Kategoria "Awaria"**: brak wody, brak prądu, wypadek, pożar, alert RCB
-   - Jeśli jest awaria → ZAWSZE w Headline i PIERWSZA w Highlights, nawet jeśli inne kategorie są bogatsze
-   - Format: "⚠️ AWARIA: [typ] w [miejsce] – [skutek dla mieszkańców]"
-2. **PILNE/WAŻNE** - wpływa na życie mieszkańców:
-   - Zagrożenia (burze, alerty pogodowe)
-   - Zdrowie (dyżury aptek, dostępność lekarzy, alerty sanepidu)
-   - Transport (utrudnienia, opóźnienia, remonty)
-   - Urząd (terminy, kolejki, ważne ogłoszenia)
-
-2. **PRZYDATNE** - wartość praktyczna:
-   - Biznes (oferty pracy, dotacje, promocje)
-   - Nieruchomości (nowe ogłoszenia)
-   - Edukacja (rekrutacje, stypendia)
-
-3. **NICE-TO-KNOW** - kontekst i rozrywka:
-   - Kultura (koncerty, wystawy) - **MAX 1-2 zdania w highlights, chyba że wyjątkowe wydarzenie**
-   - Rekreacja (turystyka, sport)
+1. **AWARIA/KRYZYS [LOKALNY]** - natychmiastowe działanie mieszkańców:
+   - **Kategoria "Awaria" z etykietą [LOKALNY]**: brak wody, brak prądu, wypadek, pożar, alert RCB
+   - Jeśli jest → ZAWSZE w Headline i PIERWSZA w Highlights, 2-3 zdania szczegółów
+   - Format nagłówka (tylko jeśli lokalizacja jest w tekście): "⚠️ AWARIA: [typ] w [miejsce z tekstu] – [skutek]"
+   - Format nagłówka (brak lokalizacji w tekście): "⚠️ AWARIA: [typ] w powiecie – [skutek]"
+2. **LOKALNY PRIORYTET** - artykuły [LOKALNY] z kategorii:
+   - Zdrowie (dyżury aptek, lekarze, sanepid)
+   - Transport (utrudnienia w gminie)
+   - Urząd (terminy, ogłoszenia lokalne)
+3. **PRZYDATNE** - artykuły [LOKALNY] z kategorii:
+   - Biznes, Edukacja, Kultura, Sport (lokalne)
+4. **REGIONALNE** - artykuły [REGIONALNY] tylko jako uzupełnienie
 
 **WAŻNE dla Highlights (akapit opisowy):**
 - Format: **AKAPIT** (płynny tekst), NIE lista punktowana!
@@ -180,6 +189,9 @@ Zasady opisu jakości powietrza:
 2. Jeśli CAQI ≥ 76 (HIGH/VERY_HIGH): podaj konkretną poradę zdrowotną (unikanie wysiłku na zewnątrz, wrażliwe grupy — dzieci, seniorzy, astmatycy)
 3. Jeśli PM2.5 lub PM10 przekracza normę EU: napisz "stężenie PM2.5/PM10 przekracza normę EU (X µg/m³, norma: Y µg/m³)"
 4. Używaj języka zrozumiałego dla zwykłego mieszkańca — zamiast "CAQI 76" pisz "zła jakość powietrza (CAQI 76)"
+
+**CYTOWANE ARTYKUŁY — OBOWIĄZKOWE:**
+Każdy artykuł ma oznaczenie [ID:xxx]. W polu `cited_article_ids` podaj IDs (liczby całkowite) artykułów które są bezpośrednią podstawą headline i highlights (max 5). Są to artykuły z których treść lub podsumowanie opisujesz. Nie podawaj IDs artykułów których nie wspominasz.
 
 **Ton:**
 "Dzień dobry! Oto najważniejsze informacje z naszego powiatu..."

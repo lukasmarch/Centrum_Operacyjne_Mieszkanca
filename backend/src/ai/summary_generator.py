@@ -154,7 +154,21 @@ class SummaryGenerator:
             result = await self.agent.run(input_data)
             summary_data = result.output
 
-            # 7. Zapisz do bazy
+            # 7. Rozwiąż cytowane artykuły → {id, title, url}
+            all_articles_map = {a.id: a for a in articles}
+            cited_articles = []
+            for art_id in summary_data.cited_article_ids:
+                art = all_articles_map.get(art_id)
+                if art and art.url:
+                    cited_articles.append({
+                        "id": art.id,
+                        "title": art.title,
+                        "url": art.url,
+                        "source_id": art.source_id,
+                        "published_at": art.published_at.isoformat() if art.published_at else None,
+                    })
+
+            # 8. Zapisz do bazy
             db_summary = DailySummary(
                 date=date_start,
                 headline=summary_data.headline,
@@ -165,6 +179,7 @@ class SummaryGenerator:
                     "summary_by_category": summary_data.summary_by_category,
                     "upcoming_events": summary_data.upcoming_events,
                     "air_quality_summary": summary_data.air_quality_summary,
+                    "cited_articles": cited_articles,
                     "stats": {
                         "total_articles": len(articles),
                         "categories_count": len(articles_by_category),
@@ -190,6 +205,17 @@ class SummaryGenerator:
             await session.rollback()
             raise
 
+    # source_ids bezpośrednio powiązane z Rybnem i gminami powiatu
+    LOCAL_SOURCE_IDS = {2, 3, 5, 6, 11, 12, 13}
+    # source_ids regionalne (Warmia i Mazury, nie specyficznie powiat)
+    REGIONAL_SOURCE_IDS = {1, 9, 10}
+
+    def _get_locality_label(self, article) -> str:
+        """Zwróć etykietę [LOKALNY] lub [REGIONALNY] dla artykułu"""
+        if article.source_id in self.LOCAL_SOURCE_IDS:
+            return "[LOKALNY]"
+        return "[REGIONALNY]"
+
     def _prepare_input_for_ai(
         self,
         date: datetime,
@@ -199,24 +225,40 @@ class SummaryGenerator:
     ) -> str:
         """Przygotuj sformatowany tekst dla AI"""
 
+        local_count = sum(
+            1 for arts in articles_by_category.values()
+            for a in arts if a.source_id in self.LOCAL_SOURCE_IDS
+        )
+        total_count = sum(len(arts) for arts in articles_by_category.values())
+
         lines = [
             f"Data: {date.strftime('%Y-%m-%d')}",
-            f"Liczba artykułów: {sum(len(arts) for arts in articles_by_category.values())}",
+            f"Liczba artykułów: {total_count} (lokalnych: {local_count}, regionalnych: {total_count - local_count})",
             "",
             "=" * 80,
             "ARTYKUŁY PO KATEGORIACH:",
+            "  [LOKALNY]   = dotyczy bezpośrednio Rybna, Działdowa lub gmin powiatu",
+            "  [REGIONALNY] = dotyczy Warmii i Mazur lub obszarów poza powiatem",
             "=" * 80,
             ""
         ]
 
         # Dodaj artykuły pogrupowane po kategoriach
+        # W każdej kategorii: najpierw [LOKALNY], potem [REGIONALNY]
         for category, arts in sorted(articles_by_category.items()):
-            lines.append(f"\n## {category.upper()} ({len(arts)} artykułów):\n")
-            for i, article in enumerate(arts[:10], 1):  # max 10 per kategoria
-                lines.append(f"{i}. {article.title}")
+            sorted_arts = sorted(
+                arts,
+                key=lambda a: (0 if a.source_id in self.LOCAL_SOURCE_IDS else 1, -a.published_at.timestamp() if a.published_at else 0)
+            )
+            lines.append(f"\n## {category.upper()} ({len(sorted_arts)} artykułów):\n")
+            for i, article in enumerate(sorted_arts[:10], 1):  # max 10 per kategoria
+                label = self._get_locality_label(article)
+                lines.append(f"{i}. {label} [ID:{article.id}] {article.title}")
                 if article.summary:
                     lines.append(f"   → {article.summary}")
-                if article.location_mentioned:
+                # Lokalizację pokazuj tylko dla artykułów LOKALNYCH - dla regionalnych
+                # może być halucynowana przez AI kategoryzacji
+                if article.location_mentioned and article.source_id in self.LOCAL_SOURCE_IDS:
                     lines.append(f"   📍 {', '.join(article.location_mentioned)}")
                 lines.append("")
 

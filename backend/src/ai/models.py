@@ -77,8 +77,8 @@ class DailySummary(BaseModel):
         description="Główny nagłówek dnia - chwytliwy, przyciągający uwagę"
     )
     highlights: str = Field(
-        max_length=800,
-        description="Akapit opisowy (3-5 zdań) z najważniejszymi wiadomościami, pogodą i wydarzeniami. Najważniejsze info w **bold** (markdown)"
+        max_length=1000,
+        description="Akapit opisowy (4-6 zdań) z najważniejszymi wiadomościami, pogodą i wydarzeniami. Najważniejsze info w **bold** (markdown)"
     )
     summary_by_category: dict[str, str] = Field(
         default_factory=dict,
@@ -90,4 +90,8 @@ class DailySummary(BaseModel):
     )
     air_quality_summary: str = Field(
         description="Podsumowanie jakości powietrza i warunków pogodowych (dane z czujnika w Rybnie)"
+    )
+    cited_article_ids: List[int] = Field(
+        default_factory=list,
+        description="IDs artykułów (z pola [ID:xxx]) które są cytowane lub stanowią podstawę headline i highlights. Max 5 najważniejszych."
     )
