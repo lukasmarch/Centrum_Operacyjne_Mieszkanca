@@ -1,5 +1,7 @@
 import React from 'react';
+import { Bot, BarChart3, Newspaper, Landmark, ShieldAlert, Map, CalendarDays } from 'lucide-react';
 import { ChatMessageData, ChartConfig } from '../src/hooks/useChat';
+import { useAuth } from '../src/context/AuthContext';
 import SourceChip from './SourceChip';
 import TrendChart from './gus/charts/TrendChart';
 
@@ -7,13 +9,34 @@ interface ChatMessageProps {
   message: ChatMessageData;
 }
 
-const AGENT_ICONS: Record<string, string> = {
-  redaktor: '📰',
-  urzednik: '🏛️',
-  gus_analityk: '📊',
-  przewodnik: '🗺️',
-  straznik: '🛡️',
+// Agent images – must match frontend/public/agents/
+const AGENT_IMAGES: Record<string, string> = {
+  redaktor: '/agents/redaktor.png',
+  urzednik: '/agents/urzednik.jpeg',
+  straznik: '/agents/straznik.jpeg',
+  przewodnik: '/agents/przewodnik.png',
+  organizator: '/agents/organizator.jpeg',
 };
+
+const AGENT_COLORS: Record<string, string> = {
+  redaktor: 'from-sky-500 to-blue-700',
+  urzednik: 'from-amber-500 to-orange-700',
+  straznik: 'from-red-500 to-rose-700',
+  przewodnik: 'from-emerald-500 to-teal-700',
+  organizator: 'from-purple-500 to-fuchsia-700',
+  gus_analityk: 'from-cyan-500 to-blue-700',
+};
+
+const AGENT_ICONS: Record<string, React.ReactNode> = {
+  redaktor: <Newspaper size={14} />,
+  urzednik: <Landmark size={14} />,
+  straznik: <ShieldAlert size={14} />,
+  przewodnik: <Map size={14} />,
+  organizator: <CalendarDays size={14} />,
+  gus_analityk: <BarChart3 size={14} />,
+};
+
+// ── Markdown renderer ──────────────────────────────────────────────────────
 
 function renderMarkdown(text: string): React.ReactNode {
   const paragraphs = text.split(/\n\n+/);
@@ -24,7 +47,11 @@ function renderMarkdown(text: string): React.ReactNode {
 
     const flushList = () => {
       if (listItems.length > 0) {
-        nodes.push(<ul key={`ul-${pi}-${nodes.length}`} className="list-disc list-inside space-y-0.5 my-1">{listItems}</ul>);
+        nodes.push(
+          <ul key={`ul-${pi}-${nodes.length}`} className="list-disc list-inside space-y-0.5 my-1">
+            {listItems}
+          </ul>
+        );
         listItems = [];
       }
     };
@@ -43,23 +70,24 @@ function renderMarkdown(text: string): React.ReactNode {
         );
       } else if (listMatch) {
         listItems.push(
-          <li key={`li-${pi}-${li}`} className="text-neutral-200">{inlineMarkdown(listMatch[1])}</li>
+          <li key={`li-${pi}-${li}`} className="text-neutral-200">
+            {inlineMarkdown(listMatch[1])}
+          </li>
         );
       } else if (numberedMatch) {
         listItems.push(
-          <li key={`li-${pi}-${li}`} className="text-neutral-200">{inlineMarkdown(numberedMatch[1])}</li>
+          <li key={`li-${pi}-${li}`} className="text-neutral-200">
+            {inlineMarkdown(numberedMatch[1])}
+          </li>
         );
       } else if (line.trim()) {
         flushList();
-        nodes.push(
-          <span key={`t-${pi}-${li}`}>{inlineMarkdown(line)}</span>
-        );
+        nodes.push(<span key={`t-${pi}-${li}`}>{inlineMarkdown(line)}</span>);
         if (li < lines.length - 1) nodes.push(<br key={`br-${pi}-${li}`} />);
       }
     });
 
     flushList();
-
     if (nodes.length === 0) return null;
     return (
       <p key={`p-${pi}`} className="mb-2 last:mb-0">
@@ -70,11 +98,14 @@ function renderMarkdown(text: string): React.ReactNode {
 }
 
 function inlineMarkdown(text: string): React.ReactNode {
-  // Split on **bold** and [text](url) links
   const parts = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)]+\))/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+      return (
+        <strong key={i} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
     }
     const linkMatch = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
     if (linkMatch) {
@@ -94,8 +125,10 @@ function inlineMarkdown(text: string): React.ReactNode {
   });
 }
 
+// ── Mini KPI chart ─────────────────────────────────────────────────────────
+
 const MiniKPI: React.FC<{ chart: ChartConfig }> = ({ chart }) => (
-  <div className="bg-gray-700/50 rounded-xl p-3 flex items-center justify-between gap-4">
+  <div className="bg-neutral-800/60 rounded-xl p-3 flex items-center justify-between gap-4">
     <div className="min-w-0">
       <p className="text-xs text-neutral-400 mb-1 truncate">{chart.title}</p>
       <p className="text-2xl font-bold text-white leading-none">
@@ -117,13 +150,62 @@ const MiniKPI: React.FC<{ chart: ChartConfig }> = ({ chart }) => (
   </div>
 );
 
+// ── Avatar helpers ─────────────────────────────────────────────────────────
+
+const UserAvatar: React.FC<{ avatarUrl?: string; fullName?: string }> = ({ avatarUrl, fullName }) => {
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt="Ty"
+        className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-white/10"
+      />
+    );
+  }
+  const initials = fullName
+    ? fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : 'TY';
+  return (
+    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
+      {initials}
+    </div>
+  );
+};
+
+const AgentAvatar: React.FC<{ agentName?: string }> = ({ agentName }) => {
+  const name = agentName || '';
+  const imgSrc = AGENT_IMAGES[name];
+  const color = AGENT_COLORS[name] || 'from-blue-600 to-violet-600';
+  const icon = AGENT_ICONS[name] || <Bot size={14} />;
+
+  if (imgSrc) {
+    return (
+      <img
+        src={imgSrc}
+        alt={name}
+        className="w-8 h-8 rounded-full object-cover object-top flex-shrink-0 border border-white/10"
+      />
+    );
+  }
+  return (
+    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${color} flex items-center justify-center text-white flex-shrink-0`}>
+      {icon}
+    </div>
+  );
+};
+
+// ── Main component ─────────────────────────────────────────────────────────
+
 const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+  const { user } = useAuth();
+
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[80%] bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed">
+      <div className="flex items-end justify-end gap-2">
+        <div className="max-w-[78%] bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed shadow-md">
           {message.content}
         </div>
+        <UserAvatar avatarUrl={user?.avatarUrl} fullName={user?.full_name} />
       </div>
     );
   }
@@ -131,17 +213,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const hasCharts = message.chartData && message.chartData.length > 0 && !message.isStreaming;
 
   return (
-    <div className="flex gap-3 items-start">
-      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-sm shrink-0 mt-0.5">
-        {message.agent_name ? (AGENT_ICONS[message.agent_name] || '🤖') : '🤖'}
-      </div>
+    <div className="flex gap-2.5 items-end">
+      <AgentAvatar agentName={message.agent_name} />
+
       <div className="flex-1 min-w-0">
         {message.agent_name && (
-          <p className="text-[10px] text-neutral-500 mb-1 uppercase tracking-widest font-bold">
+          <p className="text-[10px] text-neutral-500 mb-1 uppercase tracking-widest font-semibold pl-1">
             {message.agent_name.replace('_', '-')}.ai
           </p>
         )}
-        <div className="bg-gray-900/60 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-neutral-200 leading-relaxed">
+
+        <div className="bg-neutral-900/80 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-neutral-200 leading-relaxed shadow-sm">
           {message.content ? (
             <>
               <div>{renderMarkdown(message.content)}</div>
@@ -161,25 +243,18 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         {hasCharts && (
           <div className="mt-3 space-y-3">
             {message.chartData!.map((chart, i) => (
-              <div key={i} className="bg-gray-900/60 border border-white/5 rounded-2xl px-4 py-3 overflow-hidden">
+              <div key={i} className="bg-neutral-900/80 border border-white/5 rounded-2xl px-4 py-3 overflow-hidden">
                 {chart.chart_type === 'trend' && chart.data && chart.data.length >= 2 && (
-                  <TrendChart
-                    data={chart.data}
-                    title={chart.title}
-                    height={180}
-                    color="#3b82f6"
-                  />
+                  <TrendChart data={chart.data} title={chart.title} height={180} color="#3b82f6" />
                 )}
-                {chart.chart_type === 'kpi' && (
-                  <MiniKPI chart={chart} />
-                )}
+                {chart.chart_type === 'kpi' && <MiniKPI chart={chart} />}
               </div>
             ))}
           </div>
         )}
 
         {message.sources && message.sources.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-2 mt-2 pl-1">
             {message.sources.map((source, i) => (
               <SourceChip key={i} source={source} />
             ))}

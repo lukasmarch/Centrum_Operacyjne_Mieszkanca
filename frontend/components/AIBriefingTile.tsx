@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Sparkles, CalendarDays } from 'lucide-react';
+import { ArrowRight, Sparkles, ExternalLink } from 'lucide-react';
 import { useDailySummary } from '../src/hooks/useDailySummary';
 import { AppSection } from '../types';
 
@@ -67,9 +67,22 @@ const AIBriefingTile: React.FC<AIBriefingTileProps> = ({ onNavigate }) => {
         ) : summary ? (
           <>
             {/* Headline */}
-            <h3 className="text-lg font-bold text-white leading-snug mb-3">
+            <h3 className="text-lg font-bold text-white leading-snug mb-1">
               {summary.headline}
             </h3>
+
+            {/* Link do artykułu z nagłówka */}
+            {summary.cited_articles?.[0]?.url && (
+              <a
+                href={summary.cited_articles[0].url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] text-blue-400/80 hover:text-blue-300 mb-3 transition-colors group"
+              >
+                <ExternalLink size={10} />
+                <span className="truncate max-w-[220px]">{summary.cited_articles[0].title}</span>
+              </a>
+            )}
 
             {/* Highlights – akapit z markdown bold */}
             {summary.highlights && (

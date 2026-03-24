@@ -60,7 +60,8 @@ const BottomTabBar: React.FC<BottomTabBarProps> = React.memo(({ activeTab, onTab
               {isActive && (
                 <motion.div
                   layoutId="tab-indicator"
-                  className="absolute -bottom-1 w-5 h-0.5 rounded-full bg-gradient-to-r from-blue-500 to-violet-500"
+                  className="absolute -bottom-1 w-5 h-0.5 rounded-full"
+                  style={{ background: 'linear-gradient(to right, var(--chart-2), var(--chart-3))' }}
                   transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 />
               )}

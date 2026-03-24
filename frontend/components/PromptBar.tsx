@@ -77,7 +77,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ onNavigate, onSubmit }) => {
           />
           <button
             onClick={() => handleSubmit(query || suggestions[currentSuggestion])}
-            className="shrink-0 bg-gradient-to-br from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white rounded-2xl px-5 py-3 font-medium transition-all shadow-lg shadow-blue-900/30 flex items-center gap-2 text-sm"
+            className="btn-primary shrink-0 flex items-center gap-2"
           >
             <Send size={15} />
             <span className="hidden sm:inline">Zapytaj</span>
@@ -90,7 +90,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ onNavigate, onSubmit }) => {
             <button
               key={i}
               onClick={() => handleSubmit(s)}
-              className="text-xs text-slate-400 bg-slate-800/60 border border-slate-700/40 hover:border-blue-500/40 hover:text-blue-400 px-3 py-1.5 rounded-full transition-all"
+              className="btn-chip"
             >
               {s}
             </button>

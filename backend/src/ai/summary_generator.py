@@ -141,21 +141,46 @@ class SummaryGenerator:
         air_quality = air_quality_result.scalar_one_or_none()
 
         # 5. Przygotuj dane wejściowe dla AI
+        top_article = self._select_top_article(articles_by_category)
+        if top_article:
+            locality = "LOKALNY" if top_article.source_id in self.LOCAL_SOURCE_IDS else "REGIONALNY"
+            self.logger.info(
+                f"Top article (deterministic): [ID:{top_article.id}] [{locality}] "
+                f"cat={top_article.category} '{top_article.title[:60]}'"
+            )
         input_data = self._prepare_input_for_ai(
             date_start,
             articles_by_category,
             events,
-            air_quality
+            air_quality,
+            top_article=top_article
         )
 
         try:
-            # 6. Wywołaj AI agent
+            # 6. Wywołaj AI agent dwukrotnie, wybierz lepszy wynik
+            all_articles_map = {a.id: a for a in articles}
             self.logger.info(f"Calling AI to generate summary (articles: {len(articles)}, events: {len(events)})")
-            result = await self.agent.run(input_data)
-            summary_data = result.output
+            result_a = await self.agent.run(input_data)
+            result_b = await self.agent.run(input_data)
+
+            score_a = result_a.output.headline_importance_score
+            score_b = result_b.output.headline_importance_score
+            local_a = self._is_headline_local(result_a.output, all_articles_map)
+            local_b = self._is_headline_local(result_b.output, all_articles_map)
+
+            a_wins, reason = self._pick_winner(local_a, score_a, local_b, score_b)
+            chosen = "A" if a_wins else "B"
+
+            self.logger.info(
+                f"Iteration A: score={score_a} local={local_a} headline='{result_a.output.headline[:60]}'"
+            )
+            self.logger.info(
+                f"Iteration B: score={score_b} local={local_b} headline='{result_b.output.headline[:60]}'"
+            )
+            self.logger.info(f"→ Choosing {chosen} ({reason})")
+            summary_data = result_a.output if chosen == "A" else result_b.output
 
             # 7. Rozwiąż cytowane artykuły → {id, title, url}
-            all_articles_map = {a.id: a for a in articles}
             cited_articles = []
             for art_id in summary_data.cited_article_ids:
                 art = all_articles_map.get(art_id)
@@ -210,6 +235,78 @@ class SummaryGenerator:
     # source_ids regionalne (Warmia i Mazury, nie specyficznie powiat)
     REGIONAL_SOURCE_IDS = {1, 9, 10}
 
+    # Hierarchia ważności kategorii (niższy = ważniejszy)
+    CATEGORY_PRIORITY = {
+        "Awaria": 0,
+        "Zdrowie": 1,
+        "Transport": 2,
+        "Urząd": 3,
+        "Biznes": 4,
+        "Edukacja": 5,
+        "Kultura": 6,
+        "Sport": 7,
+        "Rekreacja": 8,
+        "Nieruchomości": 9,
+    }
+
+    def _select_top_article(self, articles_by_category: dict):
+        """Deterministycznie wybierz artykuł do nagłówka.
+
+        Priorytet: lokalny > regionalny, Awaria > Zdrowie > Transport > ...
+        Wśród artykułów tej samej kategorii i źródła: najnowszy.
+        Regionalne mogą wygrać tylko jeśli brak jakichkolwiek lokalnych.
+        """
+        best = None
+        best_key = (999, 1, 0)  # (priorytet kategorii, 0=lokalny/1=regionalny, -timestamp)
+
+        for category, arts in articles_by_category.items():
+            cat_prio = self.CATEGORY_PRIORITY.get(category, 10)
+            for art in arts:
+                is_local = art.source_id in self.LOCAL_SOURCE_IDS
+                locality_key = 0 if is_local else 1
+                ts = art.published_at.timestamp() if art.published_at else 0
+                key = (cat_prio, locality_key, -ts)
+                if key < best_key:
+                    best_key = key
+                    best = art
+
+        return best
+
+    def _pick_winner(self, local_a: bool, score_a: int, local_b: bool, score_b: int) -> tuple[bool, str]:
+        """Wybierz lepszą iterację (True = A wygrywa).
+
+        Reguła 1: lokalne score >= 6 zawsze wygrywa z regionalnym (niezależnie od score regionalnego)
+        Reguła 2: regionalne score = 9 (kryzys wpływający na lokalnych) wygrywa z lokalnym score <= 5
+        Reguła 3: w pozostałych przypadkach (oba lokalne / oba regionalne / lokalne 1-5 vs regionalne 1-8) → wyższy score (remis → A)
+        """
+        # Reguła 1
+        if local_a and not local_b and score_a >= 6:
+            return True, f"A=lokalny(score={score_a}>=6) wygrywa z regionalnym"
+        if local_b and not local_a and score_b >= 6:
+            return False, f"B=lokalny(score={score_b}>=6) wygrywa z regionalnym"
+
+        # Reguła 2
+        if not local_a and local_b and score_a == 9 and score_b <= 5:
+            return True, f"A=regionalny krytyczny(9) wygrywa z lokalnym(score={score_b}<=5)"
+        if not local_b and local_a and score_b == 9 and score_a <= 5:
+            return False, f"B=regionalny krytyczny(9) wygrywa z lokalnym(score={score_a}<=5)"
+
+        # Reguła 3
+        if score_a >= score_b:
+            return True, f"score A={score_a} >= B={score_b}"
+        return False, f"score B={score_b} > A={score_a}"
+
+    def _is_headline_local(self, summary_output, articles_map: dict) -> bool:
+        """Sprawdź czy artykuł będący podstawą nagłówka pochodzi z lokalnego źródła.
+        Pierwszy ID w cited_article_ids = artykuł z nagłówka (konwencja w prompcie).
+        """
+        if not summary_output.cited_article_ids:
+            return False
+        headline_art = articles_map.get(summary_output.cited_article_ids[0])
+        if headline_art is None:
+            return False
+        return headline_art.source_id in self.LOCAL_SOURCE_IDS
+
     def _get_locality_label(self, article) -> str:
         """Zwróć etykietę [LOKALNY] lub [REGIONALNY] dla artykułu"""
         if article.source_id in self.LOCAL_SOURCE_IDS:
@@ -221,7 +318,8 @@ class SummaryGenerator:
         date: datetime,
         articles_by_category: dict,
         events: list,
-        air_quality: Optional[AirQuality]
+        air_quality: Optional[AirQuality],
+        top_article=None
     ) -> str:
         """Przygotuj sformatowany tekst dla AI"""
 
@@ -231,7 +329,26 @@ class SummaryGenerator:
         )
         total_count = sum(len(arts) for arts in articles_by_category.values())
 
-        lines = [
+        lines = []
+
+        # Sekcja WYMAGANY ARTYKUŁ NAGŁÓWKA — kod decyduje deterministycznie
+        if top_article:
+            locality = "LOKALNY" if top_article.source_id in self.LOCAL_SOURCE_IDS else "REGIONALNY"
+            lines += [
+                "=" * 80,
+                f"⚡ WYMAGANY ARTYKUŁ NAGŁÓWKA [ID:{top_article.id}]:",
+                f"   Tytuł: {top_article.title}",
+                f"   Kategoria: {top_article.category} | Źródło: [{locality}]",
+            ]
+            if top_article.summary:
+                lines.append(f"   Treść: {top_article.summary}")
+            lines += [
+                f"   ZASADA: Headline MUSI być o tym artykule. cited_article_ids[0] MUSI = {top_article.id}.",
+                "=" * 80,
+                "",
+            ]
+
+        lines += [
             f"Data: {date.strftime('%Y-%m-%d')}",
             f"Liczba artykułów: {total_count} (lokalnych: {local_count}, regionalnych: {total_count - local_count})",
             "",

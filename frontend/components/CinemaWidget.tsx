@@ -34,11 +34,11 @@ export const CinemaWidget: React.FC = () => {
     const currentRepertoire = data[activeTab];
 
     return (
-        <div className="bg-gray-950 rounded-3xl border border-gray-800/50 overflow-hidden h-full flex flex-col">
+        <div className="overflow-hidden h-full flex flex-col">
             {/* Header */}
             <div className="p-4 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <Film size={14} className="text-purple-400" />
+                    <Film size={14} style={{ color: 'var(--chart-2)' }} />
                     <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Repertuar Kina</span>
                 </div>
                 <div className="flex bg-gray-900/80 rounded-lg p-0.5 gap-0.5">

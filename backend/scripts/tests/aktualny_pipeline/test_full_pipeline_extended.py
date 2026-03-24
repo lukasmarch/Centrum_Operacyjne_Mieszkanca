@@ -8,9 +8,11 @@ Scheduler Timeline (produkcja):
     Cron      → Traffic Cache         (2,6,10,14,18,22:00)
     06:00     → Article Scraping      (daily pipeline: krok 1)
     06:15     → AI Processing         (daily pipeline: krok 2)
+    06:20     → Embedding Job         (RAG, tylko dzisiejsze artykuły/eventy)
     07:00     → Daily Summary         (daily pipeline: krok 3)
     07:15     → Newsletter Daily      (pon-pt, po summary)
     08:00     → Cinema Repertoire     (daily)
+    Poniedziałek → Health Job         (harmonogramy SPGZOZ + dyżury aptek)
     Niedziela → CEIDG Business Sync   (weekly)
     Kwartalny → GUS Statistics        (quarterly)
 
@@ -19,13 +21,14 @@ UWAGA:
     - Traffic job wymaga skonfigurowanego Gemini API (GOOGLE_API_KEY)
     - Air Quality wymaga skonfigurowanego AIRLY_API_KEY
     - Joby które mogą być skip'owane (brak API key) są oznaczone ⚠️
+    - Health job cotygodniowy — domyślnie włączony, użyj --skip-health by pominąć
 
 Uruchomienie:
     cd backend
     python scripts/tests/aktualny_pipeline/test_full_pipeline_extended.py
 
     # Pomiń konkretne joby:
-    python scripts/tests/aktualny_pipeline/test_full_pipeline_extended.py --skip-traffic --skip-airly
+    python scripts/tests/aktualny_pipeline/test_full_pipeline_extended.py --skip-traffic --skip-airly --skip-health
 """
 import asyncio
 import sys
@@ -41,8 +44,10 @@ from src.scheduler.air_quality_job import update_air_quality
 from src.scheduler.traffic_job import run_traffic_job_async
 from src.scheduler.article_job import update_articles_job
 from src.scheduler.ai_jobs import run_ai_processing
+from src.scheduler.embedding_job import run_embedding_job_async
 from src.scheduler.summary_job import run_daily_summary
 from src.scheduler.cinema_job import run_cinema_job_async
+from src.scheduler.health_job import run_health_job_async
 from src.utils.logger import setup_logger
 
 logger = setup_logger("FullPipelineExtended")
@@ -54,7 +59,8 @@ def parse_args():
     parser.add_argument("--skip-airly", action="store_true", help="Pomiń Air Quality (Airly API)")
     parser.add_argument("--skip-weather", action="store_true", help="Pomiń Weather Update")
     parser.add_argument("--skip-cinema", action="store_true", help="Pomiń Cinema Repertoire")
-    parser.add_argument("--articles-only", action="store_true", help="Uruchom tylko daily pipeline (artykuły+AI+summary)")
+    parser.add_argument("--skip-health", action="store_true", help="Pomiń Health Job (SPGZOZ + apteki, cotygodniowy)")
+    parser.add_argument("--articles-only", action="store_true", help="Uruchom tylko daily pipeline (artykuły+AI+embedding+summary)")
     return parser.parse_args()
 
 
@@ -97,11 +103,12 @@ async def main():
 
     if args.articles_only:
         # Tryb: tylko daily pipeline
-        logger.info("Tryb: --articles-only (pomijam weather/airly/traffic/cinema)")
+        logger.info("Tryb: --articles-only (pomijam weather/airly/traffic/cinema/health)")
         steps = [
-            ("Scraping artykułów",         update_articles_job(),   False),
-            ("AI Processing (batch=100)",  run_ai_processing(),     False),
-            ("Generowanie daily summary",  run_daily_summary(),     False),
+            ("Scraping artykułów",                    update_articles_job(),      False),
+            ("AI Processing (batch=100)",             run_ai_processing(),        False),
+            ("Embedding Job (RAG, dzisiejsze)",       run_embedding_job_async(),  False),
+            ("Generowanie daily summary",             run_daily_summary(),        False),
         ]
         total = len(steps)
         for i, (name, coro, skip) in enumerate(steps, 1):
@@ -110,13 +117,15 @@ async def main():
         # Pełny pipeline — kolejność jak w schedularze
         steps = [
             # (nazwa, korutyna, czy_pominąć)
-            ("Weather Update",             update_weather_job(),    args.skip_weather),
-            ("Air Quality / Airly",        update_air_quality(),    args.skip_airly),
-            ("Traffic Cache / Gemini",     run_traffic_job_async(), args.skip_traffic),
-            ("Scraping artykułów",         update_articles_job(),   False),
-            ("AI Processing (batch=100)",  run_ai_processing(),     False),
-            ("Generowanie daily summary",  run_daily_summary(),     False),
-            ("Cinema Repertoire",          run_cinema_job_async(),  args.skip_cinema),
+            ("Weather Update",                        update_weather_job(),       args.skip_weather),
+            ("Air Quality / Airly",                   update_air_quality(),       args.skip_airly),
+            ("Traffic Cache / Gemini",                run_traffic_job_async(),    args.skip_traffic),
+            ("Scraping artykułów",                    update_articles_job(),      False),
+            ("AI Processing (batch=100)",             run_ai_processing(),        False),
+            ("Embedding Job (RAG, dzisiejsze)",       run_embedding_job_async(),  False),
+            ("Generowanie daily summary",             run_daily_summary(),        False),
+            ("Cinema Repertoire",                     run_cinema_job_async(),     args.skip_cinema),
+            ("Health Job (SPGZOZ + apteki)",          run_health_job_async(),     args.skip_health),
         ]
         total = len(steps)
         for i, (name, coro, skip) in enumerate(steps, 1):

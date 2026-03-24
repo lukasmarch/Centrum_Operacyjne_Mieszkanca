@@ -187,12 +187,12 @@ const BusTrackerWidget: React.FC = () => {
     if (statuses.dzaRyb.isActive && statuses.dzaRyb.activeBus) activeBuses.push(statuses.dzaRyb.activeBus);
 
     return (
-        <div className="bg-gray-950 rounded-3xl p-5 flex flex-col gap-5 border border-gray-800/50 overflow-hidden w-full">
+        <div className="p-5 flex flex-col gap-5 overflow-hidden w-full h-full">
             <div className="flex justify-between items-start px-1">
                 <div>
                     <div className="flex items-center gap-2.5 mb-1">
                         <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center shadow-md shadow-blue-500/10 border border-blue-500/20">
-                            <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24"><path d="M18 11V7a2 2 0 00-2-2H8a2 2 0 00-2 2v4m12 0a2 2 0 012 2v3a2 2 0 01-2 2h-1a2 2 0 01-2-2v-1H7v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-3a2 2 0 012-2m14 0H4M8 11h2m4 0h2" /></svg>
+                            <svg className="w-4 h-4" style={{ color: 'var(--chart-1)' }} fill="currentColor" viewBox="0 0 24 24"><path d="M18 11V7a2 2 0 00-2-2H8a2 2 0 00-2 2v4m12 0a2 2 0 012 2v3a2 2 0 01-2 2h-1a2 2 0 01-2-2v-1H7v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-3a2 2 0 012-2m14 0H4M8 11h2m4 0h2" /></svg>
                         </div>
                         <h3 className="text-lg font-bold text-neutral-100 leading-none">Monitoring</h3>
                     </div>

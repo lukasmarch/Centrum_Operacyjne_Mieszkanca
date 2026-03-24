@@ -17,7 +17,7 @@ const HealthTile: React.FC = () => {
   // Loading skeleton
   if (loading) {
     return (
-      <div className="bg-gray-950/80 border border-gray-700/50/50 rounded-2xl p-5 h-[500px] animate-pulse">
+      <div className="flex flex-col p-5 h-full animate-pulse">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-4 h-4 bg-gray-700 rounded" />
           <div className="w-28 h-3 bg-gray-700 rounded" />
@@ -37,9 +37,9 @@ const HealthTile: React.FC = () => {
   // Error state
   if (error) {
     return (
-      <div className="bg-gray-950/80 border border-gray-700/50/50 rounded-2xl p-5 h-[500px]">
+      <div className="flex flex-col p-5 h-full">
         <div className="flex items-center gap-2 mb-4">
-          <Heart size={14} className="text-rose-400" />
+          <Heart size={14} style={{ color: 'var(--chart-5)' }} />
           <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Twoje Zdrowie</p>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -54,11 +54,11 @@ const HealthTile: React.FC = () => {
   const isEmpty = !hasClinics && !hasPharmacies;
 
   return (
-    <div className="bg-gray-950/80 border border-gray-700/50/50 rounded-2xl p-5 h-[500px] flex flex-col overflow-hidden">
+    <div className="flex flex-col p-5 h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Heart size={14} className="text-rose-400" />
+          <Heart size={14} style={{ color: 'var(--chart-5)' }} />
           <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Twoje Zdrowie</p>
         </div>
         {data && (

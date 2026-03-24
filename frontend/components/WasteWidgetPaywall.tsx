@@ -3,12 +3,12 @@ import { Truck } from 'lucide-react';
 
 const WasteWidgetPaywall: React.FC = () => {
   return (
-    <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
+    <div className="overflow-hidden flex flex-col h-full">
       {/* Header - identyczny jak WasteWidget */}
       <div className="p-5 border-b border-white/10 flex justify-between items-center bg-emerald-500/5 backdrop-blur-md">
         <div>
           <h2 className="font-bold text-neutral-100 text-lg flex items-center gap-2">
-            <Truck className="text-emerald-400" size={22} />
+            <Truck style={{ color: 'var(--chart-3)' }} size={22} />
             Harmonogram Odbioru Śmieci
           </h2>
           <p className="text-sm text-neutral-400 mt-1">

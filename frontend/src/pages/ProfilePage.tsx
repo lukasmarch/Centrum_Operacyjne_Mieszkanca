@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import { Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -24,6 +25,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
   const [profileData, setProfileData] = useState({
     full_name: user?.full_name || '',
     location: user?.location || 'Rybno',
+    avatarUrl: user?.avatarUrl || '',
   });
 
   // Password form
@@ -61,6 +63,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
     }
   };
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setLocalError('Plik jest za duży. Maksymalny rozmiar to 2MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileData(p => ({ ...p, avatarUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError('');
@@ -70,6 +87,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
       await updateProfile({
         full_name: profileData.full_name,
         location: profileData.location,
+        avatarUrl: profileData.avatarUrl,
       });
       showSuccess('Profil zaktualizowany!');
     } catch {
@@ -165,9 +183,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
           <div className="bg-gray-950 rounded-2xl p-6 border border-gray-800/50 sticky top-24">
             {/* User info */}
             <div className="text-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-2xl mx-auto mb-3">
-                {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-              </div>
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 border border-gray-800/50" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-2xl mx-auto mb-3">
+                  {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                </div>
+              )}
               <h3 className="font-bold text-lg">{user.full_name}</h3>
               <p className="text-neutral-400 text-sm">{user.email}</p>
               <div className="mt-2">{getTierBadge(user.tier as UserTier)}</div>
@@ -227,6 +249,32 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               <h2 className="text-xl font-bold mb-6">Dane profilu</h2>
 
               <form onSubmit={handleProfileSubmit} className="space-y-6">
+                
+                {/* Avatar Upload */}
+                <div className="flex items-center gap-6 mb-8">
+                  <div className="relative">
+                    {profileData.avatarUrl ? (
+                      <img 
+                        src={profileData.avatarUrl} 
+                        alt="Avatar preview" 
+                        className="w-24 h-24 rounded-full object-cover border-4 border-gray-800/50"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-3xl border-4 border-gray-800/50">
+                        {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </div>
+                    )}
+                    <label className="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors shadow-lg">
+                      <Camera size={16} className="text-white" />
+                      <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                    </label>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">Zmień zdjęcie profilowe</h3>
+                    <p className="text-sm text-neutral-500">JPG, PNG lub GIF. Max 2MB.</p>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-neutral-300 mb-2">
                     Imię i nazwisko

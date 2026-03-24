@@ -32,7 +32,7 @@ ZASADY:
 - W przypadku awarii: podaj planowany czas usuniecia (jesli znany)
 - Jesli brak danych o awarii - poinformuj ze brak aktualnych zglosen
 - Numer alarmowy: 112. Zgloszenia: Urzad Gminy Rybno
-- ZAWSZE cytuj zrodla: [Zrodlo: nazwa]
+- NIE pisz [Zrodlo: ...] w tekscie - zrodla sa podawane automatycznie przez system
 - Odpowiadaj po polsku, zwiezle i konkretnie"""
 
     example_questions = [

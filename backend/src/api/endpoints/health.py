@@ -4,7 +4,9 @@ Health API — clinic schedules + pharmacy duties for Gmina Rybno
 GET /api/health/today    → who's on duty today (main widget endpoint)
 GET /api/health/clinics  → full weekly schedule (future use)
 """
-from datetime import date, datetime
+import re
+from datetime import date
+from typing import Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -18,6 +20,56 @@ DAY_NAMES_PL = [
     "poniedziałek", "wtorek", "środa", "czwartek",
     "piątek", "sobota", "niedziela"
 ]
+
+# Matches day ranges like "02-03.03" or "2-3.03"
+_RANGE_RE = re.compile(r'(\d{1,2})-(\d{1,2})\.(\d{2})')
+# Matches single dates like "16.03" or "2.03"
+_DATE_RE = re.compile(r'(\d{1,2})\.(\d{2})')
+
+
+def _dates_in_segment(segment: str, year: int) -> list[date]:
+    """Extract all dates from a note segment (handles ranges and single dates)."""
+    found: list[date] = []
+
+    # Ranges first: "02-03.03" → March 2 and 3
+    for m in _RANGE_RE.finditer(segment):
+        d_start, d_end, month = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        for day in range(d_start, d_end + 1):
+            try:
+                found.append(date(year, month, day))
+            except ValueError:
+                pass
+
+    # Single dates from remainder (remove ranges to avoid double-match)
+    clean = _RANGE_RE.sub("", segment)
+    for m in _DATE_RE.finditer(clean):
+        day, month = int(m.group(1)), int(m.group(2))
+        try:
+            found.append(date(year, month, day))
+        except ValueError:
+            pass
+
+    return found
+
+
+def _today_change_note(notes: Optional[str], today: date) -> Optional[str]:
+    """
+    Parse pipe-separated note segments and return the first segment
+    that mentions today's date.  Returns None when today is not affected.
+
+    Example notes value:
+      "W dniach 2.03, 16.03 lekarz przyjmuje w godz. 8:00-18:00. |
+       W dniu 19.03, 31.03 lekarz nie przyjmuje."
+    """
+    if not notes:
+        return None
+    for segment in notes.split(" | "):
+        segment = segment.strip()
+        if not segment:
+            continue
+        if today in _dates_in_segment(segment, today.year):
+            return segment
+    return None
 
 
 @router.get("/today")
@@ -53,8 +105,10 @@ async def get_health_today(session: AsyncSession = Depends(get_session)):
             "role": doctor_role,
             "hours": f"{hours_from}-{hours_to}",
         }
-        if notes:
-            doctor_entry["notes"] = notes
+        # Only include notes when today's date is explicitly mentioned
+        change_note = _today_change_note(notes, today)
+        if change_note:
+            doctor_entry["notes"] = change_note
         clinics_map[clinic_name].append(doctor_entry)
 
     clinics = [
@@ -63,7 +117,6 @@ async def get_health_today(session: AsyncSession = Depends(get_session)):
     ]
 
     # 2. Pharmacies active today
-    is_weekend = day_of_week >= 5
     result = await session.execute(
         text("""
             SELECT pharmacy_name, address, phone, hours_from, hours_to, duty_type, notes

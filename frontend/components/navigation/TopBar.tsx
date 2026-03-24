@@ -2,7 +2,7 @@ import React from 'react';
 import { AppSection } from '../../types';
 
 interface TopBarProps {
-  user: { full_name: string; tier: string; location: string } | null;
+  user: { full_name: string; tier: string; location: string; email?: string; avatarUrl?: string } | null;
   isAuthenticated: boolean;
   onNavigate: (section: AppSection) => void;
 }
@@ -10,26 +10,19 @@ interface TopBarProps {
 const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate }) => {
   return (
     <header className="relative z-40 px-4 md:px-8 py-3 flex items-center justify-between">
-      {/* Logo */}
+      {/* Left side empty or reserved for mobile menu toggle later, removed logo per request */}
       <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-violet-600 rounded-lg flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-blue-500/20">
-          R
-        </div>
-        <div className="hidden sm:block">
-          <span className="text-sm font-bold text-white tracking-tight">RybnoLive</span>
-          <span className="text-[9px] text-neutral-500 font-medium uppercase tracking-widest block -mt-0.5">Centrum Operacyjne</span>
-        </div>
       </div>
 
-      {/* Location pill (center) */}
+      {/* Location pill */}
       {isAuthenticated && user && (
         <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-3 bg-black/60 backdrop-blur-md border border-white/10 rounded-full py-1.5 px-5">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
           </span>
           <span className="text-xs text-neutral-400">
-            <strong className="text-indigo-300 font-semibold">{user.location}</strong>
+            <strong className="text-blue-300 font-semibold">{user.location}</strong>
           </span>
           <button
             onClick={() => onNavigate('profile')}
@@ -40,21 +33,33 @@ const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate }) =>
         </div>
       )}
 
-      {/* Right side: auth */}
+      {/* Right: auth */}
       <div className="flex items-center gap-2">
         {isAuthenticated && user ? (
-          <button
-            onClick={() => onNavigate('profile')}
-            className="group transition-transform hover:scale-105 active:scale-95"
-          >
-            <div className={`px-4 py-1.5 rounded-full font-bold text-white text-xs shadow-lg tracking-wide bg-gradient-to-r ${
-              user.tier === 'business' ? 'from-blue-600 via-indigo-600 to-purple-600 shadow-indigo-500/20' :
-              user.tier === 'premium' ? 'from-indigo-500 via-purple-500 to-pink-500 shadow-purple-500/20' :
-              'from-neutral-700 to-neutral-600'
-            }`}>
-              {user.tier === 'business' ? 'Business' : user.tier === 'premium' ? 'Premium' : 'Free'}
+          <div className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => onNavigate('profile')}>
+            <div className="hidden sm:flex items-center gap-2 pr-4 border-r border-white/10">
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                user.tier === 'business' ? 'bg-indigo-500 text-white' : 
+                user.tier === 'premium' ? 'bg-blue-100 text-blue-700' : 
+                'bg-white/10 text-neutral-400'
+              }`}>
+                {user.tier}
+              </span>
             </div>
-          </button>
+            
+            {/* User Profile */}
+            <div className="flex items-center gap-3">
+              <img 
+                src={user.avatarUrl || "https://i.pravatar.cc/150?u=a042581f4e29026024d"} 
+                alt="Avatar" 
+                className="w-10 h-10 rounded-full object-cover border border-white/10 bg-white/5"
+              />
+              <div className="hidden sm:flex flex-col">
+                <span className="text-sm font-bold text-neutral-100 leading-tight">{user.full_name}</span>
+                <span className="text-xs text-neutral-500 leading-tight">{user.email || 'cameron20@mail.com'}</span>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="flex items-center gap-2">
             <button
@@ -65,7 +70,7 @@ const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate }) =>
             </button>
             <button
               onClick={() => onNavigate('register')}
-              className="bg-gradient-to-b from-white via-white/95 to-white/70 text-black px-4 py-1.5 rounded-full transition-all shadow-lg hover:shadow-white/20 hover:scale-105 active:scale-95 text-sm font-bold"
+              className="btn-primary rounded-full"
             >
               Zarejestruj
             </button>

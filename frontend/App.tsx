@@ -17,6 +17,7 @@ import AssistantPage from './src/pages/AssistantPage';
 import BottomTabBar from './components/navigation/BottomTabBar';
 import SubNavBar from './components/navigation/SubNavBar';
 import TopBar from './components/navigation/TopBar';
+import { BeamsBackground } from './components/ui/beams-background';
 
 const MIASTO_ITEMS = [
     { id: 'news', label: 'Wiadomości' },
@@ -156,7 +157,7 @@ const AppContent: React.FC = () => {
                                 </ul>
                                 <button
                                     onClick={() => !isAuthenticated && handleNavigate('register')}
-                                    className="w-full mt-8 py-3 rounded-xl bg-white text-blue-600 font-bold shadow-lg shadow-blue-800/20 hover:bg-blue-50 transition-colors"
+                                    className="btn-primary w-full mt-8 py-3 rounded-xl"
                                 >
                                     {isAuthenticated ? 'Wybierz Premium' : 'Zarejestruj się'}
                                 </button>
@@ -171,7 +172,7 @@ const AppContent: React.FC = () => {
                                     <li className="flex items-center gap-2">✅ Promocja Wydarzeń</li>
                                     <li className="flex items-center gap-2">✅ Dane historyczne GUS</li>
                                 </ul>
-                                <button className="w-full mt-8 py-3 rounded-xl border border-gray-700/50 font-bold hover:bg-gray-900 transition-colors">Skontaktuj się</button>
+                                <button className="btn-primary w-full mt-8 py-3 rounded-xl" style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)' }}>Skontaktuj się</button>
                             </div>
                         </div>
                     </div>
@@ -203,9 +204,11 @@ const AppContent: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-black text-white selection:bg-blue-500/30">
-            {/* Background Gradients */}
-            <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/15 via-black to-black pointer-events-none" />
+        <div className="min-h-screen text-white selection:bg-blue-500/30" style={{ background: '#05080f' }}>
+            {/* Global BeamsBackground — fixed full-page, shared with hero */}
+            <BeamsBackground intensity="medium" className="fixed inset-0 pointer-events-none" />
+            {/* Extra depth: dark radial overlay at centre-bottom */}
+            <div className="fixed inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_100%,rgba(37,99,239,0.06),transparent)] pointer-events-none" />
 
             {/* Top Bar */}
             <TopBar
@@ -232,7 +235,17 @@ const AppContent: React.FC = () => {
 
             {/* Dynamic Content */}
             <main className="pb-24 relative z-10">
-                <div className="max-w-7xl mx-auto p-4 md:p-8">
+                {/* AssistantPage always mounted — preserves chat state between tab switches */}
+                <div style={{ display: activeSection === 'assistant' ? 'block' : 'none' }}>
+                    <AssistantPage
+                        initialQuery={initialQuery}
+                        onNavigate={handleNavigate}
+                        onInitialQuerySent={() => setInitialQuery('')}
+                    />
+                </div>
+
+                {/* All other sections with animation */}
+                {activeSection !== 'assistant' && (
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={activeSection}
@@ -241,14 +254,16 @@ const AppContent: React.FC = () => {
                             exit={{ opacity: 0, y: -8 }}
                             transition={{ duration: 0.25, ease: 'easeOut' }}
                         >
-                            {renderContent()}
+                            <div className="max-w-7xl mx-auto p-4 md:p-8">
+                                {renderContent()}
+                            </div>
                         </motion.div>
                     </AnimatePresence>
-                </div>
+                )}
             </main>
 
             {/* Footer */}
-            <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-600 text-xs flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
+            {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-600 text-xs flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
                 <div className="flex items-center gap-6">
                     <p className="font-medium">© 2024 Rybno Live</p>
                     <div className="flex gap-4">
@@ -260,7 +275,7 @@ const AppContent: React.FC = () => {
                     <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Rybno-1</span>
                     <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> API: v2.4</span>
                 </div>
-            </footer>
+            </footer>}
 
             {/* Bottom Tab Bar */}
             <BottomTabBar

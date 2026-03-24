@@ -302,6 +302,14 @@ export interface DailySummaryStats {
   events_count: number;
 }
 
+export interface CitedArticle {
+  id: number;
+  title: string;
+  url: string;
+  source_id?: number;
+  published_at?: string;
+}
+
 export interface DailySummary {
   date: string;
   headline: string;
@@ -309,6 +317,7 @@ export interface DailySummary {
   summary_by_category: Record<string, string>;
   upcoming_events: string[];
   air_quality_summary?: string;
+  cited_articles?: CitedArticle[];
   stats: DailySummaryStats;
 }
 
@@ -382,6 +391,7 @@ export interface User {
   preferences: Record<string, unknown> | null;
   created_at: string;
   last_login: string | null;
+  avatarUrl?: string;
 }
 
 export interface AuthTokens {
@@ -411,6 +421,7 @@ export interface RegisterData {
 export interface UserUpdateData {
   full_name?: string;
   location?: string;
+  avatarUrl?: string;
   preferences?: {
     categories?: string[];
     notifications?: Record<string, boolean>;

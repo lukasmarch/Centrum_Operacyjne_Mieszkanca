@@ -57,6 +57,8 @@ class BaseAgent:
     rag_threshold: float = 0.50
     rag_semantic_weight: float = 0.70
     rag_recency_boost: float = 0.0
+    # Minimum similarity to show source chip in UI (higher than rag_threshold)
+    source_display_threshold: float = 0.60
 
     def __init__(self):
         self.client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
@@ -113,7 +115,7 @@ class BaseAgent:
                 f"{date_str} | Trafnosc: {doc['similarity']:.2f}]"
             )
             key = f"{doc['source_type']}:{doc['source_id']}"
-            if key not in seen:
+            if key not in seen and doc["similarity"] >= self.source_display_threshold:
                 seen.add(key)
                 sources.append({
                     "type": doc["source_type"],
@@ -129,7 +131,7 @@ class BaseAgent:
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "system", "content": get_datetime_context()},
-            {"role": "system", "content": f"KONTEKST:\n{context}"}
+            {"role": "system", "content": f"KONTEKST:\n{context}\n\nNIE pisz [Zrodlo: ...] ani [Źródło: ...] w treści odpowiedzi — źródła są podawane automatycznie przez system."}
         ]
 
         if conversation_history:

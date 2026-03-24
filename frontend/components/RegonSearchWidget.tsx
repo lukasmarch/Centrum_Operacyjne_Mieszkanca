@@ -215,10 +215,10 @@ const BusinessSearchWidget: React.FC = () => {
     const selectedItem = results.find(r => r.id === selectedId) ?? null;
 
     return (
-        <div className="bg-gray-950 rounded-3xl p-5 border border-gray-800/50 h-full flex flex-col gap-4">
+        <div className="p-5 h-full flex flex-col gap-4 overflow-hidden">
             {/* Header */}
             <div className="flex items-center gap-2">
-                <Building2 size={14} className="text-emerald-400" />
+                <Building2 size={14} style={{ color: 'var(--chart-3)' }} />
                 <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Katalog Firm</span>
             </div>
 

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { CalendarDays } from 'lucide-react';
 import TrafficTile from './TrafficTile';
 import { CinemaWidget } from './CinemaWidget';
 import BusTrackerWidget from './BusTrackerWidget';
@@ -38,54 +39,61 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
 
   const renderTile = (tileId: TileId): React.ReactNode => {
     switch (tileId) {
-      case 'ai_briefing':
-        return <AIBriefingTile onNavigate={onNavigate} />;
-      case 'weather':
-        return <WeatherTile />;
-      case 'traffic':
-        return <TrafficTile />;
-      case 'events':
-        return <EventsTile />;
-      case 'airly':
-        return <AirlyTile />;
-      case 'gmina':
-        return <GminaMonitoringTile />;
-      case 'news':
-        return <NewsTile onNavigate={onNavigate} />;
-      default:
-        return null;
+      case 'ai_briefing': return <AIBriefingTile onNavigate={onNavigate} />;
+      case 'weather':     return <WeatherTile />;
+      case 'traffic':     return <TrafficTile />;
+      case 'events':      return <EventsTile />;
+      case 'airly':       return <AirlyTile />;
+      case 'gmina':       return <GminaMonitoringTile />;
+      case 'news':        return <NewsTile onNavigate={onNavigate} />;
+      default:            return null;
     }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-      {/* Header */}
+      {/* Header – style.txt chart colors (blue gradient) */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">
-            {user ? `Witaj, ${user.full_name.split(' ')[0]}! 👋` : 'Witaj, mieszkańcu! 👋'}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-lg shadow-blue-500/20"
+                 style={{ background: 'linear-gradient(135deg, var(--chart-1), var(--chart-2))' }}>
+              R
+            </div>
+            <span className="text-3xl font-black tracking-tight"
+                  style={{ background: 'linear-gradient(to right, var(--chart-1), var(--chart-2))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              RybnoLive
+            </span>
+          </div>
+          <h2 className="text-2xl font-black text-neutral-100">
+            {user ? `Witaj, ${user.full_name.split(' ')[0]}!` : 'Witaj, mieszkańcu!'}
           </h2>
-          <p className="text-neutral-400">Centrum Dowodzenia RybnoLive gotowe do działania.</p>
         </div>
-        <div className="hidden md:flex items-center gap-4 text-neutral-300/80">
+        <div className="hidden md:flex items-center gap-4 text-neutral-400">
           <div className="text-right">
-            <p className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">
+            <p className="text-xl font-black tracking-tight text-gradient" style={{ letterSpacing: '-0.02em' }}>
               {today.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
-            {holiday && <p className="text-sm font-medium text-blue-400 mt-0.5">🎉 {holiday}</p>}
-            {nameDays && <p className="text-xs text-neutral-500 mt-0.5">Imieniny: {nameDays}</p>}
+            {holiday && <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--chart-1)' }}>{holiday}</p>}
+            {nameDays && <p className="text-xs text-neutral-600 mt-0.5">Imieniny: {nameDays}</p>}
           </div>
-          <div className="w-11 h-11 rounded-xl bg-gray-900 border border-gray-800/50 flex items-center justify-center text-xl shadow-inner">
-            📅
+          {/* SVG icon zamiast emoji – style.txt compliance */}
+          <div className="w-11 h-11 rounded-xl bg-black border border-white/10 flex items-center justify-center shadow-inner">
+            <CalendarDays size={20} style={{ color: 'var(--chart-2)' }} />
           </div>
         </div>
       </header>
 
-      {/* Hero Section - AI Assistant with Spline 3D */}
-      <HeroSection onNavigate={onNavigate} onSubmit={onQuerySubmit} />
+      {/* Hero – full-bleed: ujemne marginesy znoszą padding kontenera,
+          agent wychodzi poza kartę i wtapia się w tło strony */}
+      <div className="-mx-4 md:-mx-8 relative z-[60] pointer-events-none">
+        <div className="pointer-events-auto">
+          <HeroSection onNavigate={onNavigate} onSubmit={onQuerySubmit} />
+        </div>
+      </div>
 
-      {/* ===== BENTO GRID (data-driven by layout preset) ===== */}
+      {/* bentogrid.txt: BentoGrid z dark tiles */}
       <BentoGrid>
         {activeLayout.tiles.map((tile) => (
           <BentoTile
@@ -99,33 +107,29 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
         ))}
       </BentoGrid>
 
-      {/* ===== BELOW GRID: Cinema + Health + Firmy (3 columns) ===== */}
+      {/* Cinema + Health + Firmy */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Repertuar kina */}
-        <div className="h-[500px]">
+        <BentoTile className="h-[500px]" colSpan={1} rowSpan={1}>
           <CinemaWidget />
-        </div>
-
-        {/* Twoje Zdrowie */}
-        <HealthTile />
-
-        {/* Katalog Firm */}
-        <div className="h-[500px]">
+        </BentoTile>
+        <BentoTile className="h-[500px]" colSpan={1} rowSpan={1}>
+          <HealthTile />
+        </BentoTile>
+        <BentoTile className="h-[500px]" colSpan={1} rowSpan={1}>
           <RegonSearchWidget />
-        </div>
+        </BentoTile>
       </div>
 
-      {/* ===== Bus Monitoring – full width ===== */}
-      <BusTrackerWidget />
+      <BentoTile colSpan={1} rowSpan={1}>
+        <BusTrackerWidget />
+      </BentoTile>
 
-      {/* ===== Waste (premium) ===== */}
-      {isPremium
-        ? <WasteWidget events={wasteEvents} town={userLocation} />
-        : user
-          ? <WasteWidgetPaywall />
-          : null
-      }
-
+      <BentoTile colSpan={1} rowSpan={1}>
+        {isPremium
+          ? <WasteWidget events={wasteEvents} town={userLocation} />
+          : user ? <WasteWidgetPaywall /> : null
+        }
+      </BentoTile>
     </div>
   );
 };

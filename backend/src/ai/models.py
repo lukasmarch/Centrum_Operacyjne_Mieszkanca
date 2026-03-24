@@ -91,7 +91,20 @@ class DailySummary(BaseModel):
     air_quality_summary: str = Field(
         description="Podsumowanie jakości powietrza i warunków pogodowych (dane z czujnika w Rybnie)"
     )
+    headline_importance_score: int = Field(
+        ge=1, le=10,
+        description=(
+            "Ocena ważności nagłówka 1-10: "
+            "10=awaria/kryzys LOKALNY (Rybno/Działdowo/powiat); "
+            "9=awaria/kryzys REGIONALNY bezpośrednio wpływający na mieszkańców powiatu (lotnisko Szymany, DK7/DK15, alert RCB dla woj., szpital w Działdowie); "
+            "7-8=pilne LOKALNE (zdrowie, transport, urząd); "
+            "5-6=ważne LOKALNE (biznes, edukacja, inwestycje); "
+            "3-4=kultura/sport LOKALNY, festyny; "
+            "2=tylko regionalne bez wpływu na lokalnych; "
+            "1=brak istotnych wiadomości"
+        )
+    )
     cited_article_ids: List[int] = Field(
         default_factory=list,
-        description="IDs artykułów (z pola [ID:xxx]) które są cytowane lub stanowią podstawę headline i highlights. Max 5 najważniejszych."
+        description="IDs artykułów (z pola [ID:xxx]) które są cytowane lub stanowią podstawę headline i highlights. Max 5. PIERWSZY ID = artykuł będący podstawą headline."
     )

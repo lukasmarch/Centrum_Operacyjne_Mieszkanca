@@ -1,5 +1,26 @@
 import { useState, useCallback, useRef } from 'react';
-import { getAccessToken } from '../services/authApi';
+import { getAccessToken, refreshAccessToken } from '../services/authApi';
+
+/** Returns a fresh access token, refreshing if near expiry or expired. */
+async function getFreshToken(): Promise<string | null> {
+  const token = getAccessToken();
+  if (!token) return null;
+  // Decode JWT payload (no signature check — just to read expiry)
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const expiresIn = (payload.exp * 1000) - Date.now();
+    // Refresh if < 5 minutes remaining
+    if (expiresIn < 5 * 60 * 1000) {
+      const ok = await refreshAccessToken();
+      return ok ? getAccessToken() : null;
+    }
+  } catch {
+    // Invalid token format — try refresh anyway
+    const ok = await refreshAccessToken();
+    return ok ? getAccessToken() : null;
+  }
+  return token;
+}
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -73,7 +94,7 @@ export function useChat(options: UseChatOptions = {}) {
     abortRef.current = new AbortController();
 
     try {
-      const token = getAccessToken();
+      const token = await getFreshToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 

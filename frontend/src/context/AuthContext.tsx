@@ -76,6 +76,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       try {
         const currentUser = await authApi.getCurrentUser();
+        const storedAvatar = localStorage.getItem(`avatar_${currentUser.id}`);
+        if (storedAvatar) {
+          currentUser.avatarUrl = storedAvatar;
+        }
         setUser(currentUser);
       } catch (err) {
         // Token invalid or expired, try refresh
@@ -83,6 +87,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (refreshed) {
           try {
             const currentUser = await authApi.getCurrentUser();
+            const storedAvatar = localStorage.getItem(`avatar_${currentUser.id}`);
+            if (storedAvatar) {
+              currentUser.avatarUrl = storedAvatar;
+            }
             setUser(currentUser);
           } catch {
             // Still failed, clear everything
@@ -157,6 +165,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       const updatedUser = await authApi.updateProfile(data);
+      if (data.avatarUrl) {
+        localStorage.setItem(`avatar_${updatedUser.id}`, data.avatarUrl);
+      }
+      const storedAvatar = localStorage.getItem(`avatar_${updatedUser.id}`);
+      if (storedAvatar) {
+        updatedUser.avatarUrl = storedAvatar;
+      }
       setUser(updatedUser);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Update failed';

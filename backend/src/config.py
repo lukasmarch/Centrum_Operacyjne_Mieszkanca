@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # Auth settings (Sprint 1)
     JWT_SECRET: str  # REQUIRED: Min 32 chars, set in .env
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Newsletter settings (Sprint 2)
