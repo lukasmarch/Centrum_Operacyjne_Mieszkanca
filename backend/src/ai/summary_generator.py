@@ -265,7 +265,7 @@ class SummaryGenerator:
                 is_local = art.source_id in self.LOCAL_SOURCE_IDS
                 locality_key = 0 if is_local else 1
                 ts = art.published_at.timestamp() if art.published_at else 0
-                key = (cat_prio, locality_key, -ts)
+                key = (locality_key, cat_prio, -ts)  # lokalność absolutny priorytet
                 if key < best_key:
                     best_key = key
                     best = art
