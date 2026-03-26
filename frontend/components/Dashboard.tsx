@@ -54,7 +54,7 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
       {/* Header – style.txt chart colors (blue gradient) */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 relative z-[70]">
         <div>
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-lg shadow-blue-500/20"
@@ -85,9 +85,10 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
         </div>
       </header>
 
-      {/* Hero – full-bleed: ujemne marginesy znoszą padding kontenera,
-          agent wychodzi poza kartę i wtapia się w tło strony */}
-      <div className="-mx-4 md:-mx-8 relative z-[60] pointer-events-none">
+      {/* Hero – full-bleed: ujemne marginesy znoszą padding kontenera.
+          -mt-10: likwiduje space-y-6 i wsuwamy się pod header by poświata kuli
+          przebijała się przez dolną część nagłówka. */}
+      <div className="-mx-4 md:-mx-8 -mt-10 relative z-[60] pointer-events-none">
         <div className="pointer-events-auto">
           <HeroSection onNavigate={onNavigate} onSubmit={onQuerySubmit} />
         </div>
