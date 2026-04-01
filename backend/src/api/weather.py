@@ -28,7 +28,8 @@ async def get_current_weather(
     location: str = "Rybno",
     session: AsyncSession = Depends(get_session)
 ):
-    """Get current weather data for a specific location."""
+    """Get current weather data for a specific location – full fields including
+    sunrise, sunset, temp_min, temp_max, feels_like, clouds, rain_1h."""
     weather_service = WeatherService()
     weather = await weather_service.get_current_weather(session, location)
 
@@ -38,7 +39,53 @@ async def get_current_weather(
             detail=f"Weather data not found for location: {location}"
         )
 
-    return weather
+    # Return all DB fields as dict (including sunrise/sunset/temp_min/temp_max)
+    return {
+        "location": weather.location,
+        "temperature": weather.temperature,
+        "feels_like": weather.feels_like,
+        "temp_min": weather.temp_min,
+        "temp_max": weather.temp_max,
+        "description": weather.description,
+        "icon": weather.icon,
+        "main": weather.main,
+        "humidity": weather.humidity,
+        "pressure": weather.pressure,
+        "wind_speed": weather.wind_speed,      # m/s
+        "wind_deg": weather.wind_deg,
+        "clouds": weather.clouds,              # %
+        "visibility": weather.visibility,
+        "rain_1h": weather.rain_1h,
+        "rain_3h": weather.rain_3h,
+        "sunrise": weather.sunrise.isoformat() if weather.sunrise else None,
+        "sunset": weather.sunset.isoformat() if weather.sunset else None,
+        "fetched_at": weather.fetched_at.isoformat() if weather.fetched_at else None,
+    }
+
+
+@router.get("/forecast")
+async def get_weather_forecast(
+    location: str = "Rybno",
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Get 5-day/3h hourly forecast + UV index stored in Weather.forecast JSONB.
+    Returns:
+        {
+          "hourly": [ {dt, dt_txt, temp, pop, icon, description, wind_speed, humidity, ...}, ... ],
+          "uv_index": float | null
+        }
+    """
+    weather_service = WeatherService()
+    weather = await weather_service.get_current_weather(session, location)
+
+    if not weather or not weather.forecast:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Forecast data not yet available for {location}. Trigger /api/weather/update first."
+        )
+
+    return weather.forecast
 
 @router.get("/history")
 async def get_weather_history(

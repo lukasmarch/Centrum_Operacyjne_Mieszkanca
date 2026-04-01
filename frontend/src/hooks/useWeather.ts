@@ -1,78 +1,88 @@
 import { useState, useEffect } from 'react';
-import { WeatherData } from '../../types';
 import { useDataCache } from '../context/DataCacheContext';
 
-// Backend API response
-interface WeatherApiResponse {
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
+
+/**
+ * Full API response from /api/weather/current
+ * All fields now returned by the backend including sunrise/sunset/temp_min/temp_max.
+ */
+export interface WeatherFull {
   location: string;
   temperature: number;
   feels_like: number;
+  temp_min: number;
+  temp_max: number;
   description: string;
-  humidity: number;
-  wind_speed: number;
   icon: string;
+  main: string;
+  humidity: number;
+  pressure: number;
+  wind_speed: number;  // m/s
+  wind_deg: number | null;
+  clouds: number;      // %
+  visibility: number | null;
+  rain_1h: number | null;
+  rain_3h: number | null;
+  sunrise: string | null;  // ISO string
+  sunset: string | null;   // ISO string
   fetched_at: string;
+  // Derived UI helpers
+  windKmh: number;
 }
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 
 export function useWeather(location: string = 'Rybno') {
   const { getWeather, setWeather } = useDataCache();
-  const [weather, setWeatherState] = useState<WeatherData | null>(null);
+  const [weather, setWeatherState] = useState<WeatherFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchWeather = async () => {
-      // Check cache first
-      const cachedWeather = getWeather(location);
-      if (cachedWeather) {
-        setWeatherState(cachedWeather);
-        setLoading(false);
-        setError(null);
-        return;
+      // Check legacy cache (WeatherData type) – skip if we have fresh WeatherFull in sessionStorage
+      const cacheKey = `weather_full_${location}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed: WeatherFull = JSON.parse(cached);
+          const age = Date.now() - new Date(parsed.fetched_at).getTime();
+          if (age < 30 * 60 * 1000) { // 30 min
+            setWeatherState(parsed);
+            setLoading(false);
+            return;
+          }
+        } catch { /* ignore */ }
       }
 
       try {
         setLoading(true);
-        const response = await fetch(`${API_URL}/weather/${location}`);
+        const response = await fetch(`${API_URL}/weather/current?location=${encodeURIComponent(location)}`);
 
         if (!response.ok) {
           throw new Error('Nie udało się pobrać danych pogody');
         }
 
-        const data: WeatherApiResponse = await response.json();
+        const data = await response.json();
 
-        // Map backend data to frontend format
-        const mappedWeather: WeatherData = {
-          temp: Math.round(data.temperature),
-          condition: data.description,
-          humidity: data.humidity,
-          windSpeed: Math.round(data.wind_speed * 3.6), // m/s to km/h
-          lakeTemp: undefined, // TODO: Add lake data
-          lakeLevel: undefined,
-          icon: data.icon
+        const mapped: WeatherFull = {
+          ...data,
+          windKmh: Math.round((data.wind_speed ?? 0) * 3.6),
         };
 
-        setWeatherState(mappedWeather);
-        setWeather(location, mappedWeather); // Store in cache
+        setWeatherState(mapped);
+        sessionStorage.setItem(cacheKey, JSON.stringify(mapped));
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Błąd pobierania pogody');
-        setWeatherState(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchWeather();
-
-    // Refresh every 2 hours (cache duration)
-    const interval = setInterval(fetchWeather, 2 * 60 * 60 * 1000);
-
+    const interval = setInterval(fetchWeather, 30 * 60 * 1000); // refresh every 30 min
     return () => clearInterval(interval);
-  }, [location, getWeather, setWeather]);
+  }, [location]);
 
   return { weather, loading, error };
 }
-

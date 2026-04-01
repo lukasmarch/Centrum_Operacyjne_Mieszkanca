@@ -1,8 +1,9 @@
 """
 OpenWeatherMap API Integration
 Fetches weather data for specific locations (Rybno, Działdowo)
-API Docs: https://openweathermap.org/current
+API Docs: https://openweathermap.org/current, /forecast, /uvi
 """
+import asyncio
 import httpx
 from datetime import datetime
 from typing import Optional
@@ -34,6 +35,8 @@ class WeatherService:
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or settings.OPENWEATHER_API_KEY
         self.base_url = "https://api.openweathermap.org/data/2.5/weather"
+        self.forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
+        self.uvi_url = "https://api.openweathermap.org/data/2.5/uvi"
 
     async def fetch_weather(self, location: str, lat: float, lon: float) -> dict:
         """
@@ -71,6 +74,69 @@ class WeatherService:
             except Exception as e:
                 logger.error(f"Error fetching weather for {location}: {e}")
                 raise
+
+    async def fetch_forecast(self, lat: float, lon: float) -> list:
+        """
+        Fetch 5-day / 3-hour forecast from OWM /forecast.
+        Returns a list of slots with: dt, temp, pop (precipitation probability),
+        icon, description, wind_speed, humidity, clouds, feels_like.
+        """
+        params = {
+            "lat": lat,
+            "lon": lon,
+            "appid": self.api_key,
+            "units": "metric",
+            "lang": "pl",
+            "cnt": 40,  # 5 days × 8 slots per day
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                logger.info(f"Fetching forecast for ({lat}, {lon})")
+                response = await client.get(self.forecast_url, params=params)
+                response.raise_for_status()
+                data = response.json()
+                items = []
+                for slot in data.get("list", []):
+                    main = slot.get("main", {})
+                    weather = slot.get("weather", [{}])[0]
+                    wind = slot.get("wind", {})
+                    items.append({
+                        "dt": slot.get("dt"),
+                        "dt_txt": slot.get("dt_txt", ""),
+                        "temp": main.get("temp"),
+                        "feels_like": main.get("feels_like"),
+                        "temp_min": main.get("temp_min"),
+                        "temp_max": main.get("temp_max"),
+                        "humidity": main.get("humidity"),
+                        "pressure": main.get("pressure"),
+                        "pop": slot.get("pop", 0.0),       # probability of precipitation 0–1
+                        "rain_3h": slot.get("rain", {}).get("3h"),
+                        "clouds": slot.get("clouds", {}).get("all", 0),
+                        "wind_speed": wind.get("speed"),
+                        "wind_deg": wind.get("deg"),
+                        "icon": weather.get("icon", ""),
+                        "description": weather.get("description", ""),
+                        "main": weather.get("main", ""),
+                    })
+                logger.info(f"Fetched {len(items)} forecast slots")
+                return items
+            except Exception as e:
+                logger.warning(f"Forecast fetch failed: {e}")
+                return []
+
+    async def fetch_uvi(self, lat: float, lon: float) -> Optional[float]:
+        """Fetch current UV index from OWM /uvi endpoint."""
+        params = {"lat": lat, "lon": lon, "appid": self.api_key}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            try:
+                response = await client.get(self.uvi_url, params=params)
+                response.raise_for_status()
+                uvi = response.json().get("value")
+                logger.info(f"Fetched UV index: {uvi}")
+                return uvi
+            except Exception as e:
+                logger.warning(f"UV index fetch failed: {e}")
+                return None
 
     def parse_weather_response(self, data: dict, location: str, lat: float, lon: float) -> dict:
         """
@@ -153,7 +219,7 @@ class WeatherService:
         lon: float
     ) -> Weather:
         """
-        Fetch and save weather for a specific location
+        Fetch current weather + 5-day forecast + UV index, then save to DB.
 
         Args:
             session: Database session
@@ -164,16 +230,30 @@ class WeatherService:
         Returns:
             Saved Weather object
         """
-        # Fetch from API
-        raw_data = await self.fetch_weather(location, lat, lon)
+        # Fetch all three in parallel
+        raw_data, forecast_items, uvi = await asyncio.gather(
+            self.fetch_weather(location, lat, lon),
+            self.fetch_forecast(lat, lon),
+            self.fetch_uvi(lat, lon),
+            return_exceptions=True,
+        )
 
-        # Parse response
+        if isinstance(raw_data, Exception):
+            raise raw_data
+
         weather_data = self.parse_weather_response(raw_data, location, lat, lon)
 
-        # Save to database
-        weather = await self.save_weather(session, weather_data)
+        # Build JSONB forecast payload
+        forecast_payload: dict = {}
+        if not isinstance(forecast_items, Exception) and forecast_items:
+            forecast_payload["hourly"] = forecast_items
+        if not isinstance(uvi, Exception) and uvi is not None:
+            forecast_payload["uv_index"] = uvi
 
-        return weather
+        if forecast_payload:
+            weather_data["forecast"] = forecast_payload
+
+        return await self.save_weather(session, weather_data)
 
     async def update_all_locations(self, session: AsyncSession) -> list[Weather]:
         """
