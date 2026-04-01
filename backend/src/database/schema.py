@@ -697,3 +697,43 @@ class AnonymousChatUsage(SQLModel, table=True):
     ip_address: str = Field(index=True, max_length=50)
     usage_date: date = Field(index=True)
     count: int = Field(default=0)
+
+
+# ======================
+# Bus Timetable (Linia RYBNO–DZIAŁDOWO przez Płośnicę)
+# ======================
+
+class BusStop(SQLModel, table=True):
+    """Przystanki autobusowe na trasie Rybno–Działdowo"""
+    __tablename__ = "bus_stops"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    stop_id: str = Field(max_length=50, unique=True, index=True)  # np. "rybno", "plosnica"
+    name: str = Field(max_length=100)                              # "Rybno (Centrum)"
+    lat: float
+    lng: float
+    sequence: int  # kolejność w kierunku RYB→DZA (1–13)
+
+
+class BusTrip(SQLModel, table=True):
+    """Kurs autobusowy – jeden przejazd w danym kierunku"""
+    __tablename__ = "bus_trips"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    direction: str = Field(max_length=30, index=True)   # RYBNO_DZIALDOWO | DZIALDOWO_RYBNO
+    departure_time: str = Field(max_length=5)           # godzina odjazdu z pierwszego przystanku HH:MM
+    service_type: str = Field(max_length=2)             # GS | S | G
+
+
+class BusStopTime(SQLModel, table=True):
+    """Godziny przyjazdu autobusu na każdy przystanek"""
+    __tablename__ = "bus_stop_times"
+    __table_args__ = (
+        Index('idx_bus_stop_times_trip_seq', 'trip_id', 'stop_sequence'),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    trip_id: int = Field(foreign_key="bus_trips.id", index=True)
+    stop_id: str = Field(max_length=50, index=True)  # odpowiada BusStop.stop_id
+    stop_sequence: int                                # 1-based kolejność w tym kursie
+    arrival_time: str = Field(max_length=5)           # HH:MM

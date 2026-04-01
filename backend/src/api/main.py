@@ -93,6 +93,10 @@ app.include_router(push_router)  # /api/push/*
 # Waste Schedule routes (Sprint 7) - /api/waste/towns, /api/waste/schedule
 app.include_router(waste_router)
 
+# Bus Timetable routes - /api/bus/timetable, /api/bus/status
+from src.api.endpoints.bus import router as bus_router
+app.include_router(bus_router)
+
 # Health routes - /api/health/today, /api/health/clinics
 app.include_router(health_router)
 

@@ -323,38 +323,71 @@ export interface DailySummary {
 
 // Bus Monitoring Types
 export type Direction = 'RYBNO_DZIALDOWO' | 'DZIALDOWO_RYBNO';
+export type BusServiceType = 'GS' | 'S' | 'G';
 
+export interface BusStop {
+  stop_id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  sequence: number;
+}
+
+export interface BusTripTimetable {
+  trip_id: number;
+  direction: Direction;
+  departure_time: string;       // HH:MM pierwszego przystanku
+  service_type: BusServiceType; // GS | S | G
+  stop_times: Record<string, string>; // stop_id → HH:MM
+}
+
+export interface BusTimetableResponse {
+  stops: BusStop[];
+  trips: {
+    RYBNO_DZIALDOWO: BusTripTimetable[];
+    DZIALDOWO_RYBNO: BusTripTimetable[];
+  };
+}
+
+export interface ActiveBus {
+  trip_id: number;
+  direction: Direction;
+  departure_time: string;
+  service_type: BusServiceType;
+  current_stop_id: string;
+  next_stop_id: string;
+  progress: number;           // 0–1
+  time_left_minutes: number;
+  all_stop_times: Record<string, string>; // stop_id → HH:MM
+}
+
+export interface BusDirectionStatus {
+  is_active: boolean;
+  active_bus: ActiveBus | null;
+  next_departure: {
+    trip_id: number;
+    time: string;
+    service_type: BusServiceType;
+    in_minutes: number;
+  } | null;
+}
+
+export interface BusStatusResponse {
+  now: string;        // HH:MM
+  day_of_week: number; // 0=Pon … 6=Nd
+  is_weekend: boolean;
+  directions: {
+    RYBNO_DZIALDOWO: BusDirectionStatus;
+    DZIALDOWO_RYBNO: BusDirectionStatus;
+  };
+}
+
+// Legacy types kept for busLogic.ts compatibility
 export interface Stop {
   id: string;
   name: string;
   lat: number;
   lng: number;
-}
-
-export interface TimetableEntry {
-  departureTime: string; // HH:mm
-  stops: { [stopId: string]: string }; // stopId -> HH:mm
-  type?: string;
-}
-
-export interface ActiveBus {
-  direction: Direction;
-  currentStopId: string;
-  nextStopId: string;
-  progress: number; // 0 to 1
-  timeLeftMinutes: number;
-  lastUpdate: Date;
-}
-
-export interface DirectionStatus {
-  direction: Direction;
-  isActive: boolean;
-  activeBus?: ActiveBus;
-  nextDeparture?: {
-    time: string;
-    inMinutes: number;
-    from: string;
-  };
 }
 
 // Cinema Repertoire Types
