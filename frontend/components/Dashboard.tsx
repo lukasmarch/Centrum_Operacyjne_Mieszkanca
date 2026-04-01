@@ -42,7 +42,7 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
       case 'ai_briefing': return <AIBriefingTile onNavigate={onNavigate} />;
       case 'weather':     return <WeatherTile />;
       case 'traffic':     return <TrafficTile />;
-      case 'events':      return <EventsTile />;
+      case 'events':      return <EventsTile onNavigate={onNavigate} />;
       case 'airly':       return <AirlyTile />;
       case 'gmina':       return <GminaMonitoringTile />;
       case 'news':        return <NewsTile onNavigate={onNavigate} />;
