@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     # BIP Scraper / Firecrawl (Sprint 5D)
     FIRECRAWL_API_KEY: Optional[str] = None
 
+    # Przelewy24 payments
+    P24_MERCHANT_ID: Optional[int] = None         # Numer konta P24 (z panelu)
+    P24_POS_ID: Optional[int] = None              # ID sklepu (zwykle = merchant_id)
+    P24_CRC_KEY: Optional[str] = None             # Klucz CRC do podpisu (z panelu P24)
+    P24_API_KEY: Optional[str] = None             # Klucz API (z panelu P24)
+    P24_SANDBOX: bool = True                       # True = sandbox, False = produkcja
+
     # AI Chat + RAG (Sprint 6)
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIMENSIONS: int = 1536

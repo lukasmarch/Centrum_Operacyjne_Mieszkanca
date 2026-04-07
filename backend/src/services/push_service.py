@@ -234,6 +234,75 @@ class PushService:
             icon="/icon-smog-192.png",
         )
 
+    async def send_proactive_reminder(
+        self,
+        session: AsyncSession,
+        user_ids: List[int],
+        title: str,
+        body: str,
+        url: str = "/",
+        icon: str = "/icon-192.png",
+    ) -> int:
+        """
+        Proaktywne powiadomienie dla konkretnych Premium userów (po user_id).
+        Używane przez proactive_alerts_job — śmietnik, mróz, awarie, BIP.
+        Wysyła tylko do subskrypcji powiązanych z podanymi user_ids.
+        """
+        if not self._is_configured():
+            logger.warning("VAPID keys not configured – skipping proactive push")
+            return 0
+
+        if not user_ids:
+            return 0
+
+        from src.database.schema import PushSubscription
+
+        result = await session.execute(
+            select(PushSubscription).where(
+                PushSubscription.active == True,
+                PushSubscription.user_id.in_(user_ids),
+            )
+        )
+        subscriptions = result.scalars().all()
+
+        if not subscriptions:
+            logger.info(f"No push subscriptions for {len(user_ids)} premium users")
+            return 0
+
+        logger.info(f"Sending proactive push to {len(subscriptions)} subscriptions ({len(user_ids)} users)")
+
+        sent_count = 0
+        expired_ids = []
+
+        for sub in subscriptions:
+            success = await self.send_push(
+                endpoint=sub.endpoint,
+                p256dh=sub.p256dh,
+                auth=sub.auth,
+                title=title,
+                body=body,
+                url=url,
+                icon=icon,
+            )
+            if success:
+                sent_count += 1
+                sub.last_used_at = datetime.utcnow()
+                session.add(sub)
+            else:
+                expired_ids.append(sub.id)
+
+        if expired_ids:
+            exp_result = await session.execute(
+                select(PushSubscription).where(PushSubscription.id.in_(expired_ids))
+            )
+            for sub in exp_result.scalars().all():
+                sub.active = False
+                session.add(sub)
+
+        await session.commit()
+        logger.info(f"Proactive push sent: {sent_count}/{len(subscriptions)}")
+        return sent_count
+
 
 # Singleton
 push_service = PushService()

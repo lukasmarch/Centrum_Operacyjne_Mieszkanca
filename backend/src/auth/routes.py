@@ -2,13 +2,16 @@
 Authentication routes: register, login, logout, refresh
 """
 
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.database import get_session, User
+from src.database.schema import Referral, UserTier
 from src.config import settings
+from src.auth.dependencies import get_current_active_user
 from .jwt import (
     get_password_hash, verify_password,
     create_access_token, create_refresh_token, verify_token
@@ -50,18 +53,50 @@ async def register(
             detail="Email already registered"
         )
 
-    # Create new user
+    # Sprawdź polecającego (referral)
+    referrer = None
+    if user_data.referral_code:
+        ref_result = await session.execute(
+            select(User).where(User.referral_code == user_data.referral_code)
+        )
+        referrer = ref_result.scalar_one_or_none()
+
+    # Create new user z 7-dniowym triałem Premium
+    trial_ends = datetime.utcnow() + timedelta(days=7)
     new_user = User(
         email=user_data.email,
         password_hash=get_password_hash(user_data.password),
         full_name=user_data.full_name,
         location=user_data.location,
+        tier=UserTier.PREMIUM.value,         # Trial Premium od razu
+        trial_ends_at=trial_ends,
+        referral_code=secrets.token_hex(4),  # 8-znakowy unikalny kod
+        referred_by=referrer.id if referrer else None,
         created_at=datetime.utcnow()
     )
 
     session.add(new_user)
     await session.commit()
     await session.refresh(new_user)
+
+    # Jeśli jest polecający — zapisz referral i nagrodź +14 dni (jeśli polecający ma Premium)
+    if referrer:
+        referral = Referral(
+            referrer_id=referrer.id,
+            referred_id=new_user.id,
+        )
+        session.add(referral)
+        # Nagrodź polecającego: +14 dni do trial lub extends subscription
+        if referrer.trial_ends_at and referrer.trial_ends_at > datetime.utcnow():
+            referrer.trial_ends_at = referrer.trial_ends_at + timedelta(days=14)
+        else:
+            referrer.trial_ends_at = datetime.utcnow() + timedelta(days=14)
+        if referrer.tier == UserTier.FREE.value:
+            referrer.tier = UserTier.PREMIUM.value
+        referral.rewarded_at = datetime.utcnow()
+        session.add(referrer)
+        await session.commit()
+        await session.refresh(new_user)
 
     # Generate tokens
     token_data = {
@@ -244,3 +279,39 @@ async def refresh_tokens(
         refresh_token=new_refresh_token,
         expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
+
+
+@router.get("/referral")
+async def get_referral_info(
+    user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Pobierz swój kod referralny i statystyki.
+    Link do polecania: {APP_URL}/register?ref={referral_code}
+    """
+    from sqlalchemy import func
+    from src.database.schema import Referral
+
+    # Generuj kod jeśli user go nie ma (legacy accounts)
+    if not user.referral_code:
+        import secrets
+        user.referral_code = secrets.token_hex(4)
+        await session.commit()
+        await session.refresh(user)
+
+    # Policz ile osób dołączyło przez ten kod
+    count_result = await session.execute(
+        select(func.count()).where(Referral.referrer_id == user.id)
+    )
+    referral_count = count_result.scalar() or 0
+
+    referral_link = f"{settings.APP_URL}/register?ref={user.referral_code}"
+
+    return {
+        "referral_code": user.referral_code,
+        "referral_link": referral_link,
+        "referrals_count": referral_count,
+        "reward_per_referral": "14 dni Premium dla Ciebie i osoby zaproszonej",
+        "trial_ends_at": user.trial_ends_at,
+    }

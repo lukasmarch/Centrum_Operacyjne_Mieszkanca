@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 DAILY_LIMITS = {
     "anonymous": 3,
     "free": 5,
-    "premium": 50,
+    "premium": None,  # unlimited
     "business": None,  # unlimited
 }
 

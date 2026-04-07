@@ -106,6 +106,10 @@ app.include_router(health_router)
 # AI Chat routes (Sprint 6) - /api/chat/message, /api/chat/history, /api/chat/agents
 app.include_router(chat_router)
 
+# Payments - Przelewy24 + BLIK
+from src.api.endpoints.payments import router as payments_router
+app.include_router(payments_router)  # /api/payments/*
+
 @app.on_event("startup")
 async def startup_event():
     """Start scheduler and register AI agents on app startup"""

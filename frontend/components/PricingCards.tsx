@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, Zap, Crown, Building2 } from 'lucide-react';
+import { CheckCircle, Zap, Crown, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 type Frequency = 'monthly' | 'yearly';
@@ -27,8 +27,10 @@ const PLANS: Plan[] = [
     features: [
       { text: 'Wiadomości i artykuły lokalne' },
       { text: 'Pogoda i jakość powietrza' },
+      { text: 'Harmonogram wywozu śmieci' },
+      { text: 'Zgłoszenia 24h ze zdjęciem' },
       { text: 'Newsletter tygodniowy' },
-      { text: '10 pytań AI dziennie' },
+      { text: '5 pytań AI dziennie' },
       { text: 'Podstawowe dane GUS (5 zmiennych)' },
     ],
     btnText: 'Aktualny plan',
@@ -40,34 +42,35 @@ const PLANS: Plan[] = [
     info: 'Dla świadomych mieszkańców gminy',
     tierKey: 'premium',
     highlighted: true,
-    price: { monthly: 19, yearly: Math.round(19 * 12 * 0.85) },
+    price: { monthly: 9.99, yearly: 84 },
     features: [
       { text: 'Wszystko z planu Free' },
-      { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 6:30' },
-      { text: 'Alerty push w czasie rzeczywistym', tooltip: 'Pożary, wypadki, awarie' },
       { text: 'Nieograniczone pytania AI' },
+      { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 6:30' },
+      { text: 'Alerty push w czasie rzeczywistym', tooltip: 'Pożary, wypadki, awarie, smog' },
+      { text: 'Proaktywny Asystent AI', tooltip: 'Powiadomienia bez pytania: jutro wywóz śmieci, mróz na drogach, nowe ogłoszenie BIP' },
       { text: '21 zmiennych GUS', tooltip: 'Szczegółowe dane demograficzne i ekonomiczne' },
-      { text: 'Niestandardowy układ dashboardu' },
+      { text: 'Personalizacja dashboardu' },
       { text: 'Brak reklam' },
     ],
     btnText: 'Wybierz Premium',
   },
   {
-    id: 'business',
-    name: 'Biznes',
-    icon: Building2,
-    info: 'Dla firm i organizacji z gminy',
+    id: 'pro',
+    name: 'Pro',
+    icon: BarChart2,
+    info: 'Dla entuzjastów danych lokalnych',
     tierKey: 'business',
-    price: { monthly: 99, yearly: Math.round(99 * 12 * 0.80) },
+    price: { monthly: 19.99, yearly: 169 },
     features: [
       { text: 'Wszystko z planu Premium' },
-      { text: 'Dostęp do pełnego API' },
       { text: '88 zmiennych GUS', tooltip: 'Kompletne dane statystyczne gminy i powiatu' },
-      { text: 'Raporty i eksport danych' },
-      { text: 'Promocja wydarzeń i firm' },
-      { text: 'Priorytetowe wsparcie 24/7' },
+      { text: 'Raporty PDF na żądanie', tooltip: 'AI generuje podsumowanie danych gminy' },
+      { text: 'Eksport danych GUS (CSV)' },
+      { text: 'Historia pytań AI bez limitu' },
+      { text: 'Wcześniejszy dostęp do nowych funkcji' },
     ],
-    btnText: 'Skontaktuj się',
+    btnText: 'Wybierz Pro',
   },
 ];
 
@@ -98,7 +101,7 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
               {freq === 'monthly' ? 'Miesięcznie' : 'Rocznie'}
               {freq === 'yearly' && (
                 <span className="absolute -top-2.5 -right-1 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                  -15%
+                  -30%
                 </span>
               )}
             </button>

@@ -9,6 +9,9 @@ import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { DASHBOARD_LAYOUTS, DashboardLayoutId, TileId, getUserDashboardLayout } from '../config/dashboardLayouts';
 import PricingCards from '../../components/PricingCards';
+import { getAccessToken } from '../services/authApi';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 interface ProfilePageProps {
   onNavigate: (section: 'dashboard' | 'premium') => void;
@@ -426,7 +429,34 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               </p>
               <PricingCards
                 currentTier={user.tier}
-                onSelect={() => {}}
+                onSelect={async (tierKey) => {
+                  const token = getAccessToken();
+                  if (!token) {
+                    alert('Musisz być zalogowany, aby wybrać plan.');
+                    return;
+                  }
+                  try {
+                    // Domyślnie miesięczna subskrypcja; period może być wybierany z toggle w przyszłości
+                    const period = 'monthly';
+                    const res = await fetch(`${API_BASE_URL}/payments/create-transaction`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({ tier: tierKey, period }),
+                    });
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => ({}));
+                      alert(err.detail || 'Błąd podczas tworzenia płatności.');
+                      return;
+                    }
+                    const data = await res.json();
+                    window.location.href = data.redirect_url;
+                  } catch {
+                    alert('Nie udało się połączyć z serwisem płatności.');
+                  }
+                }}
               />
             </div>
           )}
@@ -537,107 +567,77 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               {/* Newsletter */}
               <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
                 <h2 className="text-xl font-bold mb-4">Newsletter</h2>
-
                 <div className="space-y-4">
-                  <label className="flex items-center justify-between p-4 bg-gray-950 rounded-xl cursor-pointer">
+                  <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
                     <div>
                       <p className="font-semibold">Newsletter tygodniowy</p>
-                      <p className="text-sm text-neutral-500">
-                        Podsumowanie tygodnia co sobotę
-                      </p>
+                      <p className="text-sm text-neutral-500">Podsumowanie tygodnia co sobotę</p>
                     </div>
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="w-5 h-5 rounded text-blue-600"
-                    />
+                    <input type="checkbox" defaultChecked className="w-5 h-5 rounded text-blue-600" />
                   </label>
 
-                  <label
-                    className={`flex items-center justify-between p-4 rounded-xl ${
-                      isPremium
-                        ? 'bg-gray-950 cursor-pointer'
-                        : 'bg-gray-950/50 cursor-not-allowed'
-                    }`}
-                  >
-                    <div>
-                      <p className="font-semibold flex items-center gap-2">
-                        Newsletter dzienny
-                        {!isPremium && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">
-                            Premium
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-sm text-neutral-500">
-                        Poranny briefing pon-pt o 6:30
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      disabled={!isPremium}
-                      className="w-5 h-5 rounded text-blue-600 disabled:opacity-50"
-                    />
-                  </label>
+                  {isPremium && (
+                    <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
+                      <div>
+                        <p className="font-semibold">Newsletter dzienny</p>
+                        <p className="text-sm text-neutral-500">Poranny briefing pon–pt o 6:30 — newsy, śmietnik, BIP, pogoda</p>
+                      </div>
+                      <input type="checkbox" className="w-5 h-5 rounded text-blue-600" />
+                    </label>
+                  )}
                 </div>
               </div>
 
-              {/* Push Notifications */}
-              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-                <h2 className="text-xl font-bold mb-4">Powiadomienia push</h2>
+              {/* Push Notifications — tylko Premium */}
+              {isPremium && (
+                <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
+                  <h2 className="text-xl font-bold mb-1">Powiadomienia push</h2>
+                  <p className="text-sm text-neutral-500 mb-5">
+                    Alerty pilne w czasie rzeczywistym — nie pokrywają się z newsletterem.
+                  </p>
 
-                {!pushSupported ? (
-                  <div className="p-4 bg-gray-950 rounded-xl text-neutral-500 text-sm">
-                    Twoja przeglądarka nie obsługuje powiadomień push.
-                  </div>
-                ) : pushStatus === 'denied' ? (
-                  <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-700 text-sm">
-                    Powiadomienia zostały zablokowane w ustawieniach przeglądarki.
-                    Zmień pozwolenia ręcznie aby je włączyć.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <label className="flex items-center justify-between p-4 bg-gray-950 rounded-xl cursor-pointer">
-                      <div>
-                        <p className="font-semibold">Alerty bezpieczeństwa</p>
-                        <p className="text-sm text-neutral-500">
-                          Pożary, wypadki – natychmiastowe powiadomienia
-                        </p>
-                        <p className="text-xs text-green-600 mt-0.5">Dostępne bezpłatnie</p>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          setPushLoading(true);
-                          if (pushSubscribed) {
-                            await pushUnsubscribe();
-                          } else {
-                            await pushSubscribe(['alerty', 'powietrze', 'artykuly']);
-                          }
-                          setPushLoading(false);
-                        }}
-                        disabled={pushLoading || pushStatus === 'loading'}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          pushSubscribed ? 'bg-blue-600' : 'bg-gray-200'
-                        } disabled:opacity-50`}
-                        role="switch"
-                        aria-checked={pushSubscribed}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            pushSubscribed ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </label>
-
-                    {pushSubscribed && (
-                      <p className="text-xs text-neutral-500 px-1">
-                        Powiadomienia włączone. Otrzymasz alerty o pożarach, wypadkach, smogu i dziennym podsumowaniu.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
+                  {!pushSupported ? (
+                    <p className="text-sm text-neutral-500">Twoja przeglądarka nie obsługuje powiadomień push.</p>
+                  ) : pushStatus === 'denied' ? (
+                    <div className="p-4 bg-amber-950/30 border border-amber-800/30 rounded-xl text-amber-400 text-sm">
+                      Powiadomienia zablokowane w ustawieniach przeglądarki. Zmień pozwolenia ręcznie.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-between p-4 bg-blue-950/30 border border-blue-800/30 rounded-xl cursor-pointer">
+                        <div className="flex-1 pr-4">
+                          <p className="font-semibold">Proaktywny Asystent</p>
+                          <p className="text-sm text-neutral-400 mt-0.5">
+                            Pożary · Wypadki · Smog · Mróz &lt; −5°C · Nowe awarie
+                          </p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            setPushLoading(true);
+                            if (pushSubscribed) {
+                              await pushUnsubscribe();
+                            } else {
+                              await pushSubscribe(['alerty', 'powietrze', 'artykuly']);
+                            }
+                            setPushLoading(false);
+                          }}
+                          disabled={pushLoading || pushStatus === 'loading'}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            pushSubscribed ? 'bg-blue-600' : 'bg-gray-600'
+                          } disabled:opacity-50`}
+                          role="switch"
+                          aria-checked={pushSubscribed}
+                        >
+                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${pushSubscribed ? 'translate-x-5' : 'translate-x-0'}`} />
+                        </button>
+                      </label>
+                      {pushSubscribed && (
+                        <p className="text-xs text-neutral-600 px-1">Asystent aktywny — otrzymasz wszystkie pilne alerty.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Account info */}
               <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">

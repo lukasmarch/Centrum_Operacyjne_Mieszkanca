@@ -51,6 +51,13 @@ class User(SQLModel, table=True):
     # Preferences (JSONB) - kategorie, powiadomienia, etc.
     preferences: Optional[dict] = Field(default_factory=dict, sa_column=Column(JSONB))
 
+    # Trial Premium (7 dni po rejestracji)
+    trial_ends_at: Optional[datetime] = None
+
+    # Referral program
+    referral_code: Optional[str] = Field(default=None, max_length=20, unique=True)
+    referred_by: Optional[int] = Field(default=None, foreign_key="users.id")
+
     # Status flags
     email_verified: bool = Field(default=False)
     is_active: bool = Field(default=True)
@@ -69,9 +76,9 @@ class Subscription(SQLModel, table=True):
     tier: str = Field(max_length=20)  # premium, business
     status: str = Field(default=SubscriptionStatus.ACTIVE.value, max_length=20)  # active, cancelled, expired
 
-    # Stripe integration (Sprint 4)
-    stripe_subscription_id: Optional[str] = Field(default=None, max_length=100)
-    stripe_customer_id: Optional[str] = Field(default=None, max_length=100)
+    # Przelewy24 integration
+    p24_order_id: Optional[str] = Field(default=None, max_length=100)
+    p24_session_id: Optional[str] = Field(default=None, max_length=100)
 
     # Dates
     started_at: datetime = Field(default_factory=datetime.utcnow)
@@ -737,3 +744,31 @@ class BusStopTime(SQLModel, table=True):
     stop_id: str = Field(max_length=50, index=True)  # odpowiada BusStop.stop_id
     stop_sequence: int                                # 1-based kolejność w tym kursie
     arrival_time: str = Field(max_length=5)           # HH:MM
+
+
+# ======================
+# Referral Program (Monetyzacja)
+# ======================
+
+class Referral(SQLModel, table=True):
+    """Program poleceń — poleć znajomemu, oboje dostają +14 dni Premium"""
+    __tablename__ = "referrals"
+    __table_args__ = (
+        Index('idx_referral_referrer', 'referrer_id'),
+        Index('idx_referral_referred', 'referred_id', unique=True),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Kto polecił
+    referrer_id: int = Field(foreign_key="users.id", index=True)
+
+    # Kto dołączył przez polecenie
+    referred_id: int = Field(foreign_key="users.id", index=True)
+
+    # Nagroda
+    rewarded_at: Optional[datetime] = None  # NULL = jeszcze nie nagrodzony
+    reward_days: int = Field(default=14)    # Ile dni Premium dostają oboje
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)

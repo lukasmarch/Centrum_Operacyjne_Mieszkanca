@@ -21,6 +21,8 @@ from src.scheduler.ceidg_job import run_ceidg_job
 from src.scheduler.embedding_job import run_embedding_job
 from src.scheduler.places_job import run_places_job
 from src.scheduler.health_job import run_health_job
+from src.scheduler.proactive_alerts_job import run_proactive_alerts
+from src.scheduler.trial_expiry_job import run_trial_expiry
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
@@ -190,6 +192,25 @@ def start_scheduler():
         trigger=CronTrigger(day_of_week='mon-fri', hour=7, minute=15),
         id='newsletter_daily',
         name='Send daily newsletter (Premium)',
+        replace_existing=True
+    )
+
+    # Proactive AI Asystent — codziennie o 6:50 (po summary 6:45, przed newsletterem 7:15)
+    # Wysyła spersonalizowane push dla Premium: wywóz śmieci, mróz, awarie, BIP
+    scheduler.add_job(
+        func=run_proactive_alerts,
+        trigger=CronTrigger(hour=6, minute=50),
+        id='proactive_alerts',
+        name='Proactive AI Asystent (Premium push)',
+        replace_existing=True
+    )
+
+    # Trial Expiry — codziennie o 5:00, downgrade wygasłych triali do Free
+    scheduler.add_job(
+        func=run_trial_expiry,
+        trigger=CronTrigger(hour=5, minute=0),
+        id='trial_expiry',
+        name='Trial Expiry (downgrade to Free)',
         replace_existing=True
     )
 
