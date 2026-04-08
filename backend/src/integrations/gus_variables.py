@@ -304,29 +304,29 @@ def get_gmina_available_variables() -> List[GUSVariable]:
 
 
 def get_gmina_variables_for_category(category: str) -> List[GUSVariable]:
-    """Get variables for a specific category (Gmina + Powiat level).
+    """Get variables for a specific category with actual gmina Rybno data.
 
-    Returns:
-    1. Variables with ACTUAL data for gmina Rybno
-    2. Variables defined at 'powiat' level (fallback context)
+    Returns ONLY variables that have real data for gmina Rybno (unit 042815403062).
+    Powiat-level variables are excluded from standalone display — they are used
+    only in comparison queries (gmina vs powiat, gmina vs other villages).
     """
     return [
         var for var in _VARIABLES_LIST
-        if var.category == category and (
-            var.var_id in GMINA_AVAILABLE_VAR_IDS or var.level == "powiat"
-        )
+        if var.category == category and var.var_id in GMINA_AVAILABLE_VAR_IDS
     ]
 
 
 def get_gmina_variables_for_tier(tier: str) -> List[GUSVariable]:
-    """Get available variables for a tier (Gmina + Powiat level).
+    """Get available variables for a tier with actual gmina Rybno data.
 
-    Similar to get_variables_for_tier() but filtered to show:
-    1. Variables with ACTUAL gmina data
-    2. Variables defined at 'powiat' level
+    Returns ONLY variables that have real data for gmina Rybno (unit 042815403062).
+    Powiat-level variables are excluded from standalone display — they are used
+    only in comparison queries (gmina vs powiat, gmina vs other villages).
+
+    Counts: Free=8, Premium=39, Pro=55
     """
     all_tier_vars = get_variables_for_tier(tier)
     return [
         var for var in all_tier_vars
-        if var.var_id in GMINA_AVAILABLE_VAR_IDS or var.level == "powiat"
+        if var.var_id in GMINA_AVAILABLE_VAR_IDS
     ]

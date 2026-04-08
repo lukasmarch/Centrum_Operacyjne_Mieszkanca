@@ -141,18 +141,11 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
           Powrót do przeglądu
         </button>
 
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-neutral-100 mb-2">{section_name}</h1>
-            <p className="text-neutral-400">
-              Szczegółowe statystyki dla Gminy Rybno · {variableKeys.length} wskaźników
-            </p>
-          </div>
-          {user_tier && (
-            <span className="px-4 py-2 rounded-full text-sm font-bold uppercase bg-indigo-900/30 text-indigo-300 border border-indigo-500/30">
-              {user_tier}
-            </span>
-          )}
+        <div>
+          <h1 className="text-3xl font-bold text-neutral-100 mb-2">{section_name}</h1>
+          <p className="text-neutral-400">
+            Szczegółowe statystyki dla Gminy Rybno · {variableKeys.length} wskaźników
+          </p>
         </div>
       </div>
 
@@ -397,12 +390,12 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
         </div>
       </div>
 
-      {/* Business Upsell (AI Insights) */}
-      {user?.tier !== 'business' && (
+      {/* Pro Upsell - only for anonymous/free users */}
+      {(!user || user.tier === 'free') && (
         <div className="mb-8">
           <GUSTierGate
             requiredTier="business"
-            currentTier={user?.tier || 'premium'}
+            currentTier={user?.tier || 'free'}
             context="insights"
           />
         </div>

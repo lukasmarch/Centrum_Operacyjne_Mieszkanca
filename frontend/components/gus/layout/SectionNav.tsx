@@ -96,11 +96,11 @@ const SectionNav: React.FC<SectionNavProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-neutral-100">Kategorie Statystyk</h3>
-        {userTier && (
+        {userTier && userTier !== 'free' && (
           <span
             className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getTierBadgeColor(userTier as UserTier)}`}
           >
-            {userTier}
+            {userTier === 'business' ? 'Pro' : userTier}
           </span>
         )}
       </div>

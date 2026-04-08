@@ -11,7 +11,7 @@
  */
 
 import React from 'react';
-import { Users, Building2, Wallet, RefreshCw, AlertCircle, TrendingUp, ArrowUpRight } from 'lucide-react';
+import { Users, Building2, Wallet, TrendingUp, RefreshCw, AlertCircle } from 'lucide-react';
 import { useGUSOverview } from '../../src/hooks/useGUSStats';
 import { useAuth } from '../../src/context/AuthContext';
 import KPICard from './charts/KPICard';
@@ -58,7 +58,7 @@ const GUSOverview: React.FC = () => {
 
   if (!data) return null;
 
-  const { variables, user_tier, latest_year, last_refresh } = data;
+  const { variables, latest_year, last_refresh } = data;
 
   // Extract Free tier variables (ONLY 8 verified gmina Rybno variables)
   // Demografia (3 vars)
@@ -77,29 +77,6 @@ const GUSOverview: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-neutral-100 mb-2">
-              Statystyki GUS - Gmina Rybno
-            </h1>
-            <p className="text-neutral-400">
-              Dane historyczne z Banku Danych Lokalnych GUS (1995-{latest_year})
-            </p>
-            <p className="text-sm text-neutral-500 mt-1">
-              Pokazujemy TYLKO dane gminy Rybno • 8 wskaźników • {user_tier === 'free' ? 'Free tier' : user_tier}
-            </p>
-          </div>
-          {user_tier && (
-            <span className="px-4 py-2 rounded-full text-sm font-bold uppercase bg-gray-900 text-neutral-300 border border-gray-700/50">
-              {user_tier === 'free' ? 'FREE (8 wskaźników)' : user_tier}
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* Hero KPI Row (8 Free tier variables - Gmina Rybno only) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 min-w-0">
         {/* Row 1: Core Metrics */}
@@ -355,52 +332,10 @@ const GUSOverview: React.FC = () => {
         </div>
       </div>
 
-      {/* Premium Upsell */}
-      <GUSTierGate requiredTier="premium" currentTier={user_tier || 'free'}>
-        <div className="bg-gradient-to-br from-indigo-900/20 to-purple-900/20 rounded-xl p-8 border border-indigo-500/20 relative overflow-hidden">
-          {/* Decorative background glow */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-
-          <div className="flex items-start gap-6 relative z-10">
-            <div className="p-4 bg-gray-950 rounded-lg shadow-sm border border-gray-800/50">
-              <TrendingUp className="text-indigo-400" size={32} />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-2xl font-bold text-neutral-100 mb-2">
-                Odblokuj Premium - 47 dodatkowych wskaźników
-              </h3>
-              <p className="text-neutral-400 mb-4 leading-relaxed">
-                Uzyskaj dostęp do pełnej analizy gminy:
-              </p>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center gap-2 text-neutral-300">
-                  <ArrowUpRight className="text-indigo-400" size={18} />
-                  <span>7 kategorii danych (Demografia, Finanse, Przedsiębiorczość, Edukacja, Zdrowie, Rynek Pracy, Mieszkalnictwo)</span>
-                </li>
-                <li className="flex items-center gap-2 text-neutral-300">
-                  <ArrowUpRight className="text-indigo-400" size={18} />
-                  <span>Porównania gmina vs powiat Działdowski</span>
-                </li>
-                <li className="flex items-center gap-2 text-neutral-300">
-                  <ArrowUpRight className="text-indigo-400" size={18} />
-                  <span>Dane historyczne od 1995 roku</span>
-                </li>
-                <li className="flex items-center gap-2 text-neutral-300">
-                  <ArrowUpRight className="text-indigo-400" size={18} />
-                  <span>Export danych do CSV/Excel</span>
-                </li>
-              </ul>
-              <a
-                href="/pricing"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 transition-colors font-semibold shadow-lg shadow-indigo-500/20"
-              >
-                Zobacz plany Premium
-                <ArrowUpRight size={18} />
-              </a>
-            </div>
-          </div>
-        </div>
-      </GUSTierGate>
+      {/* Premium Upsell - only for free/anonymous users */}
+      {(!user || user.tier === 'free') && (
+        <GUSTierGate requiredTier="premium" context="overview" />
+      )}
 
       {/* Footer - Data Freshness */}
       {last_refresh && (

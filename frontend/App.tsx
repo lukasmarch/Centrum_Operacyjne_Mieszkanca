@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Dashboard from './components/Dashboard';
 import NewsFeed from './components/NewsFeed';
@@ -15,6 +15,7 @@ import BusinessPage from './src/pages/BusinessPage';
 import ReportsPage from './src/pages/ReportsPage';
 import AssistantPage from './src/pages/AssistantPage';
 import BottomTabBar from './components/navigation/BottomTabBar';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import SubNavBar from './components/navigation/SubNavBar';
 import TopBar from './components/navigation/TopBar';
 import { BeamsBackground } from './components/ui/beams-background';
@@ -87,6 +88,13 @@ const AppContent: React.FC = () => {
         setActiveTab(tab);
         setActiveSection(TAB_DEFAULT_SECTION[tab]);
     }, []);
+
+    // Listen for GUSTierGate subscription navigation events
+    useEffect(() => {
+        const handleSubscriptionNav = () => handleNavigate('subscription');
+        window.addEventListener('navigate-to-subscription', handleSubscriptionNav);
+        return () => window.removeEventListener('navigate-to-subscription', handleSubscriptionNav);
+    }, [handleNavigate]);
 
     const handleSubNavChange = useCallback((id: string) => {
         setActiveSection(id as AppSection);
@@ -208,7 +216,7 @@ const AppContent: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen text-white selection:bg-blue-500/30" style={{ background: '#05080f' }}>
+        <div className="min-h-screen text-white selection:bg-blue-500/30 overflow-x-hidden" style={{ background: '#05080f' }}>
             {/* Global BeamsBackground — fixed full-page, shared with hero */}
             <BeamsBackground intensity="medium" className="fixed inset-0 pointer-events-none" />
             {/* Extra depth: dark radial overlay at centre-bottom */}
@@ -280,6 +288,9 @@ const AppContent: React.FC = () => {
                     <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> API: v2.4</span>
                 </div>
             </footer>}
+
+            {/* PWA install prompt — shown after 3rd visit */}
+            <PWAInstallPrompt />
 
             {/* Bottom Tab Bar */}
             <BottomTabBar

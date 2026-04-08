@@ -88,39 +88,20 @@ const GUSPage: React.FC = () => {
                 Bank Danych Lokalnych GUS · Gmina Rybno · Powiat Działdowski
               </p>
             </div>
-
-            {/* Tier badge */}
-            {user && (
-              <div className="text-right">
-                <p className="text-xs text-neutral-400 mb-1 uppercase tracking-wider font-bold">Twój plan</p>
-                <span
-                  className={`inline-block px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider ${user.tier === 'free'
-                      ? 'bg-gray-900 text-neutral-300 border border-gray-700/50'
-                      : user.tier === 'premium'
-                        ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    }`}
-                >
-                  {user.tier}
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Section Navigation (only show if not on overview) */}
-      {activeSection !== 'overview' && (
-        <div className="bg-gray-950 border-b border-gray-800/50">
-          <div className="max-w-7xl mx-auto px-4 py-4">
-            <SectionNav
-              activeSection={activeSection}
-              onSectionChange={handleSectionChange}
-              userTier={user?.tier || 'free'}
-            />
-          </div>
+      {/* Section Navigation - always visible */}
+      <div className="bg-gray-950 border-b border-gray-800/50">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <SectionNav
+            activeSection={activeSection}
+            onSectionChange={handleSectionChange}
+            userTier={user?.tier || 'free'}
+          />
         </div>
-      )}
+      </div>
 
       {/* Main Content - Conditional Rendering */}
       <div className="py-8">
@@ -128,16 +109,6 @@ const GUSPage: React.FC = () => {
           /* Overview - Free tier dashboard */
           <div className="max-w-7xl mx-auto px-4">
             <GUSOverview />
-
-            {/* Section Navigation below overview */}
-            <div className="mt-12">
-              <h2 className="text-2xl font-bold text-neutral-100 mb-6">Odkryj więcej kategorii</h2>
-              <SectionNav
-                activeSection={activeSection}
-                onSectionChange={handleSectionChange}
-                userTier={user?.tier || 'free'}
-              />
-            </div>
           </div>
         ) : (
           /* Section Page - Premium tier detailed view */
@@ -148,60 +119,6 @@ const GUSPage: React.FC = () => {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="bg-gray-950 border-t border-gray-800/50 mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-sm text-neutral-400">
-            <div>
-              <h3 className="font-bold text-neutral-200 mb-4 text-lg">O danych GUS</h3>
-              <p className="leading-relaxed">
-                Dane pochodzą z Banku Danych Lokalnych GUS (bdl.stat.gov.pl).
-                Statystyki są aktualizowane kwartalnie i przechowywane lokalnie
-                dla szybkiego dostępu.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-bold text-neutral-200 mb-4 text-lg">Dostępne plany</h3>
-              <ul className="space-y-3">
-                <li className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                  <span><strong>Free:</strong> 9 podstawowych wskaźników</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                  <span><strong>Premium (19 PLN/mies):</strong> 57 wskaźników, 10 kategorii</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                  <span><strong>Business (99 PLN/mies):</strong> 88 wskaźników, AI insights</span>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-bold text-neutral-200 mb-4 text-lg">Źródła danych</h3>
-              <ul className="space-y-2">
-                <li>• Gmina Rybno (kod TERYT: 042815403062)</li>
-                <li>• Powiat Działdowski (kod TERYT: 042815403000)</li>
-                <li>• Województwo warmińsko-mazurskie</li>
-                <li>• Polska (średnie krajowe)</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-12 pt-8 border-t border-gray-800/50 text-center text-xs text-neutral-600">
-            <p>
-              Dane GUS © Główny Urząd Statystyczny · Ostatnia aktualizacja:{' '}
-              {new Date().toLocaleDateString('pl-PL', {
-                year: 'numeric',
-                month: 'long',
-              })}
-            </p>
-            <p className="mt-2">
-              Centrum Operacyjne Mieszkańca · Powiat Działdowski · 2026
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
