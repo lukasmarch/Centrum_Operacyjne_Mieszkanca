@@ -23,6 +23,9 @@ from src.newsletter.routes import router as newsletter_router
 # GUS Stats with tier-based access (Sprint 3)
 from src.api.endpoints.gus import router as gus_router
 
+# Polska w Liczbach — uzupełnienie danych gminnych (PwL)
+from src.api.endpoints.pwl import router as pwl_router
+
 # Business / CEIDG directory (Sprint 3+)
 from src.api.endpoints.business import router as business_router
 
@@ -84,6 +87,9 @@ app.include_router(newsletter_router)  # /api/newsletter/*
 # GUS Stats routes (Sprint 3 - Enhanced GUS Dashboard)
 app.include_router(gus_router)  # /api/stats/*
 
+# Polska w Liczbach routes — uzupełnienie gmina-poziom
+app.include_router(pwl_router, prefix="/api/stats/pwl")  # /api/stats/pwl/*
+
 # Business / CEIDG directory routes
 app.include_router(business_router)  # /api/business/*
 
@@ -109,6 +115,10 @@ app.include_router(chat_router)
 # Payments - Przelewy24 + BLIK
 from src.api.endpoints.payments import router as payments_router
 app.include_router(payments_router)  # /api/payments/*
+
+# SEO — sitemap.xml (no /api/ prefix, standard location for Google)
+from src.api.endpoints.seo import router as seo_router
+app.include_router(seo_router)
 
 @app.on_event("startup")
 async def startup_event():
@@ -266,18 +276,26 @@ async def get_upcoming_events(
     limit: int = 50,
     session: AsyncSession = Depends(get_session)
 ):
-    """Get upcoming events"""
+    """Get upcoming events with source name (scraped from)"""
+    from sqlalchemy import outerjoin
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    
+
     result = await session.execute(
-        select(Event)
+        select(Event, Source.name.label("source_name"))
+        .outerjoin(Article, Event.source_article_id == Article.id)
+        .outerjoin(Source, Article.source_id == Source.id)
         .where(Event.event_date >= today_start)
         .order_by(Event.event_date.asc())
         .limit(limit)
     )
-    events = result.scalars().all()
-    return events
+    rows = result.all()
+    output = []
+    for event, source_name in rows:
+        d = event.dict()
+        d["source_name"] = source_name
+        output.append(d)
+    return output
 
 
 @app.get("/api/traffic")

@@ -23,6 +23,7 @@ from src.scheduler.places_job import run_places_job
 from src.scheduler.health_job import run_health_job
 from src.scheduler.proactive_alerts_job import run_proactive_alerts
 from src.scheduler.trial_expiry_job import run_trial_expiry
+from src.scheduler.pwl_job import run_pwl_job
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
@@ -135,6 +136,17 @@ def start_scheduler():
         trigger=CronTrigger(month='1,4,7,10', day=1, hour=4, minute=0),
         id='gus_update',
         name='Update GUS statistics (quarterly)',
+        replace_existing=True
+    )
+
+    # PwL (Polska w Liczbach) quarterly scraping (Jan, Apr, Jul, Oct) at 5:00 AM
+    # Scrapes polskawliczbach.pl via Firecrawl, imports with is_verified=False
+    # Requires FIRECRAWL_API_KEY; data requires manual verification via POST /api/stats/pwl/verify/{log_id}
+    scheduler.add_job(
+        func=run_pwl_job,
+        trigger=CronTrigger(month='1,4,7,10', day=15, hour=5, minute=0),
+        id='pwl_scrape',
+        name='Scrape PwL data (Firecrawl, quarterly)',
         replace_existing=True
     )
     
