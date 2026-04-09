@@ -58,9 +58,7 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
-    define: {
-      'import.meta.env.VITE_API_URL': JSON.stringify(env.API_URL || 'http://localhost:8000/api')
-    },
+    define: {},
     build: {
       sourcemap: false,
     },
