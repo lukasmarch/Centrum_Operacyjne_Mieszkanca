@@ -1,7 +1,0 @@
-{
-  "name": "Działdowo Live - Centrum Operacyjne Mieszkańca",
-  "description": "Inteligentny agregator informacji, danych publicznych i monitoringu real-time dla powiatu działdowskiego.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}

@@ -66,15 +66,15 @@ const ChatLimitPrompt: React.FC<ChatLimitPromptProps> = ({ limitInfo, onNavigate
             <p className="text-xs font-semibold text-indigo-300">19 zł / mies.</p>
           </div>
 
-          {/* Business card */}
-          <div className="bg-gradient-to-br from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-xl p-4">
+          {/* Pro card */}
+          <div className="bg-gradient-to-br from-violet-600/20 to-purple-600/20 border border-violet-500/30 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Infinity size={14} className="text-amber-400" />
-              <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">Business</span>
+              <Infinity size={14} className="text-violet-400" />
+              <span className="text-xs font-bold text-violet-300 uppercase tracking-wide">Pro</span>
             </div>
             <p className="text-2xl font-bold text-neutral-100 mb-0.5">∞</p>
             <p className="text-xs text-neutral-400 mb-3">bez limitu</p>
-            <p className="text-xs font-semibold text-amber-300">99 zł / mies.</p>
+            <p className="text-xs font-semibold text-violet-300">19,99 zł / mies.</p>
           </div>
         </div>
 

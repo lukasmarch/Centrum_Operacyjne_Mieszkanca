@@ -34,7 +34,9 @@ export function useEvents(limit: number = 50) {
                     isPromoted: item.is_featured,
                     imageUrl: item.image_url || undefined,
                     description: item.short_description || item.description || undefined,
-                    externalUrl: item.external_url || undefined
+                    externalUrl: item.external_url || undefined,
+                    organizer: item.organizer || undefined,
+                    sourceName: item.source_name || undefined,
                 }));
 
                 setEvents(mappedEvents);

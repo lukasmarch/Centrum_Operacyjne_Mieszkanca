@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Send } from 'lucide-react';
+import { Bot, Send, Mic, MicOff, MicOff as MicBlocked } from 'lucide-react';
 import { AppSection } from '../types';
+import { useSpeechRecognition } from '../src/hooks/useSpeechRecognition';
 
 interface PromptBarProps {
   onNavigate?: (section: AppSection) => void;
@@ -23,6 +24,16 @@ const PromptBar: React.FC<PromptBarProps> = ({ onNavigate, onSubmit }) => {
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
   const [currentSuggestion, setCurrentSuggestion] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
+  const speech = useSpeechRecognition((text) => {
+    setQuery(text);
+    setIsTyping(true);
+  });
+
+  const toggleListening = () => {
+    if (speech.isListening) { speech.stop(); return; }
+    speech.clearError();
+    speech.start();
+  };
 
   useEffect(() => {
     fetch('/api/chat/suggestions')
@@ -66,15 +77,58 @@ const PromptBar: React.FC<PromptBarProps> = ({ onNavigate, onSubmit }) => {
 
         {/* Input row */}
         <div className="flex gap-3">
-          <input
-            type="text"
-            value={query}
-            onChange={e => { setQuery(e.target.value); setIsTyping(true); }}
-            onBlur={() => setIsTyping(false)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit(query)}
-            placeholder={suggestions[currentSuggestion]}
-            className="flex-1 bg-slate-900/80 border border-slate-700/60 rounded-2xl px-5 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all text-sm"
-          />
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={query}
+              onChange={e => { setQuery(e.target.value); setIsTyping(true); }}
+              onBlur={() => setIsTyping(false)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit(query)}
+              placeholder={speech.isListening ? 'Słucham...' : suggestions[currentSuggestion]}
+              className={`w-full bg-slate-900/80 border rounded-2xl px-5 py-3 text-slate-100 placeholder-slate-600 focus:outline-none transition-all text-sm ${
+                speech.isListening
+                  ? 'border-red-500/50 ring-1 ring-red-500/20 placeholder-red-400/60'
+                  : 'border-slate-700/60 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20'
+              }`}
+            />
+            {speech.isListening && (
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-0.5 items-end h-4">
+                {[0, 1, 2, 3].map(i => (
+                  <span
+                    key={i}
+                    className="w-0.5 bg-red-400 rounded-full animate-[soundbar_0.8s_ease-in-out_infinite]"
+                    style={{ animationDelay: `${i * 0.15}s`, height: '60%' }}
+                  />
+                ))}
+              </span>
+            )}
+          </div>
+          {speech.isSupported && (
+            <div className="relative shrink-0">
+              <button
+                onClick={toggleListening}
+                title={
+                  speech.error === 'not-allowed'
+                    ? 'Brak dostępu do mikrofonu — kliknij ikonę kłódki w pasku adresu Chrome i zezwól na mikrofon'
+                    : speech.isListening ? 'Zatrzymaj nagrywanie' : 'Mów do mikrofonu'
+                }
+                className={`w-[46px] h-full rounded-2xl flex items-center justify-center transition-all ${
+                  speech.error === 'not-allowed'
+                    ? 'bg-amber-500/10 border border-amber-500/40 text-amber-400'
+                    : speech.isListening
+                    ? 'bg-red-500/20 border border-red-500/50 text-red-400'
+                    : 'bg-slate-900/80 border border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                }`}
+              >
+                {speech.isListening ? <MicOff size={16} /> : <Mic size={16} />}
+              </button>
+              {speech.error === 'not-allowed' && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-56 bg-slate-800 border border-amber-500/30 rounded-xl px-3 py-2 text-[11px] text-amber-300 leading-snug text-center shadow-xl z-50">
+                  Zezwól na mikrofon w pasku adresu Chrome (ikona kłódki)
+                </div>
+              )}
+            </div>
+          )}
           <button
             onClick={() => handleSubmit(query || suggestions[currentSuggestion])}
             className="btn-primary shrink-0 flex items-center gap-2"

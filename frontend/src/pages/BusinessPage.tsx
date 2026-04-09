@@ -3,6 +3,8 @@ import { Business } from '../../types';
 import { useAuth } from '../context/AuthContext';
 import { Search, X } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
 interface Locality {
     name: string;
     count: number;
@@ -149,10 +151,10 @@ const BusinessPage: React.FC = () => {
         const fetchMetadata = async () => {
             try {
                 const [statsRes, locRes, analyticsRes, categoriesRes] = await Promise.all([
-                    fetch('http://localhost:8000/api/business/stats'),
-                    fetch('http://localhost:8000/api/business/localities'),
-                    fetch('http://localhost:8000/api/business/analytics'),
-                    fetch('http://localhost:8000/api/business/categories'),
+                    fetch(`${API_URL}/business/stats`),
+                    fetch(`${API_URL}/business/localities`),
+                    fetch(`${API_URL}/business/analytics`),
+                    fetch(`${API_URL}/business/categories`),
                 ]);
 
                 if (statsRes.ok) setStats(await statsRes.json());
@@ -178,7 +180,7 @@ const BusinessPage: React.FC = () => {
             setSearchLoading(true);
             try {
                 const res = await fetch(
-                    `http://localhost:8000/api/business/search?nazwa=${encodeURIComponent(searchTerm)}&limit=50`
+                    `${API_URL}/business/search?nazwa=${encodeURIComponent(searchTerm)}&limit=50`
                 );
                 const data = await res.json();
                 setSearchResults(Array.isArray(data) ? data : []);
@@ -206,7 +208,7 @@ const BusinessPage: React.FC = () => {
         setLoading(true);
 
         try {
-            let url = `http://localhost:8000/api/business/list?page=${pageParam}&limit=24`;
+            let url = `${API_URL}/business/list?page=${pageParam}&limit=24`;
             if (selectedLocality) url += `&miasto=${encodeURIComponent(selectedLocality)}`;
             if (selectedCategory) url += `&category=${encodeURIComponent(selectedCategory)}`;
             if (selectedYear) url += `&year=${selectedYear}&status=`; // year filter: no status restriction
@@ -271,7 +273,7 @@ const BusinessPage: React.FC = () => {
     return (
         <div className="space-y-8 pb-12">
             {/* Header / Stats */}
-            <header className="bg-gray-950/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-800/50 shadow-sm">
+            <header className="bg-white/[0.04] backdrop-blur-xl rounded-3xl p-8 border border-white/5">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
                     <div>
                         <h2 className="text-3xl font-black text-neutral-100 tracking-tight">Katalog Firm</h2>
@@ -281,7 +283,7 @@ const BusinessPage: React.FC = () => {
 
                 {/* Key stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700/50">
+                    <div className="bg-white/[0.04] p-4 rounded-xl border border-white/8">
                         <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">Wszystkie Firmy</p>
                         <p className="text-2xl font-black text-neutral-100">{stats?.total_count ?? analytics?.total ?? 0}</p>
                     </div>
@@ -301,7 +303,7 @@ const BusinessPage: React.FC = () => {
 
                 {/* Year chart */}
                 {analytics && Object.keys(analytics.by_year).length > 0 && (
-                    <div className="bg-gray-900/30 rounded-2xl p-5 border border-gray-800/50">
+                    <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/5">
                         <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
                             {/* Left: title + description + legend */}
                             <div>
@@ -326,7 +328,7 @@ const BusinessPage: React.FC = () => {
                             {/* Right: selected year details */}
                             {selectedYear && (
                                 <div className="flex items-start gap-3">
-                                    <div className="bg-gray-900 border border-blue-500/30 rounded-xl px-4 py-3 text-right min-w-[130px]">
+                                    <div className="bg-white/[0.06] border border-blue-500/30 rounded-xl px-4 py-3 text-right min-w-[130px]">
                                         <p className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold mb-1">
                                             📅 Rok {selectedYear}
                                         </p>
@@ -370,7 +372,7 @@ const BusinessPage: React.FC = () => {
                         placeholder="Szukaj firmy po nazwie..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-12 py-3.5 bg-gray-950/80 backdrop-blur border border-gray-700/50 rounded-2xl text-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-neutral-500 transition-all"
+                        className="w-full pl-12 pr-12 py-3.5 bg-white/[0.05] backdrop-blur border border-white/8 rounded-2xl text-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-neutral-500 transition-all"
                     />
                     {searchTerm && (
                         <button
@@ -401,7 +403,7 @@ const BusinessPage: React.FC = () => {
                                     onClick={() => handleCategorySelect(null)}
                                     className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${selectedCategory === null
                                         ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
-                                        : 'bg-gray-900/50 text-neutral-400 hover:bg-gray-900 border border-gray-700/50 hover:text-neutral-200'
+                                        : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
                                         }`}
                                 >
                                     Wszystkie branże
@@ -412,7 +414,7 @@ const BusinessPage: React.FC = () => {
                                         onClick={() => handleCategorySelect(cat.category)}
                                         className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${selectedCategory === cat.category
                                             ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
-                                            : 'bg-gray-900/50 text-neutral-400 hover:bg-gray-900 border border-gray-700/50 hover:text-neutral-200'
+                                            : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
                                             }`}
                                     >
                                         <span>{CATEGORY_ICONS[cat.category] ?? '📌'}</span>
@@ -432,7 +434,7 @@ const BusinessPage: React.FC = () => {
                                 onClick={() => handleLocalitySelect(null)}
                                 className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${selectedLocality === null
                                     ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                                    : 'bg-gray-900/50 text-neutral-400 hover:bg-gray-900 border border-gray-700/50 hover:text-neutral-200'
+                                    : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
                                     }`}
                             >
                                 Wszystkie
@@ -443,7 +445,7 @@ const BusinessPage: React.FC = () => {
                                     onClick={() => handleLocalitySelect(loc.name)}
                                     className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${selectedLocality === loc.name
                                         ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                                        : 'bg-gray-900/50 text-neutral-400 hover:bg-gray-900 border border-gray-700/50 hover:text-neutral-200'
+                                        : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
                                         }`}
                                 >
                                     {loc.name} <span className="ml-1 opacity-60">({loc.count})</span>
@@ -483,7 +485,7 @@ const BusinessPage: React.FC = () => {
                     return (
                         <div
                             key={business.id}
-                            className="group bg-gray-950/50 backdrop-blur-sm p-5 rounded-2xl border border-gray-800/50 hover:border-gray-700 shadow-sm hover:shadow-xl hover:shadow-black/20 transition-all duration-300 flex flex-col"
+                            className="group bg-white/[0.04] backdrop-blur-sm p-5 rounded-2xl border border-white/5 hover:border-white/10 shadow-sm hover:shadow-xl hover:shadow-black/20 transition-all duration-300 flex flex-col"
                         >
                             {/* Top row: status badge + initials */}
                             <div className="flex justify-between items-start mb-3">
@@ -491,13 +493,13 @@ const BusinessPage: React.FC = () => {
                                     ? 'bg-green-500/10 text-green-400 border border-green-500/20'
                                     : business.status === 'ZAWIESZONY'
                                         ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                        : 'bg-gray-900 text-neutral-500 border border-gray-700/50'
+                                        : 'bg-white/[0.04] text-neutral-500 border border-white/8'
                                     }`}>
                                     {business.status === 'AKTYWNY' ? '● Aktywna'
                                         : business.status === 'ZAWIESZONY' ? '⏸ Zawieszona'
                                             : business.status}
                                 </span>
-                                <div className="w-9 h-9 rounded-xl bg-gray-900 border border-gray-700/50 flex items-center justify-center text-xs font-bold text-neutral-400 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all">
+                                <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/8 flex items-center justify-center text-xs font-bold text-neutral-400 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all">
                                     {business.nazwa.substring(0, 2).toUpperCase()}
                                 </div>
                             </div>
@@ -532,7 +534,7 @@ const BusinessPage: React.FC = () => {
 
                             {/* Category badge */}
                             {business.branza && (
-                                <div className="mt-3 pt-3 border-t border-gray-800/50">
+                                <div className="mt-3 pt-3 border-t border-white/5">
                                     <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
                                         {CATEGORY_ICONS[business.branza] ?? '📌'} {business.branza}
                                     </span>
@@ -564,7 +566,7 @@ const BusinessPage: React.FC = () => {
                     <button
                         onClick={loadMore}
                         disabled={loading}
-                        className="px-8 py-3 bg-gray-950 border border-gray-700/50 text-neutral-300 rounded-xl font-bold hover:bg-gray-900 disabled:opacity-50 transition-colors"
+                        className="px-8 py-3 bg-white/[0.04] border border-white/8 text-neutral-300 rounded-xl font-bold hover:bg-white/[0.07] disabled:opacity-50 transition-colors"
                     >
                         {loading ? 'Ładowanie...' : 'Pokaż więcej firm'}
                     </button>

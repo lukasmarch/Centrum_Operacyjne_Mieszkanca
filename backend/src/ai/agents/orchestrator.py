@@ -40,8 +40,10 @@ Dostepni agenci i ich INTENCJE:
   Przykladowe pytania: "jest awaria wody na ulicy...", "gdzie zglasza sie usterke?",
   "czy sa jakies ostrzezenia?", "wypadek na drodze..."
 
-- organizator: pyta o HARMONOGRAMY ODBIORU SMIECI lub REPERTUAR KINA
-  Przykladowe pytania: "kiedy wywoz smieci?", "co gra w kinie?", "harmonogram odpadow dla..."
+- organizator: pyta o HARMONOGRAMY ODBIORU SMIECI, REPERTUAR KINA lub ZDROWIE/LEKARZY
+  Przykladowe pytania: "kiedy wywoz smieci?", "co gra w kinie?", "harmonogram odpadow dla...",
+  "kiedy przyjmuje lekarz?", "godziny poradni stomatologicznej", "ktora apteka dzis dyzuruje?",
+  "dyzur apteki w weekend", "godziny POZ", "harmonogram poradni ginekologicznej"
 
 Odpowiedz TYLKO jedna nazwa agenta (np. "redaktor"). Nic wiecej."""
 

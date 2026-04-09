@@ -23,9 +23,6 @@ from src.newsletter.routes import router as newsletter_router
 # GUS Stats with tier-based access (Sprint 3)
 from src.api.endpoints.gus import router as gus_router
 
-# Polska w Liczbach — uzupełnienie danych gminnych (PwL)
-from src.api.endpoints.pwl import router as pwl_router
-
 # Business / CEIDG directory (Sprint 3+)
 from src.api.endpoints.business import router as business_router
 
@@ -86,9 +83,6 @@ app.include_router(newsletter_router)  # /api/newsletter/*
 
 # GUS Stats routes (Sprint 3 - Enhanced GUS Dashboard)
 app.include_router(gus_router)  # /api/stats/*
-
-# Polska w Liczbach routes — uzupełnienie gmina-poziom
-app.include_router(pwl_router, prefix="/api/stats/pwl")  # /api/stats/pwl/*
 
 # Business / CEIDG directory routes
 app.include_router(business_router)  # /api/business/*

@@ -3,17 +3,6 @@
  *
  * Horizontal bar chart for comparing Gmina Rybno with other gminy in powiat
  * Highlights Rybno's bar with special color
- *
- * Used in:
- * - GUSOverview: Top 3-5 gminy comparison
- * - GUSSectionPage: Full powiat comparison
- * - GUSVariableDetail: Ranking among all gminy
- *
- * Features:
- * - Horizontal BarChart (better for long gmina names)
- * - Highlighted bar for Rybno
- * - Tooltip with ranking
- * - Sorted by value (descending)
  */
 
 import React, { useMemo } from 'react';
@@ -39,8 +28,8 @@ interface ComparisonBarProps {
   data: ComparisonData[];
   title?: string;
   unit?: string;
-  highlightUnitId?: string; // Default: Rybno's unit_id
-  maxItems?: number; // Show top N items
+  highlightUnitId?: string;
+  maxItems?: number;
   height?: number;
   formatType?: 'integer' | 'decimal' | 'percentage' | 'currency';
 }
@@ -56,7 +45,6 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
   height = 400,
   formatType = 'integer',
 }) => {
-  // Sort data by value (descending) and limit to maxItems
   const sortedData = useMemo(() => {
     return [...data]
       .sort((a, b) => b.value - a.value)
@@ -64,14 +52,12 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
       .map((item, index) => ({
         ...item,
         rank: index + 1,
-        // Shorten long gmina names
         display_name: item.unit_name.length > 25
           ? item.unit_name.substring(0, 22) + '...'
           : item.unit_name,
       }));
   }, [data, maxItems]);
 
-  // Format value based on type
   const formatValue = (val: number): string => {
     switch (formatType) {
       case 'integer':
@@ -87,19 +73,19 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
     }
   };
 
-  // Custom tooltip
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const item = payload[0].payload;
+      const isRybno = item.unit_id === highlightUnitId;
       return (
-        <div className="bg-white px-4 py-3 rounded-lg shadow-lg border border-gray-200">
-          <p className="text-sm font-semibold text-gray-900 mb-1">
+        <div className="bg-gray-800 border border-white/10 px-4 py-3 rounded-lg shadow-xl">
+          <p className={`text-sm font-semibold mb-1 ${isRybno ? 'text-blue-400' : 'text-neutral-200'}`}>
             {item.unit_name}
           </p>
-          <p className="text-lg font-bold text-blue-600">
+          <p className="text-lg font-bold text-neutral-100">
             {formatValue(item.value)} {unit}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-neutral-500 mt-1">
             Pozycja #{item.rank} w powiecie
           </p>
         </div>
@@ -108,83 +94,82 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
     return null;
   };
 
-  // Get bar color (highlight Rybno)
   const getBarColor = (unitId: string) => {
-    return unitId === highlightUnitId ? '#3b82f6' : '#e5e7eb'; // blue-500 vs gray-200
+    return unitId === highlightUnitId ? '#3b82f6' : '#334155';
   };
 
+  const rybnoItem = sortedData.find(item => item.unit_id === highlightUnitId);
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 min-w-0">
+    <div className="bg-white/[0.04] rounded-xl border border-white/5 p-5 min-w-0">
       {title && (
-        <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>
+        <h3 className="text-lg font-bold text-neutral-100 mb-4">{title}</h3>
       )}
 
       <div style={{ width: '100%', height: `${height}px`, minWidth: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={sortedData}
-          layout="vertical"
-          margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-
-          <XAxis
-            type="number"
-            stroke="#9ca3af"
-            style={{ fontSize: '12px', fontWeight: 500 }}
-            tick={{ fill: '#6b7280' }}
-            tickFormatter={(value) => formatValue(value).split(',')[0]}
-          />
-
-          <YAxis
-            type="category"
-            dataKey="display_name"
-            stroke="#9ca3af"
-            style={{ fontSize: '12px', fontWeight: 500 }}
-            tick={{ fill: '#6b7280' }}
-            width={120}
-          />
-
-          <Tooltip content={<CustomTooltip />} />
-
-          <Bar
-            dataKey="value"
-            radius={[0, 4, 4, 0]}
-            animationDuration={800}
-            animationEasing="ease-out"
+          <BarChart
+            data={sortedData}
+            layout="vertical"
+            margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
           >
-            {sortedData.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={getBarColor(entry.unit_id)}
-                opacity={entry.unit_id === highlightUnitId ? 1 : 0.6}
-              />
-            ))}
-          </Bar>
-        </BarChart>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+
+            <XAxis
+              type="number"
+              stroke="#334155"
+              style={{ fontSize: '12px', fontWeight: 500 }}
+              tick={{ fill: '#64748b' }}
+              tickFormatter={(value) => formatValue(value).split(',')[0]}
+            />
+
+            <YAxis
+              type="category"
+              dataKey="display_name"
+              stroke="#334155"
+              style={{ fontSize: '12px', fontWeight: 500 }}
+              tick={{ fill: '#94a3b8' }}
+              width={120}
+            />
+
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+
+            <Bar
+              dataKey="value"
+              radius={[0, 4, 4, 0]}
+              animationDuration={800}
+              animationEasing="ease-out"
+            >
+              {sortedData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={getBarColor(entry.unit_id)}
+                  opacity={entry.unit_id === highlightUnitId ? 1 : 0.7}
+                />
+              ))}
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </div>
 
       {/* Legend */}
-      <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-sm">
+      <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-center gap-4 text-sm">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-blue-500 rounded"></div>
-          <span className="text-gray-700 font-medium">Gmina Rybno</span>
+          <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+          <span className="text-neutral-400 font-medium">Gmina Rybno</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-gray-200 rounded"></div>
-          <span className="text-gray-700">Pozostałe gminy</span>
+          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#334155' }}></div>
+          <span className="text-neutral-500">Pozostałe gminy</span>
         </div>
       </div>
 
       {/* Rybno's ranking */}
-      {sortedData.find(item => item.unit_id === highlightUnitId) && (
-        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-          <p className="text-sm text-gray-700">
-            <span className="font-bold text-blue-700">Gmina Rybno</span> zajmuje{' '}
-            <span className="font-bold text-blue-700">
-              #{sortedData.find(item => item.unit_id === highlightUnitId)?.rank}
-            </span>{' '}
+      {rybnoItem && (
+        <div className="mt-3 p-3 bg-blue-900/20 rounded-lg border border-blue-500/20">
+          <p className="text-sm text-neutral-300">
+            <span className="font-bold text-blue-400">Gmina Rybno</span> zajmuje{' '}
+            <span className="font-bold text-blue-400">#{rybnoItem.rank}</span>{' '}
             miejsce w powiecie
           </p>
         </div>

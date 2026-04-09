@@ -14,6 +14,9 @@ coverage/
 .env
 .env.local
 .env.*.local
+
+# Production secrets (never in repo)
+backend/.env.production
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -48,6 +51,20 @@ MANIFEST
 backend/notebooks/.ipynb_checkpoints
 stellar-oort
 temp_opady_widget
+
+# Archive (nie deployowane)
+archive/
+
+# Dev tools
+.agents/
+
+# Uploads (dane użytkowników — nie w repo)
+backend/uploads/reports/*.jpeg
+backend/uploads/reports/*.jpg
+backend/uploads/reports/*.png
+
+# Cache (regenerowane)
+backend/data/cache/
 
 # Logs (keep .gitkeep)
 backend/logs/*.log

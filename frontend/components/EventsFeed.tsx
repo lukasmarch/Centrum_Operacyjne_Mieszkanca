@@ -126,6 +126,11 @@ const EventCard: React.FC<{ event: Event }> = ({ event }) => {
                 {event.description && (
                     <p className="text-xs text-neutral-500 mt-1.5 line-clamp-2">{event.description}</p>
                 )}
+                {event.sourceName && (
+                    <p className="text-[10px] text-neutral-600 mt-1.5">
+                        <span>Źródło:</span> <span className="font-medium text-neutral-500">{event.sourceName}</span>
+                    </p>
+                )}
             </div>
 
             {/* Google Calendar button */}

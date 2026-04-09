@@ -19,11 +19,11 @@ Data refreshed quarterly by scheduler.
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_, desc, func
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from src.database import get_session, User
+from src.database import get_session, User, Article, Event, AirQuality, Weather, Report
 from src.database.schema import GUSGminaStats, GUSNationalAverages, GUSDataRefreshLog
 from src.auth.dependencies import get_optional_user, get_premium_user, get_business_user
 from src.integrations.gus_variables import (
@@ -683,7 +683,7 @@ async def list_variables(current_user: Optional[User] = Depends(get_optional_use
         - total_available: Number of variables available to user
     """
     user_tier = current_user.tier if current_user else "free"
-    allowed_vars = get_variables_for_tier(user_tier)
+    allowed_vars = get_gmina_variables_for_tier(user_tier)  # Only vars with Rybno data
 
     # Build metadata dict
     filtered_metadata = {}
@@ -714,10 +714,10 @@ async def list_variables(current_user: Optional[User] = Depends(get_optional_use
             "level": var.level,
         })
 
-    # Calculate tier counts
-    free_count = len(get_variables_for_tier("free"))
-    premium_count = len(get_variables_for_tier("premium"))
-    business_count = len(get_variables_for_tier("business"))
+    # Calculate tier counts (gmina-data-only filter: Free=8, Premium=37, Business=53)
+    free_count = len(get_gmina_variables_for_tier("free"))
+    premium_count = len(get_gmina_variables_for_tier("premium"))
+    business_count = len(get_gmina_variables_for_tier("business"))
 
     return {
         "user_tier": user_tier,
@@ -797,6 +797,75 @@ async def get_categories(
         "user_tier": user_tier,
         "categories": categories,
         "note": f"Showing {len(categories)} categories with actual gmina Rybno data from database."
+    }
+
+
+@router.get("/weekly-summary")
+async def get_weekly_summary(session: AsyncSession = Depends(get_session)):
+    """
+    Tygodniowe statystyki gminy: artykuły, zgłoszenia, wydarzenia, pogoda, powietrze.
+    Używane przez ShareCard i poniedziałkowy newsletter.
+    """
+    week_ago = datetime.utcnow() - timedelta(days=7)
+
+    r = await session.execute(
+        select(func.count(Article.id)).where(Article.published_at >= week_ago)
+    )
+    articles_count = r.scalar() or 0
+
+    r = await session.execute(
+        select(Article.category, func.count(Article.id).label("cnt"))
+        .where(Article.published_at >= week_ago)
+        .group_by(Article.category)
+        .order_by(func.count(Article.id).desc())
+        .limit(3)
+    )
+    top_categories = [{"category": row[0] or "Inne", "count": row[1]} for row in r.all()]
+
+    r = await session.execute(
+        select(func.count(Report.id))
+        .where(Report.created_at >= week_ago)
+        .where(Report.is_spam == False)
+    )
+    reports_count = r.scalar() or 0
+
+    r = await session.execute(
+        select(func.count(Event.id)).where(Event.event_date >= week_ago)
+    )
+    events_count = r.scalar() or 0
+
+    r = await session.execute(
+        select(
+            func.avg(Weather.temperature),
+            func.min(Weather.temp_min),
+            func.max(Weather.temp_max),
+        )
+        .where(Weather.fetched_at >= week_ago)
+        .where(Weather.location == "Rybno")
+    )
+    wrow = r.one_or_none()
+
+    r = await session.execute(
+        select(func.avg(AirQuality.caqi), func.avg(AirQuality.pm25))
+        .where(AirQuality.fetched_at >= week_ago)
+    )
+    aqrow = r.one_or_none()
+
+    return {
+        "period": f"{week_ago.strftime('%d.%m')} – {datetime.utcnow().strftime('%d.%m.%Y')}",
+        "articles_count": articles_count,
+        "top_categories": top_categories,
+        "reports_count": reports_count,
+        "events_count": events_count,
+        "weather": {
+            "temp_avg": round(float(wrow[0]), 1) if wrow and wrow[0] else None,
+            "temp_min": round(float(wrow[1]), 1) if wrow and wrow[1] else None,
+            "temp_max": round(float(wrow[2]), 1) if wrow and wrow[2] else None,
+        },
+        "air_quality": {
+            "caqi_avg": round(float(aqrow[0]), 1) if aqrow and aqrow[0] else None,
+            "pm25_avg": round(float(aqrow[1]), 1) if aqrow and aqrow[1] else None,
+        },
     }
 
 

@@ -11,13 +11,13 @@ interface TopBarProps {
 const TIER_LABELS: Record<string, string> = {
   free: 'Free',
   premium: 'Premium',
-  business: 'Business',
+  business: 'Pro',
 };
 
 const TIER_COLORS: Record<string, string> = {
   free: 'bg-white/10 text-neutral-400',
   premium: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-  business: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30',
+  business: 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
 };
 
 const AI_LIMITS: Record<string, { used: number; max: number; label: string }> = {

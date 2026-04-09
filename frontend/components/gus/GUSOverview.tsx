@@ -206,7 +206,7 @@ const GUSOverview: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
           {/* Population Trend */}
           {population && population.historical && population.historical.length > 0 && (
-            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
+            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-neutral-100 mb-1">Ludność gminy</h3>
                 <p className="text-sm text-neutral-500">
@@ -227,7 +227,7 @@ const GUSOverview: React.FC = () => {
 
           {/* Births Trend */}
           {births && births.historical && births.historical.length > 0 && (
-            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
+            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-neutral-100 mb-1">Urodzenia żywe</h3>
                 <p className="text-sm text-neutral-500">
@@ -248,7 +248,7 @@ const GUSOverview: React.FC = () => {
 
           {/* Migration Balance Trend */}
           {migration && migration.historical && migration.historical.length > 0 && (
-            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
+            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-neutral-100 mb-1">Saldo migracji na 1000 ludności</h3>
                 <p className="text-sm text-neutral-500">
@@ -269,7 +269,7 @@ const GUSOverview: React.FC = () => {
 
           {/* Business Dynamics - Entity Registrations */}
           {entities && entities.historical && entities.historical.length > 0 && (
-            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
+            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-neutral-100 mb-1">Podmioty REGON na 10k</h3>
                 <p className="text-sm text-neutral-500">
@@ -290,7 +290,7 @@ const GUSOverview: React.FC = () => {
 
           {/* Revenue Per Capita Trend */}
           {revenue && revenue.historical && revenue.historical.length > 0 && (
-            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
+            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-neutral-100 mb-1">Dochody gminy per capita</h3>
                 <p className="text-sm text-neutral-500">
@@ -311,7 +311,7 @@ const GUSOverview: React.FC = () => {
 
           {/* Expenditure Per Capita Trend */}
           {expenditure && expenditure.historical && expenditure.historical.length > 0 && (
-            <div className="bg-gray-950 rounded-xl p-6 min-w-0 border border-gray-800/50">
+            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-neutral-100 mb-1">Wydatki gminy per capita</h3>
                 <p className="text-sm text-neutral-500">

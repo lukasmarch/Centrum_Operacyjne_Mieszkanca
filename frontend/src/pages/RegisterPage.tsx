@@ -85,7 +85,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-3xl text-white mx-auto mb-4">
             D
           </div>
-          <h1 className="text-3xl font-black mb-2">Dołącz do nas!</h1>
+          <h1 className="text-3xl font-black mb-2 text-white">Dołącz do nas!</h1>
           <p className="text-neutral-500">Stwórz konto w Centrum Operacyjnym</p>
         </div>
 
@@ -110,7 +110,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 value={formData.full_name}
                 onChange={handleChange}
                 placeholder="Jan Kowalski"
-                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
             </div>
@@ -126,7 +126,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="twoj@email.pl"
-                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
             </div>
@@ -140,7 +140,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-gray-950"
+                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               >
                 {AVAILABLE_LOCATIONS.map((loc) => (
@@ -165,7 +165,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
               <p className="text-xs text-neutral-400 mt-1">
@@ -184,7 +184,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 disabled={isLoading}
               />
             </div>
@@ -232,7 +232,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
           </div>
 
           {/* Login link */}
-          <p className="text-center text-neutral-600">
+          <p className="text-center text-neutral-400">
             Masz już konto?{' '}
             <button
               onClick={() => onNavigate('login')}

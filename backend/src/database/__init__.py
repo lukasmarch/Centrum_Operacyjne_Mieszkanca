@@ -3,7 +3,6 @@ from .schema import (
     User, Subscription, UserTier, SubscriptionStatus,
     NewsletterSubscriber, NewsletterLog, NewsletterFrequency, NewsletterStatus,
     CEIDGBusiness, CEIDGSyncStats, AirQuality, Report,
-    PwLGminaStats, PwLScrapeLog
 )
 from .connection import engine, get_session
 
@@ -12,6 +11,5 @@ __all__ = [
     "User", "Subscription", "UserTier", "SubscriptionStatus",
     "NewsletterSubscriber", "NewsletterLog", "NewsletterFrequency", "NewsletterStatus",
     "CEIDGBusiness", "CEIDGSyncStats", "AirQuality", "Report",
-    "PwLGminaStats", "PwLScrapeLog",
     "engine", "get_session"
 ]

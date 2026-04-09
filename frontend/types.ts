@@ -39,6 +39,8 @@ export interface Event {
   imageUrl?: string;
   description?: string;
   externalUrl?: string;
+  organizer?: string;
+  sourceName?: string;
 }
 
 // Legacy GUS type (kept for backward compatibility)

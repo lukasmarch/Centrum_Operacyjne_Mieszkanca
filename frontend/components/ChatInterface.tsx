@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Mic } from 'lucide-react';
+import { Send, Mic, MicOff } from 'lucide-react';
 import { useChat } from '../src/hooks/useChat';
+import { useSpeechRecognition } from '../src/hooks/useSpeechRecognition';
 import ChatMessage from './ChatMessage';
 import ChatLimitPrompt from './ChatLimitPrompt';
 
@@ -22,6 +23,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onInitialQuerySent,
 }) => {
   const [input, setInput] = useState('');
+  const speech = useSpeechRecognition((text) => setInput(text));
   const { messages, isLoading, sendMessage, limitReached, limitInfo } = useChat({
     agentName: selectedAgent || undefined,
   });
@@ -96,13 +98,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               className="flex-1 bg-transparent text-neutral-100 placeholder-neutral-600 focus:outline-none text-sm disabled:opacity-50"
             />
 
-            <button
-              type="button"
-              className="shrink-0 text-neutral-600 hover:text-neutral-400 transition-colors"
-              aria-label="Mikrofon"
-            >
-              <Mic size={16} />
-            </button>
+            {speech.isSupported && (
+              <button
+                type="button"
+                onClick={() => speech.isListening ? speech.stop() : speech.start()}
+                title={
+                  speech.error === 'not-allowed'
+                    ? 'Brak dostępu — zezwól na mikrofon w pasku adresu Chrome'
+                    : speech.isListening ? 'Zatrzymaj' : 'Mów do mikrofonu'
+                }
+                className={`shrink-0 transition-colors ${
+                  speech.error === 'not-allowed'
+                    ? 'text-amber-500'
+                    : speech.isListening
+                    ? 'text-red-400'
+                    : 'text-neutral-600 hover:text-neutral-400'
+                }`}
+                aria-label="Mikrofon"
+              >
+                {speech.isListening ? <MicOff size={16} /> : <Mic size={16} />}
+              </button>
+            )}
 
             <button
               onClick={handleSend}

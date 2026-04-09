@@ -158,10 +158,21 @@ async def send_daily_newsletter():
                 by_location[location] = []
             by_location[location].append((subscriber, user))
 
+        # On Monday: generate weekly stats card once (location-independent)
+        weekly_card = None
+        if datetime.utcnow().weekday() == 0:
+            try:
+                weekly_card = await generator.get_weekly_stats(session)
+                logger.info("Weekly stats card generated for Monday newsletter")
+            except Exception as e:
+                logger.error(f"Failed to generate weekly card: {str(e)}")
+
         # Generate and send per location
         for location, subs in by_location.items():
             try:
                 content = await generator.generate_daily(session, location=location)
+                if weekly_card:
+                    content["weekly_card"] = weekly_card
             except Exception as e:
                 logger.error(f"Failed to generate daily for {location}: {str(e)}")
                 continue

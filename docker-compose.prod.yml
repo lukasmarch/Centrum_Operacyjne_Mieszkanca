@@ -1,0 +1,61 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: centrum_operacyjne
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/centrum_operacyjne
+    env_file:
+      - ./backend/.env.production
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level warning
+    stop_grace_period: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+      - uploads:/app/uploads:ro
+      - frontend_dist:/srv/frontend:ro
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  uploads:
+  logs:
+  caddy_data:
+  caddy_config:
+  frontend_dist:

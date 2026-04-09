@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import select, func
 from openai import AsyncOpenAI
 
 from src.config import settings
@@ -58,7 +58,7 @@ Przygotuj treść cotygodniowego newslettera w języku polskim.
 
 **Ważne wytyczne:**
 - Priorytetyzuj: PILNE (awarie, zdrowie, urząd) > PRZYDATNE (biznes, edukacja) > CIEKAWE (kultura, rozrywka)
-- Używaj konkretnych nazw miejsc (Rybno, Działdowo, Lubawa)
+- Nazwy miejsc podawaj WYŁĄCZNIE jeśli są w podanych danych — nie dopisuj lokalizacji z głowy
 - Dodaj emotikony dla czytelności (🗓️, 📰, ☁️, 💎)
 - Tekst powinien być zwięzły ale informatywny
 - Nie wymyślaj informacji - używaj tylko podanych danych
@@ -430,7 +430,12 @@ class NewsletterGenerator:
 
         cinema_data = []
         for s in showtimes:
-            evening_times = [t for t in (s.showtimes or []) if int(t.split(':')[0]) >= 17]
+            def _hour(t: str) -> int:
+                try:
+                    return int(t.split(':')[-2].split()[-1])
+                except (ValueError, IndexError):
+                    return 0
+            evening_times = [t for t in (s.showtimes or []) if _hour(t) >= 17]
             if evening_times:
                 cinema_data.append({
                     "title": s.title,
@@ -554,3 +559,71 @@ class NewsletterGenerator:
         logger.info(f"Daily newsletter generated: {content.get('subject', 'No subject')}")
 
         return content
+
+    async def get_weekly_stats(self, session: AsyncSession) -> Dict[str, Any]:
+        """
+        Returns raw weekly stats for 'Gmina w Liczbach' card.
+        No AI — pure DB aggregates for last 7 days.
+        """
+        week_ago = datetime.utcnow() - timedelta(days=7)
+
+        result = await session.execute(
+            select(func.count(Article.id)).where(Article.published_at >= week_ago)
+        )
+        articles_count = result.scalar() or 0
+
+        result = await session.execute(
+            select(Article.category, func.count(Article.id).label("cnt"))
+            .where(Article.published_at >= week_ago)
+            .group_by(Article.category)
+            .order_by(func.count(Article.id).desc())
+            .limit(3)
+        )
+        top_categories = [
+            {"category": row[0] or "Inne", "count": row[1]}
+            for row in result.all()
+        ]
+
+        result = await session.execute(
+            select(func.count(Report.id))
+            .where(Report.created_at >= week_ago)
+            .where(Report.is_spam == False)
+        )
+        reports_count = result.scalar() or 0
+
+        result = await session.execute(
+            select(func.count(Event.id)).where(Event.event_date >= week_ago)
+        )
+        events_count = result.scalar() or 0
+
+        result = await session.execute(
+            select(
+                func.avg(Weather.temperature),
+                func.min(Weather.temp_min),
+                func.max(Weather.temp_max),
+            )
+            .where(Weather.fetched_at >= week_ago)
+            .where(Weather.location == "Rybno")
+        )
+        row = result.one_or_none()
+        temp_avg = round(float(row[0]), 1) if row and row[0] else None
+        temp_min = round(float(row[1]), 1) if row and row[1] else None
+        temp_max = round(float(row[2]), 1) if row and row[2] else None
+
+        result = await session.execute(
+            select(func.avg(AirQuality.caqi), func.avg(AirQuality.pm25))
+            .where(AirQuality.fetched_at >= week_ago)
+        )
+        aq_row = result.one_or_none()
+        caqi_avg = round(float(aq_row[0]), 1) if aq_row and aq_row[0] else None
+        pm25_avg = round(float(aq_row[1]), 1) if aq_row and aq_row[1] else None
+
+        return {
+            "period": f"{week_ago.strftime('%d.%m')} – {datetime.utcnow().strftime('%d.%m.%Y')}",
+            "articles_count": articles_count,
+            "top_categories": top_categories,
+            "reports_count": reports_count,
+            "events_count": events_count,
+            "weather": {"temp_avg": temp_avg, "temp_min": temp_min, "temp_max": temp_max},
+            "air_quality": {"caqi_avg": caqi_avg, "pm25_avg": pm25_avg},
+        }

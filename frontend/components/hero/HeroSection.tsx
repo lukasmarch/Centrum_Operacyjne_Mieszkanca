@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Mic, MicOff } from 'lucide-react';
 import { AppSection } from '../../types';
+import { useSpeechRecognition } from '../../src/hooks/useSpeechRecognition';
 
 interface HeroSectionProps {
   onNavigate?: (section: AppSection) => void;
@@ -32,6 +33,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
   const [currentSuggestion, setCurrentSuggestion] = useState(0);
   const [isTyping, setIsTyping]                   = useState(false);
   const [inputFocused, setInputFocused]           = useState(false);
+  const speech = useSpeechRecognition((text) => {
+    setQuery(text);
+    setIsTyping(true);
+  });
 
   const containerRef    = useRef<HTMLDivElement>(null);
   const canvasRef       = useRef<HTMLCanvasElement>(null);
@@ -286,14 +291,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
               onFocus={() => setInputFocused(true)}
               onBlur={() => { setInputFocused(false); setIsTyping(false); }}
               onKeyDown={e => e.key === 'Enter' && handleSubmit(query)}
-              placeholder={suggestions[currentSuggestion]}
+              placeholder={speech.isListening ? 'Słucham...' : suggestions[currentSuggestion]}
               className="flex-1 rounded-2xl px-6 py-4 text-base transition-all"
               style={{
                 background:           'rgba(21,27,43,0.8)',
                 backdropFilter:       'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
-                border:               `1px solid ${inputFocused ? 'var(--chart-2)' : 'rgba(255,255,255,0.12)'}`,
-                boxShadow:            inputFocused
+                border:               `1px solid ${
+                  speech.isListening ? 'rgba(239,68,68,0.6)'
+                  : inputFocused ? 'var(--chart-2)'
+                  : 'rgba(255,255,255,0.12)'
+                }`,
+                boxShadow:            inputFocused || speech.isListening
                   ? '0 0 0 3px rgba(58,129,246,0.18), 0 4px 20px rgba(0,0,0,0.4)'
                   : '0 4px 20px rgba(0,0,0,0.4)',
                 color:                '#fafafa',
@@ -302,6 +311,35 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
                 caretColor:           'var(--chart-1)',
               }}
             />
+            {speech.isSupported && (
+              <button
+                onClick={() => speech.isListening ? speech.stop() : speech.start()}
+                title={
+                  speech.error === 'not-allowed'
+                    ? 'Zezwól na mikrofon — kliknij kłódkę w pasku adresu Chrome'
+                    : speech.isListening ? 'Zatrzymaj nagrywanie' : 'Mów do mikrofonu'
+                }
+                className="shrink-0 flex items-center justify-center rounded-2xl px-4 transition-all"
+                style={{
+                  background: speech.isListening
+                    ? 'rgba(239,68,68,0.15)'
+                    : speech.error === 'not-allowed'
+                    ? 'rgba(245,158,11,0.1)'
+                    : 'rgba(21,27,43,0.8)',
+                  border: `1px solid ${
+                    speech.isListening ? 'rgba(239,68,68,0.5)'
+                    : speech.error === 'not-allowed' ? 'rgba(245,158,11,0.4)'
+                    : 'rgba(255,255,255,0.12)'
+                  }`,
+                  color: speech.isListening ? '#f87171'
+                    : speech.error === 'not-allowed' ? '#fbbf24'
+                    : 'rgba(255,255,255,0.5)',
+                  backdropFilter: 'blur(12px)',
+                }}
+              >
+                {speech.isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+            )}
             <button
               onClick={() => handleSubmit(query || suggestions[currentSuggestion])}
               className="btn-primary shrink-0 flex items-center gap-2"

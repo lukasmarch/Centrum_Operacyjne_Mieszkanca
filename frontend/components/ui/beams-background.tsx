@@ -1,5 +1,3 @@
-import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
 interface BeamsBackgroundProps {
@@ -7,124 +5,66 @@ interface BeamsBackgroundProps {
   intensity?: "subtle" | "medium" | "strong";
 }
 
-interface Beam {
-  x: number;
-  y: number;
-  width: number;
-  length: number;
-  angle: number;
-  speed: number;
-  opacity: number;
-  hue: number;
-  pulse: number;
-  pulseSpeed: number;
-}
+// Opacity scale per intensity — blobs stay very subtle so they don't fight content
+const intensityOpacity = { subtle: 0.12, medium: 0.18, strong: 0.24 };
 
-function createBeam(width: number, height: number): Beam {
-  const angle = -35 + Math.random() * 10;
-  return {
-    x: Math.random() * width * 1.5 - width * 0.25,
-    y: Math.random() * height * 1.5 - height * 0.25,
-    width: 30 + Math.random() * 60,
-    length: height * 2.5,
-    angle,
-    speed: 0.6 + Math.random() * 1.2,
-    opacity: 0.12 + Math.random() * 0.16,
-    hue: 190 + Math.random() * 70,
-    pulse: Math.random() * Math.PI * 2,
-    pulseSpeed: 0.02 + Math.random() * 0.03,
-  };
-}
-
-export function BeamsBackground({ className, intensity = "strong" }: BeamsBackgroundProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const beamsRef = useRef<Beam[]>([]);
-  const animationFrameRef = useRef<number>(0);
-  const MINIMUM_BEAMS = 20;
-
-  const opacityMap = { subtle: 0.7, medium: 0.85, strong: 1 };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const updateCanvasSize = () => {
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
-      ctx.scale(dpr, dpr);
-      const totalBeams = MINIMUM_BEAMS * 1.5;
-      beamsRef.current = Array.from({ length: totalBeams }, () =>
-        createBeam(canvas.width, canvas.height)
-      );
-    };
-
-    updateCanvasSize();
-    window.addEventListener("resize", updateCanvasSize);
-
-    function resetBeam(beam: Beam, index: number, totalBeams: number) {
-      if (!canvas) return beam;
-      const column = index % 3;
-      const spacing = canvas.width / 3;
-      beam.y = canvas.height + 100;
-      beam.x = column * spacing + spacing / 2 + (Math.random() - 0.5) * spacing * 0.5;
-      beam.width = 100 + Math.random() * 100;
-      beam.speed = 0.5 + Math.random() * 0.4;
-      beam.hue = 190 + (index * 70) / totalBeams;
-      beam.opacity = 0.2 + Math.random() * 0.1;
-      return beam;
-    }
-
-    function drawBeam(ctx: CanvasRenderingContext2D, beam: Beam) {
-      ctx.save();
-      ctx.translate(beam.x, beam.y);
-      ctx.rotate((beam.angle * Math.PI) / 180);
-      const pulsingOpacity = beam.opacity * (0.8 + Math.sin(beam.pulse) * 0.2) * opacityMap[intensity];
-      const gradient = ctx.createLinearGradient(0, 0, 0, beam.length);
-      gradient.addColorStop(0, `hsla(${beam.hue}, 85%, 65%, 0)`);
-      gradient.addColorStop(0.1, `hsla(${beam.hue}, 85%, 65%, ${pulsingOpacity * 0.5})`);
-      gradient.addColorStop(0.4, `hsla(${beam.hue}, 85%, 65%, ${pulsingOpacity})`);
-      gradient.addColorStop(0.6, `hsla(${beam.hue}, 85%, 65%, ${pulsingOpacity})`);
-      gradient.addColorStop(0.9, `hsla(${beam.hue}, 85%, 65%, ${pulsingOpacity * 0.5})`);
-      gradient.addColorStop(1, `hsla(${beam.hue}, 85%, 65%, 0)`);
-      ctx.fillStyle = gradient;
-      ctx.fillRect(-beam.width / 2, 0, beam.width, beam.length);
-      ctx.restore();
-    }
-
-    function animate() {
-      if (!canvas || !ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.filter = "blur(35px)";
-      const totalBeams = beamsRef.current.length;
-      beamsRef.current.forEach((beam, index) => {
-        beam.y -= beam.speed;
-        beam.pulse += beam.pulseSpeed;
-        if (beam.y + beam.length < -100) resetBeam(beam, index, totalBeams);
-        drawBeam(ctx, beam);
-      });
-      animationFrameRef.current = requestAnimationFrame(animate);
-    }
-
-    animate();
-    return () => {
-      window.removeEventListener("resize", updateCanvasSize);
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    };
-  }, [intensity]);
+/**
+ * AuroraBackground — replaces canvas BeamsBackground.
+ * Three slowly drifting radial-gradient blobs rendered as pure CSS divs.
+ *
+ * Performance: ~0% CPU. Each blob is a GPU-composited layer whose transform
+ * matrix is animated by the compositor thread. No canvas, no JS loop, no blur
+ * recalculated per-frame. The @keyframes are defined in index.html.
+ */
+export function BeamsBackground({ className, intensity = "medium" }: BeamsBackgroundProps) {
+  const opacity = intensityOpacity[intensity];
 
   return (
-    <div className={cn("inset-0 overflow-hidden", className)}>
-      <canvas ref={canvasRef} className="absolute inset-0" style={{ filter: "blur(15px)" }} />
-      <motion.div
-        className="absolute inset-0"
-        animate={{ opacity: [0.03, 0.1, 0.03] }}
-        transition={{ duration: 10, ease: "easeInOut", repeat: Infinity }}
-        style={{ backdropFilter: "blur(50px)" }}
+    <div className={cn("inset-0 overflow-hidden pointer-events-none", className)}>
+
+      {/* Blob 1 — Blue, top-center-left, 28s */}
+      <div
+        className="aurora-blob absolute rounded-full"
+        style={{
+          top: "-15%",
+          left: "15%",
+          width: "52vw",
+          height: "52vw",
+          background: `radial-gradient(circle, rgba(37,99,235,${opacity}) 0%, transparent 65%)`,
+          filter: "blur(90px)",
+          willChange: "transform",
+          animation: "aurora-1 28s ease-in-out infinite",
+        }}
+      />
+
+      {/* Blob 2 — Cyan, bottom-right, 36s reverse feel */}
+      <div
+        className="aurora-blob absolute rounded-full"
+        style={{
+          bottom: "0%",
+          right: "5%",
+          width: "46vw",
+          height: "46vw",
+          background: `radial-gradient(circle, rgba(6,182,212,${opacity * 0.85}) 0%, transparent 65%)`,
+          filter: "blur(100px)",
+          willChange: "transform",
+          animation: "aurora-2 36s ease-in-out infinite",
+        }}
+      />
+
+      {/* Blob 3 — Indigo, mid-left, 22s */}
+      <div
+        className="aurora-blob absolute rounded-full"
+        style={{
+          top: "35%",
+          left: "-8%",
+          width: "38vw",
+          height: "38vw",
+          background: `radial-gradient(circle, rgba(99,102,241,${opacity * 0.75}) 0%, transparent 65%)`,
+          filter: "blur(80px)",
+          willChange: "transform",
+          animation: "aurora-3 22s ease-in-out infinite",
+        }}
       />
     </div>
   );

@@ -262,6 +262,52 @@ async def get_my_subscription(
     return SubscriberResponse.model_validate(subscriber)
 
 
+@router.put("/my-subscription")
+async def update_my_subscription(
+    data: dict,
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Upsert newsletter subscription for the logged-in user.
+    Body: {"frequency": "daily"|"weekly", "weekly": bool, "daily": bool}
+    """
+    # Validate daily requires premium
+    frequency = data.get("frequency")
+    if frequency == NewsletterFrequency.DAILY.value:
+        if current_user.tier not in [UserTier.PREMIUM.value, UserTier.BUSINESS.value]:
+            raise HTTPException(status_code=403, detail="Daily newsletter requires Premium")
+
+    result = await session.execute(
+        select(NewsletterSubscriber)
+        .where(NewsletterSubscriber.user_id == current_user.id)
+        .where(NewsletterSubscriber.status == NewsletterStatus.ACTIVE.value)
+    )
+    subscriber = result.scalar_one_or_none()
+
+    if not subscriber:
+        # Create new subscriber
+        subscriber = NewsletterSubscriber(
+            email=current_user.email,
+            user_id=current_user.id,
+            frequency=frequency or NewsletterFrequency.WEEKLY.value,
+            status=NewsletterStatus.ACTIVE.value,
+            confirmed_at=datetime.utcnow(),
+            unsubscribe_token=generate_token(),
+        )
+        session.add(subscriber)
+    else:
+        if frequency:
+            subscriber.frequency = frequency
+        if not subscriber.confirmed_at:
+            subscriber.confirmed_at = datetime.utcnow()
+        subscriber.updated_at = datetime.utcnow()
+
+    await session.commit()
+    await session.refresh(subscriber)
+    return {"status": "ok", "frequency": subscriber.frequency, "email": subscriber.email}
+
+
 @router.get("/stats", response_model=SubscriptionStats)
 async def get_newsletter_stats(
     session: AsyncSession = Depends(get_session)

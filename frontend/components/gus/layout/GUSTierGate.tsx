@@ -16,7 +16,7 @@
  * - Blur/lock visual effect
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Lock, TrendingUp, BarChart3, Brain, FileDown, Zap, ArrowRight } from 'lucide-react';
 import { UserTier } from '../../../types';
 
@@ -32,17 +32,18 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
   context = 'overview',
   className = '',
 }) => {
+  const [activeTab, setActiveTab] = useState<'premium' | 'business'>(requiredTier);
   // Tier-specific content
   const getTierContent = () => {
-    if (requiredTier === 'premium') {
+    if (activeTab === 'premium') {
       return {
         badge: 'Premium',
         badgeColor: 'from-indigo-500 to-purple-500',
         title: 'Odblokuj pełną analizę statystyczną',
-        description: 'Uzyskaj dostęp do 39 zmiennych GUS Gminy Rybno, szczegółowych trendów historycznych i porównań między gminami',
+        description: 'Uzyskaj dostęp do 37 wskaźników GUS dla rejonu Rybno, szczegółowych trendów historycznych i porównań między gminami',
         features: [
-          { icon: <BarChart3 size={18} />, text: '39 zmiennych GUS (vs 8 w Free)' },
-          { icon: <TrendingUp size={18} />, text: '10 kategorii tematycznych z pełnymi danymi' },
+          { icon: <BarChart3 size={18} />, text: '37 wskaźników GUS (vs 8 w Free)' },
+          { icon: <TrendingUp size={18} />, text: '7 kategorii tematycznych z danymi' },
           { icon: <Zap size={18} />, text: 'Trendy historyczne (10-30 lat)' },
           { icon: <BarChart3 size={18} />, text: 'Porównania między gminami w powiecie' },
         ],
@@ -55,11 +56,11 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
         badge: 'Pro',
         badgeColor: 'from-amber-500 to-orange-500',
         title: 'Zaawansowane analizy AI + eksport danych',
-        description: 'Pełny dostęp do 55 zmiennych GUS Gminy Rybno + AI insights + eksport do CSV',
+        description: 'Pełny dostęp do 53 wskaźników GUS dla rejonu Rybno + AI insights + eksport do CSV',
         features: [
           { icon: <Brain size={18} />, text: 'AI Insights - automatyczne analizy trendów' },
           { icon: <FileDown size={18} />, text: 'Eksport danych do CSV' },
-          { icon: <BarChart3 size={18} />, text: 'Wszystkie 55 zmiennych GUS Gminy Rybno' },
+          { icon: <BarChart3 size={18} />, text: 'Wszystkie 53 wskaźniki GUS dla rejonu Rybno' },
           { icon: <Zap size={18} />, text: 'Historia pytań AI bez limitu' },
         ],
         buttonText: 'Zobacz plany subskrypcji',
@@ -74,7 +75,7 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
   const getContextText = () => {
     switch (context) {
       case 'overview':
-        return 'Widzisz tylko 8 podstawowych zmiennych. Przejdź na Premium, aby odblokować 39 zmiennych w 7 kategoriach.';
+        return 'Widzisz tylko 8 podstawowych wskaźników. Przejdź na Premium, aby odblokować 37 wskaźników w 7 kategoriach.';
       case 'section':
         return 'Ta sekcja wymaga dostępu Premium. Odblokuj szczegółowe dane demograficzne, rynek pracy, finanse gminy i więcej.';
       case 'variable':
@@ -95,13 +96,28 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
         </div>
       </div>
 
-      {/* Badge */}
-      <div className="inline-block mb-4">
-        <span
-          className={`px-4 py-1.5 rounded-full text-white text-sm font-bold bg-gradient-to-r ${content.badgeColor} shadow-md`}
+      {/* Tab switcher */}
+      <div className="inline-flex items-center gap-1 mb-4 p-1 bg-gray-800/60 rounded-full border border-gray-700/50">
+        <button
+          onClick={() => setActiveTab('premium')}
+          className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all duration-200 ${
+            activeTab === 'premium'
+              ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
         >
-          {content.badge}
-        </span>
+          Premium
+        </button>
+        <button
+          onClick={() => setActiveTab('business')}
+          className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all duration-200 ${
+            activeTab === 'business'
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md'
+              : 'text-neutral-400 hover:text-neutral-200'
+          }`}
+        >
+          Pro
+        </button>
       </div>
 
       {/* Title and description */}

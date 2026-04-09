@@ -41,7 +41,8 @@ class TrafficService:
 
     async def get_traffic_data(self) -> "TrafficData":
         import time
-        
+        from datetime import datetime
+
         # Check cache
         if TrafficService._cache and TrafficService._last_update:
             if time.time() - TrafficService._last_update < TrafficService.CACHE_DURATION_SECONDS:
@@ -51,23 +52,28 @@ class TrafficService:
         if not self.client:
             return self._get_fallback_data()
 
-        prompt = """
-      Jesteś dyspozytorem ruchu dla regionu Rybno (powiat działdowski). 
-      Twoim centrum jest miejscowość RYBNO. Sprawdź AKTUALNE (real-time) warunki drogowe i czasy przejazdu dla tras:
+        now = datetime.now()
+        date_str = now.strftime("%d.%m.%Y %H:%M")
+
+        prompt = f"""
+      Jesteś dyspozytorem ruchu dla regionu Rybno (powiat działdowski, Warmia i Mazury).
+      Aktualna data i godzina: {date_str}.
+      Twoim centrum jest miejscowość RYBNO. Użyj Google Search aby sprawdzić AKTUALNE warunki drogowe i czasy przejazdu dla tras:
       1. Rybno -> Działdowo (DW538)
       2. Rybno -> Lubawa (DW538/DW541)
       3. Rybno -> Iława (przez Hartowiec)
       4. Rybno -> Olsztyn (najszybsza aktualna trasa)
-      
-      Zasady analizy:
-      - Podaj AKTUALNY CZAS PRZEJAZDU (TravelTime) w minutach.
-      - Opóźnienie (Delay) to różnica między czasem aktualnym a optymalnym.
-      - W opisie ('NOTE') bądź ekstremalnie precyzyjny: jeśli jest zima, sprawdź czy przyczyną jest śliska nawierzchnia, błoto pośniegowe czy praca pługów. Jeśli to korek w małym mieście, określ czy to zator przy przejeździe kolejowym czy wzmożony ruch lokalny.
-      - Opis musi być jednym, treściwym zdaniem, które wyjaśnia "dlaczego" (np. "Błoto pośniegowe na podjazdach pod wzniesienia spowalnia ruch ciężarowy").
 
-      Format odpowiedzi:
+      Zasady analizy:
+      - Podaj AKTUALNY CZAS PRZEJAZDU (TravelTime) w minutach dla daty {date_str}.
+      - Opóźnienie (Delay) to różnica między czasem aktualnym a optymalnym.
+      - W opisie ('NOTE') bądź ekstremalnie precyzyjny: opisz AKTUALNĄ przyczynę na podstawie wyszukanych danych. Jeśli brak utrudnień, napisz "Ruch płynny, brak zgłoszonych utrudnień."
+      - Opis musi być jednym, treściwym zdaniem.
+      - NIE ZGADUJ - jeśli brak aktualnych danych dla trasy, podaj STATUS: Płynnie i DELAY: 0.
+
+      Format odpowiedzi (każda trasa w osobnej linii):
       [ROUTE: Skąd-Dokąd | TIME: X min | STATUS: Status | DELAY: X min | NOTE: Opis przyczyny]
-      
+
       Status values: Płynnie, Utrudnienia, Korki
     """
 
@@ -160,10 +166,10 @@ class TrafficService:
     def _get_fallback_data(self) -> TrafficData:
         return TrafficData(
             roads=[
-                RoadStatus(id='1', name='Rybno -> Działdowo', status='Utrudnienia', delayMinutes=5, travelTime='28 min', description='Utrudnienia przy wjeździe do Działdowa przez oblodzoną nawierzchnię na DW538.'),
-                RoadStatus(id='2', name='Rybno -> Lubawa', status='Płynnie', delayMinutes=0, travelTime='22 min', description='Trasa czysta, nawierzchnia czarna mokra, brak widocznych utrudnień.'),
-                RoadStatus(id='3', name='Rybno -> Iława', status='Płynnie', delayMinutes=0, travelTime='35 min', description='Ruch odbywa się płynnie, zachowana dobra przejezdność przez Hartowiec.'),
-                RoadStatus(id='4', name='Rybno -> Olsztyn', status='Korki', delayMinutes=15, travelTime='1h 10 min', description='Znaczne opóźnienia na trasie przez opady śniegu i spowolniony ruch na wysokości Nidzicy.')
+                RoadStatus(id='1', name='Rybno -> Działdowo', status='Płynnie', delayMinutes=0, travelTime='25 min', description='Brak aktualnych danych. Typowy czas przejazdu DW538.'),
+                RoadStatus(id='2', name='Rybno -> Lubawa', status='Płynnie', delayMinutes=0, travelTime='40 min', description='Brak aktualnych danych. Typowy czas przejazdu DW538/DW541.'),
+                RoadStatus(id='3', name='Rybno -> Iława', status='Płynnie', delayMinutes=0, travelTime='50 min', description='Brak aktualnych danych. Typowy czas przejazdu przez Hartowiec.'),
+                RoadStatus(id='4', name='Rybno -> Olsztyn', status='Płynnie', delayMinutes=0, travelTime='2h 30 min', description='Brak aktualnych danych. Typowy czas przejazdu przez Szczytno.')
             ],
             sources=[]
         )

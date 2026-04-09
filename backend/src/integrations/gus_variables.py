@@ -84,7 +84,7 @@ _VARIABLES_LIST: List[GUSVariable] = [
     GUSVariable("deaths_male", "66", "Zgony mężczyźni", "os.", "demografia", "business", "gmina", "integer"),
     GUSVariable("deaths_female", "67", "Zgony kobiety", "os.", "demografia", "business", "gmina", "integer"),
     GUSVariable("infant_deaths", "62", "Zgony niemowląt", "os.", "demografia", "business", "gmina", "integer"),
-    GUSVariable("infant_mortality_rate", "60569", "Zgony niemowląt na 1000 urodzeń", "", "demografia", "premium", "powiat", "float"),
+    GUSVariable("infant_mortality_rate", "60569", "Zgony niemowląt na 1000 urodzeń", "", "demografia", "premium", "powiat", "float"),  # brak danych dla Rybno
     GUSVariable("mortality_rate", "454134", "Zgony ogółem na 1000 urodzeń żywych", "", "demografia", "business", "powiat", "float"),
     GUSVariable("divorces", "1616553", "Rozwody", "os.", "demografia", "business", "powiat", "integer"),
     # Migracje - verified: 269607=42(2024), 269593=87(2024), 1365234=-42(2024)
@@ -105,7 +105,7 @@ _VARIABLES_LIST: List[GUSVariable] = [
     GUSVariable("unemployed_total", "459121", "Bezrobocie ogółem", "os.", "rynek_pracy", "business", "powiat", "integer"),
     # Verified: 454132=144(2021) at gmina, 1620621=335.2(2021) at powiat
     GUSVariable("employed_per_1000", "454132", "Pracujący na 1000 ludności", "", "rynek_pracy", "premium", "gmina", "float"),
-    GUSVariable("employed_per_1000_working_age", "1620621", "Pracujący na 1000 ludności w wieku produkcyjnym", "", "rynek_pracy", "business", "powiat", "float"),
+    GUSVariable("employed_per_1000_working_age", "1620621", "Pracujący na 1000 ludności w wieku produkcyjnym", "", "rynek_pracy", "business", "gmina", "float"),
 
     # ==================== PRZEDSIĘBIORCZOŚĆ (gmina) ====================
     GUSVariable("entities_regon_per_10k", "60530", "Podmioty REGON na 10 tys. ludności", "", "przedsiebiorczosc", "free", "gmina", "float"),
@@ -154,7 +154,7 @@ _VARIABLES_LIST: List[GUSVariable] = [
     # ==================== MIESZKALNICTWO ====================
     # Verified: 9152=6148(2024) at gmina
     GUSVariable("water_supply_population", "9152", "Ludność korzystająca z sieci wodociągowej", "os.", "mieszkalnictwo", "premium", "gmina", "integer"),
-    GUSVariable("water_network_km", "1612162", "Długość sieci wodociągowej", "km", "mieszkalnictwo", "premium", "powiat", "float"),
+    GUSVariable("water_network_km", "1612162", "Długość sieci wodociągowej", "km", "mieszkalnictwo", "premium", "gmina", "float"),
     GUSVariable("housing_municipal_area", "389", "Zasoby gminne - pow. użytkowa", "m²", "mieszkalnictwo", "premium", "powiat", "integer"),
     GUSVariable("housing_private_area", "63993", "Zasoby osób fizycznych - pow. użytkowa", "m²", "mieszkalnictwo", "premium", "powiat", "integer"),
     GUSVariable("dwellings_per_1000", "148156", "Mieszkania oddane na 1000 ludności", "", "mieszkalnictwo", "premium", "powiat", "float"),
@@ -163,10 +163,10 @@ _VARIABLES_LIST: List[GUSVariable] = [
     # ==================== EDUKACJA ====================
     # Verified: 838=5(2024) at gmina, 862=5143(powiat), 804=12(powiat)
     GUSVariable("primary_schools", "838", "Szkoły podstawowe", "szt.", "edukacja", "premium", "gmina", "integer"),
-    GUSVariable("students_primary", "862", "Uczniowie szkół podstawowych", "os.", "edukacja", "premium", "powiat", "integer"),
-    GUSVariable("preschools", "804", "Przedszkola", "szt.", "edukacja", "premium", "powiat", "integer"),
-    GUSVariable("preschool_children", "1617142", "Dzieci objęte wychowaniem przedszkolnym", "os.", "edukacja", "premium", "powiat", "integer"),
-    GUSVariable("nursery_children", "410640", "Dzieci w żłobkach", "os.", "edukacja", "business", "powiat", "integer"),
+    GUSVariable("students_primary", "862", "Uczniowie szkół podstawowych", "os.", "edukacja", "premium", "gmina", "integer"),
+    GUSVariable("preschools", "804", "Przedszkola", "szt.", "edukacja", "premium", "gmina", "integer"),
+    GUSVariable("preschool_children", "1617142", "Dzieci objęte wychowaniem przedszkolnym", "os.", "edukacja", "premium", "gmina", "integer"),
+    GUSVariable("nursery_children", "410640", "Dzieci w żłobkach", "os.", "edukacja", "business", "gmina", "integer"),
 
     # ==================== BEZPIECZEŃSTWO (powiat) ====================
     # Verified: 398594=16.81(2024), 498627=8.42(2024), 471916=47.4(2024)
@@ -181,8 +181,8 @@ _VARIABLES_LIST: List[GUSVariable] = [
 
     # ==================== ZDROWIE (powiat) ====================
     # Verified: 194884=16(2024), 1616687=403309(2024)
-    GUSVariable("pharmacies", "194884", "Apteki", "szt.", "zdrowie", "premium", "powiat", "integer"),
-    GUSVariable("medical_consultations", "1616687", "Porady lekarskie ogółem", "szt.", "zdrowie", "premium", "powiat", "integer"),
+    GUSVariable("pharmacies", "194884", "Apteki", "szt.", "zdrowie", "premium", "gmina", "integer"),
+    GUSVariable("medical_consultations", "1616687", "Porady lekarskie ogółem", "szt.", "zdrowie", "premium", "gmina", "integer"),
 
     # ==================== TURYSTYKA (powiat) ====================
     # Verified: 1539594, 1539658=2.0(2024), 1539596=4770(2024), 60297=162.28(2024)
@@ -279,15 +279,25 @@ def get_unit_id_for_variable(key: str) -> str:
 #  GMINA DATA AVAILABILITY
 # ============================================================
 
-# Variables with actual data for gmina Rybno (042815403062)
-# These 55 var_ids have historical records in gus_gmina_stats table
-# Query: SELECT var_id FROM gus_gmina_stats WHERE unit_id='042815403062' GROUP BY var_id
+# Variables with actual RECENT data for gmina Rybno (042815403062)
+# These 53 var_ids have records up to 2023/2024 in gus_gmina_stats table.
+# Excluded stale vars (data only up to 2007):
+#   '389'   - housing_municipal_area (Zasoby gminne - pow. użytkowa)     → last year: 2007
+#   '63993' - housing_private_area   (Zasoby osób fizycznych - pow. użytkowa) → last year: 2007
+#
+# ALL 53 vars have GMINA-level data (verified by comparing Rybno vs Powiat values in DB).
+# Variables that were previously tagged level="powiat" but confirmed gmina-level by value check:
+#   water_network_km, pharmacies, medical_consultations, students_primary,
+#   preschools, preschool_children, nursery_children, employed_per_1000_working_age
+#
+# Tier counts (after gmina-data filter):
+#   Free=8, Premium=37 (cumulative), Business/Pro=53 (cumulative)
 GMINA_AVAILABLE_VAR_IDS = {
     '1365234', '1365239', '149128', '152710', '1548644', '1548709',
     '1612162', '1616687', '1617142', '1620132', '1620621', '1645253',
     '1645343', '1645344', '1725014', '1725023', '194884', '269593',
-    '269607', '389', '410640', '454132', '458173', '471845', '498816',
-    '59', '60528', '60529', '60530', '60559', '62', '634131', '63993',
+    '269607', '410640', '454132', '458173', '471845', '498816',
+    '59', '60528', '60529', '60530', '60559', '62', '634131',
     '65', '66', '67', '72305', '745534', '76037', '76070', '76077',
     '76450', '76964', '76967', '76970', '76973', '76976', '77002',
     '77005', '80108', '80125', '804', '838', '862', '9152'
@@ -297,7 +307,7 @@ GMINA_AVAILABLE_VAR_IDS = {
 def get_gmina_available_variables() -> List[GUSVariable]:
     """Get ONLY variables that have actual data for gmina Rybno.
 
-    Returns 55 variables with historical records in database.
+    Returns 53 variables with recent (2015+) records in database.
     Excludes variables without gmina data (transport, bezpieczeństwo, turystyka).
     """
     return [var for var in _VARIABLES_LIST if var.var_id in GMINA_AVAILABLE_VAR_IDS]
@@ -323,7 +333,7 @@ def get_gmina_variables_for_tier(tier: str) -> List[GUSVariable]:
     Powiat-level variables are excluded from standalone display — they are used
     only in comparison queries (gmina vs powiat, gmina vs other villages).
 
-    Counts: Free=8, Premium=39, Pro=55
+    Counts: Free=8, Premium=37 (cumulative), Pro=53 (cumulative)
     """
     all_tier_vars = get_variables_for_tier(tier)
     return [

@@ -24,7 +24,7 @@ import {
 } from '../../types';
 import { getAccessToken } from './authApi';
 
-const API_BASE_URL = 'http://localhost:8000/api/stats';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api') + '/stats';
 
 /**
  * Make authenticated API request to GUS endpoints

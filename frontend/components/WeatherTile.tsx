@@ -59,15 +59,16 @@ const Panel: React.FC<{ children: React.ReactNode; className?: string; style?: R
   <div
     className={`relative overflow-hidden rounded-2xl ${className}`}
     style={{
-      background: 'rgba(255,255,255,0.04)',
+      background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)',
       border: '1px solid rgba(255,255,255,0.10)',
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.2), 0 8px 32px rgba(0,0,0,0.45)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.25), 0 8px 32px rgba(0,0,0,0.5)',
+      backdropFilter: 'blur(20px) saturate(1.4)',
+      WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
       ...style,
     }}
   >
-    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent pointer-events-none" />
+    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+    <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
     {children}
   </div>
 );
@@ -163,7 +164,7 @@ const WeatherTile: React.FC = () => {
     });
   }, [forecast]);
 
-  /* ── Wind chart from DB history ────────────────────────── */
+  /* ── Wind chart: history (>1 pts) or forecast fallback ─── */
   const windData = useMemo(() => {
     if (history.length > 1) {
       return history.slice(-12).map(h => ({
@@ -171,8 +172,16 @@ const WeatherTile: React.FC = () => {
         v: +(h.wind_speed * 3.6).toFixed(1),
       }));
     }
+    // fallback: use next 12 forecast slots (wind_speed in m/s → km/h)
+    const slots = forecast?.hourly?.slice(0, 12) ?? [];
+    if (slots.length > 0) {
+      return slots.map(s => ({
+        t: `${new Date(s.dt * 1000).getHours()}h`,
+        v: +(s.wind_speed * 3.6).toFixed(1),
+      }));
+    }
     return [];
-  }, [history]);
+  }, [history, forecast]);
 
   /* ── Humidity sparkline from DB history ─────────────────── */
   const humData = useMemo(() => {
@@ -283,7 +292,12 @@ const WeatherTile: React.FC = () => {
 
           {/* Rain probability — real from OWM /forecast pop field */}
           <Panel className="flex-1 p-3 flex flex-col">
-            <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest mb-2">🌧 Szansa opadów</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">🌧 Szansa opadów</p>
+              {rainData.length > 0 && rainData.every(d => d.v === 0) && (
+                <p className="text-[9px] font-bold text-emerald-500">Brak opadów</p>
+              )}
+            </div>
             {rainData.length > 0 ? (
               <div className="flex-1" style={{ minHeight: 55 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -296,7 +310,7 @@ const WeatherTile: React.FC = () => {
                         <stop offset="100%" stopColor="#0077b6" stopOpacity={0.4} />
                       </linearGradient>
                     </defs>
-                    <Bar dataKey="v" radius={[3, 3, 0, 0]} fill="url(#rainGrad)" />
+                    <Bar dataKey="v" radius={[3, 3, 0, 0]} fill="url(#rainGrad)" minPointSize={3} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -374,7 +388,9 @@ const WeatherTile: React.FC = () => {
           ) : (
             <p className="text-xs text-neutral-600 py-4">Brak danych historycznych</p>
           )}
-          <p className="text-[8px] text-neutral-700 mt-1 text-right">historyczne 12h · prędkość km/h</p>
+          <p className="text-[8px] text-neutral-700 mt-1 text-right">
+            {history.length > 1 ? 'historyczne 12h' : 'prognoza 36h'} · prędkość km/h
+          </p>
         </Panel>
 
         {/* Humidity — DB history sparkline */}
@@ -411,54 +427,52 @@ const WeatherTile: React.FC = () => {
         </Panel>
       </div>
 
-      {/* ══ SUNRISE / SUNSET — real DB data ════════════════════ */}
-      <div className="grid grid-cols-2 gap-3">
-        <Panel className="p-3 flex items-center gap-4">
-          <div>
-            <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">🌅 Wschód</p>
-            <p className="text-xl font-black text-white mt-0.5">
-              {sunrise ? fmtTime(sunrise) : '—'} <span className="text-xs text-neutral-500 font-medium">AM</span>
-            </p>
-          </div>
-          <div className="w-px h-8 rounded-full bg-white/10" />
-          <div>
-            <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">🌇 Zachód</p>
-            <p className="text-xl font-black text-white mt-0.5">
-              {sunset ? fmtTime(sunset) : '—'} <span className="text-xs text-neutral-500 font-medium">PM</span>
-            </p>
-          </div>
-          <div className="w-px h-8 rounded-full bg-white/10" />
-          <div>
-            <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">Długość dnia</p>
-            <p className="text-xl font-black text-white mt-0.5">{dayLength(sunrise, sunset)}</p>
-          </div>
-        </Panel>
-
-        {/* Tomorrow — first forecast slot next day */}
-        <Panel className="p-3 flex items-center gap-3">
-          {(() => {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-            const tSlot = forecast?.hourly?.find(s => (s.dt_txt ?? '').startsWith(tomorrowStr) && s.dt_txt.includes('12:00'));
-            return tSlot ? (
-              <>
-                <div className="flex-1">
-                  <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">Jutro</p>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <p className="text-2xl font-black text-white">{Math.round(tSlot.temp)}°</p>
-                    <p className="text-xs text-neutral-500 capitalize">{tSlot.description}</p>
-                  </div>
-                </div>
-                <img src={owmIconUrl(tSlot.icon)} alt="" className="w-14 h-14 object-contain"
-                  style={{ filter: 'drop-shadow(0 0 12px rgba(167,139,250,0.5))' }} />
-              </>
-            ) : (
-              <p className="text-xs text-neutral-600">Brak prognozy na jutro</p>
-            );
-          })()}
-        </Panel>
-      </div>
+      {/* ══ SUNRISE / SUNSET + TOMORROW ══════════════════════════ */}
+      <Panel className="p-3">
+        {(() => {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+          const tSlot = forecast?.hourly?.find(s => (s.dt_txt ?? '').startsWith(tomorrowStr) && s.dt_txt.includes('12:00'));
+          return (
+            <div className="grid grid-cols-4 divide-x divide-white/[0.07]">
+              <div className="px-3 flex flex-col gap-0.5">
+                <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">🌅 Wschód</p>
+                <p className="text-lg font-black text-white leading-tight whitespace-nowrap">
+                  {sunrise ? fmtTime(sunrise) : '—'}<span className="text-[10px] text-neutral-500 font-medium ml-1">AM</span>
+                </p>
+              </div>
+              <div className="px-3 flex flex-col gap-0.5">
+                <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">🌇 Zachód</p>
+                <p className="text-lg font-black text-white leading-tight whitespace-nowrap">
+                  {sunset ? fmtTime(sunset) : '—'}<span className="text-[10px] text-neutral-500 font-medium ml-1">PM</span>
+                </p>
+              </div>
+              <div className="px-3 flex flex-col gap-0.5">
+                <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">Długość dnia</p>
+                <p className="text-lg font-black text-white leading-tight whitespace-nowrap">{dayLength(sunrise, sunset)}</p>
+              </div>
+              <div className="px-3 flex items-center justify-between gap-2">
+                {tSlot ? (
+                  <>
+                    <div>
+                      <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-widest">Jutro</p>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <p className="text-lg font-black text-white">{Math.round(tSlot.temp)}°</p>
+                        <p className="text-[10px] text-neutral-500 capitalize leading-tight">{tSlot.description}</p>
+                      </div>
+                    </div>
+                    <img src={owmIconUrl(tSlot.icon)} alt="" className="w-10 h-10 object-contain shrink-0"
+                      style={{ filter: 'drop-shadow(0 0 10px rgba(167,139,250,0.5))' }} />
+                  </>
+                ) : (
+                  <p className="text-xs text-neutral-600">Brak prognozy</p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </Panel>
 
     </div>
   );

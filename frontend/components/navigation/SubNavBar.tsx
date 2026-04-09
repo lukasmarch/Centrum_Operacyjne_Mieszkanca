@@ -14,7 +14,7 @@ interface SubNavBarProps {
 
 const SubNavBar: React.FC<SubNavBarProps> = ({ items, activeItem, onItemChange }) => {
   return (
-    <div className="sticky top-0 z-30 bg-black/80 backdrop-blur-xl border-b border-gray-800/30">
+    <div className="sticky top-0 z-30 border-b border-white/5 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 py-2">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {items.map((item) => {

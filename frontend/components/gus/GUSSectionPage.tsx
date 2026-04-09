@@ -21,7 +21,7 @@
  * 7. Data freshness footer
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { RefreshCw, AlertCircle, ChevronLeft, TrendingUp, Info } from 'lucide-react';
 import { useGUSSection } from '../../src/hooks/useGUSStats';
 import { useAuth } from '../../src/context/AuthContext';
@@ -41,6 +41,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
   const { data, loading, error, refetch } = useGUSSection(sectionKey);
   const { user } = useAuth();
   const [selectedVariable, setSelectedVariable] = useState<string | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
 
   // Loading state
   if (loading) {
@@ -150,19 +151,22 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
       </div>
 
       {/* KPI Cards Row (all variables in section) */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-neutral-100 mb-4">Kluczowe wskaźniki</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-w-0">
+      <div className="mb-6">
+        <h2 className="text-base font-semibold text-neutral-400 uppercase tracking-wider mb-3">Kluczowe wskaźniki</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 min-w-0">
           {variableKeys.map(varKey => {
             const variable = variables[varKey];
+            const isActive = selectedVariable === varKey || (!selectedVariable && varKey === firstVariableKey);
             return (
               <button
                 key={varKey}
-                onClick={() => setSelectedVariable(varKey)}
-                className={`text-left transition-all min-w-0 ${selectedVariable === varKey || (!selectedVariable && varKey === firstVariableKey)
-                  ? 'ring-2 ring-blue-500'
-                  : ''
-                  }`}
+                onClick={() => {
+                  setSelectedVariable(varKey);
+                  setTimeout(() => {
+                    chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 50);
+                }}
+                className={`text-left transition-all min-w-0 rounded-lg ${isActive ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-950' : ''}`}
               >
                 <KPICard
                   label={variable.current.metadata.name}
@@ -180,7 +184,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
       {/* Main Trend Chart */}
       {trendData.length > 0 && (
-        <div className="mb-8">
+        <div className="mb-8" ref={chartRef}>
           <TrendChart
             data={trendData}
             title={`Trend historyczny: ${primaryVariable.current.metadata.name}`}
@@ -210,41 +214,40 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
         {/* Gmina vs Powiat Comparison (Only for Gmina-level variables) */}
         {primaryVariable.current.metadata.level === 'gmina' && primaryVariable.powiat_comparison && (
-          <div className="bg-gray-900/60 rounded-xl border border-white/5 p-5 min-w-0">
+          <div className="bg-white/[0.04] rounded-xl border border-white/5 p-5 min-w-0">
             <h3 className="text-lg font-bold text-neutral-100 mb-4">Gmina vs Powiat</h3>
-            <div style={{ width: '100%', height: '320px', minWidth: 0 }}>
+            <div style={{ width: '100%', height: '280px', minWidth: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={[
-                    { name: 'Gmina Rybno', value: primaryVariable.powiat_comparison.gmina_value, fill: '#3b82f6' },
-                    { name: 'Powiat Działdowski', value: primaryVariable.powiat_comparison.powiat_value, fill: '#64748b' }
+                    { name: 'Gmina Rybno', value: primaryVariable.powiat_comparison.gmina_value },
+                    { name: 'Powiat Działdowski', value: primaryVariable.powiat_comparison.powiat_value }
                   ]}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} />
-                  <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={{ stroke: '#334155' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#f1f5f9' }}
+                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: '#f1f5f9' }}
+                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                     formatter={(value: number) => [
                       value.toLocaleString('pl-PL') + ' ' + primaryVariable.current.metadata.unit,
                       'Wartość'
                     ]}
                   />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {
-                      [
-                        { name: 'Gmina Rybno', fill: '#3b82f6' },
-                        { name: 'Powiat Działdowski', fill: '#64748b' }
-                      ].map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))
-                    }
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    <Cell fill="#3b82f6" />
+                    <Cell fill="#334155" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 p-3 bg-blue-900/20 rounded-lg text-sm text-neutral-300 text-center border border-blue-500/20">
+            <div className="mt-4 flex items-center justify-center gap-6 text-xs text-neutral-500 mb-3">
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span>Gmina Rybno</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-slate-600 inline-block"></span>Powiat Działdowski</span>
+            </div>
+            <div className="p-3 bg-blue-900/20 rounded-lg text-sm text-neutral-300 text-center border border-blue-500/20">
               Gmina stanowi <strong className="text-blue-400">{primaryVariable.powiat_comparison.percentage_of_powiat}%</strong> wartości powiatu.
             </div>
           </div>
@@ -252,7 +255,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
         {/* Powiat Level Information (Fallback for missing gmina data) */}
         {primaryVariable.current.metadata.level === 'powiat' && (
-          <div className="bg-gray-900/60 rounded-xl border border-white/5 p-5 flex flex-col justify-center items-center text-center h-full min-h-[400px] min-w-0">
+          <div className="bg-white/[0.04] rounded-xl border border-white/5 p-5 flex flex-col justify-center items-center text-center h-full min-h-[400px] min-w-0">
             <div className="bg-amber-900/20 p-4 rounded-full mb-4">
               <Info className="text-amber-400" size={32} />
             </div>
@@ -272,7 +275,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
         )}
 
         {/* Additional metrics - placeholder for future donut/bar charts */}
-        <div className="bg-gray-900/60 rounded-xl border border-white/5 p-5 min-w-0">
+        <div className="bg-white/[0.04] rounded-xl border border-white/5 p-5 min-w-0">
           <h3 className="text-lg font-bold text-neutral-100 mb-4">Dodatkowe metryki</h3>
           <div className="space-y-3">
             {variableKeys.slice(0, 5).map(varKey => {
@@ -329,7 +332,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
       </div>
 
       {/* Data Table (all variables with YoY change) */}
-      <div className="mb-8 bg-gray-900/60 rounded-xl border border-white/5 overflow-hidden">
+      <div className="mb-8 bg-white/[0.04] rounded-xl border border-white/5 overflow-hidden">
         <div className="p-5 border-b border-white/5">
           <h2 className="text-xl font-bold text-neutral-100">Wszystkie wskaźniki</h2>
         </div>

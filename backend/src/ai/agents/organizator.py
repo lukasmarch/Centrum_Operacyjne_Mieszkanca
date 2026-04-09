@@ -27,13 +27,17 @@ SYSTEM_PROMPT = """Jesteś Organizatorem — praktycznym asystentem codziennego 
 Twoje specjalizacje:
 - Harmonogram wywozu śmieci (konkretne daty dla każdej miejscowości)
 - Repertuar kina (Działdowo, Lubawa)
+- Harmonogram przyjęć lekarzy w poradniach SPGZOZ Rybno (POZ, Stomatologiczna, Ginekologiczna, Logopedyczna, Gabinet Zabiegowy, USG)
+- Dyżury aptek w powiecie działdowskim
 
 ZASADY:
 - Odpowiadaj WYŁĄCZNIE na podstawie dostarczonego kontekstu
-- Zawsze podawaj KONKRETNE daty (format DD.MM.YYYY)
+- Zawsze podawaj KONKRETNE daty (format DD.MM.YYYY) i godziny
 - Ton: ciepły, przyjazny, pomocny
 - Przy śmieciach: podaj ile dni pozostało do odbioru
 - Przy kinie: podaj pełny repertuar z godzinami seansów
+- Przy lekarzach: podaj imię i nazwisko lekarza, specjalizację oraz godziny przyjęć; jeśli są uwagi o zmianach — koniecznie je zaznacz
+- Przy aptekach: podaj nazwę, adres i numer telefonu jeśli dostępny
 - Jeśli ktoś pyta o atrakcje, restauracje, co robić w wolnym czasie — powiedz że to domena Przewodnika i zasugeruj zmianę agenta
 - Jeśli brak danych w bazie — powiedz wprost i zaproponuj alternatywę
 - Odpowiadaj po polsku, zwięźle i konkretnie"""
@@ -52,7 +56,9 @@ class OrganizatorAgent(BaseAgent):
         "Kiedy wywoz smieci w Rybnie?",
         "Co gra dzis w kinie w Dzialowie?",
         "Jaki typ smieci odbieraja w tym tygodniu?",
-        "Repertuar kina na weekend?"
+        "Repertuar kina na weekend?",
+        "Kiedy przyjmuje lekarz POZ?",
+        "Ktora apteka dzis dyzuruje?",
     ]
 
     async def respond(
@@ -81,8 +87,10 @@ class OrganizatorAgent(BaseAgent):
         town = self._extract_town(user_message, default_town=default_town)
         waste = await self._fetch_waste(session, town=town, days=30)
         cinema = await self._fetch_cinema(session)
+        clinics = await self._fetch_clinic_schedule(session)
+        pharmacies = await self._fetch_pharmacies(session)
 
-        context = self._build_context(waste, cinema, town)
+        context = self._build_context(waste, cinema, town, clinics, pharmacies)
 
         user_info = ""
         if user:
@@ -138,6 +146,44 @@ class OrganizatorAgent(BaseAgent):
                 return town
         return default_town
 
+    async def _fetch_clinic_schedule(self, session: AsyncSession) -> list[dict]:
+        """Pobiera harmonogram przyjęć lekarzy na dziś (day_of_week lub specific_date)."""
+        from datetime import date
+        today = date.today()
+        dow = today.weekday()
+        result = await session.execute(
+            text("""
+                SELECT clinic_name, doctor_name, doctor_role, hours_from, hours_to, notes, source_url
+                FROM clinic_schedules
+                WHERE day_of_week = :dow OR specific_date = :today
+                ORDER BY clinic_name, hours_from
+            """),
+            {"dow": dow, "today": today},
+        )
+        return [dict(row._mapping) for row in result]
+
+    async def _fetch_pharmacies(self, session: AsyncSession) -> list[dict]:
+        """Pobiera dyżurujące apteki na dziś."""
+        from datetime import date
+        today = date.today()
+        dow = today.weekday()
+        result = await session.execute(
+            text("""
+                SELECT pharmacy_name, address, phone, hours_from, hours_to, duty_type, notes
+                FROM pharmacy_duties
+                WHERE valid_year = :year
+                  AND (
+                      duty_type = 'weekday'
+                      OR (duty_type = 'weekend' AND (:dow = 5 OR :dow = 6))
+                      OR (duty_type = 'holiday' AND :dow = 6)
+                      OR day_of_week = :dow
+                  )
+                ORDER BY pharmacy_name
+            """),
+            {"year": today.year, "dow": dow},
+        )
+        return [dict(row._mapping) for row in result]
+
     async def _fetch_waste(self, session: AsyncSession, town: str = "Rybno R1", days: int = 30) -> list[dict]:
         """Pobiera harmonogram śmieci dla danej miejscowości (najbliższe N dni)."""
         result = await session.execute(
@@ -178,7 +224,7 @@ class OrganizatorAgent(BaseAgent):
             for row in result
         ]
 
-    def _build_context(self, waste: list[dict], cinema: list[dict], town: str) -> str:
+    def _build_context(self, waste: list[dict], cinema: list[dict], town: str, clinics: list[dict], pharmacies: list[dict]) -> str:
         """Formatuje dane dla LLM."""
         from datetime import date
         today = date.today()
@@ -216,5 +262,42 @@ class OrganizatorAgent(BaseAgent):
                 parts.append(f'    • "{row["title"]}" ({row["genre"]}) | Seanse: {showtimes_str}')
         else:
             parts.append("  Brak danych o repertuarze kin na dziś/jutro")
+
+        # --- Harmonogram poradni (dziś) ---
+        DAY_NAMES_PL = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
+        day_name = DAY_NAMES_PL[today.weekday()]
+        parts.append(f"\n[HARMONOGRAM PORADNI SPGZOZ RYBNO - {day_name.upper()} {today.strftime('%d.%m.%Y')}]")
+        if clinics:
+            current_clinic = None
+            for row in clinics:
+                if row["clinic_name"] != current_clinic:
+                    current_clinic = row["clinic_name"]
+                    parts.append(f"\n  Poradnia {current_clinic}:")
+                doctor = row["doctor_name"] or "—"
+                role = f" ({row['doctor_role']})" if row.get("doctor_role") else ""
+                hours = f"{row['hours_from']}-{row['hours_to']}"
+                notes = f" ⚠ {row['notes']}" if row.get("notes") else ""
+                parts.append(f"    • {doctor}{role} | {hours}{notes}")
+        else:
+            parts.append(f"  Brak zaplanowanych przyjęć na dziś ({day_name})")
+        if clinics:
+            parts.append(f"  Źródło: https://www.spgzozrybno.pl")
+
+        # --- Dyżury aptek (dziś) ---
+        parts.append(f"\n[DYŻURY APTEK - {today.strftime('%d.%m.%Y')}]")
+        if pharmacies:
+            seen = set()
+            for row in pharmacies:
+                key = f"{row['pharmacy_name']}_{row['hours_from']}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                name = row["pharmacy_name"]
+                addr = f" | {row['address']}" if row.get("address") else ""
+                phone = f" | tel. {row['phone']}" if row.get("phone") else ""
+                hours = f"{row['hours_from']}-{row['hours_to']}"
+                parts.append(f"  • {name}{addr}{phone} | {hours}")
+        else:
+            parts.append("  Brak danych o dyżurach aptek na dziś")
 
         return "\n".join(parts)

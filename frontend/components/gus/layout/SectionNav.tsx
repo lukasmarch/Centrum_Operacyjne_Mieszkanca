@@ -92,17 +92,10 @@ const SectionNav: React.FC<SectionNavProps> = ({
   };
 
   return (
-    <div className={`bg-gray-950 rounded-xl shadow-sm border border-gray-800/50 p-4 ${className}`}>
+    <div className={`rounded-xl border border-white/5 p-4 ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4">
         <h3 className="text-lg font-bold text-neutral-100">Kategorie Statystyk</h3>
-        {userTier && userTier !== 'free' && (
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getTierBadgeColor(userTier as UserTier)}`}
-          >
-            {userTier === 'business' ? 'Pro' : userTier}
-          </span>
-        )}
       </div>
 
       {/* Sections grid */}
@@ -128,8 +121,8 @@ const SectionNav: React.FC<SectionNavProps> = ({
                 ${isActive
                   ? 'border-blue-500/50 bg-blue-500/10 shadow-lg shadow-blue-500/10'
                   : isAccessible
-                    ? 'border-gray-800/50 bg-gray-900/30 hover:border-gray-600 hover:bg-gray-900'
-                    : 'border-gray-800/50/50 bg-gray-950 opacity-40 cursor-not-allowed grayscale'
+                    ? 'border-white/8 bg-white/4 hover:border-white/15 hover:bg-white/7'
+                    : 'border-white/5 bg-white/2 opacity-40 cursor-not-allowed grayscale'
                 }
               `}
             >
@@ -147,8 +140,8 @@ const SectionNav: React.FC<SectionNavProps> = ({
                   ${isActive
                     ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
                     : isAccessible
-                      ? 'bg-gray-900 text-neutral-400 group-hover:bg-gray-700 group-hover:text-neutral-200'
-                      : 'bg-gray-900/50 text-neutral-600'
+                      ? 'bg-white/8 text-neutral-400'
+                      : 'bg-white/4 text-neutral-600'
                   }
                 `}
               >
@@ -170,15 +163,15 @@ const SectionNav: React.FC<SectionNavProps> = ({
                 {section.name}
               </span>
 
-              {/* Tier badge (only for non-free) */}
-              {section.tier !== 'free' && (
+              {/* Tier badge — only when user lacks access */}
+              {section.tier !== 'free' && !isAccessible && (
                 <span
                   className={`
                     text-[10px] font-bold px-2 py-0.5 rounded-full uppercase
                     ${getTierBadgeColor(section.tier)}
                   `}
                 >
-                  {section.tier}
+                  {section.tier === 'business' ? 'Pro' : 'Premium'}
                 </span>
               )}
             </button>
@@ -191,7 +184,7 @@ const SectionNav: React.FC<SectionNavProps> = ({
         <div className="mt-4 p-3 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-lg">
           <p className="text-sm text-indigo-300">
             <Lock size={14} className="inline mr-1" />
-            <strong>10 kategorii Premium</strong> z pełnymi danymi dostępne po upgradzie.
+            <strong>7 kategorii Premium</strong> z pełnymi danymi dostępne po upgradzie.
             <button className="ml-2 text-indigo-400 hover:text-indigo-300 font-semibold underline decoration-indigo-500/30">
               Zobacz plany
             </button>

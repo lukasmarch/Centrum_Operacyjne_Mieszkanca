@@ -2,7 +2,7 @@
  * Profile Page - User settings and preferences
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
@@ -15,15 +15,117 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 interface ProfilePageProps {
   onNavigate: (section: 'dashboard' | 'premium') => void;
-  initialTab?: 'profile' | 'password' | 'preferences' | 'subscription';
+  initialTab?: 'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj';
 }
+
+const NewsletterPrefs: React.FC<{ isPremium: boolean; apiBase: string }> = ({ isPremium, apiBase }) => {
+  const [weekly, setWeekly] = useState<boolean | null>(null);
+  const [daily, setDaily] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) { setWeekly(true); setDaily(false); return; }
+    fetch(`${apiBase}/newsletter/my-subscription`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setWeekly(true); // weekly zawsze aktywny
+          setDaily(data.frequency === 'daily');
+        } else {
+          setWeekly(true);
+          setDaily(false);
+        }
+      })
+      .catch(() => { setWeekly(true); setDaily(false); });
+  }, [apiBase]);
+
+  const save = async (newWeekly: boolean, newDaily: boolean) => {
+    const token = getAccessToken();
+    if (!token) return;
+    setSaving(true);
+    const frequency = newDaily ? 'daily' : 'weekly';
+    await fetch(`${apiBase}/newsletter/my-subscription`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ frequency }),
+    }).catch(() => {});
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const toggleWeekly = (v: boolean) => { setWeekly(v); save(v, daily ?? false); };
+  const toggleDaily  = (v: boolean) => { setDaily(v);  save(weekly ?? true, v); };
+
+  if (weekly === null) return (
+    <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
+      <h2 className="text-xl font-bold mb-4">Newsletter</h2>
+      <div className="h-20 flex items-center justify-center">
+        <div className="w-5 h-5 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin" />
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">Newsletter</h2>
+        {saving && <span className="text-xs text-neutral-500">Zapisywanie...</span>}
+        {saved && !saving && <span className="text-xs text-emerald-400">Zapisano ✓</span>}
+      </div>
+      <div className="space-y-3">
+        <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
+          <div>
+            <p className="font-semibold">Newsletter tygodniowy</p>
+            <p className="text-sm text-neutral-500">Podsumowanie tygodnia co sobotę</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={weekly ?? true}
+            onChange={e => toggleWeekly(e.target.checked)}
+            className="w-5 h-5 rounded accent-blue-600"
+          />
+        </label>
+
+        {isPremium ? (
+          <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
+            <div>
+              <p className="font-semibold">Newsletter dzienny</p>
+              <p className="text-sm text-neutral-500">Poranny briefing pon–pt o 6:30 — newsy, śmietnik, BIP, pogoda</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={daily ?? false}
+              onChange={e => toggleDaily(e.target.checked)}
+              className="w-5 h-5 rounded accent-blue-600"
+            />
+          </label>
+        ) : (
+          <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl opacity-50">
+            <div>
+              <p className="font-semibold">Newsletter dzienny</p>
+              <p className="text-sm text-neutral-500">Dostępny w planie Premium</p>
+            </div>
+            <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-lg">Premium</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => {
   const { user, updateProfile, changePassword, logout, isLoading, error, clearError, isPremium } = useAuth();
   const { status: pushStatus, isSubscribed: pushSubscribed, isSupported: pushSupported, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const [pushLoading, setPushLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences' | 'subscription'>(initialTab ?? 'profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj'>(initialTab ?? 'profile');
+  const [referralData, setReferralData] = useState<{referral_code: string; referral_link: string; referrals_count: number; reward_per_referral: string} | null>(null);
+  const [referralCopied, setReferralCopied] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
   // Profile form
@@ -47,6 +149,38 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
     getUserDashboardLayout(user?.preferences ?? null)
   );
   const [layoutSaving, setLayoutSaving] = useState(false);
+
+  // Fetch referral data when tab is active
+  useEffect(() => {
+    if (activeTab !== 'polecaj') return;
+    const token = getAccessToken();
+    if (!token) return;
+    fetch(`${API_BASE_URL}/auth/referral`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(setReferralData)
+      .catch(() => {});
+  }, [activeTab]);
+
+  const copyReferralLink = () => {
+    if (!referralData) return;
+    navigator.clipboard.writeText(referralData.referral_link).then(() => {
+      setReferralCopied(true);
+      setTimeout(() => setReferralCopied(false), 2000);
+    });
+  };
+
+  const shareReferralLink = () => {
+    if (!referralData) return;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Centrum Operacyjne Rybna',
+        text: 'Dołącz do Centrum Operacyjnego Rybna i dostań 7 dni Premium za darmo!',
+        url: referralData.referral_link,
+      });
+    } else {
+      copyReferralLink();
+    }
+  };
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -139,8 +273,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
         );
       case 'business':
         return (
-          <span className="px-3 py-1 bg-gray-900 text-white rounded-full text-sm font-bold">
-            Business
+          <span className="px-3 py-1 bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full text-sm font-bold">
+            Pro
           </span>
         );
       default:
@@ -241,6 +375,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                 }`}
               >
                 Subskrypcja
+              </button>
+              <button
+                onClick={() => setActiveTab('polecaj')}
+                className={`w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-2 ${
+                  activeTab === 'polecaj'
+                    ? 'bg-blue-50 text-blue-600 font-semibold'
+                    : 'text-neutral-600 hover:bg-gray-950'
+                }`}
+              >
+                Polecaj
+                <span className="ml-auto text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">+14 dni</span>
               </button>
             </nav>
 
@@ -565,28 +710,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               </div>
 
               {/* Newsletter */}
-              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-                <h2 className="text-xl font-bold mb-4">Newsletter</h2>
-                <div className="space-y-4">
-                  <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
-                    <div>
-                      <p className="font-semibold">Newsletter tygodniowy</p>
-                      <p className="text-sm text-neutral-500">Podsumowanie tygodnia co sobotę</p>
-                    </div>
-                    <input type="checkbox" defaultChecked className="w-5 h-5 rounded text-blue-600" />
-                  </label>
-
-                  {isPremium && (
-                    <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
-                      <div>
-                        <p className="font-semibold">Newsletter dzienny</p>
-                        <p className="text-sm text-neutral-500">Poranny briefing pon–pt o 6:30 — newsy, śmietnik, BIP, pogoda</p>
-                      </div>
-                      <input type="checkbox" className="w-5 h-5 rounded text-blue-600" />
-                    </label>
-                  )}
-                </div>
-              </div>
+              <NewsletterPrefs isPremium={isPremium} apiBase={API_BASE_URL} />
 
               {/* Push Notifications — tylko Premium */}
               {isPremium && (
@@ -669,6 +793,81 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                     </dd>
                   </div>
                 </dl>
+              </div>
+            </div>
+          )}
+          {/* Polecaj Tab */}
+          {activeTab === 'polecaj' && (
+            <div className="space-y-6">
+              {/* Hero card */}
+              <div className="bg-gradient-to-br from-blue-900/40 to-violet-900/30 rounded-2xl p-8 border border-blue-500/20">
+                <h2 className="text-xl font-bold mb-1">Program Polecający</h2>
+                <p className="text-neutral-400 text-sm mb-6">Zaproś znajomych — oboje dostaniecie <span className="text-emerald-400 font-semibold">+14 dni Premium</span> za każde polecenie.</p>
+
+                {referralData ? (
+                  <div className="space-y-4">
+                    {/* Code */}
+                    <div className="bg-slate-950/70 rounded-xl p-4 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs text-neutral-500 mb-1">Twój kod polecający</p>
+                        <p className="text-2xl font-mono font-bold tracking-widest text-white">{referralData.referral_code.toUpperCase()}</p>
+                      </div>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <button
+                          onClick={copyReferralLink}
+                          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-semibold rounded-xl transition-colors"
+                        >
+                          {referralCopied ? '✓ Skopiowano' : 'Kopiuj link'}
+                        </button>
+                        <button
+                          onClick={shareReferralLink}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors"
+                        >
+                          Udostępnij
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Link preview */}
+                    <div className="bg-slate-900/50 rounded-xl px-4 py-3">
+                      <p className="text-xs text-neutral-500 mb-1">Link do zaproszenia</p>
+                      <p className="text-sm text-blue-400 break-all font-mono">{referralData.referral_link}</p>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      <div className="bg-slate-900/50 rounded-xl p-4 text-center">
+                        <p className="text-3xl font-bold text-white">{referralData.referrals_count}</p>
+                        <p className="text-xs text-neutral-500 mt-1">Zaproszonych osób</p>
+                      </div>
+                      <div className="bg-slate-900/50 rounded-xl p-4 text-center">
+                        <p className="text-3xl font-bold text-emerald-400">{referralData.referrals_count * 14}</p>
+                        <p className="text-xs text-neutral-500 mt-1">Dni Premium zdobytych</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-32 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin" />
+                  </div>
+                )}
+              </div>
+
+              {/* How it works */}
+              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
+                <h3 className="font-bold mb-4">Jak to działa?</h3>
+                <ol className="space-y-4">
+                  {[
+                    ['1', 'Udostępnij swój link znajomym z Gminy Rybno'],
+                    ['2', 'Znajomy rejestruje się przez Twój link'],
+                    ['3', 'Oboje otrzymujecie +14 dni Premium — automatycznie'],
+                  ].map(([n, text]) => (
+                    <li key={n} className="flex items-start gap-4">
+                      <span className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 text-blue-400 text-sm font-bold flex items-center justify-center">{n}</span>
+                      <span className="text-neutral-300 text-sm pt-0.5">{text}</span>
+                    </li>
+                  ))}
+                </ol>
               </div>
             </div>
           )}

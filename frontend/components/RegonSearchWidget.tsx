@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 import { Search, Loader2, Building2, MapPin, Phone, Globe, X, ChevronDown, ChevronUp, CalendarDays } from 'lucide-react';
 
 interface LocalBusiness {
@@ -184,7 +186,7 @@ const BusinessSearchWidget: React.FC = () => {
 
         try {
             const res = await fetch(
-                `http://localhost:8000/api/business/search?nazwa=${encodeURIComponent(term.trim())}&limit=20`
+                `${API_URL}/business/search?nazwa=${encodeURIComponent(term.trim())}&limit=20`
             );
             if (!res.ok) {
                 const e = await res.json();

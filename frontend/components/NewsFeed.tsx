@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronDown, ChevronUp, AlertTriangle, Clock, Sparkles } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
 import ArticleImage, { getCategoryTheme } from './ArticleImage';
@@ -71,7 +71,10 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
       {/* Content */}
       <div className="flex-1 flex flex-col p-4">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wide">{article.source}</span>
+          <span className="text-[10px] text-neutral-500">
+            <span className="text-neutral-600">Źródło:</span>{' '}
+            <span className="font-bold uppercase tracking-wide">{article.source}</span>
+          </span>
         </div>
         <h3 className="text-base font-bold text-neutral-200 mb-2 group-hover:text-blue-400 transition-colors leading-snug line-clamp-2">
           {article.title}
@@ -147,6 +150,42 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
       .filter(a => a.category === activeCategory)
       .slice(0, 10);
   }, [articles, activeCategory]);
+
+  // Schema.org ItemList — inject JSON-LD into <head> for Google rich results
+  useEffect(() => {
+    if (!filteredArticles || filteredArticles.length === 0) return;
+    const schemaId = 'schema-news-list';
+    let el = document.getElementById(schemaId) as HTMLScriptElement | null;
+    if (!el) {
+      el = document.createElement('script');
+      el.id = schemaId;
+      el.type = 'application/ld+json';
+      document.head.appendChild(el);
+    }
+    const items = filteredArticles.slice(0, 20).map((a, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'NewsArticle',
+        headline: a.title,
+        url: a.url,
+        datePublished: a.rawTimestamp || a.timestamp,
+        image: a.imageUrl || 'https://rybno.pl/icon-512.png',
+        publisher: {
+          '@type': 'Organization',
+          name: 'Centrum Operacyjne Rybna',
+          logo: { '@type': 'ImageObject', url: 'https://rybno.pl/icon-512.png' },
+        },
+      },
+    }));
+    el.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'Aktualności Gminy Rybno',
+      itemListElement: items,
+    });
+    return () => { el?.remove(); };
+  }, [filteredArticles]);
 
   // Group by date
   const groupedArticles = useMemo(() => {

@@ -100,6 +100,11 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                   <h4 className="text-sm sm:text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                     {featured.title}
                   </h4>
+                  {featured.source && (
+                    <p className="text-[9px] text-neutral-400 mt-1">
+                      <span className="text-neutral-500">Źródło:</span> {featured.source}
+                    </p>
+                  )}
                 </div>
                 <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <ExternalLink size={12} className="text-white/70" />
@@ -144,6 +149,11 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                     <p className="text-xs sm:text-sm font-semibold text-neutral-200 leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                       {article.title}
                     </p>
+                    {article.source && (
+                      <p className="text-[9px] text-neutral-500 mt-0.5">
+                        <span className="text-neutral-600">Źródło:</span> {article.source}
+                      </p>
+                    )}
                   </div>
                 </a>
               );
