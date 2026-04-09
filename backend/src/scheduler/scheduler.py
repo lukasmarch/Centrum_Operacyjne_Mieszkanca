@@ -27,8 +27,8 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
 
-# Initialize scheduler
-scheduler = BackgroundScheduler()
+# Initialize scheduler with Polish timezone
+scheduler = BackgroundScheduler(timezone='Europe/Warsaw')
 
 
 def _job_executed_listener(event):
@@ -87,42 +87,39 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # Article scraping once daily at 6:00 AM (STEP 1 of daily pipeline)
+    # Article scraping once daily at 6:00 AM PL time (STEP 1 of daily pipeline)
     scheduler.add_job(
         func=run_article_job,
-        trigger=CronTrigger(hour=19, minute=15),
+        trigger=CronTrigger(hour=6, minute=0),
         id='article_update',
         name='Update articles',
         replace_existing=True
     )
 
-    # AI processing once daily at 6:15 AM, right after scraping (STEP 2 of daily pipeline)
+    # AI processing once daily at 6:15 AM PL time (STEP 2 of daily pipeline)
     # Processes up to 100 articles (batch_size=100), takes ~32 minutes
-    # Previously ran every hour (IntervalTrigger) which caused timing issues
     scheduler.add_job(
         func=run_ai_job,
-        trigger=CronTrigger(hour=19, minute=35),
+        trigger=CronTrigger(hour=6, minute=15),
         id='ai_processing',
         name='AI article processing (batch=100)',
         replace_existing=True
     )
 
-    # Embedding job at 6:20 AM (STEP 2.5 - after AI processing starts, embeds new articles)
+    # Embedding job at 6:50 AM PL time (STEP 2.5 - po AI processing)
     scheduler.add_job(
         func=run_embedding_job,
-        trigger=CronTrigger(hour=19, minute=50),
+        trigger=CronTrigger(hour=6, minute=50),
         id='embedding_update',
         name='Embed new articles for RAG (text-embedding-3-small)',
         replace_existing=True
     )
 
-    # Daily summary generation once at 7:00 AM (STEP 3 of daily pipeline)
+    # Daily summary generation at 7:00 AM PL time (STEP 3 of daily pipeline)
     # Runs 45 minutes after AI processing to ensure all articles are categorized
-    # Generates summary for YESTERDAY (full day of data)
-    # Moved from 6:45 to 7:00 to allow AI processing (batch=100, ~32 min) to complete
     scheduler.add_job(
         func=run_summary_job,
-        trigger=CronTrigger(hour=19, minute=48),
+        trigger=CronTrigger(hour=7, minute=0),
         id='daily_summary',
         name='Generate daily summary',
         replace_existing=True
