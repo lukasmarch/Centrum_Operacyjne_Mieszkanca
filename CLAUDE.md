@@ -1,7 +1,44 @@
 # Centrum Operacyjne Mieszkańca - Status
 
 ## Aktualny stan
-**Faza 6 - Multi-Agent AI System + RAG + Chat UI**
+**Faza 7 - PRODUKCJA LIVE** 🟢 https://rybnolive.pl
+
+## Infrastruktura produkcyjna
+- **Serwer**: Hetzner CX22, IP: `91.99.142.30` (Ubuntu 24.04)
+- **Domena**: rybnolive.pl (DNS: Hostinger → 91.99.142.30)
+- **Frontend**: https://rybnolive.pl (Caddy → Docker volume)
+- **Backend API**: https://api.rybnolive.pl (Caddy → FastAPI :8000)
+- **SSL**: Let's Encrypt via Caddy (auto-renewal)
+- **Repo na serwerze**: `/opt/centrum` (branch: main)
+- **Env sekrety**: `/opt/centrum/backend/.env.production` (nie w repo)
+- **Docker env**: `/opt/centrum/.env` (DB_USER, DB_PASSWORD)
+
+## Git Workflow (PRODUKCJA)
+```
+main   ← aktywna gałąź, zmiany idą tu bezpośrednio
+        push → GitHub Actions → SSH deploy backend na VPS
+        
+Deploy frontendu (ręcznie):
+  ./deploy-frontend.sh 91.99.142.30
+```
+
+## Komendy produkcyjne
+```bash
+# SSH na serwer
+ssh root@91.99.142.30
+
+# Status kontenerów
+docker compose -f docker-compose.prod.yml ps
+
+# Logi backendu
+docker compose -f docker-compose.prod.yml logs backend --tail 50
+
+# Restart backendu (po zmianach env)
+docker compose -f docker-compose.prod.yml up -d backend
+
+# Deploy frontendu (z MacBooka)
+./deploy-frontend.sh 91.99.142.30
+```
 
 ## Stack
 - **Backend**: FastAPI + PostgreSQL + pgvector + OpenAI
@@ -162,8 +199,8 @@ Docs: http://localhost:8000/docs
 
 ## Git Branches
 ```
-main     # produkcja
-develop  # integracja (aktywna)
+main     # produkcja + aktywna praca (auto-deploy przez GitHub Actions)
+develop  # nieaktywna
 ```
 
 ## Pliki pomocnicze
