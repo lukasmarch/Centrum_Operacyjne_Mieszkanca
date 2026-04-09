@@ -13,9 +13,9 @@ interface BottomTabBarProps {
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'assistant', label: 'Asystent', icon: Bot },
-  { id: 'miasto', label: 'Miasto', icon: Building2 },
+  { id: 'miasto', label: 'Info', icon: Building2 },
   { id: 'dane', label: 'Dane', icon: BarChart3 },
-  { id: 'zgloszenia', label: 'Zgłoszenia', icon: ClipboardList },
+  { id: 'zgloszenia', label: 'Zgłoszenie24', icon: ClipboardList },
 ];
 
 const BottomTabBar: React.FC<BottomTabBarProps> = React.memo(({ activeTab, onTabChange, isAuthenticated }) => {

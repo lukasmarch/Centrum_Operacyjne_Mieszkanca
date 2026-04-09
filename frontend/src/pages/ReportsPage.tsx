@@ -57,7 +57,7 @@ const ReportCard: React.FC<{
 
     return (
         <div
-            className="bg-gray-950 rounded-3xl border border-gray-800/50 shadow-sm hover:shadow-xl hover:shadow-blue-900/10 hover:border-gray-700/50 transition-all duration-300 overflow-hidden cursor-pointer group"
+            className="bg-white/[0.04] backdrop-blur-sm rounded-3xl border border-white/8 shadow-sm hover:shadow-xl hover:shadow-blue-900/10 hover:border-white/12 transition-all duration-300 overflow-hidden cursor-pointer group"
             onClick={() => onView(report)}
         >
             {/* Image */}
@@ -757,8 +757,8 @@ const AlertMap: React.FC<{
     };
 
     return (
-        <div className="bg-gray-950 rounded-3xl border border-gray-800/50 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-800/50 flex items-center justify-between">
+        <div className="bg-white/[0.04] backdrop-blur-sm rounded-3xl border border-white/8 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-white/8 flex items-center justify-between">
                 <div>
                     <h3 className="font-bold text-neutral-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
                     <p className="text-xs text-neutral-400 mt-1">{reports.length} zgłoszeń z lokalizacją GPS</p>
@@ -928,12 +928,10 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
     ];
 
     return (
-        <div className="space-y-8 pb-12">
+        <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header */}
-            <header className="bg-gradient-to-br from-blue-900/40 via-black/80 to-violet-900/40 rounded-3xl p-8 text-white shadow-lg shadow-blue-900/20 relative overflow-hidden border border-white/10">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl -ml-16 -mb-16"></div>
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
+            <header className="bg-white/[0.04] backdrop-blur-xl rounded-3xl p-8 text-white border border-white/8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
                         <h2 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">🚨 Zgłoszenie24</h2>
                         <p className="text-neutral-400 mt-2 font-medium">Centrum Powiadamiania o Zdarzeniach – zgłoś problem w Twojej okolicy</p>
@@ -975,7 +973,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                             onClick={() => setCategory(cat.value)}
                             className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${category === cat.value
                                 ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20 border border-blue-500/30'
-                                : 'bg-gray-950 text-neutral-400 hover:bg-gray-900 border border-gray-800/50 hover:text-neutral-200 hover:border-gray-700/50'
+                                : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
                                 }`}
                         >
                             {cat.emoji} {cat.label}
@@ -987,7 +985,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     onClick={() => setShowMap(!showMap)}
                     className={`px-4 py-2 rounded-full text-sm font-bold transition-all border ${showMap
                         ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-sm shadow-blue-500/10'
-                        : 'bg-gray-950 text-neutral-400 border-gray-800/50 hover:bg-gray-900 hover:text-neutral-200'
+                        : 'bg-white/[0.04] text-neutral-400 border-white/8 hover:bg-white/[0.07] hover:text-neutral-200'
                         }`}
                 >
                     🗺️ {showMap ? 'Ukryj mapę' : 'Pokaż mapę'}
@@ -1004,7 +1002,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     <p className="text-neutral-400 font-medium">Ładowanie zgłoszeń...</p>
                 </div>
             ) : reports.length === 0 ? (
-                <div className="text-center py-16 bg-gray-950 rounded-3xl border border-gray-800/50">
+                <div className="text-center py-16 bg-white/[0.04] backdrop-blur-sm rounded-3xl border border-white/8">
                     <span className="text-6xl block mb-4">📭</span>
                     <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400 mb-2">Brak zgłoszeń</h3>
                     <p className="text-neutral-400 mb-6">Bądź pierwszy – zgłoś problem w swojej okolicy!</p>
@@ -1020,7 +1018,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     {/* Section heading */}
                     <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Zgłoszenia mieszkańców</h3>
-                        <span className="text-xs text-neutral-500 font-medium px-2.5 py-0.5 rounded-full bg-gray-900 border border-gray-700/50">{total} łącznie</span>
+                        <span className="text-xs text-neutral-500 font-medium px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/8">{total} łącznie</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1043,7 +1041,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                                     loadReports(next);
                                 }}
                                 disabled={loading}
-                                className="px-8 py-3 bg-gray-950 border border-gray-800/50 text-neutral-300 rounded-full font-bold hover:bg-gray-900 hover:text-white hover:border-gray-700/50 transition-all disabled:opacity-50 shadow-sm"
+                                className="px-8 py-3 bg-white/[0.04] border border-white/8 text-neutral-300 rounded-full font-bold hover:bg-white/[0.08] hover:text-white transition-all disabled:opacity-50 shadow-sm"
                             >
                                 {loading ? 'Ładowanie...' : 'Pokaż więcej'}
                             </button>

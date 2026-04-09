@@ -114,12 +114,6 @@ export const CinemaWidget: React.FC = () => {
                 )}
             </div>
 
-            {/* Footer */}
-            <div className="px-4 py-2.5 border-t border-white/5">
-                <span className="text-[9px] text-purple-400 font-semibold cursor-pointer hover:text-purple-300 transition-colors flex items-center justify-center gap-1">
-                    Zobacz pełny repertuar →
-                </span>
-            </div>
         </div>
     );
 };

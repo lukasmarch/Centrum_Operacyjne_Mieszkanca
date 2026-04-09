@@ -138,11 +138,6 @@ const TrafficTile: React.FC = () => {
                 ))}
             </div>
 
-            {/* Footer */}
-            <button className="mt-3 pt-3 border-t border-white/5 flex items-center justify-center gap-2 text-[12px] text-neutral-400 hover:text-blue-400 transition-colors font-medium w-full py-2 rounded-xl hover:bg-white/5">
-                <span>✏️</span>
-                <span>Zobacz mapę na żywo</span>
-            </button>
         </div>
     );
 };

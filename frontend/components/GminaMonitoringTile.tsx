@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Activity, MapPin, AlertTriangle, Clock } from 'lucide-react';
 import { CATEGORY_CONFIG, STATUS_CONFIG } from '../src/services/reportsApi';
+import { AppSection } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -17,7 +18,11 @@ interface Report {
     upvotes: number;
 }
 
-const GminaMonitoringTile: React.FC = () => {
+interface GminaMonitoringTileProps {
+    onNavigate?: (section: AppSection) => void;
+}
+
+const GminaMonitoringTile: React.FC<GminaMonitoringTileProps> = ({ onNavigate }) => {
     const [reports, setReports] = useState<Report[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -145,7 +150,10 @@ const GminaMonitoringTile: React.FC = () => {
                         {activeCount} aktywn{activeCount === 1 ? 'e' : 'ych'}
                     </span>
                 </div>
-                <span className="text-[9px] text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors">
+                <span
+                    className="text-[9px] text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors"
+                    onClick={() => onNavigate?.('reports')}
+                >
                     Zobacz wszystkie →
                 </span>
             </div>

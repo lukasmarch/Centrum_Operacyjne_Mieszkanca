@@ -44,7 +44,7 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
       case 'traffic':     return <TrafficTile />;
       case 'events':      return <EventsTile onNavigate={onNavigate} />;
       case 'airly':       return <AirlyTile />;
-      case 'gmina':       return <GminaMonitoringTile />;
+      case 'gmina':       return <GminaMonitoringTile onNavigate={onNavigate} />;
       case 'news':        return <NewsTile onNavigate={onNavigate} />;
       default:            return null;
     }
@@ -121,16 +121,20 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
         </BentoTile>
       </div>
 
-      <BentoTile colSpan={1} rowSpan={1}>
-        <BusTrackerWidget />
-      </BentoTile>
-
-      <BentoTile colSpan={1} rowSpan={1}>
-        {isPremium
-          ? <WasteWidget events={wasteEvents} town={userLocation} />
-          : user ? <WasteWidgetPaywall /> : null
-        }
-      </BentoTile>
+      {/* Bus + Waste: side by side — oba były za szerokie jako pełna szerokość */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <BentoTile colSpan={1} rowSpan={1}>
+          <BusTrackerWidget />
+        </BentoTile>
+        {(isPremium || user) && (
+          <BentoTile colSpan={1} rowSpan={1}>
+            {isPremium
+              ? <WasteWidget events={wasteEvents} town={userLocation} />
+              : <WasteWidgetPaywall />
+            }
+          </BentoTile>
+        )}
+      </div>
     </div>
   );
 };

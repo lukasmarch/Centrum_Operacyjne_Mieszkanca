@@ -233,7 +233,8 @@ async def get_businesses_by_locality(
 async def search_businesses(
     nip: Optional[str] = None,
     nazwa: Optional[str] = None,
-    limit: int = Query(20, ge=1, le=50)
+    limit: int = Query(20, ge=1, le=50),
+    status: Optional[str] = "AKTYWNY"
 ):
     """
     Wyszukaj firmy po nazwie (lub NIP)
@@ -242,6 +243,7 @@ async def search_businesses(
         nip: Numer NIP (z lub bez myślników) - opcjonalny
         nazwa: Fragment nazwy firmy - główny parametr wyszukiwania
         limit: Max liczba wyników
+        status: Filtruj po statusie (domyślnie: AKTYWNY); przekaż pusty string aby wyłączyć filtr
     """
     if not nip and not nazwa:
         raise HTTPException(status_code=400, detail="Podaj nazwę firmy do wyszukania")
@@ -249,6 +251,9 @@ async def search_businesses(
     async with async_session() as session:
         # Wyszukujemy tylko w gminie Rybno / powiecie działdowskim
         query = select(CEIDGBusiness).where(CEIDGBusiness.powiat == "działdowski")
+
+        if status:
+            query = query.where(CEIDGBusiness.status == status)
 
         if nip:
             # Usuń myślniki i spacje

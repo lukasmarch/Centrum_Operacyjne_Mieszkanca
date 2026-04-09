@@ -77,41 +77,29 @@ const GUSPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-neutral-100">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Page Header */}
-      <div className="bg-gray-950/50 backdrop-blur-xl border-b border-gray-800/50 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-black text-neutral-100 tracking-tight">Statystyki GUS</h1>
-              <p className="text-neutral-400 mt-1 font-medium">
-                Bank Danych Lokalnych GUS · Gmina Rybno · Powiat Działdowski
-              </p>
-            </div>
-          </div>
-        </div>
+      <div>
+        <h1 className="text-3xl font-black text-neutral-100 tracking-tight">Statystyki GUS</h1>
+        <p className="text-neutral-400 mt-1 font-medium">
+          Bank Danych Lokalnych GUS · Gmina Rybno · Powiat Działdowski
+        </p>
       </div>
 
       {/* Section Navigation - always visible */}
-      <div className="bg-gray-950 border-b border-gray-800/50">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <SectionNav
-            activeSection={activeSection}
-            onSectionChange={handleSectionChange}
-            userTier={user?.tier || 'free'}
-          />
-        </div>
+      <div className="border-b border-white/5 pb-4">
+        <SectionNav
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
+          userTier={user?.tier || 'free'}
+        />
       </div>
 
       {/* Main Content - Conditional Rendering */}
-      <div className="py-8">
+      <div>
         {activeSection === 'overview' ? (
-          /* Overview - Free tier dashboard */
-          <div className="max-w-7xl mx-auto px-4">
-            <GUSOverview />
-          </div>
+          <GUSOverview />
         ) : (
-          /* Section Page - Premium tier detailed view */
           <GUSSectionPage
             sectionKey={activeSection}
             onBack={handleBack}
