@@ -18,13 +18,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: false
-          debug: true
           script: |
             echo "=== whoami ===" && whoami
-            echo "=== PATH ===" && echo $PATH
             echo "=== git pull ===" && cd /opt/centrum && git pull origin main
-            echo "=== docker version ===" && docker --version
             echo "=== build ===" && docker compose -f docker-compose.prod.yml build backend
             echo "=== up ===" && docker compose -f docker-compose.prod.yml up -d backend
             echo "=== health ===" && docker compose -f docker-compose.prod.yml exec -T backend python -c "print('Health OK')"
