@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ src/
 COPY data/ data/
-COPY scripts/migrations/ scripts/migrations/
+COPY scripts/ scripts/
 
 RUN mkdir -p uploads/reports logs
 
