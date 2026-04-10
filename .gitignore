@@ -58,6 +58,9 @@ archive/
 # Dev tools
 .agents/
 
+# Notatki lokalne (nie w repo)
+SCHEDULER_JOBS.md
+
 # Uploads (dane użytkowników — nie w repo)
 backend/uploads/reports/*.jpeg
 backend/uploads/reports/*.jpg
