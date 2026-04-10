@@ -19,9 +19,8 @@ jobs:
           username: deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "=== whoami ===" && whoami
-            echo "=== git pull ===" && cd /opt/centrum && git pull origin main
-            echo "=== build ===" && docker compose -f docker-compose.prod.yml build backend
-            echo "=== up ===" && docker compose -f docker-compose.prod.yml up -d backend
-            echo "=== health ===" && docker compose -f docker-compose.prod.yml exec -T backend python -c "print('Health OK')"
-            echo "=== DONE ==="
+            cd /opt/centrum
+            git pull origin main
+            docker compose -f docker-compose.prod.yml build backend
+            docker compose -f docker-compose.prod.yml up -d backend
+            docker compose -f docker-compose.prod.yml exec -T backend python -c "print('Health OK')"
