@@ -83,3 +83,4 @@ async def transcribe_audio(audio: UploadFile = File(...)):
         raise HTTPException(status_code=502, detail="Błąd transkrypcji audio")
     finally:
         os.unlink(tmp_path)
+# voice
