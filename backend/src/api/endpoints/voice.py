@@ -1,5 +1,5 @@
 """
-Voice Transcription Endpoint
+Voice Transcription Endpoint (Whisper)
 POST /api/voice/transcribe — transkrypcja audio przez OpenAI Whisper
 Działa na wszystkich przeglądarkach (Chrome iOS, Firefox, Safari)
 """
