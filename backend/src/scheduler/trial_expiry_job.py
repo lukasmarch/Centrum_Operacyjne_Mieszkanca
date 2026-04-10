@@ -9,9 +9,10 @@ import logging
 from datetime import datetime
 
 from sqlmodel import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
-from src.database.connection import async_session
+from src.config import settings
 from src.database.schema import User, Subscription, UserTier, SubscriptionStatus
 from src.utils.logger import setup_logger
 
@@ -23,6 +24,10 @@ async def run_trial_expiry_async():
     logger.info("=== Trial Expiry Job START ===")
     now = datetime.utcnow()
     downgraded = 0
+
+    # Tworzymy własny engine dla tego event loopa (nie reużywamy globalnego z uvloop FastAPI)
+    engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
         # Znajdź userów z wygasłym trialem (tier=premium, trial_ends_at < now)
