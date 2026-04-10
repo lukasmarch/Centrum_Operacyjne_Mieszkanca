@@ -114,6 +114,9 @@ app.include_router(payments_router)  # /api/payments/*
 from src.api.endpoints.seo import router as seo_router
 app.include_router(seo_router)
 
+from src.api.endpoints.voice import router as voice_router
+app.include_router(voice_router)  # /api/voice/transcribe
+
 @app.on_event("startup")
 async def startup_event():
     """Start scheduler and register AI agents on app startup"""

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Mic, MicOff } from 'lucide-react';
+import { Send, Mic, MicOff, Loader2 } from 'lucide-react';
 import { AppSection } from '../../types';
-import { useSpeechRecognition } from '../../src/hooks/useSpeechRecognition';
+import { useVoiceInput } from '../../src/hooks/useVoiceInput';
 
 interface HeroSectionProps {
   onNavigate?: (section: AppSection) => void;
@@ -33,7 +33,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
   const [currentSuggestion, setCurrentSuggestion] = useState(0);
   const [isTyping, setIsTyping]                   = useState(false);
   const [inputFocused, setInputFocused]           = useState(false);
-  const speech = useSpeechRecognition((text) => {
+  const speech = useVoiceInput((text) => {
     setQuery(text);
     setIsTyping(true);
   });
@@ -314,30 +314,41 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
             {speech.isSupported && (
               <button
                 onClick={() => speech.isListening ? speech.stop() : speech.start()}
+                disabled={speech.isProcessing}
                 title={
                   speech.error === 'not-allowed'
-                    ? 'Zezwól na mikrofon — kliknij kłódkę w pasku adresu Chrome'
-                    : speech.isListening ? 'Zatrzymaj nagrywanie' : 'Mów do mikrofonu'
+                    ? 'Zezwól na mikrofon w ustawieniach przeglądarki'
+                    : speech.isProcessing ? 'Przetwarzam nagranie...'
+                    : speech.isListening ? 'Zatrzymaj nagrywanie'
+                    : 'Mów do mikrofonu'
                 }
                 className="shrink-0 flex items-center justify-center rounded-2xl px-4 transition-all"
                 style={{
-                  background: speech.isListening
+                  background: speech.isProcessing
+                    ? 'rgba(59,130,246,0.15)'
+                    : speech.isListening
                     ? 'rgba(239,68,68,0.15)'
                     : speech.error === 'not-allowed'
                     ? 'rgba(245,158,11,0.1)'
                     : 'rgba(21,27,43,0.8)',
                   border: `1px solid ${
-                    speech.isListening ? 'rgba(239,68,68,0.5)'
+                    speech.isProcessing ? 'rgba(59,130,246,0.5)'
+                    : speech.isListening ? 'rgba(239,68,68,0.5)'
                     : speech.error === 'not-allowed' ? 'rgba(245,158,11,0.4)'
                     : 'rgba(255,255,255,0.12)'
                   }`,
-                  color: speech.isListening ? '#f87171'
+                  color: speech.isProcessing ? '#60a5fa'
+                    : speech.isListening ? '#f87171'
                     : speech.error === 'not-allowed' ? '#fbbf24'
                     : 'rgba(255,255,255,0.5)',
                   backdropFilter: 'blur(12px)',
                 }}
               >
-                {speech.isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                {speech.isProcessing
+                  ? <Loader2 size={18} className="animate-spin" />
+                  : speech.isListening
+                  ? <MicOff size={18} />
+                  : <Mic size={18} />}
               </button>
             )}
             <button
