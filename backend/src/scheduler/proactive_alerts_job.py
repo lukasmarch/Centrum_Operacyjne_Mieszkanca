@@ -16,9 +16,11 @@ import asyncio
 from datetime import datetime, date, timedelta
 from typing import List, Set
 
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
-from src.database.connection import async_session
+from src.core.config import settings
 from src.database.schema import User, UserTier, WasteSchedule
 from src.services.push_service import push_service
 from src.utils.logger import setup_logger
@@ -175,6 +177,9 @@ async def run_proactive_alerts_async():
     start = datetime.utcnow()
     total_sent = 0
 
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
     async with async_session() as session:
         premium_ids = await _get_premium_user_ids(session)
         if not premium_ids:
@@ -196,6 +201,7 @@ async def run_proactive_alerts_async():
         sent = await _send_waste_reminder_no_newsletter(session, premium_ids, newsletter_ids)
         total_sent += sent
 
+    await engine.dispose()
     elapsed = (datetime.utcnow() - start).total_seconds()
     logger.info(f"=== Proactive Alerts Job DONE: {total_sent} total, {elapsed:.1f}s ===")
 

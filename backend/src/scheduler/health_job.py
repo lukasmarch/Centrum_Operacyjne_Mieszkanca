@@ -9,8 +9,10 @@ import asyncio
 from datetime import datetime
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
-from src.database.connection import async_session
+from src.core.config import settings
 from src.integrations.health_scraper import HealthScraper
 from src.utils.logger import setup_logger
 
@@ -24,6 +26,8 @@ async def run_health_job_async():
     logger.info("=" * 80)
 
     scraper = HealthScraper()
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     try:
         clinics, pharmacies = await scraper.scrape_all()
@@ -90,6 +94,7 @@ async def run_health_job_async():
         logger.error(f"  ✗ Health job error: {e}", exc_info=True)
     finally:
         await scraper.close()
+        await engine.dispose()
 
     logger.info("=" * 80)
     logger.info("Health job finished")

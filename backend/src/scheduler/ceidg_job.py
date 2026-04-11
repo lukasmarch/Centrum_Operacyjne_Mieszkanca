@@ -6,10 +6,11 @@ Pobiera firmy z Gminy Rybno (powiat działdowski) i zapisuje do bazy.
 """
 import asyncio
 from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 from sqlmodel import select, func
 
-from src.database.connection import async_session
+from src.core.config import settings
 from src.database.schema import CEIDGBusiness, CEIDGSyncStats
 from src.integrations.ceidg_api import CEIDGService
 from src.utils.logger import setup_logger
@@ -56,6 +57,9 @@ async def fetch_ceidg_businesses():
     except ValueError as e:
         logger.error(f"❌ CEIDG Job failed: {e}")
         return
+
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
         # Optimization: Check if DB is populated before hitting API
@@ -165,7 +169,7 @@ async def fetch_ceidg_businesses():
         except Exception as e:
             logger.error(f"❌ CEIDG Job failed: {e}")
             await session.rollback()
-            
+
             # Zapisz status błędu
             try:
                 result = await session.execute(
@@ -179,6 +183,8 @@ async def fetch_ceidg_businesses():
             except:
                 pass
             raise
+
+    await engine.dispose()
 
 
 async def import_from_json(json_path: str):
@@ -196,7 +202,10 @@ async def import_from_json(json_path: str):
         data = json.load(f)
     
     businesses = data.get("businesses", [])
-    
+
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
     async with async_session() as session:
         imported = 0
         
@@ -249,6 +258,8 @@ async def import_from_json(json_path: str):
         
         await session.commit()
         logger.info(f"✓ Imported {imported} businesses from JSON")
+
+    await engine.dispose()
 
 
 if __name__ == "__main__":

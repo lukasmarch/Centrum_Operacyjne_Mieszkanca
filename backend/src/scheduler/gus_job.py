@@ -13,10 +13,11 @@ import asyncio
 import aiohttp
 from datetime import datetime
 from typing import List, Tuple, Optional, Dict
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
-from src.database.connection import async_session
+from src.core.config import settings
 from src.database.schema import GUSGminaStats, GUSNationalAverages, GUSDataRefreshLog
 from src.integrations.gus_variables import (
     get_all_variables,
@@ -376,6 +377,8 @@ class GUSMonthlyRefresh:
 
         # Create HTTP session
         timeout = aiohttp.ClientTimeout(total=TIMEOUT)
+        engine = create_async_engine(settings.DATABASE_URL, echo=False)
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         async with aiohttp.ClientSession(timeout=timeout) as http_session:
             # Create DB session
             async with async_session() as db_session:
@@ -395,6 +398,8 @@ class GUSMonthlyRefresh:
                     logger.error(f"❌ Refresh failed: {e}")
                     await db_session.rollback()
                     raise
+
+        await engine.dispose()
 
         # Summary
         self.stats["finished_at"] = datetime.utcnow()

@@ -8,10 +8,11 @@ import asyncio
 from datetime import datetime
 from typing import List
 from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 from src.scrapers.cinema import CinemaScraper, CinemaRepertoire
-from src.database.connection import async_session
+from src.core.config import settings
 from src.database.schema import CinemaShowtime
 from src.utils.logger import setup_logger
 
@@ -68,6 +69,9 @@ async def run_cinema_job_async():
     cities = ["Dzialdowo", "Lubawa"]
     total_movies = 0
 
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
     async with async_session() as session:
         for city in cities:
             try:
@@ -87,6 +91,7 @@ async def run_cinema_job_async():
             except Exception as e:
                 logger.error(f"  ✗ Error processing {city}: {e}", exc_info=True)
 
+    await engine.dispose()
     logger.info("=" * 80)
     logger.info(f"Cinema job finished - Total movies: {total_movies}")
     logger.info("=" * 80)
