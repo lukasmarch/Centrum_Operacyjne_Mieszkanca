@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Mic, MicOff, Loader2 } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { useChat } from '../src/hooks/useChat';
 import { useVoiceInput } from '../src/hooks/useVoiceInput';
+import { VoiceMicButton } from './VoiceMicButton';
 import ChatMessage from './ChatMessage';
 import ChatLimitPrompt from './ChatLimitPrompt';
 
@@ -98,36 +99,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               className="flex-1 bg-transparent text-neutral-100 placeholder-neutral-600 focus:outline-none text-sm disabled:opacity-50"
             />
 
-            {speech.isSupported && (
-              <button
-                type="button"
-                onClick={() => speech.isListening ? speech.stop() : speech.start()}
-                disabled={speech.isProcessing}
-                title={
-                  speech.error === 'not-allowed'
-                    ? 'Brak dostępu do mikrofonu — zezwól w ustawieniach przeglądarki'
-                    : speech.isProcessing ? 'Przetwarzam...'
-                    : speech.isListening ? 'Zatrzymaj nagrywanie'
-                    : 'Mów do mikrofonu'
-                }
-                className={`shrink-0 transition-colors ${
-                  speech.error === 'not-allowed'
-                    ? 'text-amber-500'
-                    : speech.isProcessing
-                    ? 'text-blue-400'
-                    : speech.isListening
-                    ? 'text-red-400'
-                    : 'text-neutral-600 hover:text-neutral-400'
-                }`}
-                aria-label="Mikrofon"
-              >
-                {speech.isProcessing
-                  ? <Loader2 size={16} className="animate-spin" />
-                  : speech.isListening
-                  ? <MicOff size={16} />
-                  : <Mic size={16} />}
-              </button>
-            )}
+            <VoiceMicButton
+              speech={speech}
+              onTranscript={(text) => setInput(text)}
+              iconSize={16}
+              className={`shrink-0 transition-colors ${
+                speech.isListening ? 'text-red-400' : 'text-neutral-600 hover:text-neutral-400'
+              }`}
+            />
 
             <button
               onClick={handleSend}

@@ -29,8 +29,10 @@ export function useVoiceInput(onResult?: (text: string) => void): UseVoiceInputR
   const webSpeech = useSpeechRecognition(onResult);
   const whisper = useVoiceRecorder(onResult);
 
-  // Używaj Whisper gdy Web Speech API niedostępne (Chrome iOS, Firefox)
-  const useWhisper = !webSpeech.isSupported;
+  // iOS (Safari + Chrome + Firefox) → zawsze Whisper przez file input.
+  // Web Speech API na iOS często zwraca network error (Apple servers).
+  const isIOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const useWhisper = isIOS || !webSpeech.isSupported;
 
   if (useWhisper) {
     return {
