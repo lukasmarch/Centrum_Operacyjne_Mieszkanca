@@ -116,10 +116,17 @@ async def get_status(session: AsyncSession = Depends(_get_db)):
             }
         all_trips[key]["stops"].append((row.stop_id, row.arrival_time, row.stop_sequence))
 
+    is_weekend = now.weekday() >= 5  # 5=So, 6=Nd
+    # GS = zawsze, S = tylko dni szkolne (pon-pt), G = tylko dni wolne (so-nd, ferie)
+    allowed_service_types = {"GS", "G"} if is_weekend else {"GS", "S"}
+
     directions_result = {}
 
     for direction in ("RYBNO_DZIALDOWO", "DZIALDOWO_RYBNO"):
-        dir_trips = [t for (d, _), t in all_trips.items() if d == direction]
+        dir_trips = [
+            t for (d, _), t in all_trips.items()
+            if d == direction and t["service_type"] in allowed_service_types
+        ]
         dir_trips.sort(key=lambda t: t["departure_time"])
 
         active_bus = None
