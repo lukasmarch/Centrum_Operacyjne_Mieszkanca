@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from src.scrapers.cinema import CinemaScraper, CinemaRepertoire
-from src.core.config import settings
+from src.config import settings
 from src.database.schema import CinemaShowtime
 from src.utils.logger import setup_logger
 

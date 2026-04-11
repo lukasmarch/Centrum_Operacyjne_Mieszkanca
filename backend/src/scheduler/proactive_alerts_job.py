@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
-from src.core.config import settings
+from src.config import settings
 from src.database.schema import User, UserTier, WasteSchedule
 from src.services.push_service import push_service
 from src.utils.logger import setup_logger

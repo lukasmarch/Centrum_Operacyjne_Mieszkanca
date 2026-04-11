@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
-from src.core.config import settings
+from src.config import settings
 from src.database.schema import GUSGminaStats, GUSNationalAverages, GUSDataRefreshLog
 from src.integrations.gus_variables import (
     get_all_variables,

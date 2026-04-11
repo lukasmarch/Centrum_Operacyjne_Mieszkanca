@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-from src.core.config import settings
+from src.config import settings
 from src.integrations.health_scraper import HealthScraper
 from src.utils.logger import setup_logger
 

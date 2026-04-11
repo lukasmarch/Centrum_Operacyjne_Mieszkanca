@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select, func
 
-from src.core.config import settings
+from src.config import settings
 from src.database.schema import CEIDGBusiness, CEIDGSyncStats
 from src.integrations.ceidg_api import CEIDGService
 from src.utils.logger import setup_logger
