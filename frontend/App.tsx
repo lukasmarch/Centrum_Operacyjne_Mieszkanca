@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Dashboard from './components/Dashboard';
 import NewsFeed from './components/NewsFeed';
@@ -8,17 +8,19 @@ import { DataCacheProvider } from './src/context/DataCacheContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginPage from './src/pages/LoginPage';
 import RegisterPage from './src/pages/RegisterPage';
-import ProfilePage from './src/pages/ProfilePage';
-import GUSPage from './src/pages/GUSPage';
-import WeatherPage from './src/pages/WeatherPage';
-import BusinessPage from './src/pages/BusinessPage';
-import ReportsPage from './src/pages/ReportsPage';
-import AssistantPage from './src/pages/AssistantPage';
 import BottomTabBar from './components/navigation/BottomTabBar';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import SubNavBar from './components/navigation/SubNavBar';
 import TopBar from './components/navigation/TopBar';
 import { BeamsBackground } from './components/ui/beams-background';
+
+// Lazy-loaded pages — pobierane dopiero przy pierwszym wejściu
+const ProfilePage  = lazy(() => import('./src/pages/ProfilePage'));
+const GUSPage      = lazy(() => import('./src/pages/GUSPage'));
+const WeatherPage  = lazy(() => import('./src/pages/WeatherPage'));
+const BusinessPage = lazy(() => import('./src/pages/BusinessPage'));
+const ReportsPage  = lazy(() => import('./src/pages/ReportsPage'));
+const AssistantPage = lazy(() => import('./src/pages/AssistantPage'));
 
 const MIASTO_ITEMS = [
     { id: 'news', label: 'Wiadomości' },
@@ -249,11 +251,13 @@ const AppContent: React.FC = () => {
             <main className="pb-24 relative z-10">
                 {/* AssistantPage always mounted — preserves chat state between tab switches */}
                 <div style={{ display: activeSection === 'assistant' ? 'block' : 'none' }}>
-                    <AssistantPage
-                        initialQuery={initialQuery}
-                        onNavigate={handleNavigate}
-                        onInitialQuerySent={() => setInitialQuery('')}
-                    />
+                    <Suspense fallback={null}>
+                        <AssistantPage
+                            initialQuery={initialQuery}
+                            onNavigate={handleNavigate}
+                            onInitialQuerySent={() => setInitialQuery('')}
+                        />
+                    </Suspense>
                 </div>
 
                 {/* All other sections with animation */}
@@ -267,7 +271,9 @@ const AppContent: React.FC = () => {
                             transition={{ duration: 0.25, ease: 'easeOut' }}
                         >
                             <div className="max-w-7xl mx-auto p-4 md:p-8">
-                                {renderContent()}
+                                <Suspense fallback={null}>
+                                    {renderContent()}
+                                </Suspense>
                             </div>
                         </motion.div>
                     </AnimatePresence>

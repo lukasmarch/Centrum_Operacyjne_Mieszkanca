@@ -61,6 +61,17 @@ export default defineConfig(({ mode }) => {
     define: {},
     build: {
       sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react':   ['react', 'react-dom'],
+            'vendor-motion':  ['framer-motion'],
+            'vendor-leaflet': ['leaflet', 'react-leaflet'],
+            'vendor-lucide':  ['lucide-react'],
+            'vendor-chart':   ['recharts'],
+          },
+        },
+      },
     },
     resolve: {
       alias: {

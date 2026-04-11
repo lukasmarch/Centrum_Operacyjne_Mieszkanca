@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Bot, BarChart3, Newspaper, Landmark, ShieldAlert, Map,
   CalendarDays, RotateCcw, SlidersHorizontal, Info, ChevronRight,
@@ -42,7 +42,7 @@ const AGENTS: AgentDef[] = [
     desc: 'Wiadomości i aktualności',
     about: 'Zna wszystkie lokalne artykuły, ogłoszenia i aktualności z gminy Rybno.',
     capabilities: ['Wiadomości lokalne', 'Ogłoszenia', 'Aktualności', 'Artykuły prasowe'],
-    image: '/agents/redaktor.png',
+    image: '/agents/redaktor.webp',
     video: '/agents/redaktor.mp4',
     icon: <Newspaper size={22} />,
     color: 'from-sky-500 to-blue-700',
@@ -64,7 +64,7 @@ const AGENTS: AgentDef[] = [
     desc: 'Awarie i bezpieczeństwo',
     about: 'Informuje o awariach sieci, alertach RCB, zagrożeniach i zdarzeniach kryzysowych.',
     capabilities: ['Awarie wody i prądu', 'Alerty RCB', 'Bezpieczeństwo', 'Zdarzenia drogowe'],
-    image: '/agents/straznik.jpeg',
+    image: '/agents/straznik.webp',
     video: '/agents/straznik.mp4',
     icon: <ShieldAlert size={22} />,
     color: 'from-red-500 to-rose-700',
@@ -75,7 +75,7 @@ const AGENTS: AgentDef[] = [
     desc: 'Wydarzenia i atrakcje',
     about: 'Doradza w kwestiach wydarzeń lokalnych, atrakcji turystycznych i prognozy pogody.',
     capabilities: ['Imprezy lokalne', 'Atrakcje turystyczne', 'Pogoda', 'Miejsca w gminie'],
-    image: '/agents/przewodnik.png',
+    image: '/agents/przewodnik.webp',
     video: '/agents/przewodnik.mp4',
     icon: <Map size={22} />,
     color: 'from-emerald-500 to-teal-700',
@@ -107,11 +107,15 @@ const AGENTS: AgentDef[] = [
 const AssistantPage: React.FC<AssistantPageProps> = ({ initialQuery, onNavigate, onInitialQuerySent }) => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [chatKey, setChatKey] = useState(0);
+  // Video ładuje się dopiero po pierwszym kliknięciu agenta — nie blokuje FCP
+  const [videoEnabled, setVideoEnabled] = useState(false);
+  const _videoRef = useRef<HTMLVideoElement>(null);
 
   const activeAgent = AGENTS.find(a => a.id === selectedAgentId) ?? AGENTS[0];
 
   const handleSelectAgent = (id: string | null) => {
     setSelectedAgentId(id);
+    if (!videoEnabled) setVideoEnabled(true);
   };
 
   return (
@@ -128,14 +132,16 @@ const AssistantPage: React.FC<AssistantPageProps> = ({ initialQuery, onNavigate,
         {/* ZDJĘCIE AGENTA */}
         <div className="max-w-7xl mx-auto w-full px-4 md:px-8 pt-6 pb-0">
           <div className="relative w-full h-[260px] sm:h-[340px] md:h-[420px] lg:h-[480px] rounded-2xl overflow-hidden">
-              {activeAgent.video ? (
+              {videoEnabled && activeAgent.video ? (
                 <video
                   key={activeAgent.video}
+                  ref={_videoRef}
                   src={activeAgent.video}
                   autoPlay
                   loop
                   muted
                   playsInline
+                  preload="none"
                   className="w-full h-full"
                   style={{ objectFit: 'cover', objectPosition: 'center 20%', display: 'block' }}
                 />
