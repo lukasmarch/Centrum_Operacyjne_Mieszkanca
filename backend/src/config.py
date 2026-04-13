@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     CHAT_MODEL: str = "gpt-4o"
     CHAT_MAX_CONTEXT_TOKENS: int = 8000
 
+    # Token do autoryzacji endpointu /api/cinema/ingest (GitHub Actions → backend)
+    CINEMA_INGEST_TOKEN: Optional[str] = None
+
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),

@@ -1,0 +1,32 @@
+name: Cinema Scrape (biletyna.pl)
+
+# GitHub Actions IP nie jest blokowany przez Cloudflare na biletyna.pl
+# VPS i Apify mają zablokowane IP — dlatego scraper działa stąd.
+
+on:
+  schedule:
+    - cron: '15 6 * * *'   # 06:15 UTC = 08:15 CEST codziennie
+  workflow_dispatch:         # możliwość ręcznego wywołania
+
+jobs:
+  scrape-cinema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Scrape biletyna.pl & ingest
+        env:
+          CINEMA_INGEST_TOKEN: ${{ secrets.CINEMA_INGEST_TOKEN }}
+          BACKEND_URL: https://api.rybnolive.pl
+        run: python backend/scripts/scrape_cinema_gha.py
