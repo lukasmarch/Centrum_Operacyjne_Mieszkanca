@@ -90,21 +90,37 @@ class RSSFeedScraper(BaseScraper):
             Sparsowany feed
         """
         import asyncio
+        import httpx
 
-        # feedparser może parsować bezpośrednio z URL + custom headers
-        def parse_with_headers():
-            return feedparser.parse(
-                url,
-                agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        }
 
-        # Uruchom w executor aby nie blokować event loop
+        # Pobierz raw content przez httpx - feedparser.parse(url) ma problemy
+        # z niektórymi feedami (encoding, chunked transfer, invalid tokens)
+        try:
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                raw_content = response.content
+        except Exception as e:
+            self.logger.error(f"Failed to fetch RSS feed via httpx: {e}")
+            raw_content = None
+
+        if not raw_content:
+            return feedparser.FeedParserDict()
+
+        # Parsuj raw content (nie URL) - unika problemów z parsowaniem on-the-fly
+        def parse_raw():
+            return feedparser.parse(raw_content)
+
         try:
             loop = asyncio.get_event_loop()
-            feed = await loop.run_in_executor(None, parse_with_headers)
+            feed = await loop.run_in_executor(None, parse_raw)
             return feed
         except Exception as e:
-            self.logger.error(f"Failed to fetch RSS feed: {e}")
+            self.logger.error(f"Failed to parse RSS feed: {e}")
             return feedparser.FeedParserDict()
 
     def _parse_entry(self, entry: feedparser.FeedParserDict) -> Optional[Dict]:
