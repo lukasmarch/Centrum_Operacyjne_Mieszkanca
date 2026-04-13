@@ -78,7 +78,8 @@ async def run_cinema_job_async():
                 logger.info(f"Processing {city}...")
 
                 # Scrape fresh data (bypass cache)
-                result = scraper.fetch_repertoire(city, force_update=True)
+                # fetch_repertoire_async: Lubawa=sync-in-executor, Dzialdowo=Apify (Cloudflare bypass)
+                result = await scraper.fetch_repertoire_async(city, force_update=True)
 
                 if result and result.movies:
                     # Save to database
