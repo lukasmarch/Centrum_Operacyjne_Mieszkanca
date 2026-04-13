@@ -5,7 +5,7 @@
 set -e
 
 VPS_IP="${1:?Podaj IP VPS: ./deploy-frontend.sh <IP>}"
-VPS_USER="deploy"
+VPS_USER="root"
 
 echo "Budowanie frontendu..."
 cd frontend
@@ -13,7 +13,7 @@ VITE_API_URL=https://api.rybnolive.pl/api npm run build
 cd ..
 
 echo "Kopiowanie na VPS..."
-# Tymczasowy katalog z prawami deploy
+# Tymczasowy katalog na VPS
 ssh ${VPS_USER}@${VPS_IP} "mkdir -p /tmp/frontend_dist"
 rsync -avz --delete frontend/dist/ ${VPS_USER}@${VPS_IP}:/tmp/frontend_dist/
 
