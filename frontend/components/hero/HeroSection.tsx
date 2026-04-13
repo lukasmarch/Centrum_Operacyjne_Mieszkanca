@@ -22,11 +22,10 @@ const DEFAULT_SUGGESTIONS = [
 
 const BG = '#05080f';
 const TOTAL_FRAMES  = 121;
-// Zoom in slightly so the image overflows the canvas horizontally,
-// giving room to pan left/right via objectPositionX.
-// 1.08 creates ~8% horizontal overflow on 16:9 monitors, enough to pan left.
-// Keep small so ball doesn't zoom too aggressively.
 const SCALE_BOOST   = 1.08;
+// Keep only ±WIN frames around the current scroll position decoded in memory.
+// Max 2×WIN+1 = 31 frames × 3.5 MB ≈ 108 MB  (vs. preloading all 121 = 424 MB).
+const WIN = 15;
 
 const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
   const [query, setQuery]                         = useState('');
@@ -41,8 +40,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
 
   const containerRef    = useRef<HTMLDivElement>(null);
   const canvasRef       = useRef<HTMLCanvasElement>(null);
-  const framesRef       = useRef<HTMLImageElement[]>([]);
-  const progressRef     = useRef(0);
+  // ImageBitmap gives explicit GPU-memory control via .close()
+  const bitmapsRef      = useRef(new Map<number, ImageBitmap>());
+  const loadingRef      = useRef(new Set<number>());
   const currentFrameRef = useRef(0);
 
   // ── suggestions ──────────────────────────────────────────────────────────
@@ -62,51 +62,70 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
     return () => clearInterval(id);
   }, [suggestions.length, isTyping]);
 
-  // ── canvas draw — cover behaviour matching objectPosition: 40% 55% ───────
+  // ── canvas draw ───────────────────────────────────────────────────────────
   const drawFrame = useCallback((idx: number) => {
     const canvas = canvasRef.current;
     const ctx    = canvas?.getContext('2d');
-    const img    = framesRef.current[idx];
-    if (!canvas || !ctx || !img?.complete || !img.naturalWidth) return;
+    const bmp    = bitmapsRef.current.get(idx);
+    if (!canvas || !ctx || !bmp) return;
 
-    const cw = canvas.width;
-    const ch = canvas.height;
-    const iw = img.naturalWidth;   // 1280
-    const ih = img.naturalHeight;  // 720
+    const cw = canvas.width,  ch = canvas.height;
+    const iw = bmp.width,     ih = bmp.height;   // 1280 × 720
 
-    // cover + slight zoom so there's horizontal overflow room for panning
     const scale = Math.max(cw / iw, ch / ih) * SCALE_BOOST;
     const dw    = iw * scale;
     const dh    = ih * scale;
 
-    // On mobile (<1024px): centre the ball (dxFactor=0.50).
-    // On desktop: shift slightly left (dxFactor=0.62).
-    const isMobile  = cw < 1024;
-    const dxFactor  = isMobile ? 0.50 : 0.62;
-    const dyFactor  = isMobile ? 0.48 : 0.55;
-    const dx = (cw - dw) * dxFactor;
-    const dy = (ch - dh) * dyFactor;
+    const isMobile = cw < 1024;
+    const dx = (cw - dw) * (isMobile ? 0.50 : 0.62);
+    const dy = (ch - dh) * (isMobile ? 0.48 : 0.55);
 
     ctx.clearRect(0, 0, cw, ch);
-    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.drawImage(bmp, dx, dy, dw, dh);
     currentFrameRef.current = idx;
   }, []);
 
-  // ── preload all frames ────────────────────────────────────────────────────
-  useEffect(() => {
-    const imgs: HTMLImageElement[] = [];
-    for (let i = 0; i < TOTAL_FRAMES; i++) {
-      const img = new Image();
-      img.src   = `/videos/kula6/${String(i + 1).padStart(4, '0')}.jpg`;
-      imgs.push(img);
-    }
-    framesRef.current = imgs;
+  // ── windowed bitmap loading ───────────────────────────────────────────────
+  const loadBitmap = useCallback((idx: number) => {
+    if (idx < 0 || idx >= TOTAL_FRAMES) return;
+    if (bitmapsRef.current.has(idx) || loadingRef.current.has(idx)) return;
 
-    // Draw frame 0 as soon as it's decoded
-    const drawFirst = () => drawFrame(0);
-    imgs[0].onload = drawFirst;
-    if (imgs[0].complete) drawFirst();
+    loadingRef.current.add(idx);
+    fetch(`/videos/kula6/${String(idx + 1).padStart(4, '0')}.jpg`)
+      .then(r => r.blob())
+      .then(blob => createImageBitmap(blob))
+      .then(bmp => {
+        bitmapsRef.current.set(idx, bmp);
+        loadingRef.current.delete(idx);
+        // Redraw if this is the frame currently on screen
+        if (idx === currentFrameRef.current) drawFrame(idx);
+      })
+      .catch(() => loadingRef.current.delete(idx));
   }, [drawFrame]);
+
+  const updateWindow = useCallback((center: number) => {
+    const lo = Math.max(0, center - WIN);
+    const hi = Math.min(TOTAL_FRAMES - 1, center + WIN);
+
+    for (let i = lo; i <= hi; i++) loadBitmap(i);
+
+    // Evict and free GPU memory of frames outside the window
+    for (const [idx, bmp] of bitmapsRef.current) {
+      if (idx < lo - 3 || idx > hi + 3) {
+        bmp.close();
+        bitmapsRef.current.delete(idx);
+      }
+    }
+  }, [loadBitmap]);
+
+  // ── initial load ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    updateWindow(0);
+    return () => {
+      for (const bmp of bitmapsRef.current.values()) bmp.close();
+      bitmapsRef.current.clear();
+    };
+  }, [updateWindow]);
 
   // ── sync canvas pixel size to CSS size (ResizeObserver) ──────────────────
   useEffect(() => {
@@ -137,9 +156,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
 
     const scrub = () => {
       const progress = Math.min(1, Math.max(0, window.scrollY / (container.offsetHeight * 0.75)));
-      progressRef.current = progress;
-      // clamp to valid index
       const frameIdx = Math.min(TOTAL_FRAMES - 1, Math.floor(progress * TOTAL_FRAMES));
+      updateWindow(frameIdx);
       drawFrame(frameIdx);
       rafId = null;
     };
@@ -154,7 +172,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
       window.removeEventListener('scroll', onScroll);
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
-  }, [drawFrame]);
+  }, [drawFrame, updateWindow]);
 
   const handleSubmit = (text: string) => {
     if (!text.trim()) return;
@@ -171,12 +189,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
 
       {/* ── CANVAS BACKGROUND — frame-sequence scroll animation ───────────── */}
       {/*
-        Technique: 121 JPG frames pre-loaded into HTMLImageElement[].
-        Scroll maps linearly to frame index → ctx.drawImage() per RAF tick.
-        Canvas is faster than video.currentTime scrubbing because:
-          - No seek latency / decoder stall
-          - Direct GPU-backed 2D blit
-          - No audio track overhead
+        Technique: JPG frames loaded on-demand into ImageBitmap (GPU-backed).
+        Windowed cache: only ±WIN frames around current scroll position are kept
+        decoded in memory. Frames outside the window are .close()d to free GPU RAM.
+        Peak: ~31 frames × 3.5 MB ≈ 108 MB  (vs. preloading all 121 = 424 MB).
         CSS mask fades edges; gradient divs cover the BG colour seam.
       */}
       {/* Canvas wrapper extended 120px above the hero container so the ball's
