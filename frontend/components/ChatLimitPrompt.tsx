@@ -1,6 +1,7 @@
 import React from 'react';
-import { AlertTriangle, Zap, Infinity } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { LimitInfo } from '../src/hooks/useChat';
+import PricingCards from './PricingCards';
 
 interface ChatLimitPromptProps {
   limitInfo: LimitInfo;
@@ -20,8 +21,16 @@ const ChatLimitPrompt: React.FC<ChatLimitPromptProps> = ({ limitInfo, onNavigate
     }
   };
 
+  const handlePlanSelect = (tierId: string) => {
+    if (isAnonymous) {
+      onNavigate?.('login');
+    } else {
+      onNavigate?.('premium');
+    }
+  };
+
   return (
-    <div className="mx-auto max-w-xl w-full mt-2">
+    <div className="mx-auto max-w-3xl w-full mt-2">
       <div className="bg-gray-900/60 border border-amber-500/30 rounded-2xl p-5 backdrop-blur-sm">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
@@ -53,38 +62,11 @@ const ChatLimitPrompt: React.FC<ChatLimitPromptProps> = ({ limitInfo, onNavigate
           </div>
         )}
 
-        {/* Plan cards */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Premium card */}
-          <div className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 border border-indigo-500/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap size={14} className="text-indigo-400" />
-              <span className="text-xs font-bold text-indigo-300 uppercase tracking-wide">Premium</span>
-            </div>
-            <p className="text-2xl font-bold text-neutral-100 mb-0.5">50</p>
-            <p className="text-xs text-neutral-400 mb-3">pytań / dzień</p>
-            <p className="text-xs font-semibold text-indigo-300">19 zł / mies.</p>
-          </div>
-
-          {/* Pro card */}
-          <div className="bg-gradient-to-br from-violet-600/20 to-purple-600/20 border border-violet-500/30 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Infinity size={14} className="text-violet-400" />
-              <span className="text-xs font-bold text-violet-300 uppercase tracking-wide">Pro</span>
-            </div>
-            <p className="text-2xl font-bold text-neutral-100 mb-0.5">∞</p>
-            <p className="text-xs text-neutral-400 mb-3">bez limitu</p>
-            <p className="text-xs font-semibold text-violet-300">19,99 zł / mies.</p>
-          </div>
-        </div>
-
-        {/* CTA */}
-        <button
-          onClick={() => onNavigate?.('premium')}
-          className="mt-4 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-900/30"
-        >
-          Wybierz plan i pisz dalej →
-        </button>
+        {/* Pricing cards */}
+        <PricingCards
+          currentTier={isAnonymous ? 'anonymous' : 'free'}
+          onSelect={handlePlanSelect}
+        />
       </div>
     </div>
   );
