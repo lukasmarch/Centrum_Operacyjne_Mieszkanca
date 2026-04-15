@@ -66,7 +66,7 @@ async def run_cinema_job_async():
     logger.info("=" * 80)
 
     scraper = CinemaScraper()
-    cities = ["Dzialdowo", "Lubawa"]
+    cities = ["Lubawa"]  # Działdowo obsługiwane przez GitHub Actions (cinema_scrape.yml)
     total_movies = 0
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
@@ -77,8 +77,6 @@ async def run_cinema_job_async():
             try:
                 logger.info(f"Processing {city}...")
 
-                # Scrape fresh data (bypass cache)
-                # fetch_repertoire_async: Lubawa=sync-in-executor, Dzialdowo=Apify (Cloudflare bypass)
                 result = await scraper.fetch_repertoire_async(city, force_update=True)
 
                 if result and result.movies:
