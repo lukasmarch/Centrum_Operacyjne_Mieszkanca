@@ -1,5 +1,4 @@
 from .base import BaseScraper
-from .klikajinfo import KlikajInfoScraper
 from .gmina_rybno import GminaRybnoScraper
 from .mojedzialdowo import MojeDzialdowoScraper
 from .apify_facebook import ApifyFacebookScraper
@@ -7,7 +6,6 @@ from .registry import SCRAPER_REGISTRY, get_scraper, register_scraper, list_scra
 
 __all__ = [
     "BaseScraper",
-    "KlikajInfoScraper",
     "GminaRybnoScraper",
     "MojeDzialdowoScraper",
     "ApifyFacebookScraper",

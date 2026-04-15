@@ -6,7 +6,6 @@ Mapuje nazwę źródła (Source.name) na odpowiednią klasę scrapera.
 """
 from typing import Dict, Type, Optional
 from src.scrapers.base import BaseScraper
-from src.scrapers.klikajinfo import KlikajInfoScraper
 from src.scrapers.gmina_rybno import GminaRybnoScraper
 from src.scrapers.mojedzialdowo import MojeDzialdowoScraper
 from src.scrapers.apify_facebook import ApifyFacebookScraper
@@ -18,7 +17,6 @@ logger = setup_logger("ScraperRegistry")
 
 # Rejestr: nazwa źródła -> klasa scrapera
 SCRAPER_REGISTRY: Dict[str, Type[BaseScraper]] = {
-    "Klikaj.info": KlikajInfoScraper,
     "Gmina Rybno": GminaRybnoScraper,
     "Moje Działdowo": MojeDzialdowoScraper,
     "Facebook - Syla": ApifyFacebookScraper,
