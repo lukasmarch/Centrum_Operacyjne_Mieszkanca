@@ -7,6 +7,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
 import atexit
+import traceback
+import threading
+from datetime import datetime, timedelta
 
 from src.scheduler.weather_job import run_weather_job
 from src.scheduler.article_job import run_article_job
@@ -30,6 +33,102 @@ logger = setup_logger("Scheduler")
 # Initialize scheduler with Polish timezone
 scheduler = BackgroundScheduler(timezone='Europe/Warsaw')
 
+# Rate limit state: {job_id: datetime_last_sent}
+# Moduł-poziomowy singleton — przeżywa wszystkie wywołania listenerów w procesie
+_alert_last_sent: dict = {}
+_alert_lock = threading.Lock()
+
+
+def _send_admin_alert(job_id: str, exception: Exception, traceback_str: str) -> None:
+    """
+    Wyślij email do admina gdy job schedulera crasha.
+
+    SYNC — wywoływana z wątku APScheduler (nie może używać async/await).
+    Rate limit: max 1 email/job/ADMIN_ALERT_RATE_LIMIT_HOURS godzin.
+    Połyka wszystkie wyjątki — awaria alertu nie może wpłynąć na scheduler.
+    """
+    try:
+        from src.config import settings
+
+        if not settings.ADMIN_ALERT_EMAIL:
+            return
+        if not settings.RESEND_API_KEY:
+            logger.warning("ADMIN_ALERT_EMAIL ustawiony ale brak RESEND_API_KEY — alert pominięty")
+            return
+
+        now = datetime.now()
+        rate_limit = timedelta(hours=settings.ADMIN_ALERT_RATE_LIMIT_HOURS)
+
+        with _alert_lock:
+            last_sent = _alert_last_sent.get(job_id)
+            if last_sent and (now - last_sent) < rate_limit:
+                logger.debug(
+                    f"Alert rate-limited dla '{job_id}' "
+                    f"(następny po {(last_sent + rate_limit).strftime('%H:%M:%S')})"
+                )
+                return
+            # Zapisz PRZED wysyłką — ochrona przy Resend timeout (nie zalewa API przy awarii Resend)
+            _alert_last_sent[job_id] = now
+
+        exc_type = type(exception).__name__
+        exc_message = str(exception)
+        tb_snippet = traceback_str[-2000:] if len(traceback_str) > 2000 else traceback_str
+        timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+
+        subject = f"[ALERT] Scheduler job '{job_id}' crashed — {exc_type}"
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: monospace; background: #f5f5f5; padding: 20px; color: #222; }}
+    .card {{ background: #fff; border-left: 4px solid #d32f2f; padding: 20px;
+             border-radius: 4px; max-width: 700px; }}
+    h2 {{ color: #d32f2f; margin-top: 0; font-size: 18px; }}
+    .label {{ color: #666; font-size: 12px; text-transform: uppercase; margin: 12px 0 4px; }}
+    .value {{ background: #f0f0f0; padding: 8px 12px; border-radius: 3px; word-break: break-all; }}
+    pre {{ background: #1e1e1e; color: #f8f8f2; padding: 16px; border-radius: 4px;
+           font-size: 12px; white-space: pre-wrap; word-break: break-word; }}
+    .footer {{ margin-top: 20px; font-size: 11px; color: #999; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Scheduler Job Failed</h2>
+    <div class="label">Job ID</div>
+    <div class="value">{job_id}</div>
+    <div class="label">Exception Type</div>
+    <div class="value">{exc_type}</div>
+    <div class="label">Message</div>
+    <div class="value">{exc_message}</div>
+    <div class="label">Timestamp</div>
+    <div class="value">{timestamp}</div>
+    <div class="label">Traceback (ostatnie 2000 znaków)</div>
+    <pre>{tb_snippet}</pre>
+    <div class="footer">
+      Centrum Operacyjne Mieszkańca — Automated Alert<br>
+      Rate limit: 1 alert / {settings.ADMIN_ALERT_RATE_LIMIT_HOURS}h per job
+    </div>
+  </div>
+</body>
+</html>"""
+
+        import resend as resend_lib
+        resend_lib.api_key = settings.RESEND_API_KEY
+        resend_lib.Emails.send({
+            "from": f"{settings.NEWSLETTER_FROM_NAME} <{settings.NEWSLETTER_FROM_EMAIL}>",
+            "to": [settings.ADMIN_ALERT_EMAIL],
+            "subject": subject,
+            "html": html_body,
+        })
+        logger.info(
+            f"Admin alert wysłany dla '{job_id}' ({exc_type}) → {settings.ADMIN_ALERT_EMAIL}"
+        )
+
+    except Exception as alert_exc:
+        # CRITICAL: nigdy nie propaguj błędu alertu — log i połknij
+        logger.error(f"Błąd wysyłki alertu admina dla '{job_id}': {alert_exc}")
+
 
 def _job_executed_listener(event):
     """Log successful job executions"""
@@ -37,8 +136,19 @@ def _job_executed_listener(event):
 
 
 def _job_error_listener(event):
-    """Log job errors with traceback"""
-    logger.error(f"✗ Job '{event.job_id}' raised exception: {event.exception}", exc_info=True)
+    """Log job errors with traceback and send admin alert"""
+    tb_str = (
+        "".join(traceback.format_tb(event.traceback))
+        if event.traceback else "(brak traceback)"
+    )
+    logger.error(
+        f"✗ Job '{event.job_id}' raised {type(event.exception).__name__}: {event.exception}\n{tb_str}"
+    )
+    _send_admin_alert(
+        job_id=event.job_id,
+        exception=event.exception,
+        traceback_str=tb_str,
+    )
 
 
 def _job_missed_listener(event):

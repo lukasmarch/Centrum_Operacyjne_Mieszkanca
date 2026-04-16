@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # Token do autoryzacji endpointu /api/cinema/ingest (GitHub Actions → backend)
     CINEMA_INGEST_TOKEN: Optional[str] = None
 
+    # Admin alerts (scheduler errors)
+    ADMIN_ALERT_EMAIL: Optional[str] = None        # None = alerty wyłączone (dev)
+    ADMIN_ALERT_RATE_LIMIT_HOURS: int = 1          # max 1 email/job/godzinę
+
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
