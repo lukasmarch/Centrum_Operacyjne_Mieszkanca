@@ -65,7 +65,7 @@ async def _send_frost_alert(session, premium_ids: List[int]) -> int:
     from src.database.schema import Weather
 
     result = await session.execute(
-        select(Weather).order_by(Weather.recorded_at.desc()).limit(1)
+        select(Weather).order_by(Weather.fetched_at.desc()).limit(1)
     )
     weather = result.scalar_one_or_none()
     if not weather:
