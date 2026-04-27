@@ -166,13 +166,17 @@ class BaseAgent:
             messages=messages,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
-            stream=True
+            stream=True,
+            stream_options={"include_usage": True}
         )
 
         async def generate():
             full_content = ""
+            total_tokens = 0
             async for chunk in stream:
-                if chunk.choices[0].delta.content:
+                if chunk.usage:
+                    total_tokens = chunk.usage.total_tokens
+                if chunk.choices and chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     full_content += content
                     yield json.dumps({"type": "chunk", "content": content}) + "\n"
@@ -182,7 +186,8 @@ class BaseAgent:
                 "type": "done",
                 "full_content": full_content,
                 "model": self.model,
-                "agent_name": self.name
+                "agent_name": self.name,
+                "tokens_used": total_tokens
             }) + "\n"
 
         return generate()

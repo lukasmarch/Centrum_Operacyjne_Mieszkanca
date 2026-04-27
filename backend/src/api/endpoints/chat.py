@@ -11,6 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -204,6 +205,8 @@ async def send_message(
 
                 full_content = ""
                 sources = []
+                resolved_agent_name = request.agent_name
+                resolved_tokens = 0
 
                 async for line in result:
                     data = json.loads(line)
@@ -216,17 +219,24 @@ async def send_message(
                     elif data["type"] == "chart_data":
                         yield f"data: {line}\n\n"
                     elif data["type"] == "done":
+                        resolved_agent_name = data.get("agent_name", request.agent_name)
+                        resolved_tokens = data.get("tokens_used", 0)
                         yield f"data: {line}\n\n"
 
-                # Save assistant message
+                # Save assistant message with resolved agent_name and tokens_used
                 async with async_session() as save_session:
+                    await save_session.execute(
+                        update(ChatMessage)
+                        .where(ChatMessage.id == user_msg.id)
+                        .values(agent_name=resolved_agent_name)
+                    )
                     assistant_msg = ChatMessage(
                         conversation_id=conversation.id,
                         role="assistant",
                         content=full_content,
                         sources=sources,
-                        agent_name=request.agent_name,
-                        tokens_used=0
+                        agent_name=resolved_agent_name,
+                        tokens_used=resolved_tokens
                     )
                     save_session.add(assistant_msg)
                     await save_session.commit()
