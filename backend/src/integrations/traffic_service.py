@@ -71,10 +71,11 @@ class TrafficService:
       - Opis musi być jednym, treściwym zdaniem.
       - NIE ZGADUJ - jeśli brak aktualnych danych dla trasy, podaj STATUS: Płynnie i DELAY: 0.
 
-      Format odpowiedzi (każda trasa w osobnej linii):
-      [ROUTE: Skąd-Dokąd | TIME: X min | STATUS: Status | DELAY: X min | NOTE: Opis przyczyny]
+      Format odpowiedzi (każda trasa w osobnej linii, BEZ Markdown, BEZ pogrubień, BEZ nawiasów kwadratowych):
+      ROUTE: Skąd-Dokąd | TIME: X min | STATUS: Status | DELAY: X min | NOTE: Opis przyczyny
 
       Status values: Płynnie, Utrudnienia, Korki
+      WAŻNE: Odpowiedz TYLKO liniami w powyższym formacie, bez żadnego dodatkowego tekstu, bez **bold**, bez list punktowanych.
     """
 
         try:
@@ -128,11 +129,20 @@ class TrafficService:
     def _parse_response(self, text: str) -> List[RoadStatus]:
         roads = []
         import re
-        
-        # [ROUTE: Skąd-Dokąd | TIME: X min | STATUS: Status | DELAY: X min | NOTE: Opis przyczyny]
+
+        # Gemini zwraca Markdown bold: **ROUTE:** ... | **TIME:** ... lub [ROUTE: ... ]
+        # Strip markdown bold markers before matching
+        clean = re.sub(r'\*\*(\w+:)\*\*', r'\1', text)
+
+        # Try bracket format first: [ROUTE: ... | TIME: ... | STATUS: ... | DELAY: ... | NOTE: ...]
         pattern = r"\[ROUTE: (.*?) \| TIME: (.*?) \| STATUS: (.*?) \| DELAY: (.*?) \| NOTE: (.*?)\]"
-        matches = re.finditer(pattern, text)
-        
+        matches = list(re.finditer(pattern, clean))
+
+        # Fallback: plain pipe format without brackets
+        if not matches:
+            pattern = r"ROUTE:\s*(.*?)\s*\|\s*TIME:\s*(.*?)\s*\|\s*STATUS:\s*(.*?)\s*\|\s*DELAY:\s*(.*?)\s*\|\s*NOTE:\s*(.*?)(?:\n|$)"
+            matches = list(re.finditer(pattern, clean))
+
         for i, match in enumerate(matches):
             name = match.group(1).strip()
             travel_time = match.group(2).strip()
