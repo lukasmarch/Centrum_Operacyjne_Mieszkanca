@@ -137,10 +137,15 @@ def _job_executed_listener(event):
 
 def _job_error_listener(event):
     """Log job errors with traceback and send admin alert"""
-    tb_str = (
-        "".join(traceback.format_tb(event.traceback))
-        if event.traceback else "(brak traceback)"
-    )
+    if not event.traceback:
+        tb_str = "(brak traceback)"
+    elif isinstance(event.traceback, str):
+        tb_str = event.traceback
+    else:
+        try:
+            tb_str = "".join(traceback.format_tb(event.traceback))
+        except TypeError:
+            tb_str = str(event.traceback)
     logger.error(
         f"✗ Job '{event.job_id}' raised {type(event.exception).__name__}: {event.exception}\n{tb_str}"
     )

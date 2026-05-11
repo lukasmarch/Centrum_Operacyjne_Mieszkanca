@@ -97,9 +97,9 @@ async def _send_emergency_article_alert(session, premium_ids: List[int]) -> int:
     two_hours_ago = datetime.utcnow() - timedelta(hours=2)
     result = await session.execute(
         select(Article).where(
-            Article.primary_category == "Awaria",
+            Article.category == "Awaria",
             Article.published_at >= two_hours_ago,
-            Article.is_processed == True,
+            Article.processed == True,
         ).order_by(Article.published_at.desc()).limit(1)
     )
     article = result.scalar_one_or_none()
