@@ -65,17 +65,19 @@ class TrafficService:
       4. Rybno -> Olsztyn (najszybsza aktualna trasa)
 
       Zasady analizy:
-      - Podaj AKTUALNY CZAS PRZEJAZDU (TravelTime) w minutach dla daty {date_str}.
-      - Opóźnienie (Delay) to różnica między czasem aktualnym a optymalnym.
-      - W opisie ('NOTE') bądź ekstremalnie precyzyjny: opisz AKTUALNĄ przyczynę na podstawie wyszukanych danych. Jeśli brak utrudnień, napisz "Ruch płynny, brak zgłoszonych utrudnień."
+      - Podaj AKTUALNY CZAS PRZEJAZDU (TIME) jako liczbę minut, np. "25 min".
+      - Jeśli brak aktualnych danych o ruchu dla trasy, użyj typowego czasu przejazdu:
+        Rybno-Działdowo: 25 min, Rybno-Lubawa: 40 min, Rybno-Iława: 50 min, Rybno-Olsztyn: 90 min
+      - Opóźnienie (DELAY) to różnica między czasem aktualnym a optymalnym, domyślnie 0 min.
+      - W opisie (NOTE) opisz AKTUALNĄ sytuację. Jeśli brak utrudnień: "Ruch płynny, brak zgłoszonych utrudnień."
       - Opis musi być jednym, treściwym zdaniem.
-      - NIE ZGADUJ - jeśli brak aktualnych danych dla trasy, podaj STATUS: Płynnie i DELAY: 0.
 
-      Format odpowiedzi (każda trasa w osobnej linii, BEZ Markdown, BEZ pogrubień, BEZ nawiasów kwadratowych):
-      ROUTE: Skąd-Dokąd | TIME: X min | STATUS: Status | DELAY: X min | NOTE: Opis przyczyny
+      Format odpowiedzi (każda trasa w osobnej linii, BEZ Markdown, BEZ pogrubień):
+      ROUTE: Rybno-Działdowo | TIME: 25 min | STATUS: Płynnie | DELAY: 0 min | NOTE: Ruch płynny, brak zgłoszonych utrudnień.
+      ROUTE: Rybno-Lubawa | TIME: 40 min | STATUS: Płynnie | DELAY: 0 min | NOTE: Ruch płynny, brak zgłoszonych utrudnień.
 
       Status values: Płynnie, Utrudnienia, Korki
-      WAŻNE: Odpowiedz TYLKO liniami w powyższym formacie, bez żadnego dodatkowego tekstu, bez **bold**, bez list punktowanych.
+      WAŻNE: TIME musi być zawsze liczbą minut (np. "25 min"), nigdy słowem "Brak". Odpowiedz TYLKO liniami ROUTE, bez dodatkowego tekstu.
     """
 
         try:
@@ -126,12 +128,18 @@ class TrafficService:
                 return TrafficService._cache
             return self._get_fallback_data()
 
+    # Domyślne czasy przejazdu gdy Gemini nie ma danych
+    _DEFAULT_TRAVEL_TIMES = {
+        "działdowo": "25 min",
+        "lubawa": "40 min",
+        "iława": "50 min",
+        "olsztyn": "90 min",
+    }
+
     def _parse_response(self, text: str) -> List[RoadStatus]:
         roads = []
         import re
 
-        # Gemini zwraca Markdown bold: **ROUTE:** ... | **TIME:** ... lub [ROUTE: ... ]
-        # Strip markdown bold markers before matching
         clean = re.sub(r'\*\*(\w+:)\*\*', r'\1', text)
 
         # Try bracket format first: [ROUTE: ... | TIME: ... | STATUS: ... | DELAY: ... | NOTE: ...]
@@ -149,17 +157,27 @@ class TrafficService:
             status_text = match.group(3).strip()
             delay_text = match.group(4).strip()
             note = match.group(5).strip()
-            
-            status = "UNKNOWN"
+
+            # Gdy Gemini nie zwraca cyfr w TIME — użyj domyślnego czasu dla danej trasy
+            if not any(c.isdigit() for c in travel_time):
+                name_lower = name.lower()
+                for key, default_time in self._DEFAULT_TRAVEL_TIMES.items():
+                    if key in name_lower:
+                        travel_time = default_time
+                        break
+                else:
+                    travel_time = "—"
+
+            status = "Płynnie"
             s_lower = status_text.lower()
-            if 'płyn' in s_lower: status = 'Płynnie'
-            elif 'utrud' in s_lower: status = 'Utrudnienia'
-            elif 'kork' in s_lower: status = 'Korki'
-            
-            # Parse delay "5 min" -> 5
+            if 'utrud' in s_lower:
+                status = 'Utrudnienia'
+            elif 'kork' in s_lower:
+                status = 'Korki'
+
             try:
                 delay = int(''.join(filter(str.isdigit, delay_text)))
-            except:
+            except Exception:
                 delay = 0
 
             roads.append(RoadStatus(
@@ -170,7 +188,7 @@ class TrafficService:
                 travelTime=travel_time,
                 description=note if note and len(note) > 5 else None
             ))
-            
+
         return roads
 
     def _get_fallback_data(self) -> TrafficData:

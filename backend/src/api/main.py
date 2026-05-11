@@ -306,22 +306,29 @@ async def get_traffic(session: AsyncSession = Depends(get_session)):
     from src.database.schema import TrafficCache
     from src.integrations.traffic_service import TrafficService
 
-    # Query latest cache entry
+    from datetime import datetime, timedelta
+
+    # Query latest cache entry (current or most recent when TTL expired)
     result = await session.execute(
         select(TrafficCache)
-        .where(TrafficCache.is_current == True)
         .order_by(TrafficCache.fetched_at.desc())
         .limit(1)
     )
     cache_entry = result.scalar_one_or_none()
 
     if cache_entry:
-        return cache_entry.data
+        expires_at = cache_entry.fetched_at + timedelta(seconds=cache_entry.ttl_seconds)
+        data = dict(cache_entry.data)
+        data["fetched_at"] = cache_entry.fetched_at.isoformat()
+        data["is_expired"] = datetime.utcnow() > expires_at
+        return data
 
-    # Fallback: no cache available - return static fallback data
+    # Fallback: no cache at all - return static fallback data
     service = TrafficService()
     fallback_data = service._get_fallback_data()
-    return fallback_data.dict()
+    result = fallback_data.dict()
+    result["is_expired"] = True
+    return result
 
 
 # ======================
