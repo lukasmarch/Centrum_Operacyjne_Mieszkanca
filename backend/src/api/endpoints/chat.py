@@ -18,7 +18,7 @@ from sqlmodel import select
 
 from src.database import get_session
 from src.database.connection import async_session
-from src.database.vectors import Conversation, ChatMessage
+from src.database.vectors import Conversation, ChatMessage, APICostLog
 from src.ai.agents.orchestrator import orchestrator
 from src.auth.dependencies import get_optional_user
 from src.database.schema import User, AnonymousChatUsage
@@ -34,6 +34,28 @@ DAILY_LIMITS = {
     "premium": None,  # unlimited
     "business": None,  # unlimited
 }
+
+
+def _log_chat_cost(session, tokens: int, agent_name: Optional[str], user_id: Optional[int]) -> None:
+    """
+    Zapis kosztu wywołania AI do api_cost_log (kontrola marży planów).
+    Agenci nie zwracają podziału input/output — przyjmujemy szacunkowo 60/40
+    i cennik gpt-4o-mini ($0.15/1M in, $0.60/1M out). Wpis to estymata.
+    """
+    if not tokens:
+        return
+    tokens_in = int(tokens * 0.6)
+    tokens_out = tokens - tokens_in
+    cost = tokens_in * 0.15 / 1_000_000 + tokens_out * 0.60 / 1_000_000
+    session.add(APICostLog(
+        service="openai",
+        model="gpt-4o-mini",
+        tokens_input=tokens_in,
+        tokens_output=tokens_out,
+        estimated_cost_usd=round(cost, 8),
+        endpoint=f"/api/chat/message:{agent_name or 'auto'}",
+        user_id=user_id,
+    ))
 
 
 def _hash_ip(ip: str) -> str:
@@ -252,6 +274,8 @@ async def send_message(
                         tokens_used=resolved_tokens
                     )
                     save_session.add(assistant_msg)
+                    _log_chat_cost(save_session, resolved_tokens, resolved_agent_name,
+                                   user.id if user else None)
                     await save_session.commit()
 
             except Exception as e:
@@ -288,6 +312,8 @@ async def send_message(
         tokens_used=result["tokens_used"]
     )
     session.add(assistant_msg)
+    _log_chat_cost(session, result["tokens_used"], request.agent_name,
+                   user.id if user else None)
     await session.commit()
 
     return ChatResponse(
