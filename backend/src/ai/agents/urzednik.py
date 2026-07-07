@@ -13,7 +13,7 @@ class UrzednikAgent(BaseAgent):
     temperature = 0.2
     source_types = ["bip", "article"]
     rag_top_k = 4
-    rag_threshold = 0.52
+    rag_threshold = 0.40
     rag_semantic_weight = 0.55
     rag_recency_boost = 0.0
 

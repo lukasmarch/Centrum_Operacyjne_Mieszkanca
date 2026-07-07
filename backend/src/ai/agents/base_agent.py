@@ -53,12 +53,14 @@ class BaseAgent:
     example_questions: list[str] = []
 
     # RAG parameters (per-agent overrides)
+    # Progi skalibrowane na realnym korpusie (07.2026): trafne wyniki mają
+    # kosinus 0.43-0.63, więc 0.50 odcinało połowę trafień.
     rag_top_k: int = 5
-    rag_threshold: float = 0.50
+    rag_threshold: float = 0.35
     rag_semantic_weight: float = 0.70
     rag_recency_boost: float = 0.0
     # Minimum similarity to show source chip in UI (higher than rag_threshold)
-    source_display_threshold: float = 0.60
+    source_display_threshold: float = 0.50
 
     def __init__(self):
         self.client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
@@ -135,7 +137,7 @@ class BaseAgent:
         ]
 
         if conversation_history:
-            for msg in conversation_history[-6:]:
+            for msg in conversation_history[-10:]:
                 messages.append({"role": msg["role"], "content": msg["content"]})
 
         messages.append({"role": "user", "content": user_message})

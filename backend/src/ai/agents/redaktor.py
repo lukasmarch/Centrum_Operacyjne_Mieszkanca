@@ -13,9 +13,9 @@ class RedaktorAgent(BaseAgent):
     temperature = 0.3
     source_types = ["article"]
     rag_top_k = 8
-    rag_threshold = 0.45
+    rag_threshold = 0.35
     rag_semantic_weight = 0.90  # BM25 bez stemmingu polskiego szkodzi - dominuje semantic
-    rag_recency_boost = 0.10
+    rag_recency_boost = 0.25
 
     system_prompt = """Jestes Redaktorem - asystentem informacyjnym Centrum Operacyjnego Mieszkanca RybnoLive.
 Twoja specjalizacja: wiadomosci lokalne, artykuly, aktualnosci z gminy Rybno i powiatu dzialdowniego.

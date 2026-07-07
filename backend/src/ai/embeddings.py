@@ -146,7 +146,7 @@ class EmbeddingService:
         query: str,
         top_k: int = 5,
         source_types: Optional[list[str]] = None,
-        similarity_threshold: float = 0.50,
+        similarity_threshold: float = 0.35,
         semantic_weight: float = 0.70,
         recency_boost: float = 0.0,
         rrf_k: int = 60
@@ -182,9 +182,15 @@ class EmbeddingService:
         sem_result = await session.execute(text(sem_sql), params)
         sem_rows = {row[0]: row for row in sem_result.fetchall()}
 
-        # BM25 candidates (tsvector) — graceful fallback if column missing
+        # BM25 candidates (tsvector) — graceful fallback if column missing.
+        # Prefiksy (slowo:*) to namiastka polskiego stemmingu w konfiguracji
+        # 'simple': "przetarg:*" dopasuje "przetargu", "przetargiem" itd.
         bm25_rows: dict = {}
-        bm25_query_str = " | ".join(w.strip() for w in query.split() if len(w.strip()) > 2)
+        bm25_terms = [
+            "".join(c for c in w.strip() if c.isalnum())
+            for w in query.split()
+        ]
+        bm25_query_str = " | ".join(f"{t}:*" for t in bm25_terms if len(t) > 2)
         if bm25_query_str:
             params_bm25 = {**params, "bm25_query": bm25_query_str}
             bm25_sql = f"""
@@ -241,6 +247,25 @@ class EmbeddingService:
 
         top_ids = sorted(rrf_scores, key=lambda x: rrf_scores[x], reverse=True)[:top_k]
 
+        # Kosinusowe podobieństwo dla dokumentów tylko-BM25 (nie było ich wśród
+        # kandydatów semantycznych) — jedno tanie zapytanie po id.
+        # "similarity" MUSI być kosinusem 0-1: base_agent porównuje je
+        # z source_display_threshold, a LLM dostaje je jako "Trafność".
+        cosine_by_id = {doc_id: float(sem_rows[doc_id][5]) for doc_id in top_ids if doc_id in sem_rows}
+        missing = [doc_id for doc_id in top_ids if doc_id not in cosine_by_id]
+        if missing:
+            placeholders = ", ".join(f":id_{i}" for i in range(len(missing)))
+            cos_sql = f"""
+                SELECT id, 1 - (embedding <=> '{embedding_str}'::vector) AS score
+                FROM document_embeddings
+                WHERE id IN ({placeholders})
+            """
+            cos_result = await session.execute(
+                text(cos_sql), {f"id_{i}": v for i, v in enumerate(missing)}
+            )
+            for row in cos_result.fetchall():
+                cosine_by_id[row[0]] = float(row[1])
+
         results = []
         for doc_id in top_ids:
             row = sem_rows.get(doc_id) or bm25_rows.get(doc_id)
@@ -249,7 +274,8 @@ class EmbeddingService:
                 "source_type": row[2],
                 "source_id": row[3],
                 "metadata": row[4] or {},
-                "similarity": round(rrf_scores[doc_id], 6),
+                "similarity": round(cosine_by_id.get(doc_id, 0.0), 4),
+                "rrf_score": round(rrf_scores[doc_id], 6),
             })
         return results
 

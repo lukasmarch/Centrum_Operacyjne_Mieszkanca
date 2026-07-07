@@ -18,13 +18,21 @@ GUS_CATEGORIES = [
     "transport", "bezpieczenstwo", "zdrowie", "turystyka"
 ]
 
-CATEGORY_CLASSIFY_PROMPT = (
-    f"Sklasyfikuj pytanie użytkownika do jednej z kategorii GUS.\n"
-    f"Dostępne kategorie: {', '.join(GUS_CATEGORIES)}\n"
-    "Odpowiedz TYLKO jedną nazwą kategorii (np. \"demografia\" lub \"finanse_gminy\"). "
-    "Jeśli pytanie dotyczy kilku - wybierz główną. "
-    "Jeśli nie pasuje do żadnej - odpowiedz \"demografia\"."
-)
+CATEGORY_CLASSIFY_PROMPT = """Sklasyfikuj pytanie użytkownika do jednej kategorii danych GUS.
+
+Kategorie i ich zakres:
+- demografia: liczba ludności, urodzenia, zgony, migracje, wiek mieszkańców, przyrost naturalny
+- rynek_pracy: bezrobocie, zatrudnienie, pracujący, wynagrodzenia
+- przedsiebiorczosc: firmy, podmioty gospodarcze, REGON, nowe działalności
+- finanse_gminy: budżet, dochody i wydatki gminy, subwencje, podatki lokalne
+- mieszkalnictwo: mieszkania, budownictwo, pozwolenia na budowę, zasoby mieszkaniowe
+- edukacja: szkoły, przedszkola, uczniowie, wyniki egzaminów
+- transport: drogi, pojazdy, komunikacja
+- bezpieczenstwo: przestępstwa (kryminalne, gospodarcze, drogowe, przeciwko mieniu/rodzinie), wypadki drogowe
+- zdrowie: przychodnie, apteki, porady lekarskie
+- turystyka: noclegi, turyści, baza turystyczna
+
+Odpowiedz TYLKO nazwą kategorii (np. "bezpieczenstwo"). Jeśli pytanie dotyczy kilku — wybierz główną. Jeśli żadna nie pasuje — "demografia"."""
 
 
 class GUSAnalitykAgent(BaseAgent):
@@ -83,7 +91,7 @@ ZASADY:
         ]
 
         if conversation_history:
-            for msg in conversation_history[-6:]:
+            for msg in conversation_history[-10:]:
                 messages.append({"role": msg["role"], "content": msg["content"]})
 
         messages.append({"role": "user", "content": user_message})
@@ -131,24 +139,36 @@ ZASADY:
             logger.error(f"Category classification failed: {e}")
             return "demografia"
 
+    # Gmina Rybno + Powiat Działdowski. Część kategorii (bezpieczeństwo,
+    # transport, turystyka, większość rynku pracy) ma dane WYŁĄCZNIE na
+    # poziomie powiatu — filtrowanie po samej gminie zwracało pustkę.
+    UNIT_GMINA = "042815403062"
+    UNIT_POWIAT = "042815403000"
+
     async def _fetch_gus_rows(self, session: AsyncSession, category: str) -> list[dict]:
-        """Fetch GUS data rows for a category, returns list of dicts"""
+        """Fetch GUS data rows for a category (gmina + powiat), returns list of dicts"""
         try:
             result = await session.execute(text("""
-                SELECT g.var_name, g.year, g.value,
+                SELECT g.var_name, g.unit_id, g.unit_name, g.year, g.value,
                        n.value as avg_national
                 FROM gus_gmina_stats g
                 LEFT JOIN gus_national_averages n
                     ON g.var_id = n.var_id AND g.year = n.year AND n.level = 'national'
-                WHERE g.unit_id = '042815403062'
+                WHERE g.unit_id IN (:unit_gmina, :unit_powiat)
                   AND g.category = :category
-                ORDER BY g.var_name, g.year DESC
-            """), {"category": category})
+                ORDER BY g.unit_id DESC, g.var_name, g.year DESC
+            """), {
+                "category": category,
+                "unit_gmina": self.UNIT_GMINA,
+                "unit_powiat": self.UNIT_POWIAT,
+            })
 
             rows = result.all()
             return [
                 {
                     "var_name": row.var_name,
+                    "unit_id": row.unit_id,
+                    "unit_name": row.unit_name,
                     "year": row.year,
                     "value": row.value,
                     "avg_national": row.avg_national
@@ -160,7 +180,7 @@ ZASADY:
             return []
 
     def _format_gus_context(self, rows: list[dict], category: str) -> str:
-        """Format rows as text table for LLM context"""
+        """Format rows as text table for LLM context, split per unit (gmina/powiat)"""
         if not rows:
             return (
                 f"[DANE GUS - Gmina Rybno | Kategoria: {category}]\n"
@@ -168,40 +188,56 @@ ZASADY:
                 f"Dostępne kategorie: {', '.join(GUS_CATEGORIES)}"
             )
 
-        # Group by var_name, show up to 3 most recent years per variable
-        data_by_var: dict[str, list] = {}
-        for row in rows:
-            var_name = row["var_name"]
-            if var_name not in data_by_var:
-                data_by_var[var_name] = []
-            data_by_var[var_name].append(row)
-
-        header = f"[DANE GUS - Gmina Rybno | Kategoria: {category}]"
         col_sep = " | "
-        lines = [header, ""]
-        lines.append(f"{'Zmienna':<45}{col_sep}{'Rok':>4}{col_sep}{'Wartość':>15}{col_sep}{'Śr. krajowa':>15}")
-        lines.append("-" * 88)
+        lines = [f"[DANE GUS | Kategoria: {category}]", ""]
 
-        for var_name, var_rows in data_by_var.items():
-            for row in var_rows[:3]:  # max 3 years per variable
-                value_str = f"{row['value']:,.1f}" if row['value'] is not None else "brak"
-                national_str = f"{row['avg_national']:,.1f}" if row['avg_national'] is not None else "—"
-                lines.append(
-                    f"{var_name[:45]:<45}{col_sep}{row['year']:>4}{col_sep}"
-                    f"{value_str:>15}{col_sep}{national_str:>15}"
-                )
+        # Sekcja per jednostka: najpierw gmina Rybno, potem powiat działdowski
+        for unit_id, unit_label in [
+            (self.UNIT_GMINA, "GMINA RYBNO"),
+            (self.UNIT_POWIAT, "POWIAT DZIAŁDOWSKI (dane niedostępne na poziomie gminy)"),
+        ]:
+            unit_rows = [r for r in rows if r["unit_id"] == unit_id]
+            if not unit_rows:
+                continue
 
+            data_by_var: dict[str, list] = {}
+            for row in unit_rows:
+                data_by_var.setdefault(row["var_name"], []).append(row)
+
+            lines.append(f"=== {unit_label} ===")
+            lines.append(f"{'Zmienna':<45}{col_sep}{'Rok':>4}{col_sep}{'Wartość':>15}{col_sep}{'Śr. krajowa':>15}")
+            lines.append("-" * 88)
+
+            for var_name, var_rows in data_by_var.items():
+                for row in var_rows[:3]:  # max 3 years per variable
+                    value_str = f"{row['value']:,.1f}" if row['value'] is not None else "brak"
+                    national_str = f"{row['avg_national']:,.1f}" if row['avg_national'] is not None else "—"
+                    lines.append(
+                        f"{var_name[:45]:<45}{col_sep}{row['year']:>4}{col_sep}"
+                        f"{value_str:>15}{col_sep}{national_str:>15}"
+                    )
+            lines.append("")
+
+        lines.append("WAŻNE: przy danych powiatowych zaznacz w odpowiedzi, że dotyczą powiatu działdowskiego, nie samej gminy.")
         return "\n".join(lines)
 
     def _build_chart_data(self, rows: list[dict]) -> list[dict]:
-        """Build chart configs from rows: max 1 TrendChart + 1 KPI"""
+        """Build chart configs from rows: max 1 TrendChart + 1 KPI.
+
+        Wykresy z JEDNEJ jednostki (preferowana gmina, fallback powiat) —
+        mieszanie gminy i powiatu w jednej serii fałszowałoby trend.
+        """
         if not rows:
             return []
 
+        gmina_rows = [r for r in rows if r.get("unit_id") == self.UNIT_GMINA]
+        chart_rows = gmina_rows or rows
+        unit_suffix = "" if gmina_rows else " (powiat działdowski)"
+
         charts = []
         by_var: dict[str, list] = {}
-        for row in rows:
-            by_var.setdefault(row["var_name"], []).append(row)
+        for row in chart_rows:
+            by_var.setdefault(row["var_name"] + unit_suffix, []).append(row)
 
         # Sort by number of data points descending (most data first)
         sorted_vars = sorted(by_var.items(), key=lambda x: len(x[1]), reverse=True)

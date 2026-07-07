@@ -210,17 +210,26 @@ async def send_message(
     session.add(user_msg)
     await session.commit()
 
-    # Get conversation history
+    # Get conversation history — OSTATNIE 20 wiadomości (desc + reverse);
+    # rosnąco z limitem zwracało 20 najstarszych i długie rozmowy traciły
+    # świeży kontekst
     history_result = await session.execute(
         select(ChatMessage)
         .where(ChatMessage.conversation_id == conversation.id)
-        .order_by(ChatMessage.created_at)
+        .order_by(ChatMessage.created_at.desc())
         .limit(20)
     )
+    history_msgs = list(reversed(history_result.scalars().all()))
     history = [
         {"role": msg.role, "content": msg.content}
-        for msg in history_result.scalars().all()
+        for msg in history_msgs
     ]
+    # Ostatni agent w rozmowie — router używa go do obsługi pytań kontynuacyjnych
+    last_agent = next(
+        (m.agent_name for m in reversed(history_msgs)
+         if m.role == "assistant" and m.agent_name),
+        None
+    )
 
     if request.stream:
         # SSE streaming response
@@ -232,7 +241,8 @@ async def send_message(
                     agent_name=request.agent_name,
                     conversation_history=history,
                     stream=True,
-                    user=user
+                    user=user,
+                    last_agent=last_agent
                 )
 
                 # Send conversation_id first
@@ -299,7 +309,8 @@ async def send_message(
         agent_name=request.agent_name,
         conversation_history=history,
         stream=False,
-        user=user
+        user=user,
+        last_agent=last_agent
     )
 
     # Save assistant message

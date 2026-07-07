@@ -45,6 +45,11 @@ Dostepni agenci i ich INTENCJE:
   "kiedy przyjmuje lekarz?", "godziny poradni stomatologicznej", "ktora apteka dzis dyzuruje?",
   "dyzur apteki w weekend", "godziny POZ", "harmonogram poradni ginekologicznej"
 
+KONTYNUACJA ROZMOWY: jesli pytanie jest doprecyzowaniem lub kontynuacja
+poprzedniego watku (np. "a w zeszlym roku?", "a ile dokladnie?", "powiedz wiecej",
+"a w Hartowcu?"), zwroc agenta ktory obslugiwal poprzednia wiadomosc
+(podany jako OSTATNI AGENT) — chyba ze intencja WYRAZNIE sie zmienila.
+
 Odpowiedz TYLKO jedna nazwa agenta (np. "redaktor"). Nic wiecej."""
 
 
@@ -60,14 +65,33 @@ class Orchestrator:
         self.agents[agent.name] = agent
         logger.info(f"Registered agent: {agent.name} ({agent.display_name})")
 
-    async def route(self, user_message: str) -> str:
-        """Determine which agent should handle the query"""
+    async def route(
+        self,
+        user_message: str,
+        conversation_history: list[dict] = None,
+        last_agent: Optional[str] = None,
+    ) -> str:
+        """Determine which agent should handle the query.
+
+        Router widzi krótki kontekst rozmowy — bez niego pytania
+        kontynuacyjne ("a w zeszłym roku?") trafiały do złego agenta.
+        """
         try:
+            routing_input = ""
+            if conversation_history:
+                prev_user = [m["content"] for m in conversation_history if m["role"] == "user"][-2:]
+                if prev_user:
+                    prev = "\n".join(f"- {q[:150]}" for q in prev_user)
+                    routing_input += f"POPRZEDNIE PYTANIA W ROZMOWIE:\n{prev}\n"
+            if last_agent:
+                routing_input += f"OSTATNI AGENT: {last_agent}\n"
+            routing_input += f"AKTUALNE PYTANIE: {user_message}"
+
             response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": ROUTING_PROMPT},
-                    {"role": "user", "content": user_message}
+                    {"role": "user", "content": routing_input}
                 ],
                 temperature=0,
                 max_tokens=20
@@ -95,12 +119,13 @@ class Orchestrator:
         agent_name: Optional[str] = None,
         conversation_history: list[dict] = None,
         stream: bool = False,
-        user=None
+        user=None,
+        last_agent: Optional[str] = None,
     ) -> dict:
         """Route and handle a user query"""
         # Auto-route if no agent specified
         if not agent_name:
-            agent_name = await self.route(user_message)
+            agent_name = await self.route(user_message, conversation_history, last_agent)
 
         agent = self.agents.get(agent_name)
         if not agent:
