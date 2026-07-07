@@ -117,6 +117,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <Send size={13} className="text-white translate-x-px" />
             </button>
           </div>
+
+          {/* Oznaczenie AI — obowiązek informacyjny z art. 50 AI Act (UE 2024/1689) */}
+          <p className="text-center text-[10px] text-neutral-600 mt-2 px-4">
+            Rozmawiasz z asystentem AI — odpowiedzi są generowane automatycznie
+            i mogą zawierać błędy. Nie stanowią porady prawnej ani urzędowej.
+          </p>
         </div>
       </div>
     </>

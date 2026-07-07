@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_LOCATIONS } from '../../types';
 
 interface RegisterPageProps {
-  onNavigate: (page: 'login' | 'dashboard') => void;
+  onNavigate: (page: 'login' | 'dashboard' | 'terms' | 'privacy') => void;
 }
 
 const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
@@ -20,6 +20,8 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
     full_name: '',
     location: 'Rybno',
   });
+  const [consentTerms, setConsentTerms] = useState(false);
+  const [consentMarketing, setConsentMarketing] = useState(false);
   const [localError, setLocalError] = useState('');
 
   const handleChange = (
@@ -64,12 +66,19 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
       return;
     }
 
+    if (!consentTerms) {
+      setLocalError('Rejestracja wymaga akceptacji Regulaminu i Polityki prywatności');
+      return;
+    }
+
     try {
       await register({
         email: formData.email,
         password: formData.password,
         full_name: formData.full_name,
         location: formData.location,
+        consent_terms: consentTerms,
+        consent_marketing: consentMarketing,
       });
       onNavigate('dashboard');
     } catch {
@@ -189,10 +198,47 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
               />
             </div>
 
+            {/* Zgody RODO */}
+            <div className="space-y-3 pt-1">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consentTerms}
+                  onChange={(e) => setConsentTerms(e.target.checked)}
+                  disabled={isLoading}
+                  className="mt-0.5 accent-blue-500 shrink-0"
+                />
+                <span className="text-xs text-neutral-400 leading-relaxed">
+                  Akceptuję{' '}
+                  <button type="button" onClick={() => onNavigate('terms')} className="text-blue-400 hover:underline">
+                    Regulamin
+                  </button>{' '}
+                  i zapoznałem/am się z{' '}
+                  <button type="button" onClick={() => onNavigate('privacy')} className="text-blue-400 hover:underline">
+                    Polityką prywatności
+                  </button>{' '}
+                  <span className="text-red-400">*</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consentMarketing}
+                  onChange={(e) => setConsentMarketing(e.target.checked)}
+                  disabled={isLoading}
+                  className="mt-0.5 accent-blue-500 shrink-0"
+                />
+                <span className="text-xs text-neutral-400 leading-relaxed">
+                  Chcę otrzymywać newsletter i informacje o nowych funkcjach serwisu
+                  (opcjonalne, zgodę można cofnąć w każdej chwili)
+                </span>
+              </label>
+            </div>
+
             {/* Submit */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !consentTerms}
               className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
               {isLoading ? (

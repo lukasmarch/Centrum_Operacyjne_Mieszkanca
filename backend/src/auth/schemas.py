@@ -19,6 +19,8 @@ class UserCreate(BaseModel):
     full_name: str = Field(min_length=2, max_length=100)
     location: str = Field(default="Rybno", max_length=100)
     referral_code: Optional[str] = Field(default=None, max_length=20)  # Kod polecającego
+    consent_terms: bool = Field(default=False)      # akceptacja regulaminu + polityki prywatności (wymagana)
+    consent_marketing: bool = Field(default=False)  # zgoda marketingowa (opcjonalna)
 
     @field_validator("password")
     @classmethod

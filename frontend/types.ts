@@ -259,7 +259,7 @@ export interface ReportMapItem {
   created_at: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'stats' | 'business' | 'reports' | 'premium' | 'assistant' | 'login' | 'register' | 'profile';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'stats' | 'business' | 'reports' | 'premium' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies';
 
 export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'zgloszenia';
 
@@ -451,6 +451,8 @@ export interface RegisterData {
   password: string;
   full_name: string;
   location: string;
+  consent_terms: boolean;
+  consent_marketing?: boolean;
 }
 
 export interface UserUpdateData {

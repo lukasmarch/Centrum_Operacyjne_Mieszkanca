@@ -10,6 +10,7 @@ import LoginPage from './src/pages/LoginPage';
 import RegisterPage from './src/pages/RegisterPage';
 import BottomTabBar from './components/navigation/BottomTabBar';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import CookieConsent from './components/CookieConsent';
 import SubNavBar from './components/navigation/SubNavBar';
 import TopBar from './components/navigation/TopBar';
 import { BeamsBackground } from './components/ui/beams-background';
@@ -21,6 +22,9 @@ const WeatherPage  = lazy(() => import('./src/pages/WeatherPage'));
 const BusinessPage = lazy(() => import('./src/pages/BusinessPage'));
 const ReportsPage  = lazy(() => import('./src/pages/ReportsPage'));
 const AssistantPage = lazy(() => import('./src/pages/AssistantPage'));
+const TermsPage        = lazy(() => import('./src/pages/TermsPage'));
+const PrivacyPage      = lazy(() => import('./src/pages/PrivacyPage'));
+const CookiePolicyPage = lazy(() => import('./src/pages/CookiePolicyPage'));
 
 const MIASTO_ITEMS = [
     { id: 'news', label: 'Wiadomości' },
@@ -47,6 +51,9 @@ const SECTION_TO_TAB: Record<AppSection, TabId> = {
     profile: 'home',
     login: 'home',
     register: 'home',
+    terms: 'home',
+    privacy: 'home',
+    cookies: 'home',
 };
 
 // Default section for each tab
@@ -105,10 +112,10 @@ const AppContent: React.FC = () => {
     const renderContent = () => {
         // Auth pages
         if (activeSection === 'login') {
-            return <LoginPage onNavigate={(page) => handleNavigate(page === 'register' ? 'register' : 'dashboard')} />;
+            return <LoginPage onNavigate={handleNavigate} />;
         }
         if (activeSection === 'register') {
-            return <RegisterPage onNavigate={(page) => handleNavigate(page === 'login' ? 'login' : 'dashboard')} />;
+            return <RegisterPage onNavigate={handleNavigate} />;
         }
 
         // Profile page (requires login)
@@ -137,6 +144,12 @@ const AppContent: React.FC = () => {
                 return <BusinessPage />;
             case 'reports':
                 return <ReportsPage onNavigate={handleNavigate} />;
+            case 'terms':
+                return <TermsPage onNavigate={handleNavigate} />;
+            case 'privacy':
+                return <PrivacyPage onNavigate={handleNavigate} />;
+            case 'cookies':
+                return <CookiePolicyPage onNavigate={handleNavigate} />;
             case 'premium':
                 return (
                     <div className="max-w-4xl mx-auto py-12">
@@ -282,11 +295,12 @@ const AppContent: React.FC = () => {
 
             {/* Footer */}
             {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-600 text-xs flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
-                <div className="flex items-center gap-6">
-                    <p className="font-medium">© 2024 Rybno Live</p>
+                <div className="flex flex-col md:flex-row items-center gap-2 md:gap-6">
+                    <p className="font-medium">© 2026 Rybno Live · Lumargo Łukasz Marchlewicz</p>
                     <div className="flex gap-4">
-                        <a href="#" className="hover:text-blue-400 transition-colors">Prywatność</a>
-                        <a href="#" className="hover:text-blue-400 transition-colors">Regulamin</a>
+                        <button onClick={() => handleNavigate('privacy')} className="hover:text-blue-400 transition-colors">Prywatność</button>
+                        <button onClick={() => handleNavigate('terms')} className="hover:text-blue-400 transition-colors">Regulamin</button>
+                        <button onClick={() => handleNavigate('cookies')} className="hover:text-blue-400 transition-colors">Cookies</button>
                     </div>
                 </div>
                 <div className="flex gap-4 font-mono opacity-50">
@@ -297,6 +311,9 @@ const AppContent: React.FC = () => {
 
             {/* PWA install prompt — shown after 3rd visit */}
             <PWAInstallPrompt />
+
+            {/* Baner zgody cookies (PKE) — pokazywany do czasu podjęcia decyzji */}
+            <CookieConsent onNavigate={handleNavigate} />
 
             {/* Bottom Tab Bar */}
             <BottomTabBar

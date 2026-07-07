@@ -24,6 +24,10 @@ from .schemas import (
 # Cookie security: False for localhost (HTTP), True for production (HTTPS)
 COOKIE_SECURE = not settings.APP_URL.startswith("http://localhost")
 
+# Wersja dokumentów prawnych akceptowanych przy rejestracji.
+# Podbij przy każdej istotnej zmianie regulaminu/polityki prywatności.
+PRIVACY_POLICY_VERSION = "2026-07-07"
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
@@ -40,7 +44,15 @@ async def register(
     - **password**: Min 8 chars, must contain uppercase and digit
     - **full_name**: User's display name
     - **location**: User's town (default: Rybno)
+    - **consent_terms**: required acceptance of Terms of Service and Privacy Policy
     """
+    # Akceptacja regulaminu jest warunkiem zawarcia umowy (art. 8 UŚUDE, RODO art. 6 ust. 1 lit. b)
+    if not user_data.consent_terms:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rejestracja wymaga akceptacji Regulaminu i Polityki prywatności"
+        )
+
     # Check if email already exists
     result = await session.execute(
         select(User).where(User.email == user_data.email)
@@ -72,6 +84,9 @@ async def register(
         trial_ends_at=trial_ends,
         referral_code=secrets.token_hex(4),  # 8-znakowy unikalny kod
         referred_by=referrer.id if referrer else None,
+        consent_terms_at=datetime.utcnow(),
+        consent_marketing=user_data.consent_marketing,
+        consent_privacy_version=PRIVACY_POLICY_VERSION,
         created_at=datetime.utcnow()
     )
 

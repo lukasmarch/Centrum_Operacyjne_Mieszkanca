@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface LoginPageProps {
-  onNavigate: (page: 'register' | 'dashboard') => void;
+  onNavigate: (page: 'register' | 'dashboard' | 'terms' | 'privacy') => void;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
@@ -153,13 +153,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
         {/* Footer */}
         <p className="text-center text-neutral-500 text-sm mt-6">
           Logując się, akceptujesz{' '}
-          <a href="#" className="text-blue-400 hover:underline">
+          <button onClick={() => onNavigate('terms')} className="text-blue-400 hover:underline">
             Regulamin
-          </a>{' '}
+          </button>{' '}
           i{' '}
-          <a href="#" className="text-blue-400 hover:underline">
+          <button onClick={() => onNavigate('privacy')} className="text-blue-400 hover:underline">
             Politykę prywatności
-          </a>
+          </button>
         </p>
       </div>
     </div>

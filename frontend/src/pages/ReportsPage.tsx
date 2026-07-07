@@ -324,9 +324,10 @@ const LOCALITY_COORDS: Record<string, [number, number]> = {
 // ==================== Report Form Modal ====================
 
 const ReportFormModal: React.FC<{
+    onNavigate?: (section: AppSection) => void;
     onClose: () => void;
     onCreated: (report: Report) => void;
-}> = ({ onClose, onCreated }) => {
+}> = ({ onNavigate, onClose, onCreated }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [authorName, setAuthorName] = useState('');
@@ -342,6 +343,7 @@ const ReportFormModal: React.FC<{
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [gpsFromLocality, setGpsFromLocality] = useState(false);
+    const [consentReport, setConsentReport] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Auto-geolocate on mount
@@ -400,6 +402,11 @@ const ReportFormModal: React.FC<{
         e.preventDefault();
         if (!title.trim() || !description.trim()) {
             setError('Tytuł i opis są wymagane');
+            return;
+        }
+
+        if (!consentReport) {
+            setError('Wysłanie zgłoszenia wymaga zgody na przetwarzanie danych');
             return;
         }
 
@@ -664,6 +671,36 @@ const ReportFormModal: React.FC<{
                             </div>
                         </div>
 
+                        {/* Zgoda RODO + ostrzeżenie o zdjęciach */}
+                        <div className="p-3 bg-amber-500/5 border border-amber-500/15 rounded-xl space-y-2">
+                            <p className="text-[11px] text-amber-200/70 leading-relaxed">
+                                📷 Nie publikuj wizerunku osób trzecich bez ich zgody ani czytelnych
+                                tablic rejestracyjnych — takie zgłoszenia mogą zostać odrzucone lub
+                                zanonimizowane przez moderację.
+                            </p>
+                            <label className="flex items-start gap-2.5 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={consentReport}
+                                    onChange={(e) => setConsentReport(e.target.checked)}
+                                    className="mt-0.5 accent-blue-500 shrink-0"
+                                />
+                                <span className="text-[11px] text-neutral-400 leading-relaxed">
+                                    Wyrażam zgodę na przetwarzanie danych zawartych w zgłoszeniu
+                                    (treść, lokalizacja, zdjęcie, opcjonalne dane kontaktowe) w celu
+                                    jego publikacji i obsługi, zgodnie z{' '}
+                                    <button
+                                        type="button"
+                                        onClick={() => { onClose(); onNavigate?.('privacy'); }}
+                                        className="text-blue-400 hover:underline"
+                                    >
+                                        Polityką prywatności
+                                    </button>{' '}
+                                    <span className="text-red-400">*</span>
+                                </span>
+                            </label>
+                        </div>
+
                         {/* Error */}
                         {error && (
                             <div className="p-3 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-sm font-medium">
@@ -674,7 +711,7 @@ const ReportFormModal: React.FC<{
                         {/* Submit */}
                         <button
                             type="submit"
-                            disabled={submitting || !title.trim() || !description.trim()}
+                            disabled={submitting || !title.trim() || !description.trim() || !consentReport}
                             className="w-full py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black text-lg rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-900/30 border border-blue-500/20"
                         >
                             {submitting ? (
@@ -1052,7 +1089,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
 
             {/* Modals */}
             {showForm && (
-                <ReportFormModal onClose={() => setShowForm(false)} onCreated={handleReportCreated} />
+                <ReportFormModal onNavigate={onNavigate} onClose={() => setShowForm(false)} onCreated={handleReportCreated} />
             )}
             {selectedReport && (
                 <ReportDetail

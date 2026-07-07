@@ -62,6 +62,11 @@ class User(SQLModel, table=True):
     email_verified: bool = Field(default=False)
     is_active: bool = Field(default=True)
 
+    # Zgody RODO (art. 7 — rozliczalność)
+    consent_terms_at: Optional[datetime] = None          # kiedy zaakceptowano regulamin + politykę prywatności
+    consent_marketing: bool = Field(default=False)       # zgoda marketingowa (newsletter, oferty)
+    consent_privacy_version: Optional[str] = Field(default=None, max_length=20)  # wersja zaakceptowanych dokumentów
+
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
