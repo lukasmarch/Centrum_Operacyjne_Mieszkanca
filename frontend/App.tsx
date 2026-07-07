@@ -296,7 +296,7 @@ const AppContent: React.FC = () => {
             {/* Footer */}
             {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-600 text-xs flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
                 <div className="flex flex-col md:flex-row items-center gap-2 md:gap-6">
-                    <p className="font-medium">© 2026 Rybno Live · Lumargo Łukasz Marchlewicz</p>
+                    <p className="font-medium">© 2026 Rybno Live · Ai_lumargo</p>
                     <div className="flex gap-4">
                         <button onClick={() => handleNavigate('privacy')} className="hover:text-blue-400 transition-colors">Prywatność</button>
                         <button onClick={() => handleNavigate('terms')} className="hover:text-blue-400 transition-colors">Regulamin</button>
