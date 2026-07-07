@@ -2,7 +2,7 @@
 User profile routes: /me, /profile
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_session, User
@@ -11,6 +11,7 @@ from src.auth.schemas import (
     UserResponse, UserUpdate, PasswordChange, MessageResponse, AVAILABLE_LOCATIONS
 )
 from .service import UserService
+from .dsar import export_user_data, delete_user_account
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -110,18 +111,41 @@ async def get_current_subscription(
     }
 
 
-@router.delete("/me", response_model=MessageResponse)
-async def deactivate_account(
+@router.get("/me/export")
+async def export_my_data(
     current_user: User = Depends(get_current_active_user),
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Deactivate current user's account.
+    Export all personal data of the current user (RODO art. 15/20).
 
-    This doesn't delete the account, just marks it as inactive.
+    Returns a JSON document with profile, consents, subscriptions,
+    AI conversations, reports, push subscriptions and newsletter status.
     """
-    await UserService.deactivate_user(session, current_user)
-    return MessageResponse(message="Account deactivated successfully")
+    return await export_user_data(session, current_user)
+
+
+@router.delete("/me", response_model=MessageResponse)
+async def delete_account(
+    response: Response,
+    current_user: User = Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Permanently delete current user's account (RODO art. 17).
+
+    Deletes AI conversations, push subscriptions and newsletter entry,
+    anonymizes authored reports and the user record itself. Billing
+    records (subscriptions) are retained as required by tax law
+    (art. 17(3)(b) RODO). This action is irreversible.
+    """
+    await delete_user_account(session, current_user)
+
+    # Wyloguj — konto przestało istnieć
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+
+    return MessageResponse(message="Konto i dane osobowe zostały usunięte")
 
 
 @router.get("/locations")

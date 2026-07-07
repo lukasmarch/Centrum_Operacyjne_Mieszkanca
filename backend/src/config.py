@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hours
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # RODO: sól do pseudonimizacji IP (limity anonimowego czatu).
+    # Nadpisz w .env.production wartością losową — zmiana soli resetuje liczniki dnia.
+    IP_HASH_SALT: str = "rybnolive-ip-salt"
+
     # Newsletter settings (Sprint 2)
     RESEND_API_KEY: Optional[str] = None
     NEWSLETTER_FROM_EMAIL: str = "newsletter@centrum-mieszkanca.pl"

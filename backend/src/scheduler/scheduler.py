@@ -26,6 +26,7 @@ from src.scheduler.places_job import run_places_job
 from src.scheduler.health_job import run_health_job
 from src.scheduler.proactive_alerts_job import run_proactive_alerts
 from src.scheduler.trial_expiry_job import run_trial_expiry
+from src.scheduler.retention_job import run_retention_job
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
@@ -323,6 +324,15 @@ def start_scheduler():
         trigger=CronTrigger(hour=5, minute=0),
         id='trial_expiry',
         name='Trial Expiry (downgrade to Free)',
+        replace_existing=True
+    )
+
+    # Retencja danych osobowych (RODO art. 5) — codziennie o 3:30
+    scheduler.add_job(
+        func=run_retention_job,
+        trigger=CronTrigger(hour=3, minute=30),
+        id='data_retention',
+        name='Data Retention (RODO cleanup)',
         replace_existing=True
     )
 

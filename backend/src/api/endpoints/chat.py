@@ -4,6 +4,7 @@ POST /api/chat/message - send message (SSE streaming)
 GET /api/chat/history - get conversation history
 GET /api/chat/suggestions - get context-aware suggestions
 """
+import hashlib
 import json
 from datetime import datetime, date
 from typing import Optional
@@ -33,6 +34,17 @@ DAILY_LIMITS = {
     "premium": None,  # unlimited
     "business": None,  # unlimited
 }
+
+
+def _hash_ip(ip: str) -> str:
+    """
+    Pseudonimizacja IP (RODO art. 5 — minimalizacja): do dziennego limitu
+    anonimowego wystarczy stabilny identyfikator, nie sam adres.
+    Sól z konfiguracji uniemożliwia odtworzenie IP z hasha bez dostępu do env.
+    """
+    from src.config import settings
+    salt = getattr(settings, "IP_HASH_SALT", "rybnolive-ip-salt")
+    return hashlib.sha256(f"{salt}:{ip}".encode()).hexdigest()[:40]
 
 
 class ChatRequest(BaseModel):
@@ -65,8 +77,9 @@ async def check_rate_limit(
     reset_at = (reset_at + timedelta(days=1)).isoformat() + "Z"
 
     if user is None:
-        # Anonymous user - check by IP
-        ip = http_request.client.host if http_request.client else "unknown"
+        # Anonymous user — limit po zahaszowanym IP (nie przechowujemy adresu wprost)
+        raw_ip = http_request.client.host if http_request.client else "unknown"
+        ip = _hash_ip(raw_ip)
         limit = DAILY_LIMITS["anonymous"]
 
         result = await session.execute(
