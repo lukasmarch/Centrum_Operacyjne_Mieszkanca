@@ -72,6 +72,21 @@ class RSSFeedScraper(BaseScraper):
                 if article:
                     articles.append(article)
 
+            # Opcjonalny filtr lokalności (scraping_config.keyword_filter):
+            # feedy regionalne (Energa — całe woj., Radio Olsztyn) zawężamy
+            # do artykułów wspominających powiat działdowski
+            keywords = [k.lower() for k in self.config.get("keyword_filter", [])]
+            if keywords:
+                before = len(articles)
+                articles = [
+                    a for a in articles
+                    if any(
+                        kw in f"{a.get('title', '')} {a.get('summary', '')} {a.get('content', '')}".lower()
+                        for kw in keywords
+                    )
+                ]
+                self.logger.info(f"Keyword filter: {before} → {len(articles)} articles")
+
             self.logger.info(f"Successfully parsed {len(articles)} articles")
             return articles
 
