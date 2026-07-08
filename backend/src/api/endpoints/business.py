@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.connection import async_session
 from src.database.schema import CEIDGBusiness, CEIDGSyncStats
-from src.auth.dependencies import get_optional_user
+from src.auth.dependencies import get_optional_user, get_admin_user, get_current_active_user
 from src.utils.logger import setup_logger
 from src.integrations.regon_api import RegonService
 
@@ -405,15 +405,15 @@ async def get_localities():
 
 @router.post("/sync")
 async def trigger_sync(
-    user = Depends(get_optional_user)
+    user = Depends(get_admin_user)
 ):
     """
-    Ręczna synchronizacja z API CEIDG (wymaga zalogowania)
+    Ręczna synchronizacja z API CEIDG (wymaga roli administratora)
     """
     # Import here to avoid circular dependency
     from src.scheduler.ceidg_job import run_ceidg_job_async
 
-    logger.info(f"Manual CEIDG sync triggered by user: {user.email if user else 'anonymous'}")
+    logger.info(f"Manual CEIDG sync triggered by admin: {user.email}")
 
     try:
         await run_ceidg_job_async()
@@ -426,10 +426,11 @@ async def trigger_sync(
 async def regon_search_proxy(
     nip: Optional[str] = None,
     regon: Optional[str] = None,
-    nazwa: Optional[str] = None
+    nazwa: Optional[str] = None,
+    user = Depends(get_current_active_user),
 ):
     """
-    Wyszukiwarka live API REGON
+    Wyszukiwarka live API REGON (wymaga zalogowania — ochrona przed nadużyciem proxy)
     """
     if not any([nip, regon, nazwa]):
         raise HTTPException(status_code=400, detail="Podaj NIP, REGON lub nazwę")

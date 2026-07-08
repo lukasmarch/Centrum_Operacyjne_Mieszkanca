@@ -61,6 +61,7 @@ class User(SQLModel, table=True):
     # Status flags
     email_verified: bool = Field(default=False)
     is_active: bool = Field(default=True)
+    is_admin: bool = Field(default=False)  # rola administratora (moderacja, operacje serwisowe) — niezależna od tieru płatności
 
     # Zgody RODO (art. 7 — rozliczalność)
     consent_terms_at: Optional[datetime] = None          # kiedy zaakceptowano regulamin + politykę prywatności
@@ -518,6 +519,7 @@ class GUSInsight(SQLModel, table=True):
 # ======================
 
 class ReportStatus(str, Enum):
+    PENDING = "pending"  # czeka na moderację — niewidoczne publicznie
     NEW = "new"
     VERIFIED = "verified"
     IN_PROGRESS = "in_progress"

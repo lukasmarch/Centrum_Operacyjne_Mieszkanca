@@ -5,12 +5,20 @@
 
 ## 🔴 Priorytet 1 — krytyczne (najbliższa sesja)
 
-- [ ] **Podmienić `[NIP]` i `[ADRES]`** w dokumentach prawnych (dane Lumargo od Łukasza)
-      → `frontend/src/pages/TermsPage.tsx` (§1 pkt 2) i `PrivacyPage.tsx` (sekcja 1)
-      → potem `./deploy-frontend.sh 91.99.142.30`
+- [x] **Podmienić `[NIP]` i `[ADRES]`** w dokumentach prawnych — zrobione lokalnie 2026-07-08
+      → ⚠️ NIP 571-100-100 ma 9 cyfr (polski NIP = 10) i adres bez numeru budynku — POTWIERDZIĆ przed deployem!
 - [ ] **Weryfikacja dokumentów prawnych przez radcę prawnego** (wersje robocze na produkcji; budżet ~1,5–3 tys. zł)
-- [ ] **UI DSAR w ProfilePage** — przyciski „Pobierz moje dane" i „Usuń konto" (z potwierdzeniem!)
-      → endpointy już działają na prod: `GET /api/users/me/export`, `DELETE /api/users/me`
+- [x] **UI DSAR w ProfilePage** — zrobione lokalnie 2026-07-08 (sekcja „Prywatność i dane" + modal usunięcia konta)
+
+## 🟡 Zrobione lokalnie 2026-07-08 — CZEKA NA AKCEPTACJĘ I DEPLOY
+
+- [x] Rola administratora: `users.is_admin` + `get_admin_user`; moderacja/reanalyze/fix-existing/CEIDG sync wymagają admina (nie tieru Business)
+- [x] Moderacja zgłoszeń: nowe → status `pending`, publiczna lista/mapa/statystyki ukrywają pending+rejected; `GET /api/reports/moderation/pending` (admin); push emergency dopiero po zatwierdzeniu
+- [x] Deduplikacja głosów: tabela `report_upvotes` (konto lub hash IP), 1 głos/zgłoszenie
+- [x] `regon-search` wymaga zalogowania
+- [x] Checkout: `accept_terms` wymagany w create-transaction (400 bez zgody) + checkbox z linkami do Regulaminu w ProfilePage
+- Migracja: `python -m scripts.migrations.add_admin_and_moderation --grant biuro@lumargo.pl` (na serwerze po deployu!)
+- Deploy: commit → main (backend auto), `./deploy-frontend.sh 91.99.142.30` (frontend)
 
 ## 🟠 Priorytet 2 — prawo i źródła (30 dni)
 

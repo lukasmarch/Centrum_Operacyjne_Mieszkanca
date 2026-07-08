@@ -16,19 +16,23 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File, Form, Request
 from pydantic import BaseModel
 from sqlmodel import select, func, col
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.connection import async_session
 from src.database.schema import Report, ReportStatus, ReportCategory
-from src.auth.dependencies import get_optional_user, get_business_user
+from src.auth.dependencies import get_optional_user, get_admin_user
 from src.utils.logger import setup_logger
 
 logger = setup_logger("ReportsAPI")
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
+
+# Statusy niewidoczne publicznie (moderacja przed publikacją)
+HIDDEN_STATUSES = (ReportStatus.PENDING.value, ReportStatus.REJECTED.value)
 
 # Upload directory
 UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads" / "reports"
@@ -153,11 +157,12 @@ async def get_reports_for_map(
             .where(Report.latitude.isnot(None))
             .where(Report.longitude.isnot(None))
             .where(Report.is_spam == False)
+            .where(col(Report.status).notin_(HIDDEN_STATUSES))
         )
 
         if category:
             query = query.where(Report.category == category)
-        if status:
+        if status and status not in HIDDEN_STATUSES:
             query = query.where(Report.status == status)
 
         query = query.order_by(col(Report.created_at).desc()).limit(limit)
@@ -179,16 +184,18 @@ async def list_reports(
     Lista zgłoszeń z paginacją i filtrami.
     """
     async with async_session() as session:
-        # Base query - hide spam
-        base_filter = Report.is_spam == False
-
-        query = select(Report).where(base_filter)
-        count_query = select(func.count()).select_from(Report).where(base_filter)
+        # Base query - hide spam and unmoderated/rejected reports
+        query = select(Report).where(Report.is_spam == False).where(
+            col(Report.status).notin_(HIDDEN_STATUSES)
+        )
+        count_query = select(func.count()).select_from(Report).where(
+            Report.is_spam == False
+        ).where(col(Report.status).notin_(HIDDEN_STATUSES))
 
         if category:
             query = query.where(Report.category == category)
             count_query = count_query.where(Report.category == category)
-        if status:
+        if status and status not in HIDDEN_STATUSES:
             query = query.where(Report.status == status)
             count_query = count_query.where(Report.status == status)
 
@@ -218,8 +225,8 @@ async def list_reports(
 
 
 @router.get("/{report_id}", response_model=ReportResponse)
-async def get_report(report_id: int):
-    """Szczegóły pojedynczego zgłoszenia."""
+async def get_report(report_id: int, user=Depends(get_optional_user)):
+    """Szczegóły pojedynczego zgłoszenia. Zgłoszenia w moderacji widzi tylko admin i autor."""
     async with async_session() as session:
         result = await session.execute(
             select(Report).where(Report.id == report_id)
@@ -228,6 +235,12 @@ async def get_report(report_id: int):
 
         if not report:
             raise HTTPException(status_code=404, detail="Zgłoszenie nie zostało znalezione")
+
+        if report.status in HIDDEN_STATUSES or report.is_spam:
+            is_author = user and report.user_id and report.user_id == user.id
+            is_admin = user and user.is_admin
+            if not (is_author or is_admin):
+                raise HTTPException(status_code=404, detail="Zgłoszenie nie zostało znalezione")
 
         # Increment views
         report.views_count += 1
@@ -361,7 +374,9 @@ async def create_report(
         longitude=longitude,
         address=address,
         location_name=location_name,
-        status=ReportStatus.REJECTED.value if ai_result.get("is_spam") else ReportStatus.NEW.value,
+        # Moderacja przed publikacją: nowe zgłoszenie czeka na zatwierdzenie przez admina.
+        # Push o zagrożeniach wysyłany jest dopiero przy zatwierdzeniu (PATCH /status).
+        status=ReportStatus.REJECTED.value if ai_result.get("is_spam") else ReportStatus.PENDING.value,
         is_spam=ai_result.get("is_spam", False),
     )
 
@@ -370,25 +385,32 @@ async def create_report(
         await session.commit()
         await session.refresh(report)
 
-        logger.info(f"Report created: id={report.id}, title='{report.title}', category={report.category}")
-
-        # Trigger emergency push notification for critical categories
-        if not report.is_spam and report.category in [
-            ReportCategory.EMERGENCY.value, ReportCategory.FIRE.value
-        ]:
-            try:
-                from src.services.push_service import push_service
-                sent = await push_service.send_emergency_alert(session, report)
-                logger.info(f"Emergency push sent to {sent} subscribers for report {report.id}")
-            except Exception as push_err:
-                logger.error(f"Emergency push failed for report {report.id}: {push_err}")
+        logger.info(f"Report created (pending moderation): id={report.id}, title='{report.title}', category={report.category}")
 
         return ReportResponse.model_validate(report)
 
 
+def _voter_key(request: Request, user) -> str:
+    """Stabilny identyfikator głosującego: id konta albo zahaszowane IP (RODO art. 5)."""
+    if user:
+        return f"user:{user.id}"
+    import hashlib
+    from src.config import settings
+    raw_ip = request.client.host if request.client else "unknown"
+    salt = getattr(settings, "IP_HASH_SALT", "rybnolive-ip-salt")
+    return "ip:" + hashlib.sha256(f"{salt}:{raw_ip}".encode()).hexdigest()[:40]
+
+
 @router.patch("/{report_id}/upvote", response_model=ReportResponse)
-async def upvote_report(report_id: int):
-    """Głosuj 'potwierdź problem' na zgłoszeniu."""
+async def upvote_report(
+    report_id: int,
+    request: Request,
+    user=Depends(get_optional_user),
+):
+    """Głosuj 'potwierdź problem' na zgłoszeniu. Jeden głos na zgłoszenie
+    na konto / adres IP (deduplikacja w report_upvotes)."""
+    voter_key = _voter_key(request, user)
+
     async with async_session() as session:
         result = await session.execute(
             select(Report).where(Report.id == report_id)
@@ -398,21 +420,72 @@ async def upvote_report(report_id: int):
         if not report:
             raise HTTPException(status_code=404, detail="Zgłoszenie nie zostało znalezione")
 
-        report.upvotes += 1
-        session.add(report)
+        if report.status in HIDDEN_STATUSES or report.is_spam:
+            raise HTTPException(status_code=404, detail="Zgłoszenie nie zostało znalezione")
+
+        inserted = await session.execute(
+            text("""
+                INSERT INTO report_upvotes (report_id, voter_key)
+                VALUES (:report_id, :voter_key)
+                ON CONFLICT (report_id, voter_key) DO NOTHING
+                RETURNING id
+            """),
+            {"report_id": report_id, "voter_key": voter_key},
+        )
+
+        if inserted.fetchone():
+            report.upvotes += 1
+            session.add(report)
+
         await session.commit()
         await session.refresh(report)
 
         return ReportResponse.model_validate(report)
 
 
+@router.get("/moderation/pending", response_model=ReportListResponse)
+async def list_pending_reports(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    user=Depends(get_admin_user),
+):
+    """Zgłoszenia oczekujące na moderację (tylko admin)."""
+    async with async_session() as session:
+        base_filter = Report.status == ReportStatus.PENDING.value
+
+        total_result = await session.execute(
+            select(func.count()).select_from(Report).where(base_filter)
+        )
+        total = total_result.scalar()
+
+        result = await session.execute(
+            select(Report)
+            .where(base_filter)
+            .order_by(col(Report.created_at).asc())
+            .offset((page - 1) * limit)
+            .limit(limit)
+        )
+        reports = result.scalars().all()
+
+        return ReportListResponse(
+            reports=[ReportResponse.model_validate(r) for r in reports],
+            total=total,
+            page=page,
+            limit=limit,
+        )
+
+
 @router.patch("/{report_id}/status")
 async def update_report_status(
     report_id: int,
     new_status: str = Query(..., regex="^(new|verified|in_progress|resolved|rejected)$"),
-    user=Depends(get_business_user),
+    user=Depends(get_admin_user),
 ):
-    """Zmień status zgłoszenia (admin/moderator). Wymaga subskrypcji Business."""
+    """Zmień status zgłoszenia (moderacja). Wymaga roli administratora.
+
+    Zatwierdzenie zgłoszenia pending (→ new/verified) publikuje je;
+    dla kategorii zagrożeń wysyła wtedy push do subskrybentów.
+    """
     async with async_session() as session:
         result = await session.execute(
             select(Report).where(Report.id == report_id)
@@ -421,6 +494,8 @@ async def update_report_status(
 
         if not report:
             raise HTTPException(status_code=404, detail="Zgłoszenie nie zostało znalezione")
+
+        was_pending = report.status == ReportStatus.PENDING.value
 
         report.status = new_status
         report.updated_at = datetime.utcnow()
@@ -430,24 +505,40 @@ async def update_report_status(
 
         session.add(report)
         await session.commit()
+        await session.refresh(report)
+
+        # Push o zagrożeniu dopiero po zatwierdzeniu przez moderatora
+        if was_pending and new_status in (
+            ReportStatus.NEW.value, ReportStatus.VERIFIED.value
+        ) and report.category in [
+            ReportCategory.EMERGENCY.value, ReportCategory.FIRE.value
+        ]:
+            try:
+                from src.services.push_service import push_service
+                sent = await push_service.send_emergency_alert(session, report)
+                logger.info(f"Emergency push sent to {sent} subscribers for report {report.id}")
+            except Exception as push_err:
+                logger.error(f"Emergency push failed for report {report.id}: {push_err}")
 
         return {"status": "ok", "new_status": new_status}
 
 
 @router.get("/stats/summary")
 async def get_reports_stats():
-    """Statystyki zgłoszeń – do dashboardu."""
+    """Statystyki zgłoszeń – do dashboardu. Liczy tylko opublikowane zgłoszenia."""
     async with async_session() as session:
+        public_filter = (Report.is_spam == False) & col(Report.status).notin_(HIDDEN_STATUSES)
+
         # Total
         total_result = await session.execute(
-            select(func.count()).select_from(Report).where(Report.is_spam == False)
+            select(func.count()).select_from(Report).where(public_filter)
         )
         total = total_result.scalar()
 
         # By status
         status_query = (
             select(Report.status, func.count(Report.id))
-            .where(Report.is_spam == False)
+            .where(public_filter)
             .group_by(Report.status)
         )
         status_result = await session.execute(status_query)
@@ -456,7 +547,7 @@ async def get_reports_stats():
         # By category
         category_query = (
             select(Report.category, func.count(Report.id))
-            .where(Report.is_spam == False)
+            .where(public_filter)
             .group_by(Report.category)
         )
         category_result = await session.execute(category_query)
@@ -470,7 +561,7 @@ async def get_reports_stats():
 
 
 @router.post("/reanalyze-all")
-async def reanalyze_all_reports(user=Depends(get_business_user)):
+async def reanalyze_all_reports(user=Depends(get_admin_user)):
     """
     Re-analyze ALL existing reports with the current AI prompt.
     Updates category, severity, and summary for each report.
@@ -611,7 +702,7 @@ FIRE_KEYWORDS = [
 
 
 @router.post("/fix-existing")
-async def fix_existing_reports(user=Depends(get_business_user)):
+async def fix_existing_reports(user=Depends(get_admin_user)):
     """
     Fix existing reports in-place (NO Gemini API calls).
     - Updates categories based on keyword matching (wypadek→emergency, pożar→fire)

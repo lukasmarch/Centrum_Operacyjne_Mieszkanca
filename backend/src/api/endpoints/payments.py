@@ -45,6 +45,7 @@ PERIOD_DAYS = {
 class CreateTransactionRequest(BaseModel):
     tier: str            # "premium" | "business"
     period: str          # "monthly" | "yearly"
+    accept_terms: bool = False  # wymóg konsumencki: zamówienie z obowiązkiem zapłaty wymaga akceptacji regulaminu
 
 
 class CreateTransactionResponse(BaseModel):
@@ -130,6 +131,14 @@ async def create_transaction(
         raise HTTPException(status_code=400, detail=f"Nieznany tier: {req.tier}")
     if req.period not in ("monthly", "yearly"):
         raise HTTPException(status_code=400, detail="Period musi być 'monthly' lub 'yearly'")
+    if not req.accept_terms:
+        raise HTTPException(
+            status_code=400,
+            detail="Złożenie zamówienia wymaga akceptacji Regulaminu (zamówienie z obowiązkiem zapłaty)",
+        )
+
+    # Rozliczalność zgody (RODO art. 7) — odśwież datę akceptacji regulaminu przy zakupie
+    user.consent_terms_at = datetime.utcnow()
 
     amount = p24_service.get_price(req.tier, req.period)
     if amount == 0:

@@ -2,8 +2,7 @@
  * Polityka prywatności (RODO art. 13 i 14)
  *
  * ⚠️ WERSJA ROBOCZA — przed publikacją na produkcji wymaga weryfikacji
- * przez radcę prawnego / adwokata. Placeholdery [NIP], [ADRES] uzupełnić
- * danymi rejestrowymi operatora.
+ * przez radcę prawnego / adwokata.
  */
 
 import React from 'react';
@@ -20,7 +19,7 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
   <LegalLayout title="Polityka prywatności" updated="7 lipca 2026">
 
     <h2>1. Administrator danych</h2>
-    <p>Administratorem danych osobowych jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: [NIP], adres: [ADRES] (dalej: „Administrator"). Kontakt we wszystkich sprawach dotyczących danych osobowych: <strong>biuro@lumargo.pl</strong>.</p>
+    <p>Administratorem danych osobowych jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: 571-100-100, adres: ul. Wyzwolenia, 13-220 Rybno (dalej: „Administrator"). Kontakt we wszystkich sprawach dotyczących danych osobowych: <strong>biuro@lumargo.pl</strong>.</p>
 
     <h2>2. Jakie dane przetwarzamy, po co i na jakiej podstawie</h2>
     <table>

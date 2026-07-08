@@ -145,6 +145,7 @@ export const CATEGORY_CONFIG: Record<string, { label: string; emoji: string; col
 };
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+    pending: { label: 'Czeka na moderację', color: '#7f8c8d' },
     new: { label: 'Nowe', color: '#3498db' },
     verified: { label: 'Zweryfikowane', color: '#9b59b6' },
     in_progress: { label: 'W realizacji', color: '#f39c12' },

@@ -445,7 +445,7 @@ const ReportFormModal: React.FC<{
                     <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-3xl -z-10"></div>
                     <div className="text-6xl mb-4">✅</div>
                     <h2 className="text-2xl font-black text-neutral-100 mb-2">Zgłoszenie wysłane!</h2>
-                    <p className="text-neutral-400">Zgłoszenie jest analizowane...</p>
+                    <p className="text-neutral-400">Dziękujemy. Zgłoszenie trafiło do moderacji — pojawi się na mapie po zatwierdzeniu.</p>
                 </div>
             </div>
         );

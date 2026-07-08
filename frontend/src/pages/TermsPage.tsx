@@ -2,8 +2,7 @@
  * Regulamin świadczenia usług drogą elektroniczną (art. 8 UŚUDE)
  *
  * ⚠️ WERSJA ROBOCZA — przed publikacją na produkcji wymaga weryfikacji
- * przez radcę prawnego / adwokata. Placeholdery [NIP], [ADRES] uzupełnić
- * danymi rejestrowymi operatora.
+ * przez radcę prawnego / adwokata.
  */
 
 import React from 'react';
@@ -22,7 +21,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
     <h2>§ 1. Postanowienia ogólne</h2>
     <ol>
       <li>Niniejszy Regulamin określa zasady świadczenia usług drogą elektroniczną w serwisie internetowym <strong>RybnoLive.pl — Centrum Operacyjne Mieszkańca</strong> (dalej: „Serwis"), dostępnym pod adresem https://rybnolive.pl.</li>
-      <li>Operatorem Serwisu jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: [NIP], adres: [ADRES] (dalej: „Operator"). Kontakt: <strong>biuro@lumargo.pl</strong>.</li>
+      <li>Operatorem Serwisu jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: 571-100-100, adres: ul. Wyzwolenia, 13-220 Rybno (dalej: „Operator"). Kontakt: <strong>biuro@lumargo.pl</strong>.</li>
       <li>Regulamin jest regulaminem, o którym mowa w art. 8 ustawy z dnia 18 lipca 2002 r. o świadczeniu usług drogą elektroniczną.</li>
       <li>Korzystanie z Serwisu oznacza akceptację Regulaminu. Rejestracja konta wymaga wyraźnej akceptacji Regulaminu oraz zapoznania się z Polityką prywatności.</li>
     </ol>

@@ -131,6 +131,26 @@ async def get_business_user(
     return current_user
 
 
+async def get_admin_user(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """
+    Get current user and verify they have the admin role.
+
+    Use this dependency to protect moderation and service endpoints.
+    Admin is a role (users.is_admin), independent from the paid tier.
+
+    Raises:
+        HTTPException 403: If user is not an admin
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required for this operation"
+        )
+    return current_user
+
+
 async def get_optional_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     access_token: Optional[str] = Cookie(default=None),

@@ -14,7 +14,7 @@ import { getAccessToken } from '../services/authApi';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 interface ProfilePageProps {
-  onNavigate: (section: 'dashboard' | 'premium') => void;
+  onNavigate: (section: 'dashboard' | 'premium' | 'terms' | 'privacy') => void;
   initialTab?: 'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj';
 }
 
@@ -263,6 +263,58 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
     onNavigate('dashboard');
   };
 
+  // ==== RODO / DSAR (art. 15/17/20) ====
+  const [exporting, setExporting] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const handleExportData = async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    setExporting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/me/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Eksport nie powiódł się');
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rybnolive-moje-dane-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showSuccess('Dane wyeksportowane — plik JSON został pobrany.');
+    } catch {
+      setLocalError('Nie udało się pobrać danych. Spróbuj ponownie.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'USUŃ') return;
+    const token = getAccessToken();
+    if (!token) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/me`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Usunięcie nie powiodło się');
+      await logout();
+      onNavigate('dashboard');
+    } catch {
+      setLocalError('Nie udało się usunąć konta. Skontaktuj się: biuro@lumargo.pl');
+      setDeleting(false);
+      setDeleteModalOpen(false);
+    }
+  };
+
   const getTierBadge = (tier: UserTier) => {
     switch (tier) {
       case 'premium':
@@ -405,6 +457,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
         <div className={activeTab === 'subscription' ? 'lg:col-span-4' : 'lg:col-span-3'}>
           {/* Profile Tab */}
           {activeTab === 'profile' && (
+            <>
             <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
               <h2 className="text-xl font-bold mb-6">Dane profilu</h2>
 
@@ -498,6 +551,90 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                 </button>
               </form>
             </div>
+
+            {/* Prywatność i dane (RODO art. 15/17/20) */}
+            <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50 mt-8">
+              <h2 className="text-xl font-bold mb-2">Prywatność i dane</h2>
+              <p className="text-sm text-neutral-500 mb-6">
+                Masz prawo do kopii swoich danych oraz do usunięcia konta (RODO).
+                Szczegóły w Polityce prywatności.
+              </p>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 bg-gray-900 rounded-xl">
+                  <div>
+                    <p className="font-semibold">Pobierz moje dane</p>
+                    <p className="text-sm text-neutral-500">
+                      Kopia wszystkich Twoich danych w formacie JSON (profil, zgody, rozmowy z AI, subskrypcje)
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleExportData}
+                    disabled={exporting}
+                    className="px-4 py-2 bg-gray-800 text-neutral-100 font-semibold rounded-xl hover:bg-gray-700 transition-colors disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {exporting ? 'Przygotowuję...' : 'Pobierz (JSON)'}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-red-950/30 border border-red-900/40 rounded-xl">
+                  <div>
+                    <p className="font-semibold text-red-300">Usuń konto</p>
+                    <p className="text-sm text-neutral-500">
+                      Trwale usuwa konto, rozmowy z AI, powiadomienia i newsletter. Tej operacji nie można cofnąć.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setDeleteConfirmText(''); setDeleteModalOpen(true); }}
+                    className="px-4 py-2 bg-red-600/20 text-red-300 border border-red-600/40 font-semibold rounded-xl hover:bg-red-600/30 transition-colors whitespace-nowrap"
+                  >
+                    Usuń konto
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal potwierdzenia usunięcia konta */}
+            {deleteModalOpen && (
+              <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                <div className="bg-gray-950 border border-red-900/50 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                  <h3 className="text-xl font-bold text-red-300 mb-3">Usunąć konto na zawsze?</h3>
+                  <p className="text-sm text-neutral-400 mb-4">
+                    Usuniemy Twoje konto, rozmowy z AI, subskrypcje powiadomień i newsletter.
+                    Historia płatności zostanie zanonimizowana (obowiązek podatkowy).
+                    <strong className="text-neutral-200"> Tej operacji nie można cofnąć.</strong>
+                  </p>
+                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
+                    Wpisz <span className="text-red-300 font-mono">USUŃ</span> aby potwierdzić
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none transition-all mb-4"
+                    placeholder="USUŃ"
+                    autoFocus
+                  />
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      onClick={() => setDeleteModalOpen(false)}
+                      disabled={deleting}
+                      className="px-4 py-2 bg-gray-800 text-neutral-100 font-semibold rounded-xl hover:bg-gray-700 transition-colors"
+                    >
+                      Anuluj
+                    </button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={deleteConfirmText !== 'USUŃ' || deleting}
+                      className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40"
+                    >
+                      {deleting ? 'Usuwanie...' : 'Usuń konto na zawsze'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            </>
           )}
 
           {/* Password Tab */}
@@ -572,12 +709,47 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               <p className="text-sm text-neutral-500 mb-6">
                 Aktualny plan: {getTierBadge(user.tier as UserTier)}
               </p>
+
+              {/* Wymóg konsumencki: zamówienie z obowiązkiem zapłaty wymaga akceptacji regulaminu */}
+              <label className="flex items-start gap-3 p-4 bg-gray-900 rounded-xl mb-6 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptTerms}
+                  onChange={(e) => setAcceptTerms(e.target.checked)}
+                  className="w-5 h-5 rounded accent-blue-600 mt-0.5 shrink-0"
+                />
+                <span className="text-sm text-neutral-300">
+                  Akceptuję{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); onNavigate('terms'); }}
+                    className="text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                  >
+                    Regulamin
+                  </button>{' '}
+                  i przyjmuję do wiadomości, że wybór planu oznacza zamówienie z obowiązkiem zapłaty.
+                  Zasady przetwarzania danych opisuje{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); onNavigate('privacy'); }}
+                    className="text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                  >
+                    Polityka prywatności
+                  </button>.
+                </span>
+              </label>
+
               <PricingCards
                 currentTier={user.tier}
                 onSelect={async (tierKey) => {
                   const token = getAccessToken();
                   if (!token) {
                     alert('Musisz być zalogowany, aby wybrać plan.');
+                    return;
+                  }
+                  if (!acceptTerms) {
+                    setLocalError('Zaznacz akceptację Regulaminu, aby przejść do płatności.');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                     return;
                   }
                   try {
@@ -589,7 +761,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                       },
-                      body: JSON.stringify({ tier: tierKey, period }),
+                      body: JSON.stringify({ tier: tierKey, period, accept_terms: true }),
                     });
                     if (!res.ok) {
                       const err = await res.json().catch(() => ({}));
