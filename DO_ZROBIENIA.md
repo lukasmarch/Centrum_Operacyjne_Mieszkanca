@@ -22,7 +22,9 @@
 
 ## 🟠 Priorytet 2 — prawo i źródła (30 dni)
 
-- [ ] **Model snippet+link dla Syli** — content FB ≤300 znaków + link do oryginału (plan: `~/.claude/plans/wykluczenie-zrodel-fb-scoring-prawny.md`, Etap C)
+- [x] **Model snippet+link dla Syli** — WDROŻONE NA PROD 2026-07-08: scraper FB → snippet ≤300 zn. + link, bez zdjęć; backfill 1716 artykułów, usunięte 2368 embeddingów z pełnymi tekstami; backup: `/root/backup_przed_snippetami_20260708_1902.dump` na VPS
+- [x] **Notice-and-takedown** — `DELETE /api/articles/{id}` (admin) usuwa artykuł + embeddingi
+- [ ] **Anonimizacja nazwisk w snippetach** (Etap C, część 2) — nazwiska nadal widoczne w snippetach
 - [ ] **Scoring prawny artykułów** (RISK/VALUE, decyzje KEEP/MITIGATE/DROP) — Etap B planu
 - [ ] **IMGW ostrzeżenia meteo/hydro** — custom scraper JSON (`danepubliczne.imgw.pl`), filtr TERYT 2803
 - [ ] **Minimalizacja `raw_data` CEIDG** (klauzula art. 14 już jest w polityce)
