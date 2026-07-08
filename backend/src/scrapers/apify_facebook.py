@@ -5,6 +5,23 @@ import re
 
 from src.scrapers.base import BaseScraper
 
+# Model "pointer" dla treści z social mediów (prawo autorskie + RODO):
+# przechowujemy nagłówek + snippet i odsyłamy do oryginału.
+SOCIAL_SNIPPET_LIMIT = 300
+
+
+def make_social_snippet(text: str, source_url: str) -> str:
+    """Skróć treść posta do snippetu ≤300 znaków (na granicy słowa) + link do oryginału."""
+    text = (text or "").strip()
+    if len(text) > SOCIAL_SNIPPET_LIMIT:
+        cut = text[:SOCIAL_SNIPPET_LIMIT]
+        # nie ucinaj w środku słowa
+        if " " in cut:
+            cut = cut.rsplit(" ", 1)[0]
+        text = cut.rstrip(" ,;:.") + "…"
+    return f"{text}\n\nPełna treść u źródła: {source_url}"
+
+
 class ApifyFacebookScraper(BaseScraper):
     """
     Scraper dla postów z Facebooka wykorzystujący Apify API.
@@ -213,36 +230,8 @@ class ApifyFacebookScraper(BaseScraper):
                         # Fallback: generuj URL z post ID
                         post_url = f"https://facebook.com/{post_id}"
 
-                    # Obrazek - szukaj bezpośredniego URL do pliku graficznego
-                    # Odrzucaj linki do stron FB (facebook.com/photo/) - nie działają jako <img src>
-                    def is_direct_image_url(url: str) -> bool:
-                        if not url:
-                            return False
-                        # Akceptuj tylko bezpośrednie linki do plików (CDN, nie strony FB)
-                        blocked = ['facebook.com/photo', 'facebook.com/video', 'fb.com/photo']
-                        return not any(b in url for b in blocked)
-
-                    image_url = None
-                    # Sprawdź media array - aktor może zwrócić bezpośredni CDN URL
-                    media = post.get('media', [])
-                    if isinstance(media, list) and media:
-                        for m in media:
-                            candidate = m.get('url') or m.get('thumbnailUrl') or m.get('imageUrl')
-                            if is_direct_image_url(candidate):
-                                image_url = candidate
-                                break
-                    elif isinstance(media, dict):
-                        candidate = media.get('url') or media.get('thumbnailUrl')
-                        if is_direct_image_url(candidate):
-                            image_url = candidate
-
-                    # Fallback do innych pól jeśli nadal brak
-                    if not image_url:
-                        for field in ['thumbnail', 'picture', 'image', 'imageUrl']:
-                            candidate = post.get(field)
-                            if is_direct_image_url(candidate):
-                                image_url = candidate
-                                break
+                    # Zdjęć z postów FB nie przechowujemy (wizerunek osób — RODO);
+                    # image_url pozostaje None, oryginał dostępny pod linkiem posta.
 
                     # Data publikacji
                     published_at = None
@@ -258,20 +247,16 @@ class ApifyFacebookScraper(BaseScraper):
                         except Exception as e:
                             self.logger.warning(f"Nieprawidłowy timestamp: {timestamp} ({type(timestamp)})")
 
-                    # Dodatkowe metadata jako content
-                    likes = post.get('likes', 0)
-                    comments = post.get('comments', 0)
-                    shares = post.get('shares', 0)
-
-                    content = text
-                    if likes or comments or shares:
-                        content += f"\n\n[{likes} polubień, {comments} komentarzy, {shares} udostępnień]"
+                    # Model "pointer" (snippet + link) — prawo autorskie / RODO:
+                    # nie przechowujemy pełnych tekstów cudzych postów ani zdjęć
+                    # (wizerunek osób); pełna treść wyłącznie u źródła.
+                    content = make_social_snippet(text, post_url)
 
                     article_data = {
                         'title': title,
                         'url': post_url,
                         'content': content,
-                        'image_url': image_url,
+                        'image_url': None,
                         'external_id': f"fb_{post_id}",
                         'author': 'Facebook',  # lub post.get('from', {}).get('name')
                     }

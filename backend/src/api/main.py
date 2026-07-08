@@ -15,6 +15,7 @@ from src.api.weather import router as weather_router
 
 # Auth & Users (Sprint 1)
 from src.auth.routes import router as auth_router
+from src.auth.dependencies import get_admin_user
 from src.users.routes import router as users_router
 
 # Newsletter (Sprint 2)
@@ -201,6 +202,33 @@ async def get_articles(
 
     return articles
 
+
+@app.delete("/api/articles/{article_id}")
+async def takedown_article(
+    article_id: int,
+    session: AsyncSession = Depends(get_session),
+    user=Depends(get_admin_user),
+):
+    """
+    Notice-and-takedown: trwale usuwa artykuł wraz z jego embeddingami RAG
+    (żądania usunięcia treści — prawo autorskie / wizerunek / art. 17 RODO).
+    Wymaga roli administratora.
+    """
+    from sqlalchemy import text as sql_text
+
+    result = await session.execute(select(Article).where(Article.id == article_id))
+    article = result.scalar_one_or_none()
+    if not article:
+        raise HTTPException(status_code=404, detail="Artykuł nie został znaleziony")
+
+    title = article.title
+    await session.execute(sql_text(
+        "DELETE FROM document_embeddings WHERE source_type = 'article' AND source_id = :aid"
+    ), {"aid": article_id})
+    await session.delete(article)
+    await session.commit()
+
+    return {"status": "deleted", "article_id": article_id, "title": title}
 
 
 @app.get("/api/summary/daily")
