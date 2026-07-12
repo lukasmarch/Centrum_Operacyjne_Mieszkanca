@@ -20,6 +20,8 @@ const DEFAULT_SUGGESTIONS = [
   'Co mówi BIP o przetargach?',
 ];
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
 const PromptBar: React.FC<PromptBarProps> = ({ onNavigate, onSubmit }) => {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
@@ -37,7 +39,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ onNavigate, onSubmit }) => {
   };
 
   useEffect(() => {
-    fetch('/api/chat/suggestions')
+    fetch(`${API_URL}/chat/suggestions`)
       .then(r => r.json())
       .then(data => { if (data.suggestions?.length) setSuggestions(data.suggestions); })
       .catch(() => {});

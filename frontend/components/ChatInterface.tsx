@@ -6,6 +6,8 @@ import { VoiceMicButton } from './VoiceMicButton';
 import ChatMessage from './ChatMessage';
 import ChatLimitPrompt from './ChatLimitPrompt';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
 interface ChatInterfaceProps {
   initialQuery?: string;
   onNavigate?: (section: string) => void;
@@ -36,7 +38,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [suggestions, setSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch('/api/chat/suggestions')
+    fetch(`${API_URL}/chat/suggestions`)
       .then(r => r.json())
       .then(data => {
         if (data.question_of_day) setQuestionOfDay(data.question_of_day);
