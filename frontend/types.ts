@@ -206,7 +206,7 @@ export interface Business {
 }
 
 // Zgłoszenie24 – Citizen Reports
-export type ReportStatus = 'new' | 'verified' | 'in_progress' | 'resolved' | 'rejected';
+export type ReportStatus = 'pending' | 'new' | 'verified' | 'forwarded' | 'in_progress' | 'resolved' | 'rejected';
 export type ReportCategory = 'emergency' | 'fire' | 'infrastructure' | 'waste' | 'greenery' | 'safety' | 'water' | 'other';
 export type ReportSeverity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -418,6 +418,7 @@ export interface User {
   full_name: string;
   location: string;
   tier: UserTier;
+  is_admin?: boolean;
   email_verified: boolean;
   preferences: Record<string, unknown> | null;
   created_at: string;

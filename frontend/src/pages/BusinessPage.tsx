@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppSection, Business } from '../../types';
 import { useAuth } from '../context/AuthContext';
-import { Search, X, Info } from 'lucide-react';
+import { Search, X, Info, Store, BarChart3, Phone, Globe, Clock, Star, BadgeCheck, Pencil } from 'lucide-react';
+import {
+    fetchCatalog, claimBusiness, fetchMyClaims, updateBusinessProfile,
+    trackBusinessView, fetchPendingClaims, moderateClaim,
+    CatalogCard, MyClaim, PendingClaim,
+} from '../services/businessApi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -127,12 +132,442 @@ const YearBarChart: React.FC<{
     );
 };
 
+// ==================== Karta wizytówki (katalog) ====================
+
+const CatalogBusinessCard: React.FC<{
+    card: CatalogCard;
+    isOwner?: boolean;
+    onEdit?: () => void;
+}> = ({ card, isOwner, onEdit }) => {
+    const premium = card.profile.is_premium;
+
+    useEffect(() => {
+        trackBusinessView(card.id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [card.id]);
+
+    return (
+        <div className={`group p-5 rounded-2xl border transition-all duration-300 flex flex-col gap-3 ${
+            premium
+                ? 'bg-gradient-to-b from-amber-500/10 to-white/[0.03] border-amber-500/40 hover:border-amber-400/60 shadow-lg shadow-amber-900/10'
+                : 'bg-white/[0.04] border-white/8 hover:border-white/15'
+        }`}>
+            <div className="flex justify-between items-start">
+                {premium ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        <Star size={10} className="fill-amber-300" /> Polecane w Rybnie
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-300 border border-blue-500/25">
+                        <BadgeCheck size={11} /> Zweryfikowana
+                    </span>
+                )}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold overflow-hidden ${
+                    premium ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white' : 'bg-white/[0.06] border border-white/10 text-neutral-300'
+                }`}>
+                    {card.profile.logo_url
+                        ? <img src={card.profile.logo_url} alt="" className="w-full h-full object-cover" />
+                        : card.nazwa.substring(0, 2).toUpperCase()}
+                </div>
+            </div>
+
+            <h3 className="font-bold text-neutral-100 text-sm leading-snug">{card.nazwa}</h3>
+
+            {card.profile.description && (
+                <p className={`text-xs leading-relaxed line-clamp-3 ${premium ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                    {card.profile.description}
+                </p>
+            )}
+
+            <div className="space-y-1.5 text-xs text-neutral-400 mt-auto">
+                <p className="flex items-center gap-2"><span className="text-neutral-500">📍</span>{card.miasto}{card.branza ? ` · ${card.branza}` : ''}</p>
+                {card.profile.godziny && (
+                    <p className="flex items-center gap-2"><Clock size={12} className="text-neutral-500" />{card.profile.godziny}</p>
+                )}
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-white/8">
+                {card.profile.telefon && (
+                    <a
+                        href={`tel:${card.profile.telefon.replace(/\s/g, '')}`}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                            premium
+                                ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-500 hover:to-orange-500'
+                                : 'bg-blue-600 text-white hover:bg-blue-500'
+                        }`}
+                    >
+                        <Phone size={12} /> Zadzwoń
+                    </a>
+                )}
+                {card.profile.www && (
+                    <a
+                        href={card.profile.www.startsWith('http') ? card.profile.www : `https://${card.profile.www}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-white/[0.06] text-neutral-300 border border-white/10 hover:bg-white/[0.1] transition-all"
+                    >
+                        <Globe size={12} /> WWW
+                    </a>
+                )}
+                {isOwner && (
+                    <button
+                        onClick={onEdit}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/[0.06] text-neutral-300 border border-white/10 hover:bg-white/[0.1] transition-all"
+                    >
+                        <Pencil size={12} /> Edytuj
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ==================== Modal: przejmij wizytówkę ====================
+
+const ClaimModal: React.FC<{
+    onClose: () => void;
+    onClaimed: () => void;
+    onNavigate?: (section: AppSection) => void;
+    isAuthenticated: boolean;
+}> = ({ onClose, onClaimed, onNavigate, isAuthenticated }) => {
+    const [step, setStep] = useState(1);
+    const [search, setSearch] = useState('');
+    const [results, setResults] = useState<Business[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [selected, setSelected] = useState<Business | null>(null);
+    const [telefon, setTelefon] = useState('');
+    const [email, setEmail] = useState('');
+    const [www, setWww] = useState('');
+    const [note, setNote] = useState('');
+    const [consent, setConsent] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [done, setDone] = useState(false);
+
+    useEffect(() => {
+        if (search.length < 2) { setResults([]); return; }
+        const t = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const res = await fetch(`${API_URL}/business/search?nazwa=${encodeURIComponent(search)}&limit=8&status=`);
+                const data = await res.json();
+                setResults(Array.isArray(data) ? data : []);
+            } catch { setResults([]); }
+            finally { setSearching(false); }
+        }, 300);
+        return () => clearTimeout(t);
+    }, [search]);
+
+    const submit = async () => {
+        if (!selected || !consent) return;
+        setSubmitting(true);
+        setError(null);
+        try {
+            await claimBusiness(selected.id, {
+                telefon: telefon.trim() || undefined,
+                email: email.trim() || undefined,
+                www: www.trim() || undefined,
+                note: note.trim() || undefined,
+            });
+            setDone(true);
+            onClaimed();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
+                {done ? (
+                    <div className="text-center py-8">
+                        <div className="text-5xl mb-4">🎉</div>
+                        <h2 className="text-xl font-black text-neutral-100 mb-2">Zgłoszenie przyjęte!</h2>
+                        <p className="text-neutral-400 text-sm leading-relaxed">
+                            Zweryfikujemy przejęcie wizytówki <strong className="text-neutral-200">{selected?.nazwa}</strong> w
+                            ciągu 2 dni roboczych. Po zatwierdzeniu uzupełnisz opis i godziny otwarcia.
+                        </p>
+                        <button onClick={onClose} className="mt-6 px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 transition-colors">
+                            Zamknij
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="text-xl font-black text-neutral-100">Przejmij wizytówkę</h2>
+                            <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
+                        </div>
+                        <p className="text-xs text-neutral-500 mb-6">
+                            Krok {step} z 2 — {step === 1 ? 'znajdź swoją firmę w rejestrze' : 'dane kontaktowe do wizytówki'}
+                        </p>
+
+                        {!isAuthenticated ? (
+                            <div className="text-center py-6">
+                                <p className="text-neutral-300 text-sm mb-4">
+                                    Do przejęcia wizytówki potrzebujesz bezpłatnego konta —
+                                    będzie służyć do zarządzania kartą Twojej firmy.
+                                </p>
+                                <button
+                                    onClick={() => { onClose(); onNavigate?.('login'); }}
+                                    className="px-8 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold rounded-xl hover:from-blue-500 hover:to-violet-500 transition-all"
+                                >
+                                    Zaloguj się / Załóż konto
+                                </button>
+                            </div>
+                        ) : step === 1 ? (
+                            <div className="space-y-3">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-3 w-4 h-4 text-neutral-500" />
+                                    <input
+                                        type="text"
+                                        value={search}
+                                        onChange={e => setSearch(e.target.value)}
+                                        placeholder="Nazwa firmy lub NIP…"
+                                        className="w-full pl-10 pr-4 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500"
+                                        autoFocus
+                                    />
+                                </div>
+                                {searching && <p className="text-xs text-neutral-500">Szukam…</p>}
+                                <div className="space-y-2 max-h-72 overflow-y-auto">
+                                    {results.map(b => (
+                                        <button
+                                            key={b.id}
+                                            onClick={() => { setSelected(b); setStep(2); }}
+                                            className="w-full text-left p-3 rounded-xl bg-white/[0.03] border border-white/8 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all"
+                                        >
+                                            <p className="text-sm font-bold text-neutral-200">{b.nazwa}</p>
+                                            <p className="text-xs text-neutral-500 mt-0.5">📍 {b.miasto} · NIP {b.nip}</p>
+                                        </button>
+                                    ))}
+                                    {search.length >= 2 && !searching && results.length === 0 && (
+                                        <p className="text-xs text-neutral-500 text-center py-4">
+                                            Nie znaleziono firmy. Napisz do nas: biuro@lumargo.pl
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+                                    <p className="text-sm font-bold text-neutral-200">{selected?.nazwa}</p>
+                                    <p className="text-xs text-neutral-500">📍 {selected?.miasto} · NIP {selected?.nip}</p>
+                                    <button onClick={() => setStep(1)} className="text-[11px] text-blue-400 hover:underline mt-1">← zmień firmę</button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Telefon firmowy"
+                                        className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail firmowy"
+                                        className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                                </div>
+                                <input type="text" value={www} onChange={e => setWww(e.target.value)} placeholder="Strona WWW (opcjonalnie)"
+                                    className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                                <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
+                                    placeholder="Jak możemy potwierdzić, że to Twoja firma? (np. oddzwonimy na numer z szyldu/strony)"
+                                    className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500 resize-none" />
+                                <label className="flex items-start gap-2.5 cursor-pointer">
+                                    <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 accent-blue-500 shrink-0" />
+                                    <span className="text-[11px] text-neutral-400 leading-relaxed">
+                                        Oświadczam, że reprezentuję tę firmę, i wyrażam zgodę na publikację podanych
+                                        danych kontaktowych na wizytówce w katalogu firm RybnoLive. <span className="text-red-400">*</span>
+                                    </span>
+                                </label>
+                                {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠️ {error}</p>}
+                                <button
+                                    onClick={submit}
+                                    disabled={submitting || !consent}
+                                    className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 transition-all"
+                                >
+                                    {submitting ? 'Wysyłam…' : 'Przejmij wizytówkę (0 zł)'}
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ==================== Modal: edycja wizytówki (właściciel) ====================
+
+const EditProfileModal: React.FC<{
+    claim: MyClaim;
+    card?: CatalogCard;
+    onClose: () => void;
+    onSaved: () => void;
+}> = ({ claim, card, onClose, onSaved }) => {
+    const [description, setDescription] = useState(card?.profile.description || '');
+    const [telefon, setTelefon] = useState(card?.profile.telefon || '');
+    const [email, setEmail] = useState(card?.profile.email || '');
+    const [www, setWww] = useState(card?.profile.www || '');
+    const [godziny, setGodziny] = useState(card?.profile.godziny || '');
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const save = async () => {
+        setSaving(true);
+        setError(null);
+        try {
+            await updateBusinessProfile(claim.business_id, {
+                description: description,
+                telefon: telefon,
+                email: email,
+                www: www,
+                godziny: godziny,
+            });
+            onSaved();
+            onClose();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-xl font-black text-neutral-100">Edytuj wizytówkę</h2>
+                    <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
+                </div>
+                <p className="text-xs text-neutral-500 mb-5">{claim.nazwa} · 👁 {claim.views_count} wyświetleń</p>
+
+                <div className="space-y-4">
+                    <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={600}
+                        placeholder="Opis firmy — czym się zajmujecie, co Was wyróżnia (max 600 znaków)"
+                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500 resize-none" />
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Telefon"
+                            className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail"
+                            className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                    </div>
+                    <input type="text" value={www} onChange={e => setWww(e.target.value)} placeholder="Strona WWW"
+                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                    <input type="text" value={godziny} onChange={e => setGodziny(e.target.value)} placeholder="Godziny otwarcia, np. pn-pt 8-17, sb 8-13"
+                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                    {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠️ {error}</p>}
+                    <button onClick={save} disabled={saving}
+                        className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 transition-all">
+                        {saving ? 'Zapisuję…' : 'Zapisz wizytówkę'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== Modal: weryfikacja przejęć (admin) ====================
+
+const ClaimsModerationModal: React.FC<{
+    onClose: () => void;
+    onModerated: () => void;
+}> = ({ onClose, onModerated }) => {
+    const [claims, setClaims] = useState<PendingClaim[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [busyId, setBusyId] = useState<number | null>(null);
+
+    useEffect(() => {
+        fetchPendingClaims().then(setClaims).finally(() => setLoading(false));
+    }, []);
+
+    const decide = async (claimId: number, action: 'approve' | 'reject') => {
+        setBusyId(claimId);
+        try {
+            await moderateClaim(claimId, action);
+            setClaims(prev => prev.filter(c => c.claim_id !== claimId));
+            onModerated();
+        } catch (err) {
+            console.error('Claim moderation failed:', err);
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-xl w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-black text-neutral-100">🛡️ Weryfikacja wizytówek</h2>
+                    <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
+                </div>
+                {loading ? (
+                    <p className="text-neutral-400 text-center py-6">Ładowanie…</p>
+                ) : claims.length === 0 ? (
+                    <p className="text-neutral-400 text-center py-6">✅ Brak przejęć do weryfikacji</p>
+                ) : (
+                    <div className="space-y-4">
+                        {claims.map(c => (
+                            <div key={c.claim_id} className="p-4 bg-white/[0.03] border border-white/8 rounded-2xl">
+                                <p className="font-bold text-neutral-100 text-sm">{c.nazwa}</p>
+                                <p className="text-xs text-neutral-500 mt-0.5">📍 {c.miasto} · NIP {c.nip}</p>
+                                <p className="text-xs text-neutral-400 mt-1.5">
+                                    👤 {c.user_email}
+                                    {c.telefon && <> · 📞 {c.telefon}</>}
+                                    {c.email && <> · ✉️ {c.email}</>}
+                                </p>
+                                {c.note && <p className="text-xs text-neutral-400 mt-1.5 italic">„{c.note}"</p>}
+                                <div className="flex gap-2 mt-3">
+                                    <button
+                                        disabled={busyId === c.claim_id}
+                                        onClick={() => decide(c.claim_id, 'approve')}
+                                        className="flex-1 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-xs font-bold hover:bg-emerald-500/25 transition-all disabled:opacity-50"
+                                    >
+                                        ✓ Zatwierdź
+                                    </button>
+                                    <button
+                                        disabled={busyId === c.claim_id}
+                                        onClick={() => decide(c.claim_id, 'reject')}
+                                        className="flex-1 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-bold hover:bg-red-500/20 transition-all disabled:opacity-50"
+                                    >
+                                        ✕ Odrzuć
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 interface BusinessPageProps {
     onNavigate?: (section: AppSection) => void;
 }
 
 const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
+    const isAdmin = !!user?.is_admin;
+
+    // Widok: katalog wizytówek (front) | dane rejestrowe i statystyki (schowane głębiej)
+    const [view, setView] = useState<'katalog' | 'dane'>('katalog');
+    const [catalog, setCatalog] = useState<CatalogCard[]>([]);
+    const [catalogLoading, setCatalogLoading] = useState(true);
+    const [myClaims, setMyClaims] = useState<MyClaim[]>([]);
+    const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
+    const [showClaim, setShowClaim] = useState(false);
+    const [showClaimsModeration, setShowClaimsModeration] = useState(false);
+    const [editClaim, setEditClaim] = useState<MyClaim | null>(null);
+
+    const loadCatalog = useCallback(() => {
+        fetchCatalog()
+            .then(setCatalog)
+            .catch(() => setCatalog([]))
+            .finally(() => setCatalogLoading(false));
+        if (isAuthenticated) fetchMyClaims().then(setMyClaims).catch(() => {});
+        if (isAdmin) fetchPendingClaims().then(c => setPendingClaimsCount(c.length)).catch(() => {});
+    }, [isAuthenticated, isAdmin]);
+
+    useEffect(() => { loadCatalog(); }, [loadCatalog]);
+
+    const myVerifiedByBusinessId = new Map(
+        myClaims.filter(c => c.claim_status === 'verified').map(c => [c.business_id, c])
+    );
+    const myPendingClaim = myClaims.find(c => c.claim_status === 'pending');
+
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [localities, setLocalities] = useState<Locality[]>([]);
     const [stats, setStats] = useState<Stats | null>(null);
@@ -276,14 +711,131 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
 
     return (
         <div className="space-y-8 pb-12">
-            {/* Header / Stats */}
+            {/* ── Hero + przełącznik widoków ── */}
             <header className="bg-white/[0.04] backdrop-blur-xl rounded-3xl p-8 border border-white/5">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
-                        <h2 className="text-3xl font-black text-neutral-100 tracking-tight">Katalog Firm</h2>
-                        <p className="text-neutral-400 mt-2">Baza przedsiębiorców z Gminy Rybno (CEIDG)</p>
+                        <h2 className="text-3xl font-black text-neutral-100 tracking-tight">
+                            {view === 'katalog' ? 'Katalog Firm' : 'Firmy — dane i statystyki'}
+                        </h2>
+                        <p className="text-neutral-400 mt-2">
+                            {view === 'katalog'
+                                ? 'Sprawdzone lokalne firmy z Gminy Rybno — z kontaktem i godzinami otwarcia'
+                                : 'Rejestr CEIDG: statystyki, sołectwa, branże i trendy rejestracji firm'}
+                        </p>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                        {isAdmin && (
+                            <button
+                                onClick={() => setShowClaimsModeration(true)}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                                    pendingClaimsCount > 0
+                                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
+                                        : 'bg-white/[0.04] text-neutral-400 border-white/10 hover:bg-white/[0.08]'
+                                }`}
+                            >
+                                🛡️ Weryfikacja{pendingClaimsCount > 0 ? ` (${pendingClaimsCount})` : ''}
+                            </button>
+                        )}
+                        <div className="flex bg-white/[0.04] border border-white/10 rounded-xl p-1">
+                            <button
+                                onClick={() => setView('katalog')}
+                                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                                    view === 'katalog' ? 'bg-blue-600 text-white shadow' : 'text-neutral-400 hover:text-neutral-200'
+                                }`}
+                            >
+                                <Store size={13} /> Katalog
+                            </button>
+                            <button
+                                onClick={() => setView('dane')}
+                                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                                    view === 'dane' ? 'bg-blue-600 text-white shadow' : 'text-neutral-400 hover:text-neutral-200'
+                                }`}
+                            >
+                                <BarChart3 size={13} /> Dane
+                            </button>
+                        </div>
                     </div>
                 </div>
+            </header>
+
+            {/* ══════════ WIDOK: KATALOG WIZYTÓWEK ══════════ */}
+            {view === 'katalog' && (
+                <>
+                    {/* Status mojego przejęcia */}
+                    {myPendingClaim && (
+                        <div className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-4 text-sm text-neutral-300">
+                            ⏳ Twoje przejęcie wizytówki <strong>{myPendingClaim.nazwa}</strong> czeka
+                            na weryfikację — zwykle do 2 dni roboczych.
+                        </div>
+                    )}
+
+                    {catalogLoading ? (
+                        <div className="text-center py-16 text-neutral-500">Ładowanie katalogu…</div>
+                    ) : catalog.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            {catalog.map(card => (
+                                <CatalogBusinessCard
+                                    key={card.id}
+                                    card={card}
+                                    isOwner={myVerifiedByBusinessId.has(card.id)}
+                                    onEdit={() => setEditClaim(myVerifiedByBusinessId.get(card.id) || null)}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-14 bg-white/[0.03] border border-white/5 rounded-3xl">
+                            <p className="text-4xl mb-3">🏪</p>
+                            <h3 className="text-lg font-bold text-neutral-200 mb-2">Twoja firma może być pierwsza</h3>
+                            <p className="text-sm text-neutral-500 max-w-md mx-auto">
+                                Katalog wizytówek właśnie startuje. Przejmij kartę swojej firmy za darmo
+                                i bądź widoczny dla mieszkańców całej gminy.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Sekcja "Dla firm" — lejek przejęcia wizytówki */}
+                    <section className="bg-gradient-to-br from-blue-500/10 via-white/[0.03] to-violet-500/10 border border-blue-500/20 rounded-3xl p-8">
+                        <div className="max-w-2xl">
+                            <h3 className="text-2xl font-black text-neutral-100 mb-2">Prowadzisz firmę w gminie?</h3>
+                            <p className="text-sm text-neutral-400 leading-relaxed mb-6">
+                                Twoja firma prawdopodobnie już jest w naszym rejestrze — ale jej karta jest pusta.
+                                Przejmij wizytówkę <strong className="text-neutral-200">za darmo</strong>: dodasz telefon,
+                                godziny otwarcia i opis, a mieszkańcy znajdą Cię w katalogu.
+                            </p>
+                            <div className="grid sm:grid-cols-3 gap-3 mb-6 text-xs">
+                                <div className="p-4 bg-white/[0.04] border border-white/8 rounded-2xl">
+                                    <p className="font-bold text-neutral-200 mb-1">1 · Rejestrowa</p>
+                                    <p className="text-neutral-500">Podstawowe dane z CEIDG — bez kontaktu</p>
+                                </div>
+                                <div className="p-4 bg-blue-500/8 border border-blue-500/25 rounded-2xl">
+                                    <p className="font-bold text-blue-300 mb-1">2 · Przejęta — 0 zł</p>
+                                    <p className="text-neutral-400">Kontakt, godziny, opis + odznaka „Zweryfikowana"</p>
+                                </div>
+                                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
+                                    <p className="font-bold text-amber-300 mb-1">3 · Firma lokalna — 49 zł/mc</p>
+                                    <p className="text-neutral-400">„Polecane w Rybnie", top pozycji, ogłoszenia, statystyki</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowClaim(true)}
+                                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-2xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30"
+                            >
+                                Przejmij wizytówkę swojej firmy →
+                            </button>
+                            <p className="text-[11px] text-neutral-500 mt-3">
+                                Szukasz firmy, której tu nie ma? Pełny rejestr znajdziesz w zakładce „Dane".
+                            </p>
+                        </div>
+                    </section>
+                </>
+            )}
+
+            {/* ══════════ WIDOK: DANE REJESTROWE I STATYSTYKI ══════════ */}
+            {view === 'dane' && (
+                <>
+            {/* Header / Stats */}
+            <header className="bg-white/[0.04] backdrop-blur-xl rounded-3xl p-8 border border-white/5">
 
                 {/* Key stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -576,6 +1128,8 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                     </button>
                 </div>
             )}
+                </>
+            )}
 
             {/* Nota prawna — klauzula informacyjna art. 14 RODO */}
             <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 flex gap-3 items-start">
@@ -597,6 +1151,30 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                     </a>{' '}— żądania rozpatrujemy w ciągu 7 dni.
                 </p>
             </div>
+
+            {/* ── Modale wizytówek ── */}
+            {showClaim && (
+                <ClaimModal
+                    isAuthenticated={isAuthenticated}
+                    onNavigate={onNavigate}
+                    onClose={() => setShowClaim(false)}
+                    onClaimed={loadCatalog}
+                />
+            )}
+            {editClaim && (
+                <EditProfileModal
+                    claim={editClaim}
+                    card={catalog.find(c => c.id === editClaim.business_id)}
+                    onClose={() => setEditClaim(null)}
+                    onSaved={loadCatalog}
+                />
+            )}
+            {showClaimsModeration && (
+                <ClaimsModerationModal
+                    onClose={() => setShowClaimsModeration(false)}
+                    onModerated={loadCatalog}
+                />
+            )}
         </div>
     );
 };

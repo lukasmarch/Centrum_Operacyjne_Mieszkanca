@@ -85,6 +85,7 @@ class UserResponse(BaseModel):
     full_name: str
     location: str
     tier: str
+    is_admin: bool = False
     email_verified: bool
     preferences: Optional[dict] = None
     created_at: datetime

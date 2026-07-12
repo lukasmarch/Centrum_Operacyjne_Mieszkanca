@@ -6,6 +6,9 @@ import type { Report, ReportCategory, AppSection } from '../../types';
 import {
     fetchReports,
     fetchReportsForMap,
+    fetchReportsStats,
+    fetchPendingReports,
+    updateReportStatus,
     createReport,
     upvoteReport,
     getImageUrl,
@@ -14,6 +17,7 @@ import {
     SEVERITY_CONFIG,
 } from '../services/reportsApi';
 import type { ReportMapItem } from '../../types';
+import { useAuth } from '../context/AuthContext';
 
 // ==================== Helpers ====================
 
@@ -29,6 +33,66 @@ function timeAgo(dateStr: string): string {
     if (days < 7) return `${days} dni temu`;
     return new Date(dateStr).toLocaleDateString('pl-PL');
 }
+
+// ==================== Pasek interwencji (model Kontakt 24) ====================
+
+const TRACK_STEPS = [
+    { key: 'new', label: 'Zgłoszone' },
+    { key: 'verified', label: 'Zweryfikowane' },
+    { key: 'forwarded', label: 'Przekazane' },
+    { key: 'resolved', label: 'Rozwiązane' },
+];
+
+/** Pozycja statusu na pasku: -1 = nie pokazuj (pending/rejected) */
+function trackPosition(status: string): number {
+    switch (status) {
+        case 'new': return 0;
+        case 'verified': return 1;
+        case 'forwarded': return 2;
+        case 'in_progress': return 2; // w realizacji = po przekazaniu
+        case 'resolved': return 3;
+        default: return -1;
+    }
+}
+
+const InterventionTrack: React.FC<{ status: string; compact?: boolean }> = ({ status, compact }) => {
+    const pos = trackPosition(status);
+    if (pos < 0) return null;
+    return (
+        <div className="flex items-start w-full" aria-label={`Status interwencji: ${STATUS_CONFIG[status]?.label || status}`}>
+            {TRACK_STEPS.map((step, i) => {
+                const done = i < pos;
+                const now = i === pos;
+                return (
+                    <div key={step.key} className="flex-1 flex flex-col items-center relative">
+                        {i > 0 && (
+                            <div
+                                className={`absolute top-[5px] right-1/2 w-full h-0.5 ${i <= pos ? 'bg-emerald-500/70' : 'bg-white/10'}`}
+                            />
+                        )}
+                        <span
+                            className={`relative z-10 rounded-full block ${compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} ${
+                                now
+                                    ? 'bg-blue-500 ring-4 ring-blue-500/25'
+                                    : done
+                                        ? 'bg-emerald-500'
+                                        : 'bg-white/15 border border-white/20'
+                            }`}
+                        />
+                        <span className={`mt-1 text-center leading-tight ${compact ? 'text-[8px]' : 'text-[9px]'} ${
+                            now ? 'text-blue-300 font-bold' : done ? 'text-neutral-400' : 'text-neutral-600'
+                        }`}>
+                            {i === 2 && status === 'in_progress' ? 'W realizacji' : step.label}
+                        </span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+/** Badge weryfikacji redakcyjnej — dla zgłoszeń potwierdzonych przez moderację */
+const VERIFIED_STATUSES = ['verified', 'forwarded', 'in_progress', 'resolved'];
 
 // ==================== ReportCard ====================
 
@@ -71,13 +135,18 @@ const ReportCard: React.FC<{
                         loading="lazy"
                         onError={handleImgError}
                     />
-                    <div className="absolute top-3 left-3 flex gap-2 z-20">
+                    <div className="absolute top-3 left-3 flex gap-2 z-20 flex-wrap">
                         <span
                             className="px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-lg backdrop-blur-md"
                             style={{ backgroundColor: `${cat.color}dd` }}
                         >
                             {cat.emoji} {cat.label}
                         </span>
+                        {VERIFIED_STATUSES.includes(report.status) && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold text-emerald-300 bg-emerald-900/70 border border-emerald-500/40 shadow-lg backdrop-blur-md">
+                                ✓ Zweryfikowane
+                            </span>
+                        )}
                     </div>
                     {severity && (
                         <div className="absolute top-3 right-3 z-20">
@@ -95,13 +164,18 @@ const ReportCard: React.FC<{
             <div className="p-5">
                 {/* Category tag if no image */}
                 {(!report.image_url || imgError) && (
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex gap-2 mb-3 flex-wrap">
                         <span
                             className="px-2.5 py-1 rounded-full text-xs font-bold text-white"
                             style={{ backgroundColor: cat.color }}
                         >
                             {cat.emoji} {cat.label}
                         </span>
+                        {VERIFIED_STATUSES.includes(report.status) && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold text-emerald-300 bg-emerald-900/60 border border-emerald-500/40">
+                                ✓ Zweryfikowane
+                            </span>
+                        )}
                         {severity && (
                             <span
                                 className="px-2 py-1 rounded-full text-[10px] font-bold text-white uppercase"
@@ -129,32 +203,31 @@ const ReportCard: React.FC<{
                     </p>
                 )}
 
+                {/* Pasek interwencji — publiczny postęp sprawy */}
+                {trackPosition(report.status) >= 0 && (
+                    <div className="mb-3 pt-3 border-t border-white/5">
+                        <InterventionTrack status={report.status} compact />
+                    </div>
+                )}
+
                 {/* Footer */}
                 <div className="flex items-center justify-between pt-3 border-t border-gray-800/50/60">
                     <div className="flex items-center gap-3 text-xs text-neutral-500">
-                        <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border border-gray-700/50/60"
-                            style={{ backgroundColor: `${status.color}15`, color: status.color }}
-                        >
-                            {status.label}
-                        </span>
                         <span>{timeAgo(report.created_at)}</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <span className="text-xs text-neutral-500 flex items-center gap-1">
+                        <span className="flex items-center gap-1">
                             <span className="text-neutral-600">👁</span> {report.views_count}
                         </span>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onUpvote(report.id);
-                            }}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-all text-xs font-bold"
-                        >
-                            👍 {report.upvotes}
-                        </button>
                     </div>
+
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onUpvote(report.id);
+                        }}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-all text-xs font-bold"
+                    >
+                        👍 {report.upvotes > 0 ? `${report.upvotes} potwierdza` : 'Potwierdzam'}
+                    </button>
                 </div>
             </div>
         </div>
@@ -167,11 +240,14 @@ const ReportDetail: React.FC<{
     report: Report;
     onClose: () => void;
     onUpvote: (id: number) => void;
-}> = ({ report, onClose, onUpvote }) => {
+    isAdmin?: boolean;
+    onStatusChange?: (id: number, status: string) => void;
+}> = ({ report, onClose, onUpvote, isAdmin, onStatusChange }) => {
     const cat = CATEGORY_CONFIG[report.category] || CATEGORY_CONFIG.other;
     const status = STATUS_CONFIG[report.status] || STATUS_CONFIG.new;
     const severity = report.ai_severity ? SEVERITY_CONFIG[report.ai_severity] : null;
     const [detailImgError, setDetailImgError] = useState(false);
+    const [savingStatus, setSavingStatus] = useState(false);
 
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
@@ -218,11 +294,49 @@ const ReportDetail: React.FC<{
 
                     <h2 className="text-2xl font-black text-neutral-100 mb-2">{report.title}</h2>
 
-                    <div className="flex items-center gap-4 text-sm text-neutral-400 mb-6 border-b border-gray-800/50 pb-6">
+                    <div className="flex items-center gap-4 text-sm text-neutral-400 mb-4">
                         <span className="flex items-center gap-1">🕐 {timeAgo(report.created_at)}</span>
                         {report.author_name && <span className="flex items-center gap-1">👤 {report.author_name}</span>}
                         <span className="flex items-center gap-1">👁 {report.views_count} wyświetleń</span>
                     </div>
+
+                    {/* Pasek interwencji */}
+                    {trackPosition(report.status) >= 0 && (
+                        <div className="mb-6 border-b border-gray-800/50 pb-6 max-w-md">
+                            <InterventionTrack status={report.status} />
+                        </div>
+                    )}
+
+                    {/* Panel urzędnika/redakcji — zmiana statusu interwencji */}
+                    {isAdmin && (
+                        <div className="mb-6 p-4 bg-blue-500/5 border border-blue-500/15 rounded-2xl">
+                            <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
+                                🛡️ Panel redakcji — status interwencji
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                {['new', 'verified', 'forwarded', 'in_progress', 'resolved', 'rejected'].map(s => (
+                                    <button
+                                        key={s}
+                                        disabled={savingStatus || report.status === s}
+                                        onClick={async () => {
+                                            setSavingStatus(true);
+                                            try { await onStatusChange?.(report.id, s); } finally { setSavingStatus(false); }
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                                            report.status === s
+                                                ? 'bg-blue-500 text-white border-blue-400'
+                                                : 'bg-white/[0.04] text-neutral-400 border-white/10 hover:text-neutral-200 hover:bg-white/[0.08]'
+                                        } disabled:opacity-60`}
+                                    >
+                                        {STATUS_CONFIG[s]?.label || s}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-[11px] text-neutral-500 mt-2">
+                                Autor zgłoszenia dostaje e-mail przy każdej zmianie statusu.
+                            </p>
+                        </div>
+                    )}
 
                     {/* Description */}
                     <div className="mb-8">
@@ -869,6 +983,118 @@ const AlertMap: React.FC<{
     );
 };
 
+// ==================== Panel moderacji (admin) ====================
+
+const ModerationPanel: React.FC<{
+    onClose: () => void;
+    onModerated: () => void;
+}> = ({ onClose, onModerated }) => {
+    const [pending, setPending] = useState<Report[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [busyId, setBusyId] = useState<number | null>(null);
+
+    const load = useCallback(() => {
+        setLoading(true);
+        fetchPendingReports()
+            .then(data => setPending(data.reports))
+            .catch(() => setPending([]))
+            .finally(() => setLoading(false));
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const moderate = async (id: number, status: 'verified' | 'rejected') => {
+        setBusyId(id);
+        try {
+            await updateReportStatus(id, status);
+            setPending(prev => prev.filter(r => r.id !== id));
+            onModerated();
+        } catch (err) {
+            console.error('Moderation failed:', err);
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+            <div
+                className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-2xl font-black text-neutral-100">🛡️ Moderacja zgłoszeń</h2>
+                        <p className="text-sm text-neutral-500 mt-1">
+                            Zatwierdzone zgłoszenia publikują się na liście i mapie; przy zagrożeniach
+                            wysyłany jest push. Autor dostaje e-mail o decyzji.
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50 shrink-0">✕</button>
+                </div>
+
+                {loading ? (
+                    <p className="text-neutral-400 text-center py-8">Ładowanie…</p>
+                ) : pending.length === 0 ? (
+                    <div className="text-center py-10">
+                        <span className="text-4xl block mb-3">✅</span>
+                        <p className="text-neutral-400 font-medium">Brak zgłoszeń oczekujących na moderację</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {pending.map(r => {
+                            const cat = CATEGORY_CONFIG[r.category] || CATEGORY_CONFIG.other;
+                            return (
+                                <div key={r.id} className="p-4 bg-white/[0.03] border border-white/8 rounded-2xl">
+                                    <div className="flex gap-4">
+                                        {r.image_url && (
+                                            <img
+                                                src={getImageUrl(r.image_url)}
+                                                alt=""
+                                                className="w-20 h-20 object-cover rounded-xl border border-white/10 shrink-0"
+                                            />
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex gap-2 mb-1.5 flex-wrap">
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: cat.color }}>
+                                                    {cat.emoji} {cat.label}
+                                                </span>
+                                                <span className="text-[10px] text-neutral-500">{timeAgo(r.created_at)}</span>
+                                                {r.location_name && <span className="text-[10px] text-neutral-500">📍 {r.location_name}</span>}
+                                            </div>
+                                            <p className="font-bold text-neutral-100 text-sm">{r.title}</p>
+                                            <p className="text-xs text-neutral-400 line-clamp-2 mt-0.5">{r.description}</p>
+                                            {r.author_name && (
+                                                <p className="text-[11px] text-neutral-500 mt-1">👤 {r.author_name}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 mt-3">
+                                        <button
+                                            disabled={busyId === r.id}
+                                            onClick={() => moderate(r.id, 'verified')}
+                                            className="flex-1 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-xs font-bold hover:bg-emerald-500/25 transition-all disabled:opacity-50"
+                                        >
+                                            ✓ Zatwierdź i opublikuj
+                                        </button>
+                                        <button
+                                            disabled={busyId === r.id}
+                                            onClick={() => moderate(r.id, 'rejected')}
+                                            className="flex-1 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-bold hover:bg-red-500/20 transition-all disabled:opacity-50"
+                                        >
+                                            ✕ Odrzuć
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // ==================== Main ReportsPage ====================
 
 interface ReportsPageProps {
@@ -876,6 +1102,8 @@ interface ReportsPageProps {
 }
 
 const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
+    const { user } = useAuth();
+    const isAdmin = !!user?.is_admin;
     const [reports, setReports] = useState<Report[]>([]);
     const [mapReports, setMapReports] = useState<ReportMapItem[]>([]);
     const [total, setTotal] = useState(0);
@@ -885,6 +1113,35 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
     const [showForm, setShowForm] = useState(false);
     const [selectedReport, setSelectedReport] = useState<Report | null>(null);
     const [showMap, setShowMap] = useState(true);
+    const [showModeration, setShowModeration] = useState(false);
+    const [resolvedLast30d, setResolvedLast30d] = useState<number | null>(null);
+    const [pendingCount, setPendingCount] = useState(0);
+
+    // Licznik skuteczności + liczba oczekujących (admin)
+    const loadStats = useCallback(() => {
+        fetchReportsStats()
+            .then((s: any) => setResolvedLast30d(s.resolved_last_30d ?? 0))
+            .catch(() => {});
+        if (isAdmin) {
+            fetchPendingReports()
+                .then(data => setPendingCount(data.total))
+                .catch(() => setPendingCount(0));
+        }
+    }, [isAdmin]);
+
+    useEffect(() => { loadStats(); }, [loadStats]);
+
+    // Zmiana statusu z panelu redakcji w szczegółach zgłoszenia
+    const handleStatusChange = async (id: number, status: string) => {
+        try {
+            await updateReportStatus(id, status);
+            setReports(prev => prev.map(r => (r.id === id ? { ...r, status: status as Report['status'] } : r)));
+            setSelectedReport(prev => (prev && prev.id === id ? { ...prev, status: status as Report['status'] } : prev));
+            loadStats();
+        } catch (err) {
+            console.error('Status change failed:', err);
+        }
+    };
 
     const loadReports = useCallback(async (pageNum: number, reset = false) => {
         setLoading(true);
@@ -970,15 +1227,34 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
             <header className="bg-white/[0.04] backdrop-blur-xl rounded-3xl p-8 text-white border border-white/8">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div>
-                        <h2 className="text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">🚨 Zgłoszenie24</h2>
-                        <p className="text-neutral-400 mt-2 font-medium">Centrum Powiadamiania o Zdarzeniach – zgłoś problem w Twojej okolicy</p>
+                        <h2 className="text-3xl font-black tracking-tight text-neutral-100">
+                            Zgłoszenia <span className="text-red-400">24</span>
+                        </h2>
+                        <p className="text-neutral-400 mt-2 font-medium max-w-xl">
+                            Widzisz coś ważnego? Sfotografuj i zgłoś — redakcja zweryfikuje,
+                            opublikuje i dopilnuje sprawy w urzędzie.
+                        </p>
                     </div>
-                    <button
-                        onClick={() => setShowForm(true)}
-                        className="px-8 py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-2xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30 text-lg transform hover:scale-105 duration-200 border border-blue-500/20"
-                    >
-                        + Nowe zgłoszenie
-                    </button>
+                    <div className="flex gap-3 items-center">
+                        {isAdmin && (
+                            <button
+                                onClick={() => setShowModeration(true)}
+                                className={`px-5 py-4 rounded-2xl font-bold text-sm border transition-all ${
+                                    pendingCount > 0
+                                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
+                                        : 'bg-white/[0.04] text-neutral-400 border-white/10 hover:bg-white/[0.08]'
+                                }`}
+                            >
+                                🛡️ Moderacja{pendingCount > 0 ? ` (${pendingCount})` : ''}
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setShowForm(true)}
+                            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-2xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30 text-lg transform hover:scale-105 duration-200 border border-blue-500/20"
+                        >
+                            📸 Zgłoś temat
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 relative z-10">
@@ -990,9 +1266,9 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                         <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">🚨 Alarm</p>
                         <p className="text-2xl font-black text-red-400">{reports.filter(r => r.category === 'emergency').length}</p>
                     </div>
-                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">🔥 Pożar</p>
-                        <p className="text-2xl font-black text-orange-400">{reports.filter(r => r.category === 'fire').length}</p>
+                    <div className="bg-emerald-500/10 backdrop-blur-md p-4 rounded-xl border border-emerald-500/20">
+                        <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider mb-1">✅ Rozwiązane (30 dni)</p>
+                        <p className="text-2xl font-black text-emerald-400">{resolvedLast30d ?? '—'}</p>
                     </div>
                     <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
                         <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">🗺️ Na mapie</p>
@@ -1096,6 +1372,18 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     report={selectedReport}
                     onClose={() => setSelectedReport(null)}
                     onUpvote={handleUpvote}
+                    isAdmin={isAdmin}
+                    onStatusChange={handleStatusChange}
+                />
+            )}
+            {showModeration && (
+                <ModerationPanel
+                    onClose={() => setShowModeration(false)}
+                    onModerated={() => {
+                        loadStats();
+                        loadReports(1, true);
+                        loadMapReports();
+                    }}
                 />
             )}
         </div>

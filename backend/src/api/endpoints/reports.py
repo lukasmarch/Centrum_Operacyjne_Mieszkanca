@@ -475,16 +475,68 @@ async def list_pending_reports(
         )
 
 
+# Treści powiadomień dla autora zgłoszenia (pętla zwrotna — model Kontakt 24)
+STATUS_NOTIFICATIONS = {
+    "new": ("Twoje zgłoszenie jest opublikowane",
+            "Redakcja zatwierdziła Twoje zgłoszenie — jest już widoczne na mapie i liście Zgłoszeń 24."),
+    "verified": ("Twoje zgłoszenie zostało zweryfikowane",
+                 "Redakcja potwierdziła Twoje zgłoszenie — ma teraz odznakę „Zweryfikowane”."),
+    "forwarded": ("Twoje zgłoszenie przekazaliśmy do urzędu",
+                  "Sprawa trafiła do Urzędu Gminy Rybno. Damy Ci znać, gdy pojawi się odpowiedź."),
+    "in_progress": ("Twoja sprawa jest w realizacji",
+                    "Służby zajmują się Twoim zgłoszeniem."),
+    "resolved": ("Twoja sprawa została rozwiązana ✅",
+                 "Zgłoszony problem został oznaczony jako rozwiązany. Dziękujemy, że działasz dla gminy!"),
+    "rejected": ("Twoje zgłoszenie nie zostało opublikowane",
+                 "Redakcja nie mogła zatwierdzić tego zgłoszenia (np. brak możliwości weryfikacji "
+                 "lub treści niedozwolone). Możesz wysłać je ponownie z dokładniejszym opisem."),
+}
+
+
+async def _notify_report_author(report: Report, new_status: str) -> None:
+    """E-mail do autora przy zmianie statusu — buduje nawyk wracania.
+    Fire-and-forget: błąd wysyłki nigdy nie blokuje moderacji."""
+    if not report.author_email or new_status not in STATUS_NOTIFICATIONS:
+        return
+    try:
+        from src.newsletter.email_service import EmailService
+        subject, body = STATUS_NOTIFICATIONS[new_status]
+        html = f"""
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+          <h2 style="color:#1d4ed8">Zgłoszenia 24 · RybnoLive</h2>
+          <p>Cześć{f" {report.author_name}" if report.author_name else ""}!</p>
+          <p><strong>{subject}</strong></p>
+          <p>{body}</p>
+          <p style="background:#f1f5f9;padding:12px 16px;border-radius:8px">
+            📋 <strong>{report.title}</strong><br>
+            <span style="color:#64748b;font-size:13px">{report.location_name or ""}</span>
+          </p>
+          <p><a href="https://rybnolive.pl" style="color:#1d4ed8">Zobacz na rybnolive.pl →</a></p>
+          <p style="color:#94a3b8;font-size:12px">Otrzymujesz tę wiadomość, bo podałeś adres
+          e-mail przy zgłoszeniu. Odpowiedz na tego maila, jeśli chcesz coś dodać do sprawy.</p>
+        </div>
+        """
+        await EmailService().send_email(
+            to_email=report.author_email,
+            subject=f"{subject} — Zgłoszenia 24",
+            html_content=html,
+        )
+        logger.info(f"Author notified: report={report.id} status={new_status} -> {report.author_email}")
+    except Exception as e:
+        logger.error(f"Author notification failed for report {report.id}: {e}")
+
+
 @router.patch("/{report_id}/status")
 async def update_report_status(
     report_id: int,
-    new_status: str = Query(..., regex="^(new|verified|in_progress|resolved|rejected)$"),
+    new_status: str = Query(..., regex="^(new|verified|forwarded|in_progress|resolved|rejected)$"),
     user=Depends(get_admin_user),
 ):
     """Zmień status zgłoszenia (moderacja). Wymaga roli administratora.
 
     Zatwierdzenie zgłoszenia pending (→ new/verified) publikuje je;
     dla kategorii zagrożeń wysyła wtedy push do subskrybentów.
+    Autor zgłoszenia (jeśli podał e-mail) dostaje powiadomienie o każdej zmianie.
     """
     async with async_session() as session:
         result = await session.execute(
@@ -520,6 +572,9 @@ async def update_report_status(
             except Exception as push_err:
                 logger.error(f"Emergency push failed for report {report.id}: {push_err}")
 
+        # Pętla zwrotna: powiadom autora o zmianie statusu
+        await _notify_report_author(report, new_status)
+
         return {"status": "ok", "new_status": new_status}
 
 
@@ -553,10 +608,21 @@ async def get_reports_stats():
         category_result = await session.execute(category_query)
         by_category = {row[0]: row[1] for row in category_result.all()}
 
+        # Licznik skuteczności: sprawy rozwiązane w ostatnich 30 dniach
+        from datetime import timedelta
+        resolved_result = await session.execute(
+            select(func.count()).select_from(Report)
+            .where(Report.status == ReportStatus.RESOLVED.value)
+            .where(Report.resolved_at.isnot(None))
+            .where(Report.resolved_at >= datetime.utcnow() - timedelta(days=30))
+        )
+        resolved_last_30d = resolved_result.scalar()
+
         return {
             "total": total,
             "by_status": by_status,
             "by_category": by_category,
+            "resolved_last_30d": resolved_last_30d,
         }
 
 

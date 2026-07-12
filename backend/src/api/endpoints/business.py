@@ -19,7 +19,7 @@ from sqlmodel import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.connection import async_session
-from src.database.schema import CEIDGBusiness, CEIDGSyncStats
+from src.database.schema import CEIDGBusiness, CEIDGSyncStats, BusinessProfile
 from src.auth.dependencies import get_optional_user, get_admin_user, get_current_active_user
 from src.utils.logger import setup_logger
 from src.integrations.regon_api import RegonService
@@ -66,6 +66,57 @@ class BusinessResponse(BaseModel):
             from src.utils.pkd_mapping import get_friendly_category
             instance.branza = get_friendly_category(instance.pkd_main)
         return instance
+
+
+class ProfilePublic(BaseModel):
+    """Publiczne dane wizytówki (kontakt podany przez firmę = zgoda)"""
+    description: Optional[str] = None
+    telefon: Optional[str] = None
+    email: Optional[str] = None
+    www: Optional[str] = None
+    godziny: Optional[str] = None
+    logo_url: Optional[str] = None
+    is_premium: bool = False
+
+
+class CatalogCard(BaseModel):
+    """Karta katalogu wizytówek (strona główna zakładki Firmy)"""
+    id: int
+    nazwa: str
+    miasto: str
+    branza: Optional[str] = None
+    status: str
+    data_rozpoczecia: Optional[datetime] = None
+    profile: ProfilePublic
+
+
+class ClaimRequest(BaseModel):
+    telefon: Optional[str] = None
+    email: Optional[str] = None
+    www: Optional[str] = None
+    note: Optional[str] = None  # jak zweryfikować, że to Twoja firma
+
+
+class ProfileUpdateRequest(BaseModel):
+    description: Optional[str] = None
+    telefon: Optional[str] = None
+    email: Optional[str] = None
+    www: Optional[str] = None
+    godziny: Optional[str] = None
+    logo_url: Optional[str] = None
+
+
+class PendingClaim(BaseModel):
+    claim_id: int
+    business_id: int
+    nazwa: str
+    miasto: str
+    nip: str
+    user_email: str
+    note: Optional[str] = None
+    telefon: Optional[str] = None
+    email: Optional[str] = None
+    created_at: datetime
 
 
 class BusinessListResponse(BaseModel):
@@ -429,6 +480,244 @@ async def trigger_sync(
     except Exception as e:
         logger.error(f"Manual sync failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Wizytówki (katalog firm — sprint B) ====================
+
+@router.get("/catalog", response_model=List[CatalogCard])
+async def get_catalog(limit: int = Query(60, ge=1, le=200)):
+    """
+    Katalog wizytówek — strona główna zakładki Firmy.
+    Tylko firmy ze zweryfikowanym przejęciem; premium („Firma lokalna") na górze.
+    """
+    from src.utils.pkd_mapping import get_friendly_category
+
+    async with async_session() as session:
+        query = apply_public_visibility(
+            select(CEIDGBusiness, BusinessProfile)
+            .join(BusinessProfile, BusinessProfile.business_id == CEIDGBusiness.id)
+            .where(BusinessProfile.claim_status == "verified")
+        ).order_by(
+            BusinessProfile.is_premium.desc(),
+            BusinessProfile.views_count.desc(),
+            CEIDGBusiness.nazwa,
+        ).limit(limit)
+
+        result = await session.execute(query)
+        cards = []
+        for business, profile in result.all():
+            cards.append(CatalogCard(
+                id=business.id,
+                nazwa=business.nazwa,
+                miasto=business.miasto,
+                branza=get_friendly_category(business.pkd_main) if business.pkd_main else None,
+                status=business.status,
+                data_rozpoczecia=business.data_rozpoczecia,
+                profile=ProfilePublic(
+                    description=profile.description,
+                    telefon=profile.telefon,
+                    email=profile.email,
+                    www=profile.www,
+                    godziny=profile.godziny,
+                    logo_url=profile.logo_url,
+                    is_premium=profile.is_premium,
+                ),
+            ))
+        return cards
+
+
+@router.get("/my-claims")
+async def get_my_claims(user=Depends(get_current_active_user)):
+    """Przejęcia wizytówek zalogowanego użytkownika (status + business_id)."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(BusinessProfile, CEIDGBusiness.nazwa)
+            .join(CEIDGBusiness, CEIDGBusiness.id == BusinessProfile.business_id)
+            .where(BusinessProfile.user_id == user.id)
+        )
+        return [
+            {
+                "claim_id": p.id,
+                "business_id": p.business_id,
+                "nazwa": nazwa,
+                "claim_status": p.claim_status,
+                "is_premium": p.is_premium,
+                "views_count": p.views_count,
+            }
+            for p, nazwa in result.all()
+        ]
+
+
+@router.post("/{business_id}/claim", status_code=201)
+async def claim_business(
+    business_id: int,
+    request: ClaimRequest,
+    user=Depends(get_current_active_user),
+):
+    """
+    Przejmij wizytówkę — krok 3 flow (konto już istnieje).
+    Weryfikacja ręczna przez admina (MVP); kontakt podany przez firmę
+    publikowany jest dopiero po zatwierdzeniu (zgoda jako podstawa prawna).
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(CEIDGBusiness).where(CEIDGBusiness.id == business_id)
+        )
+        business = result.scalar_one_or_none()
+        if not business or business.opted_out:
+            raise HTTPException(status_code=404, detail="Firma nie została znaleziona")
+
+        existing = await session.execute(
+            select(BusinessProfile).where(BusinessProfile.business_id == business_id)
+        )
+        profile = existing.scalar_one_or_none()
+        if profile:
+            if profile.user_id == user.id:
+                raise HTTPException(status_code=409, detail="Już zgłosiłeś przejęcie tej wizytówki")
+            raise HTTPException(status_code=409, detail="Ta wizytówka została już przejęta")
+
+        profile = BusinessProfile(
+            business_id=business_id,
+            user_id=user.id,
+            claim_status="pending",
+            claim_note=request.note,
+            telefon=request.telefon,
+            email=request.email,
+            www=request.www,
+        )
+        session.add(profile)
+        await session.commit()
+        await session.refresh(profile)
+
+        logger.info(f"Business claim: business={business_id} '{business.nazwa}' by user={user.email}")
+        return {"status": "pending", "claim_id": profile.id,
+                "message": "Zgłoszenie przyjęte — zweryfikujemy je w ciągu 2 dni roboczych."}
+
+
+@router.get("/claims/pending", response_model=List[PendingClaim])
+async def list_pending_claims(user=Depends(get_admin_user)):
+    """Przejęcia wizytówek oczekujące na weryfikację (tylko admin)."""
+    from src.database.schema import User
+    async with async_session() as session:
+        result = await session.execute(
+            select(BusinessProfile, CEIDGBusiness, User.email)
+            .join(CEIDGBusiness, CEIDGBusiness.id == BusinessProfile.business_id)
+            .join(User, User.id == BusinessProfile.user_id)
+            .where(BusinessProfile.claim_status == "pending")
+            .order_by(BusinessProfile.created_at.asc())
+        )
+        return [
+            PendingClaim(
+                claim_id=p.id,
+                business_id=b.id,
+                nazwa=b.nazwa,
+                miasto=b.miasto,
+                nip=b.nip,
+                user_email=email,
+                note=p.claim_note,
+                telefon=p.telefon,
+                email=p.email,
+                created_at=p.created_at,
+            )
+            for p, b, email in result.all()
+        ]
+
+
+@router.patch("/claims/{claim_id}")
+async def moderate_claim(
+    claim_id: int,
+    action: str = Query(..., regex="^(approve|reject)$"),
+    user=Depends(get_admin_user),
+):
+    """Zatwierdź lub odrzuć przejęcie wizytówki (tylko admin)."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(BusinessProfile).where(BusinessProfile.id == claim_id)
+        )
+        profile = result.scalar_one_or_none()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Zgłoszenie nie zostało znalezione")
+
+        profile.claim_status = "verified" if action == "approve" else "rejected"
+        profile.verified_at = datetime.utcnow() if action == "approve" else None
+        profile.updated_at = datetime.utcnow()
+        session.add(profile)
+        await session.commit()
+
+        logger.info(f"Claim {claim_id} {action} by admin {user.email}")
+        return {"status": "ok", "claim_status": profile.claim_status}
+
+
+@router.patch("/{business_id}/profile")
+async def update_business_profile(
+    business_id: int,
+    request: ProfileUpdateRequest,
+    user=Depends(get_current_active_user),
+):
+    """Edycja wizytówki przez zweryfikowanego właściciela."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(BusinessProfile).where(BusinessProfile.business_id == business_id)
+        )
+        profile = result.scalar_one_or_none()
+        if not profile or profile.user_id != user.id:
+            raise HTTPException(status_code=404, detail="Wizytówka nie została znaleziona")
+        if profile.claim_status != "verified":
+            raise HTTPException(status_code=403, detail="Wizytówka czeka na weryfikację")
+
+        for field in ("description", "telefon", "email", "www", "godziny", "logo_url"):
+            value = getattr(request, field)
+            if value is not None:
+                setattr(profile, field, value.strip() or None)
+        profile.updated_at = datetime.utcnow()
+        session.add(profile)
+        await session.commit()
+        return {"status": "ok"}
+
+
+@router.patch("/{business_id}/premium")
+async def set_business_premium(
+    business_id: int,
+    enabled: bool = Query(...),
+    months: int = Query(1, ge=1, le=24),
+    user=Depends(get_admin_user),
+):
+    """Plan „Firma lokalna" (49 zł/mc) — w MVP włączany przez admina po opłacie
+    (faktura/przelew); bramka płatności dojdzie później."""
+    from datetime import timedelta
+    async with async_session() as session:
+        result = await session.execute(
+            select(BusinessProfile).where(BusinessProfile.business_id == business_id)
+        )
+        profile = result.scalar_one_or_none()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Firma nie ma przejętej wizytówki")
+
+        profile.is_premium = enabled
+        profile.premium_until = (
+            datetime.utcnow() + timedelta(days=30 * months) if enabled else None
+        )
+        profile.updated_at = datetime.utcnow()
+        session.add(profile)
+        await session.commit()
+
+        logger.info(f"Premium {'ON' if enabled else 'OFF'} for business={business_id} by {user.email}")
+        return {"status": "ok", "is_premium": enabled, "premium_until": profile.premium_until}
+
+
+@router.post("/{business_id}/view")
+async def track_business_view(business_id: int):
+    """Licznik wyświetleń wizytówki — argument sprzedażowy planu Firma lokalna."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(BusinessProfile).where(BusinessProfile.business_id == business_id)
+        )
+        profile = result.scalar_one_or_none()
+        if profile:
+            profile.views_count += 1
+            session.add(profile)
+            await session.commit()
+        return {"status": "ok"}
+
 
 @router.patch("/{business_id}/visibility")
 async def set_business_visibility(

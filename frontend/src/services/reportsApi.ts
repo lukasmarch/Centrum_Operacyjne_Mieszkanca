@@ -148,10 +148,38 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
     pending: { label: 'Czeka na moderację', color: '#7f8c8d' },
     new: { label: 'Nowe', color: '#3498db' },
     verified: { label: 'Zweryfikowane', color: '#9b59b6' },
+    forwarded: { label: 'Przekazane do urzędu', color: '#2f6fed' },
     in_progress: { label: 'W realizacji', color: '#f39c12' },
     resolved: { label: 'Rozwiązane', color: '#27ae60' },
     rejected: { label: 'Odrzucone', color: '#e74c3c' },
 };
+
+// ==================== Moderacja (admin) ====================
+
+import { getAccessToken } from './authApi';
+
+function authHeaders(): Record<string, string> {
+    const token = getAccessToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Zgloszenia oczekujace na moderacje (tylko admin) */
+export async function fetchPendingReports(): Promise<ReportListResponse> {
+    const res = await fetch(`${API_BASE}/reports/moderation/pending`, {
+        headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`Failed to fetch pending reports: ${res.status}`);
+    return res.json();
+}
+
+/** Zmiana statusu zgloszenia (tylko admin) */
+export async function updateReportStatus(id: number, status: string): Promise<void> {
+    const res = await fetch(
+        `${API_BASE}/reports/${id}/status?new_status=${encodeURIComponent(status)}`,
+        { method: 'PATCH', headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`Failed to update status: ${res.status}`);
+}
 
 export const SEVERITY_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
     low: { label: 'Niski', color: '#27ae60', icon: 'ℹ️' },

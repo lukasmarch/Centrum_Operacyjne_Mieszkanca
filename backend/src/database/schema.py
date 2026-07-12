@@ -413,6 +413,41 @@ class CEIDGBusiness(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class BusinessProfile(SQLModel, table=True):
+    """Wizytówka firmy — dane podane przez właściciela po przejęciu karty
+    (zgoda = podstawa prawna publikacji kontaktu). Model 3 poziomów:
+    rejestrowa (brak profilu) → przejęta (claim_status=verified) →
+    Firma lokalna (is_premium=True, 49 zł/mc)."""
+    __tablename__ = "business_profiles"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="ceidg_businesses.id", unique=True, index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+
+    # Przejęcie wizytówki (weryfikacja ręczna przez admina w MVP)
+    claim_status: str = Field(default="pending", max_length=20)  # pending / verified / rejected
+    claim_note: Optional[str] = Field(default=None, max_length=500)  # uzasadnienie od firmy
+
+    # Dane wizytówki — podane przez firmę
+    description: Optional[str] = Field(default=None, max_length=600)
+    telefon: Optional[str] = Field(default=None, max_length=50)
+    email: Optional[str] = Field(default=None, max_length=255)
+    www: Optional[str] = Field(default=None, max_length=500)
+    godziny: Optional[str] = Field(default=None, max_length=200)  # np. "pn-pt 8-17, sb 8-13"
+    logo_url: Optional[str] = Field(default=None, max_length=500)
+
+    # Plan "Firma lokalna" (premium; w MVP włączane przez admina po opłacie)
+    is_premium: bool = Field(default=False, index=True)
+    premium_until: Optional[datetime] = None
+
+    # Statystyki (argument sprzedażowy)
+    views_count: int = Field(default=0)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    verified_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class CEIDGSyncStats(SQLModel, table=True):
     """Statystyki synchronizacji CEIDG"""
     __tablename__ = "ceidg_sync_stats"
@@ -527,6 +562,7 @@ class ReportStatus(str, Enum):
     PENDING = "pending"  # czeka na moderację — niewidoczne publicznie
     NEW = "new"
     VERIFIED = "verified"
+    FORWARDED = "forwarded"  # przekazane do urzędu — publiczny pasek interwencji
     IN_PROGRESS = "in_progress"
     RESOLVED = "resolved"
     REJECTED = "rejected"
