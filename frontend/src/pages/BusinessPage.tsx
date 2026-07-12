@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Business } from '../../types';
+import { AppSection, Business } from '../../types';
 import { useAuth } from '../context/AuthContext';
-import { Search, X } from 'lucide-react';
+import { Search, X, Info } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -127,7 +127,11 @@ const YearBarChart: React.FC<{
     );
 };
 
-const BusinessPage: React.FC = () => {
+interface BusinessPageProps {
+    onNavigate?: (section: AppSection) => void;
+}
+
+const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
     const { isAuthenticated } = useAuth();
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [localities, setLocalities] = useState<Locality[]>([]);
@@ -572,6 +576,27 @@ const BusinessPage: React.FC = () => {
                     </button>
                 </div>
             )}
+
+            {/* Nota prawna — klauzula informacyjna art. 14 RODO */}
+            <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 flex gap-3 items-start">
+                <Info className="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                    Dane firm pochodzą z publicznego rejestru <strong className="text-neutral-400">CEIDG</strong> i
+                    obejmują nazwę, adres wykonywania działalności, NIP i branżę.
+                    Szczegóły w{' '}
+                    <button
+                        onClick={() => onNavigate?.('privacy')}
+                        className="text-blue-400 hover:text-blue-300 underline"
+                    >
+                        polityce prywatności (art. 14 RODO)
+                    </button>.
+                    {' '}Prowadzisz tę firmę i chcesz zaktualizować lub ukryć swoją kartę?
+                    Napisz:{' '}
+                    <a href="mailto:biuro@lumargo.pl?subject=Katalog%20firm%20RybnoLive" className="text-blue-400 hover:text-blue-300 underline">
+                        biuro@lumargo.pl
+                    </a>{' '}— żądania rozpatrujemy w ciągu 7 dni.
+                </p>
+            </div>
         </div>
     );
 };

@@ -51,12 +51,9 @@ class BusinessResponse(BaseModel):
     pkd_list: Optional[List[dict]]
     branza: Optional[str] = None  # UI-friendly category (from PKD_FRIENDLY_NAMES)
     data_rozpoczecia: Optional[datetime] = None  # Year founded
-    adres_korespondencyjny: Optional[Dict[str, Any]]
-    spolki: Optional[List[Dict[str, Any]]]
-    obywatelstwa: Optional[List[Dict[str, Any]]]
-    email: Optional[str]
-    www: Optional[str]
-    telefon: Optional[str]
+    # Minimalizacja danych (RODO art. 5): adres korespondencyjny, spółki,
+    # obywatelstwa i kontakt rejestrowy nie są publikowane. Kontakt pojawi się,
+    # gdy firma poda go sama przy przejęciu wizytówki (zgoda).
 
     class Config:
         from_attributes = True
@@ -101,6 +98,16 @@ class CategoryItem(BaseModel):
     count: int
 
 
+# ==================== Helpers ====================
+
+def apply_public_visibility(query):
+    """Filtry widoczności publicznej: bez sprzeciwów (RODO art. 21)
+    i bez firm wykreślonych z rejestru (retencja, art. 5)."""
+    return query.where(
+        CEIDGBusiness.opted_out == False  # noqa: E712
+    ).where(CEIDGBusiness.status != "WYKRESLONY")
+
+
 # ==================== Endpoints ====================
 
 @router.get("/list", response_model=BusinessListResponse)
@@ -126,7 +133,9 @@ async def list_businesses(
 
     async with async_session() as session:
         # Base query
-        query = select(CEIDGBusiness).where(CEIDGBusiness.powiat == "działdowski")
+        query = apply_public_visibility(
+            select(CEIDGBusiness).where(CEIDGBusiness.powiat == "działdowski")
+        )
 
         if miasto:
             query = query.where(CEIDGBusiness.miasto == miasto)
@@ -156,8 +165,10 @@ async def list_businesses(
             )
 
         # Count total (with same filters)
-        count_query = select(func.count()).select_from(CEIDGBusiness).where(
-            CEIDGBusiness.powiat == "działdowski"
+        count_query = apply_public_visibility(
+            select(func.count()).select_from(CEIDGBusiness).where(
+                CEIDGBusiness.powiat == "działdowski"
+            )
         )
         if miasto:
             count_query = count_query.where(CEIDGBusiness.miasto == miasto)
@@ -182,12 +193,10 @@ async def list_businesses(
         businesses = result.scalars().all()
 
         # Get localities breakdown (always all localities, no filters applied)
-        localities_query = (
+        localities_query = apply_public_visibility(
             select(CEIDGBusiness.miasto, func.count(CEIDGBusiness.id))
             .where(CEIDGBusiness.powiat == "działdowski")
-            .group_by(CEIDGBusiness.miasto)
-            .order_by(func.count(CEIDGBusiness.id).desc())
-        )
+        ).group_by(CEIDGBusiness.miasto).order_by(func.count(CEIDGBusiness.id).desc())
         localities_result = await session.execute(localities_query)
         localities = [{"name": row[0], "count": row[1]} for row in localities_result.all()]
 
@@ -213,7 +222,7 @@ async def get_businesses_by_locality(
         status: Filtruj po statusie
     """
     async with async_session() as session:
-        query = (
+        query = apply_public_visibility(
             select(CEIDGBusiness)
             .where(CEIDGBusiness.powiat == "działdowski")
             .where(CEIDGBusiness.miasto == miasto)
@@ -250,7 +259,9 @@ async def search_businesses(
 
     async with async_session() as session:
         # Wyszukujemy tylko w gminie Rybno / powiecie działdowskim
-        query = select(CEIDGBusiness).where(CEIDGBusiness.powiat == "działdowski")
+        query = apply_public_visibility(
+            select(CEIDGBusiness).where(CEIDGBusiness.powiat == "działdowski")
+        )
 
         if status:
             query = query.where(CEIDGBusiness.status == status)
@@ -338,13 +349,12 @@ async def get_business_categories():
 
     async with async_session() as session:
         # Fetch all active businesses' PKD main codes
-        query = (
+        query = apply_public_visibility(
             select(CEIDGBusiness.pkd_main, func.count(CEIDGBusiness.id))
             .where(CEIDGBusiness.powiat == "działdowski")
             .where(CEIDGBusiness.status == "AKTYWNY")
             .where(CEIDGBusiness.pkd_main.is_not(None))
-            .group_by(CEIDGBusiness.pkd_main)
-        )
+        ).group_by(CEIDGBusiness.pkd_main)
         result = await session.execute(query)
         rows = result.all()
 
@@ -391,13 +401,11 @@ async def get_localities():
     Pobierz listę miejscowości z liczbą firm
     """
     async with async_session() as session:
-        query = (
+        query = apply_public_visibility(
             select(CEIDGBusiness.miasto, func.count(CEIDGBusiness.id))
             .where(CEIDGBusiness.powiat == "działdowski")
             .where(CEIDGBusiness.status == "AKTYWNY")
-            .group_by(CEIDGBusiness.miasto)
-            .order_by(func.count(CEIDGBusiness.id).desc())
-        )
+        ).group_by(CEIDGBusiness.miasto).order_by(func.count(CEIDGBusiness.id).desc())
         result = await session.execute(query)
         localities = [{"name": row[0], "count": row[1]} for row in result.all()]
         return localities
@@ -421,6 +429,37 @@ async def trigger_sync(
     except Exception as e:
         logger.error(f"Manual sync failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/{business_id}/visibility")
+async def set_business_visibility(
+    business_id: int,
+    hidden: bool = Query(..., description="True = ukryj kartę (sprzeciw RODO art. 21)"),
+    user = Depends(get_admin_user),
+):
+    """
+    Obsługa sprzeciwu wobec przetwarzania (RODO art. 21) — zgłoszenia
+    przychodzą na biuro@lumargo.pl, admin ukrywa kartę firmy.
+    Flaga opted_out przetrwa kolejne synchronizacje CEIDG.
+    """
+    async with async_session() as session:
+        result = await session.execute(
+            select(CEIDGBusiness).where(CEIDGBusiness.id == business_id)
+        )
+        business = result.scalar_one_or_none()
+        if not business:
+            raise HTTPException(status_code=404, detail="Firma nie została znaleziona")
+
+        business.opted_out = hidden
+        business.updated_at = datetime.utcnow()
+        session.add(business)
+        await session.commit()
+
+        logger.info(
+            f"Business visibility changed by admin {user.email}: "
+            f"id={business_id} nip={business.nip} opted_out={hidden}"
+        )
+        return {"status": "ok", "id": business_id, "opted_out": hidden}
+
 
 @router.get("/regon-search", response_model=List[Dict[str, Any]])
 async def regon_search_proxy(

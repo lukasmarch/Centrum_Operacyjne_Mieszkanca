@@ -144,7 +144,7 @@ class BaseAgent:
 
         # 4. Generate
         if stream:
-            return await self._stream(messages, sources)
+            return await self._stream(messages, sources, context_count=len(context_docs))
 
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -161,7 +161,12 @@ class BaseAgent:
             "agent_name": self.name
         }
 
-    async def _stream(self, messages: list[dict], sources: list[dict]) -> AsyncGenerator:
+    async def _stream(
+        self,
+        messages: list[dict],
+        sources: list[dict],
+        context_count: Optional[int] = None,
+    ) -> AsyncGenerator:
         """Stream response via SSE"""
         stream = await self.client.chat.completions.create(
             model=self.model,
@@ -173,6 +178,15 @@ class BaseAgent:
         )
 
         async def generate():
+            # Widoczny krok pracy agenta (wzorzec Perplexity) — przed pierwszym
+            # chunkiem, żeby użytkownik widział co się wydarzyło w tle
+            if context_count is not None:
+                if context_count > 0:
+                    step = f"Przeszukałem bazę wiedzy — {context_count} materiałów źródłowych"
+                else:
+                    step = "Brak materiałów w bazie — odpowiadam na podstawie wiedzy ogólnej"
+                yield json.dumps({"type": "status", "message": step}) + "\n"
+
             full_content = ""
             total_tokens = 0
             async for chunk in stream:

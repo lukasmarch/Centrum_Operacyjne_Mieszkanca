@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Sparkles, CornerDownRight } from 'lucide-react';
 import { useChat } from '../src/hooks/useChat';
 import { useVoiceInput } from '../src/hooks/useVoiceInput';
 import { VoiceMicButton } from './VoiceMicButton';
@@ -31,6 +31,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastSentQuery = useRef('');
 
+  // Pytanie dnia + sugestie — obniżają próg wejścia w pustym czacie
+  const [questionOfDay, setQuestionOfDay] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch('/api/chat/suggestions')
+      .then(r => r.json())
+      .then(data => {
+        if (data.question_of_day) setQuestionOfDay(data.question_of_day);
+        if (data.suggestions?.length) setSuggestions(data.suggestions);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Chipy pytań pomocniczych tylko przy ostatniej odpowiedzi
+  const lastAssistantId = [...messages].reverse().find(m => m.role === 'assistant')?.id;
+
   useEffect(() => {
     if (initialQuery && initialQuery !== lastSentQuery.current) {
       lastSentQuery.current = initialQuery;
@@ -56,14 +73,52 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       <div className="max-w-7xl mx-auto w-full px-4 md:px-8 pb-4 space-y-4">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center w-full py-16 text-center">
-            <p className="text-neutral-600 text-sm max-w-xs leading-relaxed">
+          <div className="flex flex-col items-center justify-center w-full py-10 gap-5">
+            <p className="text-neutral-600 text-sm max-w-xs leading-relaxed text-center">
               Zadaj pytanie o gminę Rybno — wiadomości, urzędy, statystyki lub wydarzenia.
             </p>
+
+            {/* Pytanie dnia */}
+            {questionOfDay && !limitReached && (
+              <button
+                onClick={() => sendMessage(questionOfDay)}
+                className="w-full max-w-md text-left rounded-2xl px-5 py-4 transition-all
+                  bg-gradient-to-r from-blue-500/15 to-violet-500/10
+                  border border-blue-500/25 hover:border-blue-400/45 hover:from-blue-500/20"
+              >
+                <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-400 mb-1.5">
+                  <Sparkles size={11} /> Pytanie dnia
+                </p>
+                <p className="text-sm text-neutral-200 leading-snug">{questionOfDay}</p>
+              </button>
+            )}
+
+            {/* Przykładowe pytania */}
+            {suggestions.length > 0 && !limitReached && (
+              <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+                {suggestions.slice(0, 4).map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => sendMessage(s)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full
+                      bg-white/[0.04] border border-white/10 text-neutral-400
+                      hover:bg-white/[0.07] hover:text-neutral-200 transition-colors text-left"
+                  >
+                    <CornerDownRight size={11} className="opacity-50 shrink-0" />
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {messages.map(msg => (
-          <ChatMessage key={msg.id} message={msg} />
+          <ChatMessage
+            key={msg.id}
+            message={msg}
+            onFollowUp={q => !isLoading && !limitReached && sendMessage(q)}
+            showFollowups={msg.id === lastAssistantId && !isLoading}
+          />
         ))}
         {limitReached && limitInfo && (
           <ChatLimitPrompt limitInfo={limitInfo} onNavigate={onNavigate} />

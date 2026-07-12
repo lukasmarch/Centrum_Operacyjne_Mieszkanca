@@ -201,12 +201,8 @@ export interface Business {
   pkd_list?: Array<{ kod: string; nazwa: string }>;
   branza?: string; // UI-friendly category from PKD_FRIENDLY_NAMES
   data_rozpoczecia?: string; // ISO datetime string – year founded
-  adres_korespondencyjny?: Record<string, any>;
-  spolki?: Array<Record<string, any>>;
-  obywatelstwa?: Array<Record<string, any>>;
-  email?: string;
-  www?: string;
-  telefon?: string;
+  // Minimalizacja RODO: kontakt/spółki/obywatelstwa nie są publikowane przez API —
+  // dane kontaktowe wrócą jako pola wizytówki podane przez firmę (sprint B)
 }
 
 // Zgłoszenie24 – Citizen Reports

@@ -1,12 +1,19 @@
-import React from 'react';
-import { Bot, BarChart3, Newspaper, Landmark, ShieldAlert, Map, CalendarDays } from 'lucide-react';
-import { ChatMessageData, ChartConfig } from '../src/hooks/useChat';
+import React, { useState } from 'react';
+import {
+  Bot, BarChart3, Newspaper, Landmark, ShieldAlert, Map, CalendarDays,
+  Check, ThumbsUp, ThumbsDown, CornerDownRight,
+} from 'lucide-react';
+import { ChatMessageData, ChartConfig, sendChatFeedback } from '../src/hooks/useChat';
 import { useAuth } from '../src/context/AuthContext';
 import SourceChip from './SourceChip';
 import TrendChart from './gus/charts/TrendChart';
 
 interface ChatMessageProps {
   message: ChatMessageData;
+  /** Klik w chip pytania pomocniczego — wysyła je jako nową wiadomość */
+  onFollowUp?: (question: string) => void;
+  /** Chipy pytań pomocniczych pokazujemy tylko przy ostatniej odpowiedzi */
+  showFollowups?: boolean;
 }
 
 // Agent images – must match frontend/public/agents/
@@ -194,9 +201,47 @@ const AgentAvatar: React.FC<{ agentName?: string }> = ({ agentName }) => {
   );
 };
 
+// ── Oceny 👍/👎 ────────────────────────────────────────────────────────────
+
+const FeedbackButtons: React.FC<{ dbId: number }> = ({ dbId }) => {
+  const [rated, setRated] = useState<1 | -1 | null>(null);
+
+  const rate = (rating: 1 | -1) => {
+    setRated(rating);
+    sendChatFeedback(dbId, rating);
+  };
+
+  if (rated) {
+    return (
+      <p className="text-[11px] text-neutral-600 mt-1.5 pl-1">
+        {rated === 1 ? 'Dziękujemy za ocenę! 🎉' : 'Dzięki — poprawimy się.'}
+      </p>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1.5 mt-1.5 pl-1">
+      <span className="text-[11px] text-neutral-600 mr-1">Czy ta odpowiedź pomogła?</span>
+      <button
+        onClick={() => rate(1)}
+        aria-label="Odpowiedź pomogła"
+        className="p-1.5 rounded-lg text-neutral-500 hover:text-emerald-400 hover:bg-white/[0.05] transition-colors"
+      >
+        <ThumbsUp size={13} />
+      </button>
+      <button
+        onClick={() => rate(-1)}
+        aria-label="Odpowiedź nie pomogła"
+        className="p-1.5 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-white/[0.05] transition-colors"
+      >
+        <ThumbsDown size={13} />
+      </button>
+    </div>
+  );
+};
+
 // ── Main component ─────────────────────────────────────────────────────────
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+const ChatMessage: React.FC<ChatMessageProps> = ({ message, onFollowUp, showFollowups = true }) => {
   const { user } = useAuth();
 
   if (message.role === 'user') {
@@ -221,6 +266,25 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           <p className="text-[10px] text-neutral-500 mb-1 uppercase tracking-widest font-semibold pl-1">
             {message.agent_name.replace('_', '-')}.ai
           </p>
+        )}
+
+        {/* Widoczne kroki pracy agenta (wzorzec Perplexity) */}
+        {message.steps && message.steps.length > 0 && (
+          <div className="mb-1.5 pl-1 space-y-0.5">
+            {message.steps.map((step, i) => {
+              const isCurrent = message.isStreaming && !message.content && i === message.steps!.length - 1;
+              return (
+                <p key={i} className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+                  {isCurrent ? (
+                    <span className="w-3 h-3 rounded-full border border-blue-400 border-t-transparent animate-spin shrink-0" />
+                  ) : (
+                    <Check size={12} className="text-emerald-500 shrink-0" />
+                  )}
+                  {step}
+                </p>
+              );
+            })}
+          </div>
         )}
 
         <div className="bg-neutral-900/80 border border-white/5 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-neutral-200 leading-relaxed shadow-sm">
@@ -257,6 +321,29 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           <div className="flex flex-wrap gap-2 mt-2 pl-1">
             {message.sources.map((source, i) => (
               <SourceChip key={i} source={source} />
+            ))}
+          </div>
+        )}
+
+        {/* Ocena odpowiedzi — po zapisaniu wiadomości w bazie */}
+        {!message.isStreaming && message.content && message.dbId && (
+          <FeedbackButtons dbId={message.dbId} />
+        )}
+
+        {/* Pytania pomocnicze — chipy zachęcające do kontynuowania rozmowy */}
+        {showFollowups && !message.isStreaming && message.followups && message.followups.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2.5 pl-1">
+            {message.followups.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => onFollowUp?.(q)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full
+                  bg-blue-500/10 border border-blue-500/25 text-blue-300
+                  hover:bg-blue-500/20 hover:border-blue-400/40 transition-colors text-left"
+              >
+                <CornerDownRight size={11} className="opacity-60 shrink-0" />
+                {q}
+              </button>
             ))}
           </div>
         )}

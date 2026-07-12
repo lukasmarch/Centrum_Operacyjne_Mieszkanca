@@ -389,8 +389,13 @@ class CEIDGBusiness(SQLModel, table=True):
     powiat: str = Field(max_length=100)
     wojewodztwo: Optional[str] = Field(default=None, max_length=100)
     
-    # Full data as JSON for future extensibility
+    # Minimalizacja danych (RODO art. 5): kolumna wyczyszczona i nieuzupełniana
+    # od 07.2026 — pełny JSON rejestru wykraczał poza cel katalogu firm.
     raw_data: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+
+    # Sprzeciw wobec przetwarzania (RODO art. 21): karta ukryta publicznie.
+    # Flaga musi przetrwać każdą synchronizację CEIDG.
+    opted_out: bool = Field(default=False, index=True)
     
     # External link
     ceidg_link: Optional[str] = Field(default=None, max_length=500)

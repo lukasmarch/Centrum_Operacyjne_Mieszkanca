@@ -18,7 +18,7 @@ from sqlmodel import select
 
 from src.database import get_session
 from src.database.connection import async_session
-from src.database.vectors import Conversation, ChatMessage, APICostLog
+from src.database.vectors import Conversation, ChatMessage, ChatMessageFeedback, APICostLog
 from src.ai.agents.orchestrator import orchestrator
 from src.auth.dependencies import get_optional_user
 from src.database.schema import User, AnonymousChatUsage
@@ -56,6 +56,44 @@ def _log_chat_cost(session, tokens: int, agent_name: Optional[str], user_id: Opt
         endpoint=f"/api/chat/message:{agent_name or 'auto'}",
         user_id=user_id,
     ))
+
+
+async def _generate_followups(question: str, answer: str, agent_name: Optional[str]) -> list:
+    """
+    3 pytania pomocnicze (chipy pod odpowiedzią) — zachęta do kontynuowania
+    rozmowy. Osobne, tanie wywołanie gpt-4o-mini po zakończeniu streamu;
+    błąd nigdy nie psuje odpowiedzi (zwracamy pustą listę).
+    """
+    import openai
+    from src.config import settings
+    try:
+        client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.5,
+            max_tokens=200,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": (
+                    "Jesteś asystentem portalu lokalnego gminy Rybno. Na podstawie pytania "
+                    "użytkownika i odpowiedzi agenta zaproponuj 3 krótkie pytania kontynuacyjne "
+                    "(max 60 znaków każde), które użytkownik mógłby zadać jako następne. "
+                    "Pytania po polsku, konkretne, dotyczące gminy Rybno i okolic. "
+                    "Zwróć JSON: {\"questions\": [\"...\", \"...\", \"...\"]}"
+                )},
+                {"role": "user", "content": (
+                    f"Agent: {agent_name or 'auto'}\n"
+                    f"Pytanie: {question}\n"
+                    f"Odpowiedź: {answer[:1500]}"
+                )},
+            ],
+        )
+        data = json.loads(response.choices[0].message.content)
+        questions = [q for q in data.get("questions", []) if isinstance(q, str) and q.strip()]
+        return questions[:3]
+    except Exception as e:
+        logger.warning(f"Followups generation failed: {e}")
+        return []
 
 
 def _hash_ip(ip: str) -> str:
@@ -235,6 +273,11 @@ async def send_message(
         # SSE streaming response
         async def event_stream():
             try:
+                # Send conversation_id first + widoczny krok pracy (routing + RAG
+                # trwają 1-3 s — użytkownik widzi, że coś się dzieje)
+                yield f"data: {json.dumps({'type': 'start', 'conversation_id': conversation.id})}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'message': 'Analizuję pytanie i wybieram agenta…'})}\n\n"
+
                 result = await orchestrator.handle(
                     session=session,
                     user_message=request.message,
@@ -244,9 +287,6 @@ async def send_message(
                     user=user,
                     last_agent=last_agent
                 )
-
-                # Send conversation_id first
-                yield f"data: {json.dumps({'type': 'start', 'conversation_id': conversation.id})}\n\n"
 
                 full_content = ""
                 sources = []
@@ -258,6 +298,8 @@ async def send_message(
                     if data["type"] == "chunk":
                         full_content += data["content"]
                         yield f"data: {line}\n\n"
+                    elif data["type"] == "status":
+                        yield f"data: {line}\n\n"
                     elif data["type"] == "sources":
                         sources = data["sources"]
                         yield f"data: {line}\n\n"
@@ -267,6 +309,15 @@ async def send_message(
                         resolved_agent_name = data.get("agent_name", request.agent_name)
                         resolved_tokens = data.get("tokens_used", 0)
                         yield f"data: {line}\n\n"
+
+                # Pytania pomocnicze — chipy pod odpowiedzią (osobne tanie
+                # wywołanie po streamie; odpowiedź jest już widoczna)
+                if full_content:
+                    followups = await _generate_followups(
+                        request.message, full_content, resolved_agent_name
+                    )
+                    if followups:
+                        yield f"data: {json.dumps({'type': 'followups', 'questions': followups})}\n\n"
 
                 # Save assistant message with resolved agent_name and tokens_used
                 async with async_session() as save_session:
@@ -287,6 +338,10 @@ async def send_message(
                     _log_chat_cost(save_session, resolved_tokens, resolved_agent_name,
                                    user.id if user else None)
                     await save_session.commit()
+                    await save_session.refresh(assistant_msg)
+
+                # ID zapisanej wiadomości — potrzebne do ocen 👍/👎
+                yield f"data: {json.dumps({'type': 'saved', 'message_id': assistant_msg.id})}\n\n"
 
             except Exception as e:
                 logger.error(f"Chat stream error: {e}", exc_info=True)
@@ -398,11 +453,71 @@ async def get_chat_history(
 
 @router.get("/suggestions")
 async def get_suggestions():
-    """Get example questions from all agents as suggestions"""
+    """Example questions from all agents + deterministyczne pytanie dnia
+    (rotacja po dniu roku — obniża próg wejścia w pustym czacie)."""
     suggestions = []
+    pool = []
     for agent in orchestrator.agents.values():
         suggestions.extend(agent.example_questions[:2])
-    return {"suggestions": suggestions[:8]}
+        pool.extend(agent.example_questions)
+
+    question_of_day = None
+    if pool:
+        question_of_day = pool[date.today().timetuple().tm_yday % len(pool)]
+
+    return {
+        "suggestions": suggestions[:8],
+        "question_of_day": question_of_day,
+    }
+
+
+class FeedbackRequest(BaseModel):
+    message_id: int
+    rating: int = Field(..., description="+1 (pomogło) lub -1 (nie pomogło)")
+
+
+@router.post("/feedback")
+async def submit_feedback(
+    request: FeedbackRequest,
+    http_request: Request,
+    user: Optional[User] = Depends(get_optional_user),
+):
+    """Ocena odpowiedzi agenta 👍/👎 — jeden głos na wiadomość na konto/IP,
+    ponowny głos nadpisuje ocenę (można zmienić zdanie)."""
+    if request.rating not in (1, -1):
+        raise HTTPException(status_code=400, detail="rating musi być 1 lub -1")
+
+    if user:
+        voter_key = f"user:{user.id}"
+    else:
+        raw_ip = http_request.client.host if http_request.client else "unknown"
+        voter_key = f"ip:{_hash_ip(raw_ip)[:40]}"
+
+    async with async_session() as session:
+        msg_result = await session.execute(
+            select(ChatMessage).where(ChatMessage.id == request.message_id)
+        )
+        if not msg_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Wiadomość nie istnieje")
+
+        existing = await session.execute(
+            select(ChatMessageFeedback)
+            .where(ChatMessageFeedback.message_id == request.message_id)
+            .where(ChatMessageFeedback.voter_key == voter_key)
+        )
+        feedback = existing.scalar_one_or_none()
+        if feedback:
+            feedback.rating = request.rating
+        else:
+            feedback = ChatMessageFeedback(
+                message_id=request.message_id,
+                rating=request.rating,
+                voter_key=voter_key,
+            )
+        session.add(feedback)
+        await session.commit()
+
+    return {"status": "ok", "rating": request.rating}
 
 
 @router.get("/agents")

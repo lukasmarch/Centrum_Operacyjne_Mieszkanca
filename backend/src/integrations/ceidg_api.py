@@ -201,7 +201,6 @@ class CEIDGService:
         Obsługuje zarówno format skrócony (z listy) jak i pełny (z detali).
         """
         adres = raw.get("adresDzialalnosci", {})
-        adres_kor = raw.get("adresKorespondencyjny", {})
         wlasciciel = raw.get("wlasciciel", {})
         
         # Parsuj datę rozpoczęcia
@@ -238,14 +237,14 @@ class CEIDGService:
             # Detailed Fields
             "pkd_main": raw.get("pkdGlowny", {}).get("kod"),
             "pkd_list": raw.get("pkd", []),
-            "adres_korespondencyjny": adres_kor if adres_kor else None,
-            "spolki": raw.get("spolki", []),
-            "obywatelstwa": raw.get("obywatelstwa", []),
+            # Kontakt z rejestru: przechowywany wyłącznie na potrzeby kontaktu
+            # B2B (uzasadniony interes), NIE publikowany przez API.
             "email": raw.get("email"),
             "www": raw.get("www"),
             "telefon": raw.get("telefon"),
-            
-            "raw_data": raw,
+
+            # Minimalizacja danych (RODO art. 5): raw_data, spółki, obywatelstwa
+            # i adres korespondencyjny nie są już zapisywane.
             "ceidg_link": link,
             "fetched_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()

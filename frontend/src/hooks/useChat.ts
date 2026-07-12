@@ -51,6 +51,29 @@ export interface ChatMessageData {
   agent_name?: string;
   isStreaming?: boolean;
   chartData?: ChartConfig[];
+  /** Widoczne kroki pracy agenta ("Przeszukałem bazę wiedzy — 4 materiały…") */
+  steps?: string[];
+  /** Pytania pomocnicze — klikalne chipy pod odpowiedzią */
+  followups?: string[];
+  /** ID wiadomości w bazie — potrzebne do ocen 👍/👎 */
+  dbId?: number;
+}
+
+/** Wyślij ocenę odpowiedzi agenta (👍 = 1, 👎 = -1). Fire-and-forget. */
+export async function sendChatFeedback(messageId: number, rating: 1 | -1): Promise<boolean> {
+  try {
+    const token = getAccessToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_URL}/chat/feedback`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ message_id: messageId, rating }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export interface LimitInfo {
@@ -150,6 +173,18 @@ export function useChat(options: UseChatOptions = {}) {
             const data = JSON.parse(trimmed.slice(6));
             if (data.type === 'start') {
               setConversationId(data.conversation_id);
+            } else if (data.type === 'status') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, steps: [...(m.steps || []), data.message] } : m
+              ));
+            } else if (data.type === 'followups') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, followups: data.questions } : m
+              ));
+            } else if (data.type === 'saved') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, dbId: data.message_id } : m
+              ));
             } else if (data.type === 'chunk') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: m.content + data.content } : m

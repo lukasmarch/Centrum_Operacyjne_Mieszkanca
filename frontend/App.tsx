@@ -141,7 +141,7 @@ const AppContent: React.FC = () => {
             case 'stats':
                 return <GUSPage />;
             case 'business':
-                return <BusinessPage />;
+                return <BusinessPage onNavigate={handleNavigate} />;
             case 'reports':
                 return <ReportsPage onNavigate={handleNavigate} />;
             case 'terms':

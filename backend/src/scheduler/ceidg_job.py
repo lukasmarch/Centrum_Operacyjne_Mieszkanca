@@ -242,7 +242,6 @@ async def import_from_json(json_path: str):
                 gmina=adres.get("gmina", ""),
                 powiat=adres.get("powiat", ""),
                 wojewodztwo=adres.get("wojewodztwo"),
-                raw_data=raw,
                 ceidg_link=raw.get("link"),
                 fetched_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()

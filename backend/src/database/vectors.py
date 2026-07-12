@@ -60,6 +60,19 @@ class ChatMessage(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class ChatMessageFeedback(SQLModel, table=True):
+    """Oceny 👍/👎 odpowiedzi agentów — dane do poprawy RAG i dowód jakości.
+    Jeden głos na wiadomość na konto / hash IP (UNIQUE w migracji)."""
+    __tablename__ = "chat_message_feedback"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    message_id: int = Field(foreign_key="chat_messages.id", index=True)
+    rating: int  # +1 (pomogło) / -1 (nie pomogło)
+    voter_key: str = Field(max_length=60, index=True)  # "user:{id}" lub "ip:{hash}"
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class GUSNarrative(SQLModel, table=True):
     """AI-generated data storytelling narratives for GUS sections"""
     __tablename__ = "gus_narratives"
