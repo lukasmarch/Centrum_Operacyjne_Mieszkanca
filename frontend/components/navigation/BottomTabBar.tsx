@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Bot, Building2, BarChart3, ClipboardList } from 'lucide-react';
+import { Home, Bot, Building2, Store, ClipboardList } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { TabId } from '../../types';
 import { cn } from '../../lib/utils';
@@ -14,7 +14,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'assistant', label: 'Asystent', icon: Bot },
   { id: 'miasto', label: 'Info', icon: Building2 },
-  { id: 'dane', label: 'Dane', icon: BarChart3 },
+  { id: 'dane', label: 'Firmy', icon: Store },
   { id: 'zgloszenia', label: 'Zgłoszenia 24', icon: ClipboardList },
 ];
 

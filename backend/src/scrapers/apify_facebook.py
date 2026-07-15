@@ -83,6 +83,8 @@ class ApifyFacebookScraper(BaseScraper):
         self.actor_id = self.config.get('actor_id', 'apify~facebook-posts-scraper')
         # Pobieraj tylko posty nowsze niż N dni (domyślnie 2 dni)
         self.only_newer_than_days = self.config.get('only_newer_than_days', 2)
+        # Posty zawierające którekolwiek ze słów są pomijane (np. autoreklamy strony)
+        self.exclude_keywords = [k.lower() for k in self.config.get('exclude_keywords', [])]
 
         if not self.apify_api_key:
             raise ValueError("Missing 'apify_api_key' in scraper config")
@@ -216,6 +218,13 @@ class ApifyFacebookScraper(BaseScraper):
                     if not text:
                         self.logger.warning(f"Post {post_id} bez tekstu, pomijam")
                         continue
+
+                    if self.exclude_keywords:
+                        text_lower = text.lower()
+                        matched = next((k for k in self.exclude_keywords if k in text_lower), None)
+                        if matched:
+                            self.logger.info(f"Post {post_id} odfiltrowany (keyword: '{matched}')")
+                            continue
 
                     # Tytuł - pierwsze 100 znaków tekstu lub pierwsze zdanie
                     title = text[:100]

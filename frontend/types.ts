@@ -187,8 +187,6 @@ export interface Business {
   nip: string;
   regon?: string;
   status: string;
-  wlasciciel_imie?: string;
-  wlasciciel_nazwisko?: string;
   ulica?: string;
   budynek?: string;
   lokal?: string;

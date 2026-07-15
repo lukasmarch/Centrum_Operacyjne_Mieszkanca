@@ -12,7 +12,7 @@ import threading
 from datetime import datetime, timedelta
 
 from src.scheduler.weather_job import run_weather_job
-from src.scheduler.article_job import run_article_job
+from src.scheduler.article_job import run_article_job, run_energa_job
 from src.scheduler.ai_jobs import run_ai_job
 from src.scheduler.summary_job import run_summary_job
 from src.scheduler.gus_job import run_gus_job
@@ -209,6 +209,16 @@ def start_scheduler():
         trigger=CronTrigger(hour=6, minute=0),
         id='article_update',
         name='Update articles',
+        replace_existing=True
+    )
+
+    # Energa (wyłączenia prądu) — dodatkowo w ciągu dnia co 3h (poranny run
+    # pokrywa 6:00); komunikaty o awariach tracą wartość po fakcie
+    scheduler.add_job(
+        func=run_energa_job,
+        trigger=CronTrigger(hour='9,12,15,18,21', minute=5),
+        id='energa_update',
+        name='Update Energa outages (RSS, co 3h)',
         replace_existing=True
     )
 

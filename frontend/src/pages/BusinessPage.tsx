@@ -724,7 +724,13 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                                 : 'Rejestr CEIDG: statystyki, sołectwa, branże i trendy rejestracji firm'}
                         </p>
                     </div>
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-2 items-center flex-wrap">
+                        <button
+                            onClick={() => onNavigate?.('stats')}
+                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border bg-white/[0.04] text-neutral-400 border-white/10 hover:bg-white/[0.08] hover:text-neutral-200 transition-all"
+                        >
+                            <BarChart3 size={13} /> Statystyki GUS
+                        </button>
                         {isAdmin && (
                             <button
                                 onClick={() => setShowClaimsModeration(true)}
@@ -1034,10 +1040,6 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
             {/* Business Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 {displayedBusinesses.map((business) => {
-                    const yearFounded = business.data_rozpoczecia
-                        ? new Date(business.data_rozpoczecia).getFullYear()
-                        : null;
-
                     return (
                         <div
                             key={business.id}
@@ -1067,12 +1069,6 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
 
                             {/* Details */}
                             <div className="space-y-2 text-sm text-neutral-400 flex-1">
-                                {business.wlasciciel_imie && (
-                                    <p className="flex items-center gap-2 text-xs">
-                                        <span className="text-neutral-500">👤</span>
-                                        <span className="truncate">{business.wlasciciel_imie} {business.wlasciciel_nazwisko}</span>
-                                    </p>
-                                )}
                                 <p className="flex items-start gap-2 text-xs">
                                     <span className="text-neutral-500 mt-0.5 shrink-0">📍</span>
                                     <span className="leading-tight">
@@ -1080,12 +1076,6 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                                         {business.miasto}
                                     </span>
                                 </p>
-                                {yearFounded && (
-                                    <p className="flex items-center gap-2 text-xs text-neutral-500">
-                                        <span>📅</span>
-                                        <span>Zał. {yearFounded}</span>
-                                    </p>
-                                )}
                             </div>
 
                             {/* Category badge */}

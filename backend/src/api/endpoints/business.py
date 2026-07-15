@@ -38,8 +38,6 @@ class BusinessResponse(BaseModel):
     nip: str
     regon: Optional[str]
     status: str
-    wlasciciel_imie: Optional[str]
-    wlasciciel_nazwisko: Optional[str]
     ulica: Optional[str]
     budynek: Optional[str]
     miasto: str
@@ -51,9 +49,10 @@ class BusinessResponse(BaseModel):
     pkd_list: Optional[List[dict]]
     branza: Optional[str] = None  # UI-friendly category (from PKD_FRIENDLY_NAMES)
     data_rozpoczecia: Optional[datetime] = None  # Year founded
-    # Minimalizacja danych (RODO art. 5): adres korespondencyjny, spółki,
-    # obywatelstwa i kontakt rejestrowy nie są publikowane. Kontakt pojawi się,
-    # gdy firma poda go sama przy przejęciu wizytówki (zgoda).
+    # Minimalizacja danych (RODO art. 5): imię i nazwisko właściciela, adres
+    # korespondencyjny, spółki, obywatelstwa i kontakt rejestrowy nie są
+    # publikowane. Kontakt pojawi się, gdy firma poda go sama przy przejęciu
+    # wizytówki (zgoda).
 
     class Config:
         from_attributes = True

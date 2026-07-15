@@ -56,11 +56,12 @@ def filter_recent_articles(articles: list, days: int = 2) -> list:
     return filtered
 
 
-async def update_articles_job(source_filter: str = None):
+async def update_articles_job(source_filter: str = None, source_prefix: str = None):
     """Job to scrape and update articles from all active sources.
 
     Args:
         source_filter: If provided, only scrape the source with this name.
+        source_prefix: If provided, only scrape sources whose name starts with it.
     """
     logger.info("=" * 60)
     logger.info("Starting article update job...")
@@ -79,6 +80,8 @@ async def update_articles_job(source_filter: str = None):
         query = select(Source).where(Source.status == "active")
         if source_filter:
             query = query.where(Source.name == source_filter)
+        elif source_prefix:
+            query = query.where(Source.name.like(f"{source_prefix}%"))
         result = await session.execute(query)
         sources_orm = result.scalars().all()
 
@@ -182,6 +185,12 @@ async def update_articles_job(source_filter: str = None):
 def run_article_job():
     """Sync wrapper for async job"""
     asyncio.run(update_articles_job())
+
+
+def run_energa_job():
+    """Scrapuje tylko źródła Energa (wyłączenia prądu) — częściej niż główny pipeline,
+    bo komunikaty o awariach pojawiają się w ciągu dnia i tracą wartość po fakcie."""
+    asyncio.run(update_articles_job(source_prefix="Energa"))
 
 
 if __name__ == "__main__":

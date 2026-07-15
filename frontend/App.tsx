@@ -32,10 +32,8 @@ const MIASTO_ITEMS = [
     { id: 'weather', label: 'Pogoda' },
 ];
 
-const DANE_ITEMS = [
-    { id: 'stats', label: 'Statystyki GUS' },
-    { id: 'business', label: 'Katalog Firm' },
-];
+// Zakładka "Firmy": katalog wizytówek jako front, Statystyki GUS dostępne
+// przyciskiem na stronie Firm (sekcja 'stats' bez własnej pozycji w nawigacji)
 
 // Map sections to their parent tab
 const SECTION_TO_TAB: Record<AppSection, TabId> = {
@@ -61,7 +59,7 @@ const TAB_DEFAULT_SECTION: Record<TabId, AppSection> = {
     home: 'dashboard',
     assistant: 'assistant',
     miasto: 'news',
-    dane: 'stats',
+    dane: 'business',
     zgloszenia: 'reports',
 };
 
@@ -139,7 +137,19 @@ const AppContent: React.FC = () => {
             case 'weather':
                 return <WeatherPage />;
             case 'stats':
-                return <GUSPage />;
+                return (
+                    <div>
+                        <div className="max-w-7xl mx-auto px-4 pt-4">
+                            <button
+                                onClick={() => handleNavigate('business')}
+                                className="text-sm text-neutral-400 hover:text-neutral-200 font-medium transition-colors"
+                            >
+                                ← Wróć do Firm
+                            </button>
+                        </div>
+                        <GUSPage />
+                    </div>
+                );
             case 'business':
                 return <BusinessPage onNavigate={handleNavigate} />;
             case 'reports':
@@ -248,13 +258,6 @@ const AppContent: React.FC = () => {
             {activeTab === 'miasto' && (
                 <SubNavBar
                     items={MIASTO_ITEMS}
-                    activeItem={activeSection}
-                    onItemChange={handleSubNavChange}
-                />
-            )}
-            {activeTab === 'dane' && (
-                <SubNavBar
-                    items={DANE_ITEMS}
                     activeItem={activeSection}
                     onItemChange={handleSubNavChange}
                 />
