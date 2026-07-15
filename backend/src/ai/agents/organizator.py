@@ -3,7 +3,8 @@ Organizator.ai — praktyczny organizator codziennego życia
 Harmonogram śmieci, repertuar kina, atrakcje i co robić w wolnym czasie.
 Używa bezpośrednich zapytań SQL (bez RAG).
 """
-from typing import Union, AsyncGenerator
+import re
+from typing import Union, AsyncGenerator, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +23,53 @@ KNOWN_TOWNS = [
     "Tuczki", "Domki letniskowe",
 ]
 
+# Odmiany przypadków (miejscownik "w Hartowcu", dopełniacz "dla Hartowca").
+# Porównanie po normalizacji (lowercase + bez ogonków), więc "hartowcu"
+# złapie też "Hartowcu". Kolejność sprawdzania: najdłuższe frazy najpierw.
+TOWN_ALIASES: dict[str, list[str]] = {
+    "Rybno": ["rybnie", "rybna"],
+    "Jeglia": ["jeglii"],
+    "Gralewo Stacja": ["gralewie stacji", "gralewo stacji", "gralewie", "gralewo", "gralewa"],
+    "Gronowo": ["gronowie", "gronowa"],
+    "Grądy": ["gradach", "gradow"],
+    "Wery": ["werach"],
+    "Kopaniarze": ["kopaniarzach", "kopaniarzy"],
+    "Grabacz": ["grabaczu", "grabacza"],
+    "Koszelewki": ["koszelewkach", "koszelewek"],
+    "Koszelewy": ["koszelewach", "koszelew"],
+    "Żabiny": ["zabinach", "zabin"],
+    "Rapaty": ["rapatach", "rapat"],
+    "Prusy": ["prusach"],
+    "Szczupliny": ["szczuplinach", "szczuplin"],
+    "Nowa Wieś": ["nowej wsi", "nowa wies"],
+    "Groszki": ["groszkach", "groszek"],
+    "Naguszewo": ["naguszewie", "naguszewa"],
+    "Rumian": ["rumianie", "rumiana"],
+    "Truszczyny": ["truszczynach", "truszczyn"],
+    "Dębień": ["debniu", "debnia"],
+    "Hartowiec": ["hartowcu", "hartowca"],
+    "Tuczki": ["tuczkach", "tuczek"],
+    "Domki letniskowe": ["domkach letniskowych", "domki letniskowe"],
+}
+
+_PL_TRANSLATE = str.maketrans("ąćęłńóśźż", "acelnoszz")
+
+
+def _normalize(s: str) -> str:
+    """lowercase + bez polskich znaków — odporne na pisownię bez ogonków."""
+    return s.lower().translate(_PL_TRANSLATE)
+
+
+# Słowa kluczowe → sekcje kontekstu (odchudzenie: tylko potrzebne dane idą do LLM)
+INTENT_KEYWORDS = {
+    "waste": ["smieci", "odpad", "wywoz", "wywozu", "segregacj", "bio", "plastik",
+              "papier", "szklo", "zmieszan", "gabaryt", "popiol", "harmonogram"],
+    "cinema": ["kino", "kinie", "film", "repertuar", "seans"],
+    "clinics": ["lekarz", "doktor", "poradni", "poz", "stomatolog", "ginekolog",
+                "logoped", "usg", "zabiegow", "przychodni", "spgzoz", "przyjmuje"],
+    "pharmacies": ["aptek", "dyzur"],
+}
+
 SYSTEM_PROMPT = """Jesteś Organizatorem — praktycznym asystentem codziennego życia mieszkańców Gminy Rybno i powiatu działdowskiego.
 
 Twoje specjalizacje:
@@ -39,7 +87,10 @@ ZASADY:
 - Przy lekarzach: podaj imię i nazwisko lekarza, specjalizację oraz godziny przyjęć; jeśli są uwagi o zmianach — koniecznie je zaznacz
 - Przy aptekach: podaj nazwę, adres i numer telefonu jeśli dostępny
 - Jeśli ktoś pyta o atrakcje, restauracje, co robić w wolnym czasie — powiedz że to domena Przewodnika i zasugeruj zmianę agenta
-- Jeśli brak danych w bazie — powiedz wprost i zaproponuj alternatywę
+- NIGDY nie kończ odpowiedzi ślepym zaułkiem ("proszę sprawdzić lokalne źródła"). Jeśli pytanie dotyczy
+  miejscowości, której nie ma w kontekście — wymień miejscowości dostępne w harmonogramie (są w kontekście)
+  i zapytaj, o którą chodzi. Jeśli brak danych o kinie/lekarzach/aptekach na dziś — powiedz to i podaj,
+  kiedy dane będą (repertuar aktualizowany codziennie rano) lub wskaż źródło (spgzozrybno.pl, urząd gminy tel.)
 - Odpowiadaj po polsku, zwięźle i konkretnie"""
 
 
@@ -85,12 +136,20 @@ class OrganizatorAgent(BaseAgent):
                     default_town = "Rybno R1"
 
         town = self._extract_town(user_message, default_town=default_town)
-        waste = await self._fetch_waste(session, town=town, days=30)
-        cinema = await self._fetch_cinema(session)
-        clinics = await self._fetch_clinic_schedule(session)
-        pharmacies = await self._fetch_pharmacies(session)
 
-        context = self._build_context(waste, cinema, town, clinics, pharmacies)
+        # Odchudzenie kontekstu: do LLM idą tylko sekcje pasujące do pytania.
+        # Brak sygnału (np. "co dziś?") → pełny kontekst jak dotychczas.
+        msg_norm = _normalize(user_message)
+        wanted = {k for k, kws in INTENT_KEYWORDS.items() if any(kw in msg_norm for kw in kws)}
+        if not wanted:
+            wanted = {"waste", "cinema", "clinics", "pharmacies"}
+
+        waste = await self._fetch_waste(session, town=town, days=30) if "waste" in wanted else []
+        cinema = await self._fetch_cinema(session) if "cinema" in wanted else []
+        clinics = await self._fetch_clinic_schedule(session) if "clinics" in wanted else []
+        pharmacies = await self._fetch_pharmacies(session) if "pharmacies" in wanted else []
+
+        context = self._build_context(waste, cinema, town, clinics, pharmacies, wanted)
 
         user_info = ""
         if user:
@@ -134,13 +193,22 @@ class OrganizatorAgent(BaseAgent):
         return "".join(ch for ch in value if ch >= " ").strip()[:max_len]
 
     def _extract_town(self, user_message: str, default_town: str = "Rybno R1") -> str:
-        """Heurystyka: szukaj nazwy miejscowości w treści wiadomości. Default z profilu użytkownika."""
-        msg_lower = user_message.lower()
-        for town in KNOWN_TOWNS:
-            if town.lower() in msg_lower:
-                # "Rybno" alone → default to R1 unless R2 explicitly mentioned
+        """Szukaj miejscowości w wiadomości — także w odmianie ("w Hartowcu",
+        "dla Żabin") i pisowni bez polskich znaków. Default z profilu użytkownika."""
+        msg = _normalize(user_message)
+
+        # (fraza znormalizowana, nazwa kanoniczna) — nazwy + odmiany przypadków
+        candidates: list[tuple[str, str]] = [(_normalize(t), t) for t in KNOWN_TOWNS]
+        for town, aliases in TOWN_ALIASES.items():
+            candidates.extend((_normalize(a), town) for a in aliases)
+        # najdłuższe frazy najpierw — "koszelewki" musi wygrać z "koszelewy"
+        candidates.sort(key=lambda c: len(c[0]), reverse=True)
+
+        for phrase, town in candidates:
+            if re.search(rf"\b{re.escape(phrase)}\b", msg):
+                # samo "Rybno" → R1, chyba że wprost R2
                 if town == "Rybno":
-                    if "r2" in msg_lower or "rejon 2" in msg_lower:
+                    if "r2" in msg or "rejon 2" in msg:
                         return "Rybno R2"
                     return "Rybno R1"
                 return town
@@ -224,80 +292,95 @@ class OrganizatorAgent(BaseAgent):
             for row in result
         ]
 
-    def _build_context(self, waste: list[dict], cinema: list[dict], town: str, clinics: list[dict], pharmacies: list[dict]) -> str:
-        """Formatuje dane dla LLM."""
+    def _build_context(
+        self,
+        waste: list[dict],
+        cinema: list[dict],
+        town: str,
+        clinics: list[dict],
+        pharmacies: list[dict],
+        wanted: Optional[set] = None,
+    ) -> str:
+        """Formatuje dane dla LLM. `wanted` ogranicza sekcje do tematu pytania."""
         from datetime import date
         today = date.today()
         parts = []
+        if wanted is None:
+            wanted = {"waste", "cinema", "clinics", "pharmacies"}
 
         # --- Harmonogram śmieci ---
-        parts.append(f"[HARMONOGRAM ŚMIECI - Gmina Rybno | {town} | Najbliższe 30 dni]")
-        if waste:
-            # Grupuj po dacie
-            by_date: dict[str, list[str]] = {}
-            for row in waste:
-                col_date = row["collection_date"]
-                days_left = (col_date - today).days
-                date_str = col_date.strftime("%d.%m.%Y")
-                label = f"{date_str} (za {days_left} dni)" if days_left > 0 else f"{date_str} (DZIŚ)"
-                by_date.setdefault(label, []).append(row["waste_type"])
-            for label, types in by_date.items():
-                parts.append(f"  {label}: {', '.join(types)}")
-        else:
-            parts.append(f"  Brak zaplanowanych odbiorów w najbliższych 30 dniach dla: {town}")
+        if "waste" in wanted:
+            parts.append(f"[HARMONOGRAM ŚMIECI - Gmina Rybno | {town} | Najbliższe 30 dni]")
+            if waste:
+                # Grupuj po dacie
+                by_date: dict[str, list[str]] = {}
+                for row in waste:
+                    col_date = row["collection_date"]
+                    days_left = (col_date - today).days
+                    date_str = col_date.strftime("%d.%m.%Y")
+                    label = f"{date_str} (za {days_left} dni)" if days_left > 0 else f"{date_str} (DZIŚ)"
+                    by_date.setdefault(label, []).append(row["waste_type"])
+                for label, types in by_date.items():
+                    parts.append(f"  {label}: {', '.join(types)}")
+            else:
+                parts.append(f"  Brak zaplanowanych odbiorów w najbliższych 30 dniach dla: {town}")
+            towns_list = ", ".join(t for t in KNOWN_TOWNS if t != "Rybno")
+            parts.append(f"  Miejscowości dostępne w harmonogramie: {towns_list}")
 
         # --- Repertuar kina ---
-        parts.append("\n[REPERTUAR KIN - dziś i jutro]")
-        if cinema:
-            current_cinema = None
-            current_date = None
-            for row in cinema:
-                if row["cinema_name"] != current_cinema:
-                    current_cinema = row["cinema_name"]
-                    parts.append(f"\n  {current_cinema}")
-                if row["date"] != current_date:
-                    current_date = row["date"]
-                    parts.append(f"  {current_date}:")
-                showtimes_str = ", ".join(row["showtimes"]) if row["showtimes"] else "brak godzin"
-                parts.append(f'    • "{row["title"]}" ({row["genre"]}) | Seanse: {showtimes_str}')
-        else:
-            parts.append("  Brak danych o repertuarze kin na dziś/jutro")
+        if "cinema" in wanted:
+            parts.append("\n[REPERTUAR KIN - dziś i jutro]")
+            if cinema:
+                current_cinema = None
+                current_date = None
+                for row in cinema:
+                    if row["cinema_name"] != current_cinema:
+                        current_cinema = row["cinema_name"]
+                        parts.append(f"\n  {current_cinema}")
+                    if row["date"] != current_date:
+                        current_date = row["date"]
+                        parts.append(f"  {current_date}:")
+                    showtimes_str = ", ".join(row["showtimes"]) if row["showtimes"] else "brak godzin"
+                    parts.append(f'    • "{row["title"]}" ({row["genre"]}) | Seanse: {showtimes_str}')
+            else:
+                parts.append("  Brak danych o repertuarze kin na dziś/jutro")
 
         # --- Harmonogram poradni (dziś) ---
-        DAY_NAMES_PL = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
-        day_name = DAY_NAMES_PL[today.weekday()]
-        parts.append(f"\n[HARMONOGRAM PORADNI SPGZOZ RYBNO - {day_name.upper()} {today.strftime('%d.%m.%Y')}]")
-        if clinics:
-            current_clinic = None
-            for row in clinics:
-                if row["clinic_name"] != current_clinic:
-                    current_clinic = row["clinic_name"]
-                    parts.append(f"\n  Poradnia {current_clinic}:")
-                doctor = row["doctor_name"] or "—"
-                role = f" ({row['doctor_role']})" if row.get("doctor_role") else ""
-                hours = f"{row['hours_from']}-{row['hours_to']}"
-                notes = f" ⚠ {row['notes']}" if row.get("notes") else ""
-                parts.append(f"    • {doctor}{role} | {hours}{notes}")
-        else:
-            parts.append(f"  Brak zaplanowanych przyjęć na dziś ({day_name})")
-        if clinics:
-            parts.append(f"  Źródło: https://www.spgzozrybno.pl")
+        if "clinics" in wanted:
+            DAY_NAMES_PL = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
+            day_name = DAY_NAMES_PL[today.weekday()]
+            parts.append(f"\n[HARMONOGRAM PORADNI SPGZOZ RYBNO - {day_name.upper()} {today.strftime('%d.%m.%Y')}]")
+            if clinics:
+                current_clinic = None
+                for row in clinics:
+                    if row["clinic_name"] != current_clinic:
+                        current_clinic = row["clinic_name"]
+                        parts.append(f"\n  Poradnia {current_clinic}:")
+                    doctor = row["doctor_name"] or "—"
+                    role = f" ({row['doctor_role']})" if row.get("doctor_role") else ""
+                    hours = f"{row['hours_from']}-{row['hours_to']}"
+                    notes = f" ⚠ {row['notes']}" if row.get("notes") else ""
+                    parts.append(f"    • {doctor}{role} | {hours}{notes}")
+                parts.append(f"  Źródło: https://www.spgzozrybno.pl")
+            else:
+                parts.append(f"  Brak zaplanowanych przyjęć na dziś ({day_name})")
 
         # --- Dyżury aptek (dziś) ---
-        parts.append(f"\n[DYŻURY APTEK - {today.strftime('%d.%m.%Y')}]")
-        if pharmacies:
-            seen = set()
-            for row in pharmacies:
-                key = f"{row['pharmacy_name']}_{row['hours_from']}"
-                if key in seen:
-                    continue
-                seen.add(key)
-                name = row["pharmacy_name"]
-                addr = f" | {row['address']}" if row.get("address") else ""
-                phone = f" | tel. {row['phone']}" if row.get("phone") else ""
-                hours = f"{row['hours_from']}-{row['hours_to']}"
-                parts.append(f"  • {name}{addr}{phone} | {hours}")
-        else:
-            parts.append("  Brak danych o dyżurach aptek na dziś")
+        if "pharmacies" in wanted:
+            parts.append(f"\n[DYŻURY APTEK - {today.strftime('%d.%m.%Y')}]")
+            if pharmacies:
+                seen = set()
+                for row in pharmacies:
+                    key = f"{row['pharmacy_name']}_{row['hours_from']}"
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    name = row["pharmacy_name"]
+                    addr = f" | {row['address']}" if row.get("address") else ""
+                    phone = f" | tel. {row['phone']}" if row.get("phone") else ""
+                    hours = f"{row['hours_from']}-{row['hours_to']}"
+                    parts.append(f"  • {name}{addr}{phone} | {hours}")
+            else:
+                parts.append("  Brak danych o dyżurach aptek na dziś")
 
         return "\n".join(parts)

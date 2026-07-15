@@ -74,16 +74,28 @@ class BaseAgent:
         user=None
     ) -> Union[dict, AsyncGenerator]:
         """Generate a response using RAG context"""
-        # 1. Retrieve context
-        context_docs = await embedding_service.hybrid_search(
+        # 0. Pytania kontynuacyjne ("a w zeszłym roku?") są bezużyteczne jako
+        # zapytanie do wyszukiwarki — przepisz na samodzielne z kontekstem rozmowy
+        search_query = user_message
+        if conversation_history:
+            search_query = await self._rewrite_query(user_message, conversation_history)
+
+        # 1. Retrieve candidates (szerzej niż top_k — reranker zawęzi)
+        candidates = await embedding_service.hybrid_search(
             session=session,
-            query=user_message,
-            top_k=self.rag_top_k,
+            query=search_query,
+            top_k=max(self.rag_top_k * 2, 12),
             source_types=self.source_types or None,
             similarity_threshold=self.rag_threshold,
             semantic_weight=self.rag_semantic_weight,
             recency_boost=self.rag_recency_boost
         )
+
+        # 1b. Rerank: GPT-4o-mini odrzuca kandydatów niezwiązanych z pytaniem.
+        # To on decyduje, czy odpowiadamy "z bazy" czy z wiedzy ogólnej —
+        # kosinus ~0.5 przepuszczał szum (np. ogłoszenia sesji rady przy
+        # pytaniu o dowód osobisty).
+        context_docs = await self._rerank(search_query, candidates, keep=self.rag_top_k)
 
         # Log RAG metrics
         if context_docs:
@@ -161,6 +173,73 @@ class BaseAgent:
             "agent_name": self.name
         }
 
+    async def _rewrite_query(self, user_message: str, conversation_history: list[dict]) -> str:
+        """Przepisuje pytanie kontynuacyjne na samodzielne zapytanie do wyszukiwarki."""
+        recent = conversation_history[-4:]
+        convo = "\n".join(
+            f"{'Użytkownik' if m['role'] == 'user' else 'Asystent'}: {m['content'][:300]}"
+            for m in recent
+        )
+        try:
+            resp = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": (
+                        "Przekształć ostatnie pytanie użytkownika w samodzielne zapytanie "
+                        "do wyszukiwarki (po polsku), uzupełniając brakujący kontekst z rozmowy. "
+                        "Jeśli pytanie jest już samodzielne — zwróć je bez zmian. "
+                        "Zwróć TYLKO treść zapytania, nic więcej."
+                    )},
+                    {"role": "user", "content": f"ROZMOWA:\n{convo}\n\nOSTATNIE PYTANIE: {user_message}"},
+                ],
+                temperature=0,
+                max_tokens=80,
+            )
+            rewritten = (resp.choices[0].message.content or "").strip().strip('"')
+            if rewritten:
+                if rewritten != user_message:
+                    logger.info(f"Query rewrite: '{user_message[:40]}' -> '{rewritten[:60]}'")
+                return rewritten
+        except Exception as e:
+            logger.warning(f"Query rewrite failed: {e}")
+        return user_message
+
+    async def _rerank(self, query: str, docs: list[dict], keep: int) -> list[dict]:
+        """Listwise rerank przez GPT-4o-mini: zostawia tylko fragmenty, które
+        faktycznie pomagają odpowiedzieć. Pusta lista = odpowiedź z wiedzy ogólnej.
+        Przy błędzie API zachowuje oryginalną kolejność (graceful fallback)."""
+        if len(docs) <= 1:
+            return docs
+        items = "\n".join(
+            f"[{i}] {d['metadata'].get('title', '')} — {d['chunk_text'][:200]}"
+            for i, d in enumerate(docs)
+        )
+        try:
+            resp = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": (
+                        "Oceń, które fragmenty FAKTYCZNIE pomagają odpowiedzieć na pytanie. "
+                        "Zwróć TYLKO JSON: listę indeksów trafnych fragmentów od najtrafniejszego, "
+                        "np. [3,0,5]. Pomiń fragmenty niezwiązane z pytaniem (podobny temat to za mało "
+                        "— fragment musi zawierać informację przydatną do odpowiedzi). "
+                        "Jeśli żaden nie pasuje, zwróć []."
+                    )},
+                    {"role": "user", "content": f"PYTANIE: {query}\n\nFRAGMENTY:\n{items}"},
+                ],
+                temperature=0,
+                max_tokens=60,
+            )
+            raw = (resp.choices[0].message.content or "").strip()
+            start, end = raw.find("["), raw.rfind("]")
+            indices = json.loads(raw[start:end + 1]) if start != -1 and end > start else []
+            picked = [docs[i] for i in indices if isinstance(i, int) and 0 <= i < len(docs)]
+            logger.info(f"Rerank[{self.name}]: {len(docs)} kandydatów -> {len(picked)} trafnych")
+            return picked[:keep]
+        except Exception as e:
+            logger.warning(f"Rerank failed, keeping original order: {e}")
+            return docs[:keep]
+
     async def _stream(
         self,
         messages: list[dict],
@@ -182,9 +261,9 @@ class BaseAgent:
             # chunkiem, żeby użytkownik widział co się wydarzyło w tle
             if context_count is not None:
                 if context_count > 0:
-                    step = f"Przeszukałem bazę wiedzy — {context_count} materiałów źródłowych"
+                    step = f"Przeszukałem bazę wiedzy — {context_count} trafnych materiałów źródłowych"
                 else:
-                    step = "Brak materiałów w bazie — odpowiadam na podstawie wiedzy ogólnej"
+                    step = "Brak trafnych materiałów w bazie — odpowiadam na podstawie wiedzy ogólnej"
                 yield json.dumps({"type": "status", "message": step}) + "\n"
 
             full_content = ""

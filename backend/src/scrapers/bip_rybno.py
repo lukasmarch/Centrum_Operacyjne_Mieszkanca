@@ -228,11 +228,11 @@ class BipRybnoScraper(BaseScraper):
         try:
             import pdfplumber
 
-            # Pobierz PDF jako bytes
-            async with self.client:
-                response = await self.client.get(pdf_url)
-                response.raise_for_status()
-                pdf_bytes = response.content
+            # Pobierz PDF jako bytes — klient jest już otwarty przez `async with self`
+            # w scrape_bip(); `async with self.client` zamykałby go po pierwszym PDF
+            response = await self.client.get(pdf_url)
+            response.raise_for_status()
+            pdf_bytes = response.content
 
             # Wyciągnij tekst
             text_parts = []
@@ -267,7 +267,7 @@ class BipRybnoScraper(BaseScraper):
         Zabezpieczenia:
         - Detekcja duplikatów między stronami (BIP nie obsługuje ?start=N → ta sama strona)
         - Filtr daty: artykuły starsze niż 2 dni są pomijane
-        - PDF extraction wyłączone (download_pdfs=False) – aktywowane przy wdrożeniu RAG
+        - PDF extraction sterowane flagą download_pdfs w config źródła (DB)
         """
         all_saved_ids = []
         page_num = 1
@@ -325,12 +325,12 @@ class BipRybnoScraper(BaseScraper):
                         if detail.get("content"):
                             article["content"] = detail["content"]
 
-                        # PDF extraction – wyłączone do czasu wdrożenia RAG
-                        # Odkomentuj gdy RAG będzie gotowy:
-                        # if self.download_pdfs and detail.get("pdf_url"):
-                        #     pdf_text = await self.extract_pdf_text(detail["pdf_url"])
-                        #     if pdf_text:
-                        #         article["content"] = pdf_text
+                        # PDF extraction — pełna treść dokumentu dla RAG
+                        # (sterowane flagą download_pdfs w config źródła w DB)
+                        if self.download_pdfs and detail.get("pdf_url"):
+                            pdf_text = await self.extract_pdf_text(detail["pdf_url"])
+                            if pdf_text:
+                                article["content"] = pdf_text
 
                         fresh_articles.append(article)
 
