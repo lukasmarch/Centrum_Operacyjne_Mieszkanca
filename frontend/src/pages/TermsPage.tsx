@@ -13,10 +13,10 @@ interface TermsPageProps {
   onNavigate: (section: AppSection) => void;
 }
 
-export const TERMS_VERSION = '2026-07-07';
+export const TERMS_VERSION = '2026-07-18';
 
 const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
-  <LegalLayout title="Regulamin serwisu RybnoLive.pl" updated="7 lipca 2026">
+  <LegalLayout title="Regulamin serwisu RybnoLive.pl" updated="18 lipca 2026">
 
     <h2>§ 1. Postanowienia ogólne</h2>
     <ol>
@@ -103,33 +103,43 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
       <li>Układ Serwisu, oprogramowanie oraz treści własne Operatora podlegają ochronie prawnoautorskiej.</li>
     </ol>
 
-    <h2>§ 11. Reklamacje</h2>
+    <h2>§ 11. Wizytówki firm i katalog przedsiębiorców</h2>
+    <ol>
+      <li>Serwis prowadzi katalog lokalnych firm obejmujący: <strong>rejestr</strong> — podstawowe dane przedsiębiorców pochodzące z publicznego rejestru CEIDG (nazwa firmy, branża, miejscowość), oraz <strong>wizytówki</strong> — rozszerzone prezentacje firm prowadzone przez samych przedsiębiorców.</li>
+      <li>Przedsiębiorca może <strong>przejąć wizytówkę</strong> swojej firmy. Przejęcie wymaga weryfikacji uprawnienia do reprezentowania firmy — Operator może żądać potwierdzenia w szczególności poprzez NIP, firmowy adres e-mail lub kontakt telefoniczny. Operator odmawia przejęcia wizytówki w razie negatywnej weryfikacji.</li>
+      <li>Prowadzenie rozszerzonej wizytówki dostępne jest w ramach płatnego planu <strong>„Firma lokalna"</strong>, zgodnie z cennikiem prezentowanym w Serwisie. Plan „Firma lokalna" jest usługą świadczoną wyłącznie na rzecz przedsiębiorców w związku z ich działalnością gospodarczą (umowa B2B) — postanowienia Regulaminu dotyczące Konsumentów (w tym § 7) nie mają do niej zastosowania, z zastrzeżeniem przepisów o przedsiębiorcach na prawach konsumenta.</li>
+      <li>Za treści zamieszczone w wizytówce (opis, zdjęcia, dane kontaktowe, oferta) odpowiada przedsiębiorca. Zabronione jest zamieszczanie treści bezprawnych, wprowadzających w błąd lub naruszających prawa osób trzecich. Wizytówki mogą podlegać moderacji; Operator może usunąć treści naruszające Regulamin, a w razie rażących lub powtarzających się naruszeń — cofnąć przejęcie wizytówki.</li>
+      <li>Przedsiębiorca, którego dane prezentowane są w rejestrze na podstawie CEIDG, może żądać ich usunięcia lub wniesienia sprzeciwu wobec ich prezentacji — zgodnie z procedurą opisaną w § 10 ust. 3 oraz w Polityce prywatności.</li>
+      <li>Rozwiązanie umowy planu „Firma lokalna" następuje z końcem opłaconego okresu rozliczeniowego. Po wygaśnięciu planu wizytówka wraca do postaci podstawowej (dane rejestrowe).</li>
+    </ol>
+
+    <h2>§ 12. Reklamacje</h2>
     <ol>
       <li>Reklamacje dotyczące działania Serwisu można składać e-mailem na adres biuro@lumargo.pl.</li>
       <li>Reklamacja powinna zawierać: adres e-mail Użytkownika, opis problemu oraz oczekiwany sposób rozstrzygnięcia.</li>
       <li>Operator rozpatruje reklamacje w terminie <strong>14 dni</strong> od otrzymania i odpowiada na adres e-mail zgłaszającego.</li>
     </ol>
 
-    <h2>§ 12. Odpowiedzialność</h2>
+    <h2>§ 13. Odpowiedzialność</h2>
     <ol>
       <li>Operator dokłada starań, aby informacje w Serwisie były aktualne i rzetelne, jednak — z uwagi na ich agregacyjny i automatyczny charakter — nie gwarantuje ich kompletności ani nieprzerwanej dostępności Serwisu.</li>
       <li>Informacje o zagrożeniach (pogoda, awarie, utrudnienia) mają charakter pomocniczy i nie zastępują oficjalnych komunikatów właściwych służb.</li>
       <li>Postanowienia Regulaminu nie wyłączają ani nie ograniczają praw Konsumenta wynikających z przepisów bezwzględnie obowiązujących.</li>
     </ol>
 
-    <h2>§ 13. Dane osobowe</h2>
+    <h2>§ 14. Dane osobowe</h2>
     <p>Zasady przetwarzania danych osobowych oraz prawa osób, których dane dotyczą, opisuje{' '}
       <button onClick={() => onNavigate('privacy')} className="text-blue-400 hover:underline">Polityka prywatności</button>.
       Zasady wykorzystania plików cookies opisuje{' '}
       <button onClick={() => onNavigate('cookies')} className="text-blue-400 hover:underline">Polityka cookies</button>.
     </p>
 
-    <h2>§ 14. Postanowienia końcowe</h2>
+    <h2>§ 15. Postanowienia końcowe</h2>
     <ol>
       <li>Operator może zmienić Regulamin z ważnych przyczyn (zmiana przepisów, zakresu usług, względy bezpieczeństwa). O zmianach Użytkownicy zarejestrowani są informowani e-mailem lub komunikatem w Serwisie z co najmniej 14-dniowym wyprzedzeniem. Dalsze korzystanie z Serwisu po wejściu zmian w życie oznacza ich akceptację; Użytkownik może wypowiedzieć umowę usuwając Konto.</li>
       <li>Prawem właściwym jest prawo polskie. Spory z Konsumentami rozstrzygają sądy powszechne właściwe według przepisów ogólnych.</li>
       <li>Konsument może skorzystać z pozasądowych sposobów rozpatrywania reklamacji i dochodzenia roszczeń, m.in. z pomocy powiatowego (miejskiego) rzecznika konsumentów lub platformy ODR (https://ec.europa.eu/consumers/odr).</li>
-      <li>Regulamin obowiązuje od dnia 7 lipca 2026 r.</li>
+      <li>Regulamin obowiązuje od dnia 7 lipca 2026 r. (ostatnia zmiana: 18 lipca 2026 r. — dodanie § 11 o wizytówkach firm).</li>
     </ol>
 
   </LegalLayout>
