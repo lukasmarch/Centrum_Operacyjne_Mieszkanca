@@ -1,8 +1,9 @@
 """
-Trial Expiry Job — codziennie o 5:00
+Trial/Subscription Expiry Job — codziennie o 5:00
 
-Sprawdza userów których 7-dniowy trial Premium wygasł i downgrade'uje do Free.
-Logika: trial_ends_at < now AND tier = "premium" AND brak aktywnej subskrypcji.
+1. Downgrade userów z wygasłym 30-dniowym trialem Premium (brak aktywnej subskrypcji).
+2. Wygaszanie opłaconych subskrypcji po expires_at (status → expired, tier → free).
+3. Wyłączanie wyróżnienia wizytówek (is_premium) po premium_until (plan Firma lokalna).
 """
 import asyncio
 import logging
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from src.config import settings
-from src.database.schema import User, Subscription, UserTier, SubscriptionStatus
+from src.database.schema import User, Subscription, UserTier, SubscriptionStatus, BusinessProfile
 from src.utils.logger import setup_logger
 
 logger = setup_logger("TrialExpiryJob")
@@ -65,9 +66,63 @@ async def run_trial_expiry_async():
                 downgraded += 1
                 logger.info(f"User {user.id} ({user.email}) trial expired → downgraded to Free")
 
+        # 2. Wygaś opłacone subskrypcje po expires_at
+        expired_subs = 0
+        # ACTIVE i CANCELLED — anulowane zachowują dostęp do końca opłaconego okresu
+        sub_result = await session.execute(
+            select(Subscription).where(
+                Subscription.status.in_(
+                    [SubscriptionStatus.ACTIVE.value, SubscriptionStatus.CANCELLED.value]
+                ),
+                Subscription.expires_at != None,
+                Subscription.expires_at < now,
+            )
+        )
+        for sub in sub_result.scalars().all():
+            sub.status = SubscriptionStatus.EXPIRED.value
+            sub.updated_at = now
+            session.add(sub)
+            expired_subs += 1
+
+            user_result = await session.execute(select(User).where(User.id == sub.user_id))
+            sub_user = user_result.scalar_one_or_none()
+            if sub_user and sub_user.tier != UserTier.FREE.value and not sub_user.trial_ends_at:
+                # Czy user ma inną wciąż aktywną subskrypcję?
+                other_result = await session.execute(
+                    select(Subscription).where(
+                        Subscription.user_id == sub.user_id,
+                        Subscription.status == SubscriptionStatus.ACTIVE.value,
+                        Subscription.expires_at > now,
+                        Subscription.id != sub.id,
+                    )
+                )
+                if not other_result.scalars().first():
+                    sub_user.tier = UserTier.FREE.value
+                    session.add(sub_user)
+                    logger.info(f"Subscription expired: user {sub_user.id} ({sub_user.email}) → downgraded to Free")
+
+        # 3. Wyłącz wyróżnienie wizytówek po premium_until (regulamin §11: powrót do postaci podstawowej)
+        premium_off = 0
+        profile_result = await session.execute(
+            select(BusinessProfile).where(
+                BusinessProfile.is_premium == True,
+                BusinessProfile.premium_until != None,
+                BusinessProfile.premium_until < now,
+            )
+        )
+        for profile in profile_result.scalars().all():
+            profile.is_premium = False
+            profile.updated_at = now
+            session.add(profile)
+            premium_off += 1
+            logger.info(f"Business profile premium expired: profile_id={profile.id}")
+
         await session.commit()
 
-    logger.info(f"=== Trial Expiry Job DONE: {downgraded} users downgraded ===")
+    logger.info(
+        f"=== Trial Expiry Job DONE: {downgraded} triali wygaszonych, "
+        f"{expired_subs} subskrypcji expired, {premium_off} wizytówek premium off ==="
+    )
 
 
 def run_trial_expiry():

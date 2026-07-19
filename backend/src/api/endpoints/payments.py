@@ -17,7 +17,7 @@ from sqlmodel import select
 
 from src.config import settings
 from src.database import get_session
-from src.database.schema import User, Subscription, UserTier, SubscriptionStatus
+from src.database.schema import User, Subscription, UserTier, SubscriptionStatus, BusinessProfile
 from src.auth.dependencies import get_current_active_user
 from src.services.p24_service import p24_service, SUBSCRIPTION_PRICES
 
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/payments", tags=["payments"])
 # Mapowanie tierów na wyświetlane nazwy
 TIER_NAMES = {
     "premium": "Premium",
-    "business": "Pro",
+    "business": "Firma lokalna",
 }
 
 # Czas trwania subskrypcji
@@ -106,6 +106,21 @@ async def _activate_subscription(
     user.tier = tier
     user.trial_ends_at = None  # Koniec trialu po zakupie
 
+    # Plan "Firma lokalna": automatycznie włącz wyróżnioną wizytówkę
+    # na zweryfikowanym profilu firmy tego usera (do końca opłaconego okresu)
+    if tier == UserTier.BUSINESS.value:
+        profile_result = await session.execute(
+            select(BusinessProfile).where(
+                BusinessProfile.user_id == user.id,
+                BusinessProfile.claim_status == "verified",
+            )
+        )
+        for profile in profile_result.scalars().all():
+            profile.is_premium = True
+            profile.premium_until = expires_at
+            profile.updated_at = datetime.utcnow()
+            logger.info(f"Business profile premium activated: profile_id={profile.id}, until={expires_at.date()}")
+
     await session.commit()
     await session.refresh(sub)
     logger.info(f"Subscription activated: user_id={user.id}, tier={tier}, period={period}, expires={expires_at.date()}")
@@ -151,7 +166,7 @@ async def create_transaction(
 
     # URL-e zwrotne
     return_url = f"{settings.APP_URL}/payment/success?session={session_id}&tier={req.tier}"
-    notify_url = f"{settings.APP_URL.replace('localhost:3000', 'localhost:8000')}/api/payments/webhook"
+    notify_url = f"{settings.API_URL}/api/payments/webhook"
 
     # Zapis pending subscription
     pending_sub = Subscription(
@@ -329,8 +344,7 @@ async def cancel_subscription(
     sub.status = SubscriptionStatus.CANCELLED.value
     sub.cancelled_at = datetime.utcnow()
     sub.updated_at = datetime.utcnow()
-
-    user.tier = UserTier.FREE.value
+    # Tier zostaje do końca opłaconego okresu — wygasza go dzienny trial_expiry_job
 
     await session.commit()
     logger.info(f"Subscription cancelled: user_id={user.id}")

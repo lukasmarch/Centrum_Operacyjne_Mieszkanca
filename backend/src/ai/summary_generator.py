@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.models import DailySummary as DailySummaryModel
 from src.ai.prompts import DAILY_SUMMARY_PROMPT
 from src.database.schema import Article, Event, AirQuality, DailySummary
+from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 from src.config import settings
 
@@ -162,6 +163,16 @@ class SummaryGenerator:
             self.logger.info(f"Calling AI to generate summary (articles: {len(articles)}, events: {len(events)})")
             result_a = await self.agent.run(input_data)
             result_b = await self.agent.run(input_data)
+
+            for res in (result_a, result_b):
+                usage = res.usage()
+                log_api_cost(
+                    session,
+                    model="gpt-4o",
+                    tokens_input=usage.request_tokens or 0,
+                    tokens_output=usage.response_tokens or 0,
+                    endpoint="scheduler:daily_summary",
+                )
 
             score_a = result_a.output.headline_importance_score
             score_b = result_b.output.headline_importance_score

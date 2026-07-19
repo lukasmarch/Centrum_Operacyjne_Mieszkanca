@@ -20,8 +20,8 @@ P24_BASE_URL_PROD = "https://secure.przelewy24.pl"
 
 # Ceny subskrypcji w groszach (1 PLN = 100 groszy)
 SUBSCRIPTION_PRICES = {
-    "premium": {"monthly": 999, "yearly": 8400},   # 9.99 PLN | 84 PLN
-    "business": {"monthly": 1999, "yearly": 16900}, # 19.99 PLN | 169 PLN
+    "premium": {"monthly": 999, "yearly": 8400},    # 9.99 PLN | 84 PLN
+    "business": {"monthly": 4900, "yearly": 49000}, # Firma lokalna: 49 PLN | 490 PLN (B2B)
 }
 
 

@@ -51,7 +51,7 @@ class User(SQLModel, table=True):
     # Preferences (JSONB) - kategorie, powiadomienia, etc.
     preferences: Optional[dict] = Field(default_factory=dict, sa_column=Column(JSONB))
 
-    # Trial Premium (7 dni po rejestracji)
+    # Trial Premium (30 dni po rejestracji, bez karty)
     trial_ends_at: Optional[datetime] = None
 
     # Referral program

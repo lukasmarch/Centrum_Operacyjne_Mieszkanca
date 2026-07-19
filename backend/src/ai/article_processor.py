@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
+from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 from src.config import settings
 
@@ -89,6 +90,15 @@ class ArticleProcessor:
             article.location_mentioned = category_data.locations_mentioned
             article.summary = category_data.summary
             article.processed = True
+
+            usage = result.usage()
+            log_api_cost(
+                session,
+                model="gpt-4o-mini",
+                tokens_input=usage.request_tokens or 0,
+                tokens_output=usage.response_tokens or 0,
+                endpoint="scheduler:categorization",
+            )
 
             # Zapisz do bazy
             session.add(article)

@@ -174,7 +174,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
     if (navigator.share) {
       navigator.share({
         title: 'Centrum Operacyjne Rybna',
-        text: 'Dołącz do Centrum Operacyjnego Rybna i dostań 7 dni Premium za darmo!',
+        text: 'Dołącz do Centrum Operacyjnego Rybna i dostań 30 dni Premium za darmo!',
         url: referralData.referral_link,
       });
     } else {
@@ -326,7 +326,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
       case 'business':
         return (
           <span className="px-3 py-1 bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full text-sm font-bold">
-            Pro
+            Firma lokalna
           </span>
         );
       default:
@@ -741,7 +741,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
 
               <PricingCards
                 currentTier={user.tier}
-                onSelect={async (tierKey) => {
+                onSelect={async (tierKey, frequency) => {
                   const token = getAccessToken();
                   if (!token) {
                     alert('Musisz być zalogowany, aby wybrać plan.');
@@ -753,8 +753,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                     return;
                   }
                   try {
-                    // Domyślnie miesięczna subskrypcja; period może być wybierany z toggle w przyszłości
-                    const period = 'monthly';
+                    const period = frequency;
                     const res = await fetch(`${API_BASE_URL}/payments/create-transaction`, {
                       method: 'POST',
                       headers: {

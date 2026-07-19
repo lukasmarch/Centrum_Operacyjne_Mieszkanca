@@ -173,7 +173,8 @@ Docs: http://localhost:8000/docs
 | Urzędnik | ✅ działa | RAG artykuły |
 | Strażnik | ✅ działa | RAG artykuły |
 | Przewodnik | ⚠️ częściowo | RAG eventy/artykuły, pogoda/śmieci brak |
-| GUS-Analityk | ❌ wymaga naprawy | Potrzeba SQL do gus_gmina_stats |
+| GUS-Analityk | ✅ działa | Direct SQL do gus_gmina_stats + gus_national_averages (zweryfikowane na prodzie 2026-07-19) |
+| Organizator | ✅ działa | Direct SQL do waste_schedule |
 
 ## Ważne reguły techniczne
 - `VITE_API_URL = http://localhost:8000/api` → hooki NIE dodają `/api/` prefixu
@@ -184,18 +185,21 @@ Docs: http://localhost:8000/docs
 - Frontend routing: `useState<AppSection>` w App.tsx (switch/case, brak react-router)
 - Redis usunięty - cache w PostgreSQL
 
-## Tier System
-- **Free**: 5 zmiennych GUS, 10 pytań/dzień do AI
-- **Premium**: 21 zmiennych GUS, newsletter daily, push notifications
-- **Business**: 88 zmiennych GUS, multi-metric, dostęp do API
+## Tier System (ceny od 2026-07-19)
+- **Free (0 zł)**: 9 zmiennych GUS, 5 pytań AI/dzień (anonim: 3)
+- **Premium (9,99 zł/mc · 84 zł/rok)**: 57 zmiennych GUS, AI bez limitu, newsletter daily, push, proaktywny asystent; **trial 30 dni bez karty** po rejestracji
+- **Firma lokalna (tier `business`, 49 zł/mc · 490 zł/rok, B2B §11 regulaminu)**: 88 zmiennych GUS + wyróżniona wizytówka („Polecane w Rybnie", is_premium na business_profiles — auto-aktywacja po płatności P24)
+- Płatności: Przelewy24 (`p24_service.py`); IPN → `API_URL/api/payments/webhook` (api.rybnolive.pl!); powrót → `APP_URL/payment/success` (PaymentReturnBanner.tsx); wygaszanie subskrypcji/trialu/wizytówek: trial_expiry_job (5:00)
 
 ## TODO (Kolejne priorytety)
-- [ ] GUS-Analityk: SQL queries do `gus_gmina_stats` (zamiast RAG)
-- [ ] Więcej embeddingów: osadzić pozostałe ~1065 artykułów
+- [ ] P24 go-live: rejestracja merchanta (Łukasz), wpis P24_* do .env.production, P24_SANDBOX=false, test end-to-end
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
 - [ ] Filtrowanie artykułów po kategoriach
 - [ ] Panel administracyjny
+- [ ] Ogłoszenia firm w feedzie (2/mc dla planu Firma lokalna — obiecane w BusinessPage)
+
+Uwaga: ~1065 historycznych artykułów poza RAG — **celowo** (decyzja 2026-07-19), embedded=True jako marker.
 
 ## Git Branches
 ```
@@ -209,4 +213,4 @@ develop  # nieaktywna
 - `backend/logs/scheduler.log` - logi schedulera (rotacja 10MB)
 
 ---
-*Ostatnia aktualizacja: 2026-02-23*
+*Ostatnia aktualizacja: 2026-07-19*

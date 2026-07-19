@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, Zap, Crown, BarChart2 } from 'lucide-react';
+import { CheckCircle, Zap, Crown, Store } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 type Frequency = 'monthly' | 'yearly';
@@ -28,10 +28,10 @@ const PLANS: Plan[] = [
       { text: 'Wiadomości i artykuły lokalne' },
       { text: 'Pogoda i jakość powietrza' },
       { text: 'Harmonogram wywozu śmieci' },
-      { text: 'Zgłoszenia 24h ze zdjęciem' },
+      { text: 'Zgłoszenia 24 ze zdjęciem' },
       { text: 'Newsletter tygodniowy' },
       { text: '5 pytań AI dziennie' },
-      { text: 'Podstawowe dane GUS (8 wskaźników)' },
+      { text: 'Podstawowe dane GUS (9 wskaźników)' },
     ],
     btnText: 'Aktualny plan',
   },
@@ -39,44 +39,45 @@ const PLANS: Plan[] = [
     id: 'premium',
     name: 'Premium',
     icon: Crown,
-    info: 'Dla świadomych mieszkańców gminy',
+    info: 'Portal sam Cię uprzedzi — mniej niż 2 kawy miesięcznie',
     tierKey: 'premium',
     highlighted: true,
     price: { monthly: 9.99, yearly: 84 },
     features: [
-      { text: 'Wszystko z planu Free' },
+      { text: 'Proaktywny Asystent AI — nie pytasz, portal sam Cię uprzedzi', tooltip: 'Powiadomienia bez pytania: jutro wywóz odpadów, mróz na drogach, nowe ogłoszenie BIP' },
       { text: 'Nieograniczone pytania AI' },
-      { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 6:30' },
       { text: 'Alerty push w czasie rzeczywistym', tooltip: 'Pożary, wypadki, awarie, smog' },
-      { text: 'Proaktywny Asystent AI', tooltip: 'Powiadomienia bez pytania: jutro wywóz śmieci, mróz na drogach, nowe ogłoszenie BIP' },
-      { text: '37 wskaźników GUS', tooltip: '7 kategorii: demografia, rynek pracy, finanse gminy, mieszkalnictwo, edukacja, zdrowie + dane powiatu działdowskiego' },
+      { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 6:30' },
+      { text: '57 wskaźników GUS', tooltip: 'Demografia, rynek pracy, finanse gminy, mieszkalnictwo, edukacja, zdrowie + dane powiatu działdowskiego' },
       { text: 'Personalizacja dashboardu' },
       { text: 'Brak reklam' },
+      { text: 'Wszystko z planu Dla Każdego' },
     ],
     btnText: 'Wybierz Premium',
   },
   {
-    id: 'pro',
-    name: 'Pro',
-    icon: BarChart2,
-    info: 'Dla entuzjastów danych lokalnych',
+    id: 'firma',
+    name: 'Firma lokalna',
+    icon: Store,
+    info: 'Dla firm z gminy — widoczność u mieszkańców (B2B)',
     tierKey: 'business',
-    price: { monthly: 19.99, yearly: 169 },
+    price: { monthly: 49, yearly: 490 },
     features: [
+      { text: 'Wyróżniona wizytówka w katalogu firm', tooltip: 'Logo, opis, godziny otwarcia, telefon, link — na górze katalogu' },
+      { text: 'Oznaczenie „Polecane w Rybnie"' },
+      { text: 'Statystyki wyświetleń wizytówki' },
+      { text: 'Komplet 88 wskaźników GUS', tooltip: 'Pełne dane statystyczne: gmina Rybno + powiat działdowski' },
+      { text: 'Analizy lokalnego rynku od agenta AI', tooltip: 'GUS-Analityk odpowiada na pytania o demografię, rynek pracy i finanse gminy' },
       { text: 'Wszystko z planu Premium' },
-      { text: '53 wskaźniki GUS', tooltip: 'Kompletne dane statystyczne dla rejonu Rybno (gmina + powiat działdowski)' },
-      { text: 'Raporty PDF na żądanie', tooltip: 'AI generuje podsumowanie danych gminy' },
-      { text: 'Eksport danych GUS (CSV)' },
-      { text: 'Historia pytań AI bez limitu' },
       { text: 'Wcześniejszy dostęp do nowych funkcji' },
     ],
-    btnText: 'Wybierz Pro',
+    btnText: 'Wybierz Firma lokalna',
   },
 ];
 
 interface PricingCardsProps {
   currentTier: string;
-  onSelect?: (tierId: string) => void;
+  onSelect?: (tierId: string, frequency: Frequency) => void;
 }
 
 export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelect }) => {
@@ -101,7 +102,7 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
               {freq === 'monthly' ? 'Miesięcznie' : 'Rocznie'}
               {freq === 'yearly' && (
                 <span className="absolute -top-2.5 -right-1 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                  -30%
+                  do -30%
                 </span>
               )}
             </button>
@@ -206,7 +207,7 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
                   </div>
                 ) : (
                   <button
-                    onClick={() => onSelect?.(plan.tierKey)}
+                    onClick={() => onSelect?.(plan.tierKey, frequency)}
                     className={cn(
                       'w-full py-2.5 rounded-xl text-sm font-bold transition-all',
                       plan.highlighted
@@ -224,7 +225,8 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
       </div>
 
       <p className="text-center text-xs text-neutral-600">
-        Płatności bezpieczne · Anuluj w dowolnym momencie · Faktury VAT dostępne
+        Bezpieczne płatności Przelewy24 (BLIK, karta, przelew) · Anuluj w dowolnym momencie
+        · Plan „Firma lokalna" to usługa B2B (§ 11 Regulaminu) · Faktury dla firm: biuro@lumargo.pl
       </p>
     </div>
   );

@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     NEWSLETTER_FROM_EMAIL: str = "newsletter@centrum-mieszkanca.pl"
     NEWSLETTER_FROM_NAME: str = "Centrum Operacyjne Mieszkańca"
     APP_URL: str = "http://localhost:3000"  # Frontend URL for links
+    # Publiczny URL backendu — na prodzie https://api.rybnolive.pl
+    # (domena główna rybnolive.pl NIE proxuje /api, więc webhooki muszą iść na subdomenę API)
+    API_URL: str = "http://localhost:8000"
 
     # CORS settings
     CORS_ORIGINS: str = "http://localhost:3001,http://localhost:3002,http://localhost:5173"  # Comma-separated list

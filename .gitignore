@@ -74,3 +74,4 @@ backend/data/cache/
 backend/logs/*.log
 
 !frontend/lib/
+DESIGN

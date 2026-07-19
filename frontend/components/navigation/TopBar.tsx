@@ -11,7 +11,7 @@ interface TopBarProps {
 const TIER_LABELS: Record<string, string> = {
   free: 'Free',
   premium: 'Premium',
-  business: 'Pro',
+  business: 'Firma',
 };
 
 const TIER_COLORS: Record<string, string> = {

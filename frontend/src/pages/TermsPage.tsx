@@ -13,7 +13,7 @@ interface TermsPageProps {
   onNavigate: (section: AppSection) => void;
 }
 
-export const TERMS_VERSION = '2026-07-18';
+export const TERMS_VERSION = '2026-07-19';
 
 const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
   <LegalLayout title="Regulamin serwisu RybnoLive.pl" updated="18 lipca 2026">
@@ -48,7 +48,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
         </ul>
       </li>
       <li>Część funkcji dostępna jest bezpłatnie, część w ramach Planów płatnych zgodnie z cennikiem.</li>
-      <li>Po rejestracji Użytkownik otrzymuje bezpłatny, <strong>7-dniowy okres próbny planu Premium</strong>. Okres próbny nie wymaga podania danych płatniczych i nie przekształca się automatycznie w płatną subskrypcję — po jego zakończeniu Konto wraca do planu bezpłatnego.</li>
+      <li>Po rejestracji Użytkownik otrzymuje bezpłatny, <strong>30-dniowy okres próbny planu Premium</strong>. Okres próbny nie wymaga podania danych płatniczych i nie przekształca się automatycznie w płatną subskrypcję — po jego zakończeniu Konto wraca do planu bezpłatnego.</li>
     </ol>
 
     <h2>§ 4. Wymagania techniczne</h2>

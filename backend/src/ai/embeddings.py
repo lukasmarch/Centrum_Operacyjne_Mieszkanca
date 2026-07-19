@@ -22,6 +22,9 @@ class EmbeddingService:
 
     def __init__(self):
         self.client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        # Tokeny zużyte przez ostatnie wywołanie embed_text/embed_batch —
+        # odczytywane przez embedding_job do wpisu w api_cost_log
+        self.last_usage_tokens: int = 0
 
     async def embed_text(self, text_input: str) -> list[float]:
         """Generate embedding for a single text"""
@@ -30,16 +33,19 @@ class EmbeddingService:
             input=text_input,
             dimensions=EMBEDDING_DIMENSIONS
         )
+        self.last_usage_tokens = response.usage.total_tokens if response.usage else 0
         return response.data[0].embedding
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts (max 2048 per batch)"""
         if not texts:
+            self.last_usage_tokens = 0
             return []
 
         # OpenAI supports up to 2048 inputs per batch
         all_embeddings = []
         batch_size = 100  # Conservative batch size
+        used_tokens = 0
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
@@ -49,7 +55,9 @@ class EmbeddingService:
                 dimensions=EMBEDDING_DIMENSIONS
             )
             all_embeddings.extend([d.embedding for d in response.data])
+            used_tokens += response.usage.total_tokens if response.usage else 0
 
+        self.last_usage_tokens = used_tokens
         return all_embeddings
 
     async def store_embedding(

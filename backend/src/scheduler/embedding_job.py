@@ -13,6 +13,7 @@ from src.config import settings
 from src.database.schema import Article, Event, Source
 from src.ai.embeddings import embedding_service
 from src.ai.chunker import chunker
+from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 
 logger = setup_logger("EmbeddingJob")
@@ -65,6 +66,13 @@ async def _embed_articles(session):
 
             texts = [c["text"] for c in chunks]
             embeddings = await embedding_service.embed_batch(texts)
+            log_api_cost(
+                session,
+                model="text-embedding-3-small",
+                tokens_input=embedding_service.last_usage_tokens,
+                tokens_output=0,
+                endpoint="scheduler:embedding_articles",
+            )
 
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 metadata = {
@@ -124,6 +132,13 @@ async def _embed_events(session):
 
             texts = [c["text"] for c in chunks]
             embeddings = await embedding_service.embed_batch(texts)
+            log_api_cost(
+                session,
+                model="text-embedding-3-small",
+                tokens_input=embedding_service.last_usage_tokens,
+                tokens_output=0,
+                endpoint="scheduler:embedding_events",
+            )
 
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 metadata = {

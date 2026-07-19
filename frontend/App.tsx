@@ -11,6 +11,8 @@ import RegisterPage from './src/pages/RegisterPage';
 import BottomTabBar from './components/navigation/BottomTabBar';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import CookieConsent from './components/CookieConsent';
+import PaymentReturnBanner from './components/PaymentReturnBanner';
+import PricingCards from './components/PricingCards';
 import SubNavBar from './components/navigation/SubNavBar';
 import TopBar from './components/navigation/TopBar';
 import { BeamsBackground } from './components/ui/beams-background';
@@ -167,51 +169,13 @@ const AppContent: React.FC = () => {
                             <h2 className="text-4xl font-black mb-4 text-gradient-saas">Wybierz swój plan</h2>
                             <p className="text-neutral-500 text-lg">Wspieraj lokalne dziennikarstwo i zyskaj dostęp do ekstra funkcji.</p>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            {/* Free */}
-                            <div className="bg-gray-950 p-8 rounded-3xl border border-gray-800/50 flex flex-col">
-                                <h4 className="text-xl font-bold mb-2 text-white">Dla Każdego</h4>
-                                <p className="text-4xl font-black mb-6 text-white">0 zł <span className="text-sm text-neutral-500 font-normal">/mc</span></p>
-                                <ul className="space-y-4 text-sm text-neutral-400 flex-1">
-                                    <li className="flex items-center gap-2">✅ Wiadomości basic</li>
-                                    <li className="flex items-center gap-2">✅ Pogoda standard</li>
-                                    <li className="flex items-center gap-2">✅ Newsletter tygodniowy</li>
-                                </ul>
-                                <button className="w-full mt-8 py-3 rounded-xl border border-gray-800/50 font-bold text-neutral-500" disabled>Aktualny plan</button>
-                            </div>
-                            {/* Premium */}
-                            <div className="bg-gradient-to-b from-blue-600 to-blue-700 p-8 rounded-3xl shadow-xl shadow-blue-500/20 text-white flex flex-col transform scale-105">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h4 className="text-xl font-bold">Premium</h4>
-                                    <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-widest">Najczesciej wybierany</span>
-                                </div>
-                                <p className="text-4xl font-black mb-6">19 zł <span className="text-sm text-blue-200 font-normal">/mc</span></p>
-                                <ul className="space-y-4 text-sm text-blue-50 flex-1">
-                                    <li className="flex items-center gap-2">✅ AI Daily Summaries</li>
-                                    <li className="flex items-center gap-2">✅ Alerty SMS / Push</li>
-                                    <li className="flex items-center gap-2">✅ Brak reklam</li>
-                                    <li className="flex items-center gap-2">✅ Newsletter Codzienny</li>
-                                </ul>
-                                <button
-                                    onClick={() => !isAuthenticated && handleNavigate('register')}
-                                    className="btn-primary w-full mt-8 py-3 rounded-xl"
-                                >
-                                    {isAuthenticated ? 'Wybierz Premium' : 'Zarejestruj się'}
-                                </button>
-                            </div>
-                            {/* Business */}
-                            <div className="bg-gray-950 p-8 rounded-3xl border border-gray-800/50 text-white flex flex-col">
-                                <h4 className="text-xl font-bold mb-2">Biznes</h4>
-                                <p className="text-4xl font-black mb-6">99 zł <span className="text-sm text-neutral-500 font-normal">/mc</span></p>
-                                <ul className="space-y-4 text-sm text-neutral-400 flex-1">
-                                    <li className="flex items-center gap-2">✅ Dostęp do API</li>
-                                    <li className="flex items-center gap-2">✅ Raporty Customowe</li>
-                                    <li className="flex items-center gap-2">✅ Promocja Wydarzeń</li>
-                                    <li className="flex items-center gap-2">✅ Dane historyczne GUS</li>
-                                </ul>
-                                <button className="btn-primary w-full mt-8 py-3 rounded-xl" style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)' }}>Skontaktuj się</button>
-                            </div>
-                        </div>
+                        <PricingCards
+                            currentTier={user?.tier || 'free'}
+                            onSelect={() => {
+                                // Checkout (z wymaganą akceptacją regulaminu) mieszka w Profil → Subskrypcja
+                                handleNavigate(isAuthenticated ? 'subscription' : 'register');
+                            }}
+                        />
                     </div>
                 );
             default:
@@ -311,6 +275,9 @@ const AppContent: React.FC = () => {
                     <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> API: v2.4</span>
                 </div>
             </footer>}
+
+            {/* Status płatności po powrocie z Przelewy24 (/payment/success?session=...) */}
+            <PaymentReturnBanner />
 
             {/* PWA install prompt — shown after 3rd visit */}
             <PWAInstallPrompt />

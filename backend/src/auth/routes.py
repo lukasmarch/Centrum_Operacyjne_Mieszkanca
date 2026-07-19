@@ -73,8 +73,8 @@ async def register(
         )
         referrer = ref_result.scalar_one_or_none()
 
-    # Create new user z 7-dniowym triałem Premium
-    trial_ends = datetime.utcnow() + timedelta(days=7)
+    # Create new user z 30-dniowym triałem Premium (bez karty — rekomendacja raportu 07.2026)
+    trial_ends = datetime.utcnow() + timedelta(days=30)
     new_user = User(
         email=user_data.email,
         password_hash=get_password_hash(user_data.password),
