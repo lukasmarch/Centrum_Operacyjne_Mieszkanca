@@ -11,9 +11,12 @@ Endpointy:
 - GET /api/business/localities - lista miejscowości z liczbą firm
 - POST /api/business/sync - ręczna synchronizacja
 """
+import os
+import uuid
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File
 from pydantic import BaseModel
 from sqlmodel import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +30,13 @@ from src.utils.logger import setup_logger
 from src.integrations.regon_api import RegonService
 
 logger = setup_logger("BusinessAPI")
+
+# Logo wizytówki — lokalny dysk (ten sam wzorzec co uploads/reports), serwowane
+# przez StaticFiles("/uploads") zamontowane w main.py
+LOGO_UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads" / "business_logos"
+LOGO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+LOGO_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+LOGO_MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB — logo, nie zdjęcie reportażowe
 
 router = APIRouter(prefix="/api/business", tags=["business"])
 
@@ -717,6 +727,57 @@ async def update_business_profile(
         session.add(profile)
         await session.commit()
         return {"status": "ok"}
+
+
+@router.post("/{business_id}/logo")
+async def upload_business_logo(
+    business_id: int,
+    logo: UploadFile = File(...),
+    user=Depends(get_current_active_user),
+):
+    """Upload logo wizytówki przez zweryfikowanego właściciela (max 2MB, jpg/png/webp)."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(BusinessProfile).where(BusinessProfile.business_id == business_id)
+        )
+        profile = result.scalar_one_or_none()
+        if not profile or profile.user_id != user.id:
+            raise HTTPException(status_code=404, detail="Wizytówka nie została znaleziona")
+        if profile.claim_status != "verified":
+            raise HTTPException(status_code=403, detail="Wizytówka czeka na weryfikację")
+
+        ext = os.path.splitext(logo.filename or "")[1].lower()
+        if ext not in LOGO_ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Niedozwolony format pliku. Dozwolone: {', '.join(LOGO_ALLOWED_EXTENSIONS)}",
+            )
+
+        logo_bytes = await logo.read()
+        if len(logo_bytes) > LOGO_MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="Plik jest za duży. Maksymalny rozmiar: 2MB")
+
+        old_logo_url = profile.logo_url
+        filename = f"{business_id}_{uuid.uuid4().hex}{ext}"
+        filepath = LOGO_UPLOAD_DIR / filename
+        with open(filepath, "wb") as f:
+            f.write(logo_bytes)
+
+        profile.logo_url = f"/uploads/business_logos/{filename}"
+        profile.updated_at = datetime.utcnow()
+        session.add(profile)
+        await session.commit()
+
+        # Sprzątanie starego pliku (best-effort — nie blokuje odpowiedzi)
+        if old_logo_url and old_logo_url.startswith("/uploads/business_logos/"):
+            old_filename = old_logo_url.removeprefix("/uploads/business_logos/")
+            try:
+                (LOGO_UPLOAD_DIR / old_filename).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        logger.info(f"Logo uploaded for business={business_id} by {user.email}")
+        return {"status": "ok", "logo_url": profile.logo_url}
 
 
 @router.patch("/{business_id}/premium")

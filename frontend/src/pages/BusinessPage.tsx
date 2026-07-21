@@ -3,7 +3,7 @@ import { AppSection, Business } from '../../types';
 import { useAuth } from '../context/AuthContext';
 import { Search, X, Info, Store, BarChart3, Phone, Globe, Clock, Star, BadgeCheck, Pencil, Megaphone, Tag } from 'lucide-react';
 import {
-    fetchCatalog, claimBusiness, fetchMyClaims, updateBusinessProfile,
+    fetchCatalog, claimBusiness, fetchMyClaims, updateBusinessProfile, uploadBusinessLogo,
     trackBusinessView, fetchPendingClaims, moderateClaim,
     fetchActiveAnnouncements, fetchMyAnnouncements, createAnnouncement, deactivateAnnouncement,
     CatalogCard, MyClaim, PendingClaim, ActiveAnnouncement, BusinessAnnouncement, AnnouncementType,
@@ -433,8 +433,29 @@ const EditProfileModal: React.FC<{
     const [email, setEmail] = useState(card?.profile.email || '');
     const [www, setWww] = useState(card?.profile.www || '');
     const [godziny, setGodziny] = useState(card?.profile.godziny || '');
+    const [logoUrl, setLogoUrl] = useState(card?.profile.logo_url || '');
+    const [uploadingLogo, setUploadingLogo] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const onLogoSelected = async (file: File | undefined) => {
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            setError('Logo jest za duże. Maksymalny rozmiar: 2MB');
+            return;
+        }
+        setUploadingLogo(true);
+        setError(null);
+        try {
+            const url = await uploadBusinessLogo(claim.business_id, file);
+            setLogoUrl(url);
+            onSaved(); // upload zapisuje się od razu w bazie — odśwież katalog w tle
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
 
     const save = async () => {
         setSaving(true);
@@ -466,6 +487,22 @@ const EditProfileModal: React.FC<{
                 <p className="text-xs text-neutral-500 mb-5">{claim.nazwa} · 👁 {claim.views_count} wyświetleń</p>
 
                 <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {logoUrl
+                                ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                                : <span className="text-neutral-500 text-2xl">🏪</span>}
+                        </div>
+                        <div className="flex-1">
+                            <label className="inline-block px-4 py-2 bg-white/[0.06] border border-white/10 rounded-xl text-xs font-bold text-neutral-300 hover:bg-white/[0.1] cursor-pointer transition-all">
+                                {uploadingLogo ? 'Wysyłam…' : logoUrl ? 'Zmień logo' : 'Dodaj logo'}
+                                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                                    disabled={uploadingLogo}
+                                    onChange={e => onLogoSelected(e.target.files?.[0])} />
+                            </label>
+                            <p className="text-[10px] text-neutral-500 mt-1.5">JPG, PNG lub WEBP, max 2MB</p>
+                        </div>
+                    </div>
                     <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={600}
                         placeholder="Opis firmy — czym się zajmujecie, co Was wyróżnia (max 600 znaków)"
                         className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500 resize-none" />

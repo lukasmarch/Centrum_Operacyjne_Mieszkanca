@@ -108,6 +108,23 @@ export async function updateBusinessProfile(businessId: number, data: {
     }
 }
 
+/** Upload logo wizytówki (max 2MB, jpg/png/webp) — zwraca nowy logo_url */
+export async function uploadBusinessLogo(businessId: number, file: File): Promise<string> {
+    const form = new FormData();
+    form.append('logo', file);
+    const res = await fetch(`${API_BASE}/business/${businessId}/logo`, {
+        method: 'POST',
+        headers: authHeaders(), // bez Content-Type — przeglądarka ustawi boundary multipart
+        body: form,
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Wystąpił błąd' }));
+        throw new Error(err.detail || `Błąd: ${res.status}`);
+    }
+    const data = await res.json();
+    return data.logo_url;
+}
+
 // ── Ogłoszenia firm (Radar Lokalnego Biznesu, plan Firma lokalna) ──
 
 export type AnnouncementType = 'ogloszenie' | 'okazja';
