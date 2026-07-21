@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Store, Phone, Clock, Sparkles, ArrowRight, Tag } from 'lucide-react';
 import {
-  fetchCatalog, fetchActiveAnnouncements, trackBusinessView,
+  fetchCatalog, fetchActiveAnnouncements, trackBusinessView, getAssetUrl,
   CatalogCard, ActiveAnnouncement,
 } from '../src/services/businessApi';
 import { AppSection } from '../types';
@@ -127,7 +127,7 @@ const PromotedBusinessesTile: React.FC<{ onNavigate?: (section: AppSection) => v
                 >
                   <div className="flex items-center gap-2.5">
                     {card.profile.logo_url ? (
-                      <img src={card.profile.logo_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                      <img src={getAssetUrl(card.profile.logo_url)} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
                     ) : (
                       <span className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-sm flex-shrink-0">🏪</span>
                     )}

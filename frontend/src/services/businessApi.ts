@@ -5,6 +5,14 @@
 import { getAccessToken } from './authApi';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, '');
+
+/** Zamienia ścieżkę względną (np. logo_url z backendu) na pełny URL do api.rybnolive.pl */
+export function getAssetUrl(path?: string | null): string {
+    if (!path) return '';
+    if (/^https?:\/\//.test(path)) return path;
+    return `${API_ORIGIN}${path}`;
+}
 
 function authHeaders(json = false): Record<string, string> {
     const headers: Record<string, string> = {};

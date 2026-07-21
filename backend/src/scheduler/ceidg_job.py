@@ -8,7 +8,7 @@ import asyncio
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import select, func
+from sqlmodel import select
 
 from src.config import settings
 from src.database.schema import CEIDGBusiness, CEIDGSyncStats
@@ -16,6 +16,14 @@ from src.integrations.ceidg_api import CEIDGService
 from src.utils.logger import setup_logger
 
 logger = setup_logger("CEIDGJob")
+
+# Maks. liczba zapytań o szczegóły w jednym przebiegu (1 request/firmę) —
+# ochrona przed rate limitem przy uzupełnianiu braków w istniejącym katalogu.
+DETAIL_FETCH_LIMIT = 60
+
+# Minimalne pokrycie listy z API względem bazy, przy którym ufamy, że brak firmy
+# w odpowiedzi oznacza wykreślenie z rejestru, a nie awarię/niepełną odpowiedź.
+MISSING_SANITY_RATIO = 0.8
 
 
 async def run_ceidg_job_async():
@@ -62,16 +70,6 @@ async def fetch_ceidg_businesses():
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
-        # Optimization: Check if DB is populated before hitting API
-        try:
-            result = await session.execute(select(func.count(CEIDGBusiness.id)))
-            count = result.scalar() or 0
-            if count > 0:
-                logger.info(f"🛑 Zabezpieczenie: W bazie jest już {count} firm. Pomijam pobieranie z API CEIDG.")
-                return
-        except Exception as e:
-            logger.error(f"⚠️ Błąd podczas sprawdzania liczby firm: {e}")
-
         try:
             # 1. Pobierz wszystkie firmy
             logger.info("📊 Pobieranie firm z API CEIDG...")
@@ -83,46 +81,98 @@ async def fetch_ceidg_businesses():
 
             logger.info(f"✓ Pobrano {len(businesses)} firm")
 
-            # 2. Upsert każdej firmy
-            logger.info("💾 Zapisywanie firm do bazy danych...")
-            upserted = 0
-            updated = 0
+            # 2. Synchronizacja przyrostowa
+            #
+            # Lista z API jest tania (1 request / 25 firm), szczegóły kosztują
+            # 1 request na firmę — dlatego pobieramy je tylko dla firm nowych
+            # i tych, którym brakuje danych szczegółowych (pkd_main). Dzięki temu
+            # job może chodzić co tydzień bez ryzyka rate limitu.
+            logger.info("💾 Synchronizacja przyrostowa z bazą...")
 
-            total_items = len(businesses)
-            for i, short_data in enumerate(businesses, 1):
+            result = await session.execute(select(CEIDGBusiness))
+            db_firms = {b.ceidg_id: b for b in result.scalars().all()}
+
+            api_ids = set()
+            new_count = 0
+            status_changes = []
+            details_filled = 0
+            now = datetime.utcnow()
+
+            for short_data in businesses:
                 ceidg_id = short_data.get("id")
                 if not ceidg_id:
                     continue
-                
-                # Pobierz szczegóły dla każdej firmy
-                logger.info(f"[{i}/{total_items}] Fetching details for {ceidg_id}...")
-                detailed_data = await service.get_business_details(ceidg_id)
-                
-                if not detailed_data:
-                    logger.warning(f"⏩ Skipping {ceidg_id} - no details found")
+                api_ids.add(ceidg_id)
+
+                existing = db_firms.get(ceidg_id)
+                api_status = short_data.get("status", "AKTYWNY")
+
+                if existing is None:
+                    # Nowa firma — pełne dane wymagają zapytania o szczegóły
+                    detailed = await service.get_business_details(ceidg_id)
+                    data = service.extract_business_data(detailed or short_data)
+                    if not data.get("ceidg_id"):
+                        data["ceidg_id"] = ceidg_id
+                    data["status_changed_at"] = now
+                    session.add(CEIDGBusiness(**data))
+                    new_count += 1
+                    logger.info(f"  ➕ Nowa firma: {data.get('nazwa', ceidg_id)} [{api_status}]")
                     continue
 
-                data = service.extract_business_data(detailed_data)
-                
-                # Sprawdź czy firma już istnieje
-                result = await session.execute(
-                    select(CEIDGBusiness).where(CEIDGBusiness.ceidg_id == ceidg_id)
-                )
-                existing = result.scalar_one_or_none()
+                # Firma znana — reaguj tylko na realną zmianę statusu
+                if existing.status != api_status:
+                    logger.info(
+                        f"  🔄 Zmiana statusu: {existing.nazwa} "
+                        f"{existing.status} → {api_status}"
+                    )
+                    status_changes.append((existing.nazwa, existing.status, api_status))
+                    existing.previous_status = existing.status
+                    existing.status = api_status
+                    existing.status_changed_at = now
+                    existing.updated_at = now
 
-                if existing:
-                    # Update istniejącego rekordu
-                    for key, value in data.items():
-                        if key != "fetched_at":  # Zachowaj oryginalną datę pobrania
-                            setattr(existing, key, value)
-                    updated += 1
+                # Uzupełnij braki po firmach zaimportowanych bez szczegółów
+                if existing.pkd_main is None and details_filled < DETAIL_FETCH_LIMIT:
+                    detailed = await service.get_business_details(ceidg_id)
+                    if detailed:
+                        data = service.extract_business_data(detailed)
+                        for key, value in data.items():
+                            # fetched_at = data pierwszego pobrania, nie nadpisujemy;
+                            # status obsłużony wyżej (razem ze śledzeniem zmiany)
+                            if key not in ("fetched_at", "status", "ceidg_id"):
+                                setattr(existing, key, value)
+                        existing.updated_at = now
+                        details_filled += 1
+
+            # 2b. Firmy obecne w bazie, ale nieobecne w odpowiedzi API.
+            # Oznaczamy jako wykreślone tylko gdy API zwróciło wiarygodnie pełną
+            # listę — inaczej częściowa awaria API „wykreśliłaby" pół katalogu.
+            missing_ids = set(db_firms) - api_ids
+            removed_count = 0
+            if missing_ids:
+                coverage = len(api_ids) / len(db_firms) if db_firms else 0
+                if coverage >= MISSING_SANITY_RATIO:
+                    for ceidg_id in missing_ids:
+                        firm = db_firms[ceidg_id]
+                        if firm.status == "WYKRESLONY":
+                            continue
+                        logger.info(f"  ➖ Zniknęła z rejestru: {firm.nazwa} ({firm.status} → WYKRESLONY)")
+                        firm.previous_status = firm.status
+                        firm.status = "WYKRESLONY"
+                        firm.status_changed_at = now
+                        firm.updated_at = now
+                        removed_count += 1
                 else:
-                    # Insert nowego rekordu
-                    business = CEIDGBusiness(**data)
-                    session.add(business)
-                    upserted += 1
+                    logger.warning(
+                        f"⚠️  {len(missing_ids)} firm brakuje w odpowiedzi API, ale pokrycie "
+                        f"listy to tylko {coverage:.0%} (próg {MISSING_SANITY_RATIO:.0%}) — "
+                        f"pomijam oznaczanie wykreśleń, dane mogą być niekompletne"
+                    )
 
-            logger.info(f"  ✓ Nowych: {upserted}, zaktualizowanych: {updated}")
+            logger.info(
+                f"  ✓ Nowych: {new_count}, zmian statusu: {len(status_changes)}, "
+                f"wykreślonych: {removed_count}, uzupełnionych szczegółów: {details_filled}"
+            )
 
             # 3. Zaktualizuj statystyki synchronizacji
             logger.info("📈 Aktualizacja statystyk synchronizacji...")
@@ -160,6 +210,10 @@ async def fetch_ceidg_businesses():
             logger.info(f"   - Łącznie firm: {stats['total_count']}")
             logger.info(f"   - Aktywnych: {stats['active_count']}")
             logger.info(f"   - Miejscowości: {len(stats['by_miejscowosc'])}")
+            logger.info(f"   - Nowych w tym przebiegu: {new_count}")
+            logger.info(f"   - Zmian statusu: {len(status_changes)}")
+            for nazwa, old, new in status_changes[:10]:
+                logger.info(f"     · {nazwa}: {old} → {new}")
             
             # Top 5 miejscowości
             top_5 = list(stats['by_miejscowosc'].items())[:5]

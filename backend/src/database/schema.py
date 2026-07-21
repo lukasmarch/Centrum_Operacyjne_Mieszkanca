@@ -374,6 +374,11 @@ class CEIDGBusiness(SQLModel, table=True):
 
     status: str = Field(max_length=30, default="AKTYWNY")  # AKTYWNY, ZAWIESZONY, WYKRESLONY
     data_rozpoczecia: Optional[datetime] = None
+
+    # Śledzenie zmian statusu — źródło danych dla „Radaru rynku lokalnego"
+    # (nowe / zawieszone / wykreślone firmy w danym miesiącu)
+    previous_status: Optional[str] = Field(default=None, max_length=30)
+    status_changed_at: Optional[datetime] = Field(default=None, index=True)
     
     # Owner
     wlasciciel_imie: Optional[str] = Field(default=None, max_length=100)

@@ -6,6 +6,7 @@ import {
     fetchCatalog, claimBusiness, fetchMyClaims, updateBusinessProfile, uploadBusinessLogo,
     trackBusinessView, fetchPendingClaims, moderateClaim,
     fetchActiveAnnouncements, fetchMyAnnouncements, createAnnouncement, deactivateAnnouncement,
+    getAssetUrl,
     CatalogCard, MyClaim, PendingClaim, ActiveAnnouncement, BusinessAnnouncement, AnnouncementType,
 } from '../services/businessApi';
 
@@ -169,7 +170,7 @@ const CatalogBusinessCard: React.FC<{
                     premium ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white' : 'bg-white/[0.06] border border-white/10 text-neutral-300'
                 }`}>
                     {card.profile.logo_url
-                        ? <img src={card.profile.logo_url} alt="" className="w-full h-full object-cover" />
+                        ? <img src={getAssetUrl(card.profile.logo_url)} alt="" className="w-full h-full object-cover" />
                         : card.nazwa.substring(0, 2).toUpperCase()}
                 </div>
             </div>
@@ -490,7 +491,7 @@ const EditProfileModal: React.FC<{
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
                             {logoUrl
-                                ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                                ? <img src={getAssetUrl(logoUrl)} alt="Logo" className="w-full h-full object-cover" />
                                 : <span className="text-neutral-500 text-2xl">🏪</span>}
                         </div>
                         <div className="flex-1">
