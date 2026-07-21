@@ -19,7 +19,9 @@ from sqlmodel import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.connection import async_session
-from src.database.schema import CEIDGBusiness, CEIDGSyncStats, BusinessProfile
+from src.database.schema import (
+    CEIDGBusiness, CEIDGSyncStats, BusinessProfile, BusinessAnnouncement,
+)
 from src.auth.dependencies import get_optional_user, get_admin_user, get_current_active_user
 from src.utils.logger import setup_logger
 from src.integrations.regon_api import RegonService
@@ -116,6 +118,50 @@ class PendingClaim(BaseModel):
     telefon: Optional[str] = None
     email: Optional[str] = None
     created_at: datetime
+
+
+class AnnouncementCreate(BaseModel):
+    type: str = "ogloszenie"  # ogloszenie / okazja
+    title: str
+    body: str
+    valid_until: Optional[datetime] = None
+
+
+class AnnouncementResponse(BaseModel):
+    id: int
+    business_id: int
+    type: str
+    title: str
+    body: str
+    valid_until: Optional[datetime] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ActiveAnnouncement(BaseModel):
+    """Publiczna reprezentacja ogłoszenia — feed, kafel, newsletter.
+    Zawsze prezentowane z oznaczeniem materiału reklamowego."""
+    id: int
+    business_id: int
+    type: str
+    title: str
+    body: str
+    valid_until: Optional[datetime] = None
+    created_at: datetime
+    nazwa: str
+    miasto: str
+    branza: Optional[str] = None
+    telefon: Optional[str] = None
+    logo_url: Optional[str] = None
+
+
+# Limity publikacji planu Firma lokalna (BusinessPage obiecuje 2 ogłoszenia/mc;
+# okazje są krótkotrwałe, więc mają osobny, luźniejszy limit)
+ANNOUNCEMENT_MONTHLY_QUOTA = {"ogloszenie": 2, "okazja": 8}
+OKAZJA_MAX_DAYS = 7
 
 
 class BusinessListResponse(BaseModel):
@@ -716,6 +762,178 @@ async def track_business_view(business_id: int):
             session.add(profile)
             await session.commit()
         return {"status": "ok"}
+
+
+@router.get("/announcements/active", response_model=List[ActiveAnnouncement])
+async def get_active_announcements(limit: int = Query(10, ge=1, le=50)):
+    """
+    Radar Lokalnego Biznesu — aktywne ogłoszenia i okazje firm z planu
+    Firma lokalna. Zasila kafel na stronie głównej, feed i newsletter.
+    """
+    from src.utils.pkd_mapping import get_friendly_category
+
+    now = datetime.utcnow()
+    async with async_session() as session:
+        query = apply_public_visibility(
+            select(BusinessAnnouncement, CEIDGBusiness, BusinessProfile)
+            .join(CEIDGBusiness, CEIDGBusiness.id == BusinessAnnouncement.business_id)
+            .join(BusinessProfile, BusinessProfile.business_id == CEIDGBusiness.id)
+            .where(BusinessAnnouncement.is_active == True)  # noqa: E712
+            .where(
+                (BusinessAnnouncement.valid_until.is_(None))
+                | (BusinessAnnouncement.valid_until > now)
+            )
+            .where(BusinessProfile.claim_status == "verified")
+            .where(BusinessProfile.is_premium == True)  # noqa: E712
+        ).order_by(BusinessAnnouncement.created_at.desc()).limit(limit)
+
+        result = await session.execute(query)
+        items = []
+        for ann, business, profile in result.all():
+            items.append(ActiveAnnouncement(
+                id=ann.id,
+                business_id=business.id,
+                type=ann.type,
+                title=ann.title,
+                body=ann.body,
+                valid_until=ann.valid_until,
+                created_at=ann.created_at,
+                nazwa=business.nazwa,
+                miasto=business.miasto,
+                branza=get_friendly_category(business.pkd_main) if business.pkd_main else None,
+                telefon=profile.telefon,
+                logo_url=profile.logo_url,
+            ))
+        return items
+
+
+async def _get_owned_premium_profile(session, business_id: int, user) -> BusinessProfile:
+    """Wizytówka należąca do usera; publikacja ogłoszeń wymaga planu Firma lokalna."""
+    result = await session.execute(
+        select(BusinessProfile).where(BusinessProfile.business_id == business_id)
+    )
+    profile = result.scalar_one_or_none()
+    if not profile or profile.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Wizytówka nie została znaleziona")
+    if profile.claim_status != "verified":
+        raise HTTPException(status_code=403, detail="Wizytówka czeka na weryfikację")
+    return profile
+
+
+@router.get("/{business_id}/announcements", response_model=List[AnnouncementResponse])
+async def list_my_announcements(
+    business_id: int,
+    user=Depends(get_current_active_user),
+):
+    """Ogłoszenia właściciela wizytówki (także nieaktywne i wygasłe)."""
+    async with async_session() as session:
+        await _get_owned_premium_profile(session, business_id, user)
+        result = await session.execute(
+            select(BusinessAnnouncement)
+            .where(BusinessAnnouncement.business_id == business_id)
+            .order_by(BusinessAnnouncement.created_at.desc())
+            .limit(50)
+        )
+        return result.scalars().all()
+
+
+@router.post("/{business_id}/announcements", response_model=AnnouncementResponse, status_code=201)
+async def create_announcement(
+    business_id: int,
+    request: AnnouncementCreate,
+    user=Depends(get_current_active_user),
+):
+    """
+    Publikacja ogłoszenia/okazji (plan Firma lokalna).
+    Limity miesięczne: 2 ogłoszenia, 8 okazji; okazja musi mieć
+    valid_until maks. 7 dni w przód.
+    """
+    ann_type = request.type.strip().lower()
+    if ann_type not in ANNOUNCEMENT_MONTHLY_QUOTA:
+        raise HTTPException(status_code=400, detail="Typ musi być 'ogloszenie' lub 'okazja'")
+
+    title = request.title.strip()
+    body = request.body.strip()
+    if not title or len(title) > 120:
+        raise HTTPException(status_code=400, detail="Tytuł: 1–120 znaków")
+    if not body or len(body) > 500:
+        raise HTTPException(status_code=400, detail="Treść: 1–500 znaków")
+
+    now = datetime.utcnow()
+    valid_until = request.valid_until
+    if valid_until is not None and valid_until.tzinfo is not None:
+        valid_until = valid_until.astimezone(tz=None).replace(tzinfo=None)
+    if ann_type == "okazja":
+        if not valid_until:
+            raise HTTPException(status_code=400, detail="Okazja wymaga terminu ważności (valid_until)")
+        if valid_until <= now:
+            raise HTTPException(status_code=400, detail="Termin ważności musi być w przyszłości")
+        from datetime import timedelta
+        if valid_until > now + timedelta(days=OKAZJA_MAX_DAYS):
+            raise HTTPException(status_code=400, detail=f"Okazja może trwać maks. {OKAZJA_MAX_DAYS} dni")
+
+    async with async_session() as session:
+        profile = await _get_owned_premium_profile(session, business_id, user)
+        if not profile.is_premium:
+            raise HTTPException(
+                status_code=403,
+                detail="Publikacja ogłoszeń dostępna w planie Firma lokalna (49 zł/mc)",
+            )
+
+        # Limit miesięczny liczony po dacie utworzenia (wycofane też się liczą —
+        # inaczej limit dałoby się obejść kasowaniem)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        result = await session.execute(
+            select(func.count()).select_from(BusinessAnnouncement)
+            .where(BusinessAnnouncement.business_id == business_id)
+            .where(BusinessAnnouncement.type == ann_type)
+            .where(BusinessAnnouncement.created_at >= month_start)
+        )
+        used = result.scalar() or 0
+        quota = ANNOUNCEMENT_MONTHLY_QUOTA[ann_type]
+        if used >= quota:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Wykorzystano miesięczny limit ({used}/{quota}) dla typu '{ann_type}'",
+            )
+
+        ann = BusinessAnnouncement(
+            business_id=business_id,
+            type=ann_type,
+            title=title,
+            body=body,
+            valid_until=valid_until,
+        )
+        session.add(ann)
+        await session.commit()
+        await session.refresh(ann)
+        logger.info(f"Announcement created: business={business_id} type={ann_type} by {user.email}")
+        return ann
+
+
+@router.delete("/announcements/{announcement_id}")
+async def deactivate_announcement(
+    announcement_id: int,
+    user=Depends(get_current_active_user),
+):
+    """Wycofanie ogłoszenia (właściciel wizytówki lub admin). Soft delete."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(BusinessAnnouncement, BusinessProfile)
+            .join(BusinessProfile, BusinessProfile.business_id == BusinessAnnouncement.business_id)
+            .where(BusinessAnnouncement.id == announcement_id)
+        )
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Ogłoszenie nie zostało znalezione")
+        ann, profile = row
+        if profile.user_id != user.id and not user.is_admin:
+            raise HTTPException(status_code=404, detail="Ogłoszenie nie zostało znalezione")
+
+        ann.is_active = False
+        session.add(ann)
+        await session.commit()
+        return {"status": "ok", "id": announcement_id}
 
 
 @router.patch("/{business_id}/visibility")

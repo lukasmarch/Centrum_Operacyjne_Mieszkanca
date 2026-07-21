@@ -4,7 +4,7 @@ import { CalendarDays } from 'lucide-react';
 import TrafficTile from './TrafficTile';
 import { CinemaWidget } from './CinemaWidget';
 import BusTrackerWidget from './BusTrackerWidget';
-import RegonSearchWidget from './RegonSearchWidget';
+import PromotedBusinessesTile from './PromotedBusinessesTile';
 import WasteWidget from './WasteWidget';
 import WasteWidgetPaywall from './WasteWidgetPaywall';
 
@@ -117,7 +117,7 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
           <HealthTile />
         </BentoTile>
         <BentoTile className="h-[500px]" colSpan={1} rowSpan={1}>
-          <RegonSearchWidget />
+          <PromotedBusinessesTile onNavigate={onNavigate} />
         </BentoTile>
       </div>
 

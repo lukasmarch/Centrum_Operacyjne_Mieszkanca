@@ -26,6 +26,7 @@ from src.scheduler.places_job import run_places_job
 from src.scheduler.health_job import run_health_job
 from src.scheduler.proactive_alerts_job import run_proactive_alerts
 from src.scheduler.trial_expiry_job import run_trial_expiry
+from src.scheduler.business_report_job import run_business_reports
 from src.scheduler.retention_job import run_retention_job
 from src.utils.logger import setup_logger
 
@@ -295,6 +296,16 @@ def start_scheduler():
         trigger=CronTrigger(day_of_week='mon', hour=6, minute=30),
         id='health_update',
         name='Update health schedules (clinics + pharmacies)',
+        replace_existing=True
+    )
+
+    # Miesięczny raport dla firm z wizytówkami — 1. dnia miesiąca 8:30
+    # (statystyki wyświetleń + ogłoszeń; obiecany w planie Firma lokalna)
+    scheduler.add_job(
+        func=run_business_reports,
+        trigger=CronTrigger(day=1, hour=8, minute=30),
+        id='business_monthly_report',
+        name='Send monthly business reports',
         replace_existing=True
     )
 

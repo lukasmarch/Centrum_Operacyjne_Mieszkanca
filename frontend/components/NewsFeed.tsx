@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, Clock, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, Clock, Sparkles, Megaphone } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
 import ArticleImage, { getCategoryTheme } from './ArticleImage';
 import { Article } from '../types';
+import { fetchActiveAnnouncements, ActiveAnnouncement } from '../src/services/businessApi';
 
 interface NewsFeedProps {
   initialCategory?: string;
@@ -103,6 +104,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
   const { articles, loading, error } = useArticles({ limit: 50, perSource: 5, days: 2 });
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory || 'Wszystkie');
   const [chipsExpanded, setChipsExpanded] = useState(false);
+  const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
+
+  useEffect(() => {
+    fetchActiveAnnouncements(4).then(setAnnouncements).catch(() => {});
+  }, []);
 
   // Category counts
   const categoryCounts = useMemo(() => {
@@ -272,6 +278,38 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
           </button>
         )}
       </div>
+
+      {/* Ogłoszenia firm (plan Firma lokalna) — oznaczone jako materiał reklamowy */}
+      {announcements.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
+            <span className="h-px flex-1 bg-white/5" />
+            <Megaphone size={12} className="text-amber-500" />
+            Ogłoszenia firm
+            <span className="text-[9px] text-neutral-600 normal-case font-medium">materiał reklamowy</span>
+            <span className="h-px flex-1 bg-white/5" />
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {announcements.map(a => (
+              <div key={a.id} className="p-4 bg-gradient-to-br from-amber-500/8 to-white/[0.02] border border-amber-500/20 rounded-2xl">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <p className="text-sm font-bold text-neutral-100">{a.title}</p>
+                  {a.type === 'okazja' && a.valid_until && (
+                    <span className="text-[10px] text-amber-400 font-medium whitespace-nowrap">
+                      do {new Date(a.valid_until).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-neutral-400 leading-relaxed">{a.body}</p>
+                <p className="text-[11px] text-neutral-500 mt-2">
+                  {a.nazwa} · {a.miasto}
+                  {a.telefon && <> · 📞 {a.telefon}</>}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Articles grouped by date */}
       {(['today', 'yesterday', 'older'] as const).map(group => {

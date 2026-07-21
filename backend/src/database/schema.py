@@ -442,10 +442,32 @@ class BusinessProfile(SQLModel, table=True):
 
     # Statystyki (argument sprzedażowy)
     views_count: int = Field(default=0)
+    # Snapshot licznika z ostatniego raportu miesięcznego — pozwala liczyć
+    # przyrost wyświetleń "w tym miesiącu" bez tabeli historii
+    views_last_report: int = Field(default=0)
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     verified_at: Optional[datetime] = None
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class BusinessAnnouncement(SQLModel, table=True):
+    """Ogłoszenia i okazje firm (plan Firma lokalna) — „Radar Lokalnego Biznesu".
+    Dwa typy: 'ogloszenie' (dłuższa treść, ekspozycja w feedzie, limit 2/mc)
+    i 'okazja' ("tu i teraz", wymagane valid_until ≤ 7 dni, limit 8/mc).
+    Publikacja wymaga is_premium=True na business_profiles."""
+    __tablename__ = "business_announcements"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="ceidg_businesses.id", index=True)
+
+    type: str = Field(default="ogloszenie", max_length=20)  # ogloszenie / okazja
+    title: str = Field(max_length=120)
+    body: str = Field(max_length=500)
+    valid_until: Optional[datetime] = Field(default=None, index=True)
+
+    is_active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class CEIDGSyncStats(SQLModel, table=True):

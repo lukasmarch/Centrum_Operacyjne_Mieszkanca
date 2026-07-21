@@ -108,6 +108,78 @@ export async function updateBusinessProfile(businessId: number, data: {
     }
 }
 
+// ── Ogłoszenia firm (Radar Lokalnego Biznesu, plan Firma lokalna) ──
+
+export type AnnouncementType = 'ogloszenie' | 'okazja';
+
+export interface BusinessAnnouncement {
+    id: number;
+    business_id: number;
+    type: AnnouncementType;
+    title: string;
+    body: string;
+    valid_until?: string | null;
+    is_active: boolean;
+    created_at: string;
+}
+
+export interface ActiveAnnouncement {
+    id: number;
+    business_id: number;
+    type: AnnouncementType;
+    title: string;
+    body: string;
+    valid_until?: string | null;
+    created_at: string;
+    nazwa: string;
+    miasto: string;
+    branza?: string | null;
+    telefon?: string | null;
+    logo_url?: string | null;
+}
+
+/** Aktywne ogłoszenia/okazje — kafel na stronie głównej, feed, newsletter */
+export async function fetchActiveAnnouncements(limit = 10): Promise<ActiveAnnouncement[]> {
+    const res = await fetch(`${API_BASE}/business/announcements/active?limit=${limit}`);
+    if (!res.ok) return [];
+    return res.json();
+}
+
+/** Ogłoszenia właściciela wizytówki (panel firmy) */
+export async function fetchMyAnnouncements(businessId: number): Promise<BusinessAnnouncement[]> {
+    const res = await fetch(`${API_BASE}/business/${businessId}/announcements`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+}
+
+/** Publikacja ogłoszenia/okazji (limity: 2 ogłoszenia/mc, 8 okazji/mc) */
+export async function createAnnouncement(businessId: number, data: {
+    type: AnnouncementType;
+    title: string;
+    body: string;
+    valid_until?: string;
+}): Promise<BusinessAnnouncement> {
+    const res = await fetch(`${API_BASE}/business/${businessId}/announcements`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Wystąpił błąd' }));
+        throw new Error(err.detail || `Błąd: ${res.status}`);
+    }
+    return res.json();
+}
+
+/** Wycofanie ogłoszenia (soft delete) */
+export async function deactivateAnnouncement(announcementId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/business/announcements/${announcementId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`Błąd wycofania: ${res.status}`);
+}
+
 /** Licznik wyświetleń wizytówki (fire-and-forget) */
 export function trackBusinessView(businessId: number): void {
     fetch(`${API_BASE}/business/${businessId}/view`, { method: 'POST' }).catch(() => {});

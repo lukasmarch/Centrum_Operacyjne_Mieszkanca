@@ -140,6 +140,10 @@ class EmailService:
             "premium_url": f"{settings.APP_URL}/premium",
             "weekly_weather": content.get("weekly_weather"),
             "weekly_reports": content.get("weekly_reports"),
+            # Sekcja reklamowa „Polecane firmy" (plan Firma lokalna)
+            "promoted_businesses": content.get("promoted_businesses", []),
+            "business_announcements": content.get("business_announcements", []),
+            "businesses_url": f"{settings.APP_URL}/business",
         }
 
         # Process events to extract day/month for display
@@ -233,6 +237,8 @@ class EmailService:
             "cinema_evening": content.get("cinema_evening", []),
             "reports_today": content.get("reports_today", []),
             "reports_date_label": content.get("reports_date_label", "dzisiaj"),
+            "promoted_businesses": content.get("promoted_businesses", []),
+            "business_announcements": content.get("business_announcements", []),
             "unsubscribe_url": f"{settings.APP_URL}/newsletter/unsubscribe?token={unsubscribe_token}",
             "preferences_url": f"{settings.APP_URL}/newsletter/preferences?token={unsubscribe_token}",
         }

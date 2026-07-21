@@ -64,6 +64,10 @@ async def send_weekly_newsletter():
                 logger.error(f"Failed to generate weekly newsletter: {str(e)}")
                 return stats
 
+            # Sekcja „Polecane firmy" (plan Firma lokalna) — reklama w newsletterze
+            from src.newsletter.promo import get_newsletter_promo
+            content.update(await get_newsletter_promo(session))
+
             # Send to each subscriber
             for subscriber in subscribers:
                 try:
@@ -174,10 +178,15 @@ async def send_daily_newsletter():
                 except Exception as e:
                     logger.error(f"Failed to generate weekly card: {str(e)}")
 
+            # Sekcja „Polecane firmy" — wspólna dla wszystkich lokalizacji
+            from src.newsletter.promo import get_newsletter_promo
+            promo = await get_newsletter_promo(session)
+
             # Generate and send per location
             for location, subs in by_location.items():
                 try:
                     content = await generator.generate_daily(session, location=location)
+                    content.update(promo)
                     if weekly_card:
                         content["weekly_card"] = weekly_card
                 except Exception as e:
