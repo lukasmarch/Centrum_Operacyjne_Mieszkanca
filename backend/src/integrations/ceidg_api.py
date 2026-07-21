@@ -228,10 +228,14 @@ class CEIDGService:
             "ulica": adres.get("ulica"),
             "budynek": adres.get("budynek"),
             "lokal": adres.get("lokal"),
-            "miasto": adres.get("miasto", ""),
+            # Adresy normalizujemy przy zapisie — rejestr bywa zwraca WIELKIE LITERY,
+            # a zapytania filtrują po dokładnym dopasowaniu (powiat) i grupują
+            # miejscowości (miasto). Bez tego firmy wypadają ze statystyk, a lista
+            # miejscowości dubluje kafelki ("HARTOWIEC" obok "Hartowiec").
+            "miasto": (adres.get("miasto") or "").title(),
             "kod_pocztowy": adres.get("kodPocztowy", adres.get("kod", "")),
-            "gmina": adres.get("gmina", ""),
-            "powiat": adres.get("powiat", ""),
+            "gmina": (adres.get("gmina") or "").title(),
+            "powiat": (adres.get("powiat") or "").lower(),
             "wojewodztwo": adres.get("wojewodztwo"),
             
             # Detailed Fields

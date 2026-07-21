@@ -391,16 +391,22 @@ async def search_businesses(
 async def get_business_analytics():
     """
     Statystyki historyczne firm:
-    - by_year: liczba firm zarejestrowanych w danym roku (wszystkie statusy)
+    - by_year: liczba firm zarejestrowanych w danym roku (widocznych publicznie)
     - by_year_suspended: liczba zawieszonych firm wg roku rejestracji
-    - by_status: podział wg statusu
+    - by_status: podział wg statusu (pełny, łącznie z wykreślonymi — licznik na górze strony)
+
+    by_year/by_year_suspended przechodzą przez apply_public_visibility(), żeby słupek
+    wykresu zgadzał się z liczbą kafelków po kliknięciu roku. Bez tego wykres liczył
+    też firmy wykreślone z rejestru, których lista celowo nie pokazuje (RODO art. 5).
     """
     async with async_session() as session:
-        # By year: total registrations per year (all statuses)
+        # By year: registrations per year (tylko firmy widoczne publicznie)
         year_query = (
-            select(
-                func.extract("year", CEIDGBusiness.data_rozpoczecia).label("year"),
-                func.count(CEIDGBusiness.id).label("count")
+            apply_public_visibility(
+                select(
+                    func.extract("year", CEIDGBusiness.data_rozpoczecia).label("year"),
+                    func.count(CEIDGBusiness.id).label("count")
+                )
             )
             .where(CEIDGBusiness.powiat == "działdowski")
             .where(CEIDGBusiness.data_rozpoczecia.is_not(None))
@@ -412,9 +418,11 @@ async def get_business_analytics():
 
         # By year suspended: count businesses with ZAWIESZONY status per registration year
         year_suspended_query = (
-            select(
-                func.extract("year", CEIDGBusiness.data_rozpoczecia).label("year"),
-                func.count(CEIDGBusiness.id).label("count")
+            apply_public_visibility(
+                select(
+                    func.extract("year", CEIDGBusiness.data_rozpoczecia).label("year"),
+                    func.count(CEIDGBusiness.id).label("count")
+                )
             )
             .where(CEIDGBusiness.powiat == "działdowski")
             .where(CEIDGBusiness.data_rozpoczecia.is_not(None))
