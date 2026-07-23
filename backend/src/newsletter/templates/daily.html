@@ -177,7 +177,8 @@
                         <!-- Header -->
                         <tr>
                             <td class="header">
-                                <h1>{{ subject }}</h1>
+                                <div style="font-family: Georgia, serif; font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 4px;">Rybno<span style="color: #1e3a5f;">Live</span> <span style="font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.85); font-weight: 600;">&nbsp;Briefing</span></div>
+                                <h1 style="font-size: 18px;">{{ subject }}</h1>
                                 <p class="greeting">{{ sections.greeting }}</p>
                             </td>
                         </tr>
@@ -202,32 +203,38 @@
                         </tr>
                         {% endif %}
 
-                        <!-- Weather Strip (Airly) -->
+                        <!-- Pogoda (OpenWeather) + Jakość powietrza (Airly) — osobne kafle -->
                         <tr>
-                            <td class="weather-strip">
-                                {% if air_quality %}
-                                <table width="100%" cellspacing="0" cellpadding="0" border="0" style="color: white;">
+                            <td class="weather-strip" style="padding: 14px 16px;">
+                                <table width="100%" cellspacing="0" cellpadding="0" border="0" style="color: white; border-collapse: separate; border-spacing: 6px 0;">
                                     <tr>
-                                        <td style="text-align: center; width: 33%; padding: 5px;">
-                                            <div style="font-size: 36px; font-weight: 300; line-height: 1.1;">{{ air_quality.temperature }}°C</div>
-                                            <div style="font-size: 12px; opacity: 0.8;">Temperatura</div>
+                                        <!-- Pogoda -->
+                                        <td width="55%" style="vertical-align: top; text-align: left; padding: 4px 8px;">
+                                            {% if weather %}
+                                            <table cellspacing="0" cellpadding="0" border="0"><tr>
+                                                <td style="vertical-align: middle;">
+                                                    <div style="font-size: 40px; font-weight: 300; line-height: 1;">{{ weather.temperature }}°</div>
+                                                </td>
+                                                <td style="vertical-align: middle; padding-left: 12px;">
+                                                    <div style="font-size: 14px; opacity: 0.95; text-transform: capitalize;">{{ weather.description }}</div>
+                                                    <div style="font-size: 12px; opacity: 0.7; margin-top: 3px;">{% if weather.temp_min is not none %}min {{ weather.temp_min }}° · max {{ weather.temp_max }}°{% endif %}{% if weather.wind_kmh is not none %} · wiatr {{ weather.wind_kmh }} km/h{% endif %}</div>
+                                                </td>
+                                            </tr></table>
+                                            {% else %}
+                                            <span class="temp">{{ weather_temp }}°C</span>
+                                            <span class="conditions">{{ sections.weather_brief }}</span>
+                                            {% endif %}
                                         </td>
-                                        <td style="text-align: center; width: 34%; padding: 5px; border-left: 1px solid rgba(255,255,255,0.3); border-right: 1px solid rgba(255,255,255,0.3);">
-                                            <div style="font-size: 20px; font-weight: 300;">{{ air_quality.humidity }}%</div>
-                                            <div style="font-size: 12px; opacity: 0.8;">Wilgotność</div>
-                                            <div style="margin-top: 4px; font-size: 11px; opacity: 0.7;">PM2.5: {{ air_quality.pm25 }} | PM10: {{ air_quality.pm10 }}</div>
+                                        <!-- Jakość powietrza -->
+                                        {% if air_quality %}
+                                        <td width="45%" style="vertical-align: middle; text-align: center; padding: 4px 8px; border-left: 1px solid rgba(255,255,255,0.25);">
+                                            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.75;">Jakość powietrza</div>
+                                            <div class="caqi-{{ air_quality.caqi_level }}" style="font-size: 16px; font-weight: 700; margin: 2px 0;">{{ air_quality.caqi_label }}</div>
+                                            <div style="font-size: 11px; opacity: 0.6;">CAQI {{ air_quality.caqi }} · PM2.5 {{ air_quality.pm25 }} · PM10 {{ air_quality.pm10 }}</div>
                                         </td>
-                                        <td style="text-align: center; width: 33%; padding: 5px;">
-                                            <div class="caqi-{{ air_quality.caqi_level }}" style="font-size: 14px; font-weight: 700;">{{ air_quality.caqi_label }}</div>
-                                            <div style="font-size: 12px; opacity: 0.8;">Jakość powietrza</div>
-                                            <div style="font-size: 11px; opacity: 0.6;">CAQI: {{ air_quality.caqi }}</div>
-                                        </td>
+                                        {% endif %}
                                     </tr>
                                 </table>
-                                {% else %}
-                                <span class="temp">{{ weather_temp }}°C</span>
-                                <span class="conditions">{{ sections.weather_brief }}</span>
-                                {% endif %}
                             </td>
                         </tr>
 
@@ -296,16 +303,16 @@
                         <tr>
                             <td class="section" style="border-bottom: none;">
                                 <h2 class="section-title">📅 Dziś w Okolicy</h2>
-                                {% for event in sections.events_today %}
+                                {% for event in (events_today_db if events_today_db else sections.events_today) %}
                                 <div class="event-mini">
-                                    <span class="event-time">{{ event.time }}</span>
+                                    <span class="event-time">{{ event.time if event.time else '—' }}</span>
                                     <div class="event-info">
                                         <h4>{{ event.title }}</h4>
-                                        <p class="loc">📍 {{ event.location }}</p>
+                                        <p class="loc">{% if event.is_local %}<span style="color: #2e7d32; font-weight: 700;">● {{ event.location }}</span>{% else %}📍 {{ event.location }}{% endif %}</p>
                                     </div>
                                 </div>
                                 {% endfor %}
-                                {% if not sections.events_today %}
+                                {% if not events_today_db and not sections.events_today %}
                                 <p style="color: #888; font-size: 14px; text-align: center; margin: 0;">Brak zaplanowanych wydarzeń na dziś</p>
                                 {% endif %}
                             </td>
@@ -345,7 +352,7 @@
                         <!-- Footer -->
                         <tr>
                             <td class="footer">
-                                <p><strong>Centrum Operacyjne Mieszkańca</strong> - Poranny Briefing</p>
+                                <p><strong>RybnoLive</strong> · Poranny briefing · Twoja gmina. Na żywo.</p>
                                 <p>
                                     <a href="{{ unsubscribe_url }}">Wypisz się</a> |
                                     <a href="{{ preferences_url }}">Preferencje</a>

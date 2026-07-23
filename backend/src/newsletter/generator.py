@@ -24,6 +24,8 @@ MONTHS_PL = [
     "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
     "lipca", "sierpnia", "września", "października", "listopada", "grudnia"
 ]
+MONTHS_PL_SHORT = ["STY", "LUT", "MAR", "KWI", "MAJ", "CZE",
+                   "LIP", "SIE", "WRZ", "PAŹ", "LIS", "GRU"]
 
 CAQI_LABELS = {
     "VERY_LOW": "Bardzo Dobra",
@@ -44,7 +46,7 @@ def format_polish_date(dt: datetime) -> str:
     return f"{DAYS_PL[dt.weekday()]}, {dt.day} {MONTHS_PL[dt.month - 1]} {dt.year}"
 
 
-WEEKLY_NEWSLETTER_PROMPT = """Jesteś redaktorem lokalnego newslettera dla Powiatu Działdowskiego.
+WEEKLY_NEWSLETTER_PROMPT = """Jesteś redaktorem lokalnego newslettera RybnoLive dla gminy Rybno.
 Przygotuj treść cotygodniowego newslettera w języku polskim.
 
 **Styl:** Przyjazny, angażujący, lokalny. Zwracaj się do czytelnika bezpośrednio.
@@ -73,7 +75,7 @@ Dane wejściowe:
 
 Zwróć treść w formacie JSON:
 {{
-    "subject": "Tydzień w Działdowie - [data]",
+    "subject": "Tydzień w gminie Rybno - [data]",
     "preview_text": "Krótki tekst preview (max 100 znaków)",
     "sections": {{
         "greeting": "Tekst powitalny",
@@ -90,7 +92,7 @@ Zwróć treść w formacie JSON:
 """
 
 
-DAILY_NEWSLETTER_PROMPT = """Jesteś redaktorem porannego briefingu dla mieszkańców Powiatu Działdowskiego.
+DAILY_NEWSLETTER_PROMPT = """Jesteś redaktorem porannego briefingu RybnoLive dla mieszkańców gminy Rybno.
 Przygotuj krótki, rzeczowy poranny newsletter w języku polskim.
 
 **Styl:** Zwięzły, praktyczny, na start dnia. "Dzień Dobry!" vibe.
@@ -342,6 +344,28 @@ class NewsletterGenerator:
         content["weekly_weather"] = weekly_weather
         content["weekly_reports"] = weekly_reports
 
+        # Daty wydarzeń liczone WPROST z bazy (nie z AI — koniec ze znakami "?")
+        LOCAL_TOWNS = {"rybno", "hartowiec", "koszelewy", "żabiny", "wymój", "gralewo",
+                       "jeglia", "dębień", "naguszewo", "rumian", "kopaniarze", "truszczyny"}
+        content["events_db"] = [
+            {
+                "title": e.title,
+                "day": e.event_date.day,
+                "month": MONTHS_PL_SHORT[e.event_date.month - 1],
+                "location": e.location or "",
+                "time": e.event_time or "",
+                "is_local": (e.location or "").strip().lower() in LOCAL_TOWNS,
+            }
+            for e in events
+        ]
+
+        # Puls tygodnia — moduł analityczny "Gmina w liczbach" (dane DB + trend)
+        try:
+            content["puls"] = await self.get_weekly_stats(session)
+        except Exception as e:
+            logger.error(f"Nie udało się policzyć Pulsu tygodnia: {e}")
+            content["puls"] = None
+
         logger.info(f"Weekly newsletter generated: {content.get('subject', 'No subject')}")
 
         return content
@@ -556,6 +580,31 @@ class NewsletterGenerator:
         content["reports_today"] = reports_data
         content["reports_date_label"] = reports_date_label
 
+        # Prawdziwa pogoda (OpenWeather) — osobno od jakości powietrza (Airly).
+        # Wcześniej briefing pokazywał kafel Airly udający pogodę.
+        content["weather"] = {
+            "temperature": round(weather.temperature) if weather and weather.temperature is not None else None,
+            "description": weather.description if weather else None,
+            "temp_min": round(weather.temp_min) if weather and weather.temp_min is not None else None,
+            "temp_max": round(weather.temp_max) if weather and weather.temp_max is not None else None,
+            "wind_kmh": round(weather.wind_speed * 3.6) if weather and weather.wind_speed is not None else None,
+        } if weather else None
+
+        # Daty wydarzeń wprost z bazy (chip dzień/miesiąc, marker lokalny)
+        LOCAL_TOWNS = {"rybno", "hartowiec", "koszelewy", "żabiny", "wymój", "gralewo",
+                       "jeglia", "dębień", "naguszewo", "rumian", "kopaniarze", "truszczyny"}
+        content["events_today_db"] = [
+            {
+                "title": e.title,
+                "day": e.event_date.day,
+                "month": MONTHS_PL_SHORT[e.event_date.month - 1],
+                "location": e.location or "",
+                "time": e.event_time or "",
+                "is_local": (e.location or "").strip().lower() in LOCAL_TOWNS,
+            }
+            for e in events
+        ]
+
         logger.info(f"Daily newsletter generated: {content.get('subject', 'No subject')}")
 
         return content
@@ -566,6 +615,13 @@ class NewsletterGenerator:
         No AI — pure DB aggregates for last 7 days.
         """
         week_ago = datetime.utcnow() - timedelta(days=7)
+        prev_week_ago = datetime.utcnow() - timedelta(days=14)
+
+        def trend_pct(current: int, previous: int):
+            """Zmiana % vs poprzedni tydzień (None gdy brak bazy porównania)."""
+            if not previous:
+                return None
+            return round((current - previous) / previous * 100)
 
         result = await session.execute(
             select(func.count(Article.id)).where(Article.published_at >= week_ago)
@@ -573,16 +629,26 @@ class NewsletterGenerator:
         articles_count = result.scalar() or 0
 
         result = await session.execute(
+            select(func.count(Article.id))
+            .where(Article.published_at >= prev_week_ago)
+            .where(Article.published_at < week_ago)
+        )
+        articles_prev = result.scalar() or 0
+
+        result = await session.execute(
             select(Article.category, func.count(Article.id).label("cnt"))
             .where(Article.published_at >= week_ago)
             .group_by(Article.category)
             .order_by(func.count(Article.id).desc())
-            .limit(3)
+            .limit(6)
         )
         top_categories = [
             {"category": row[0] or "Inne", "count": row[1]}
             for row in result.all()
         ]
+        max_cat = max((c["count"] for c in top_categories), default=0)
+        for c in top_categories:
+            c["pct"] = round(c["count"] / max_cat * 100) if max_cat else 0
 
         result = await session.execute(
             select(func.count(Report.id))
@@ -595,6 +661,13 @@ class NewsletterGenerator:
             select(func.count(Event.id)).where(Event.event_date >= week_ago)
         )
         events_count = result.scalar() or 0
+
+        result = await session.execute(
+            select(func.count(Event.id))
+            .where(Event.event_date >= prev_week_ago)
+            .where(Event.event_date < week_ago)
+        )
+        events_prev = result.scalar() or 0
 
         result = await session.execute(
             select(
@@ -621,9 +694,11 @@ class NewsletterGenerator:
         return {
             "period": f"{week_ago.strftime('%d.%m')} – {datetime.utcnow().strftime('%d.%m.%Y')}",
             "articles_count": articles_count,
+            "articles_trend": trend_pct(articles_count, articles_prev),
             "top_categories": top_categories,
             "reports_count": reports_count,
             "events_count": events_count,
+            "events_trend": trend_pct(events_count, events_prev),
             "weather": {"temp_avg": temp_avg, "temp_min": temp_min, "temp_max": temp_max},
             "air_quality": {"caqi_avg": caqi_avg, "pm25_avg": pm25_avg},
         }

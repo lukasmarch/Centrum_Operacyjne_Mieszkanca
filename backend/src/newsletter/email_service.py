@@ -132,7 +132,7 @@ class EmailService:
         """
         # Build context for template
         context = {
-            "subject": content.get("subject", "Tydzień w Działdowie"),
+            "subject": content.get("subject", "Tydzień w gminie Rybno"),
             "date": datetime.now().strftime("%d.%m.%Y"),
             "sections": content.get("sections", {}),
             "unsubscribe_url": f"{settings.APP_URL}/newsletter/unsubscribe?token={unsubscribe_token}",
@@ -140,6 +140,8 @@ class EmailService:
             "premium_url": f"{settings.APP_URL}/premium",
             "weekly_weather": content.get("weekly_weather"),
             "weekly_reports": content.get("weekly_reports"),
+            "puls": content.get("puls"),
+            "events_db": content.get("events_db", []),
             # Sekcja reklamowa „Polecane firmy" (plan Firma lokalna)
             "promoted_businesses": content.get("promoted_businesses", []),
             "business_announcements": content.get("business_announcements", []),
@@ -237,6 +239,8 @@ class EmailService:
             "cinema_evening": content.get("cinema_evening", []),
             "reports_today": content.get("reports_today", []),
             "reports_date_label": content.get("reports_date_label", "dzisiaj"),
+            "weather": content.get("weather"),
+            "events_today_db": content.get("events_today_db", []),
             "promoted_businesses": content.get("promoted_businesses", []),
             "business_announcements": content.get("business_announcements", []),
             "unsubscribe_url": f"{settings.APP_URL}/newsletter/unsubscribe?token={unsubscribe_token}",
@@ -323,7 +327,7 @@ class EmailService:
         </head>
         <body>
             <h2>Potwierdź subskrypcję newslettera</h2>
-            <p>Dziękujemy za zapisanie się do newslettera Centrum Operacyjnego Mieszkańca!</p>
+            <p>Dziękujemy za zapisanie się do newslettera RybnoLive!</p>
             <p>Kliknij poniższy przycisk, aby potwierdzić swoją subskrypcję:</p>
             <a href="{confirmation_url}" class="btn">Potwierdzam subskrypcję</a>
             <p style="font-size: 12px; color: #888;">
@@ -335,6 +339,6 @@ class EmailService:
 
         return await self.send_email(
             to_email=to_email,
-            subject="Potwierdź subskrypcję newslettera - Centrum Operacyjne",
+            subject="Potwierdź subskrypcję newslettera - RybnoLive",
             html_content=html
         )

@@ -261,8 +261,8 @@
                         <!-- Header -->
                         <tr>
                             <td class="header">
-                                <h1>{{ subject }}</h1>
-                                <p class="date">{{ date }}</p>
+                                <div style="font-family: Georgia, serif; font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">Rybno<span style="color: #ff9500;">Live</span> <span style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #a8c5de; font-weight: 600;">&nbsp;Tygodnik</span></div>
+                                <p class="date" style="margin-top: 6px;">{{ date }} · Twoja gmina. Na żywo.</p>
                             </td>
                         </tr>
 
@@ -274,6 +274,57 @@
                                 </p>
                             </td>
                         </tr>
+
+                        <!-- Puls tygodnia (analityka DB) -->
+                        {% if puls %}
+                        <tr>
+                            <td class="section" style="background: linear-gradient(180deg, #fffdf9, #f7f1e6);">
+                                <p style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; color: #d9862b; margin: 0 0 2px;">Puls tygodnia</p>
+                                <h2 class="section-title" style="margin-top: 0;">📊 Gmina w liczbach</h2>
+                                <table width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: separate; border-spacing: 6px 0;">
+                                    <tr>
+                                        <td width="33%" style="background: #ffffff; border: 1px solid #e7e0d3; border-radius: 10px; padding: 12px; text-align: center; vertical-align: top;">
+                                            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7680; font-weight: 600;">Wiadomości</div>
+                                            <div style="font-family: Georgia, serif; font-size: 26px; color: #16324f; margin: 3px 0;">{{ puls.articles_count }}</div>
+                                            {% if puls.articles_trend is not none %}
+                                            <div style="font-size: 12px; font-weight: 700; color: {{ '#4e8a5b' if puls.articles_trend >= 0 else '#c0392b' }};">{{ '▲' if puls.articles_trend >= 0 else '▼' }} {{ puls.articles_trend }}% do zeszłego tyg.</div>
+                                            {% endif %}
+                                        </td>
+                                        <td width="33%" style="background: #ffffff; border: 1px solid #e7e0d3; border-radius: 10px; padding: 12px; text-align: center; vertical-align: top;">
+                                            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7680; font-weight: 600;">Wydarzenia</div>
+                                            <div style="font-family: Georgia, serif; font-size: 26px; color: #16324f; margin: 3px 0;">{{ puls.events_count }}</div>
+                                            {% if puls.events_trend is not none %}
+                                            <div style="font-size: 12px; font-weight: 700; color: {{ '#4e8a5b' if puls.events_trend >= 0 else '#c0392b' }};">{{ '▲' if puls.events_trend >= 0 else '▼' }} {{ puls.events_trend }}% do zeszłego tyg.</div>
+                                            {% endif %}
+                                        </td>
+                                        <td width="33%" style="background: #ffffff; border: 1px solid #e7e0d3; border-radius: 10px; padding: 12px; text-align: center; vertical-align: top;">
+                                            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7680; font-weight: 600;">Aura</div>
+                                            <div style="font-family: Georgia, serif; font-size: 26px; color: #16324f; margin: 3px 0;">{% if puls.weather.temp_avg is not none %}{{ puls.weather.temp_avg }}°{% else %}—{% endif %}</div>
+                                            {% if puls.air_quality.caqi_avg is not none %}
+                                            <div style="font-size: 12px; font-weight: 700; color: #4e8a5b;">CAQI {{ puls.air_quality.caqi_avg }}</div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                                {% if puls.top_categories %}
+                                <p style="font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; color: #d9862b; margin: 18px 0 8px;">O czym mówił tydzień</p>
+                                <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                                    {% for cat in puls.top_categories %}
+                                    <tr>
+                                        <td width="90" style="font-size: 13px; color: #22303c; font-weight: 600; padding: 4px 0;">{{ cat.category }}</td>
+                                        <td style="padding: 4px 0;">
+                                            <div style="background: #ede6d8; border-radius: 4px; height: 14px; width: 100%;">
+                                                <div style="background: #d9862b; border-radius: 4px; height: 14px; width: {{ cat.pct }}%;"></div>
+                                            </div>
+                                        </td>
+                                        <td width="30" style="font-size: 13px; color: #6b7680; text-align: right; font-weight: 600; padding: 4px 0 4px 8px;">{{ cat.count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
 
                         <!-- Top News -->
                         <tr>
@@ -292,7 +343,7 @@
                         <tr>
                             <td class="section">
                                 <h2 class="section-title">📅 Nadchodzące Wydarzenia</h2>
-                                {% for event in sections.events %}
+                                {% for event in (events_db if events_db else sections.events) %}
                                 <div class="event-item">
                                     <div class="event-date">
                                         <span class="day">{{ event.day }}</span>
@@ -300,10 +351,13 @@
                                     </div>
                                     <div class="event-details">
                                         <h4>{{ event.title }}</h4>
-                                        <p class="location">📍 {{ event.location }}</p>
+                                        <p class="location">{% if event.is_local %}<span style="color: #4e8a5b; font-weight: 700;">● {{ event.location }}</span>{% else %}📍 {{ event.location }}{% endif %}{% if event.time %} · {{ event.time }}{% endif %}</p>
                                     </div>
                                 </div>
                                 {% endfor %}
+                                {% if not events_db and not sections.events %}
+                                <p style="color: #888; font-size: 14px; margin: 0;">Brak zaplanowanych wydarzeń.</p>
+                                {% endif %}
                             </td>
                         </tr>
 
@@ -436,8 +490,8 @@
                         <!-- Footer -->
                         <tr>
                             <td class="footer">
-                                <p><strong>Centrum Operacyjne Mieszkańca</strong></p>
-                                <p>Twoje lokalne centrum informacyjne dla Powiatu Działdowskiego</p>
+                                <p><strong>RybnoLive</strong> · Twoja gmina. Na żywo.</p>
+                                <p>Twoje lokalne centrum informacyjne dla gminy Rybno</p>
                                 <p class="unsubscribe">
                                     <a href="{{ unsubscribe_url }}">Wypisz się z newslettera</a> |
                                     <a href="{{ preferences_url }}">Zmień preferencje</a>
