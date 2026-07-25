@@ -69,6 +69,19 @@ def cron(name, expressions, pos):
                 {"rule": {"interval": [{"field": "cronExpression", "expression": e} for e in expressions]}}, pos)
 
 
+def manual_path(slug: str) -> str:
+    """
+    Sekret jest CZĘŚCIĄ ścieżki webhooka, nie parametrem `?k=`.
+
+    Przycisk w Telegramie to zwykły link — nie da się wysłać nagłówka, a walidacja
+    parametru wymagałaby dodatkowego noda IF w każdym workflow. Ścieżka z sekretem
+    jest niezgadywalna i kosztuje zero nodów. Uruchomienie i tak tylko GENERUJE
+    propozycję (publikować może wyłącznie jednorazowy resumeUrl), więc najgorsze,
+    co daje wyciek, to zbędna wiadomość na Telegramie i kilka kredytów kie.ai.
+    """
+    return f"rybnolive-{slug}-{SECRET}"
+
+
 def manual_webhook(name, path, pos):
     """Ręczne uruchomienie = również przycisk „wygeneruj ponownie”."""
     return node(name, "n8n-nodes-base.webhook", 2,
@@ -97,7 +110,7 @@ def wait_for_click(name, pos):
 def tg_buttons(regen_path, regen_label="🔄 Wygeneruj ponownie"):
     return {"rows": [{"row": {"buttons": [
         {"text": "✅ Publikuj na Facebooku", "additionalFields": {"url": "={{ $execution.resumeUrl }}"}},
-        {"text": regen_label, "additionalFields": {"url": f"{N8N}/webhook/{regen_path}?k={SECRET}"}},
+        {"text": regen_label, "additionalFields": {"url": f"{N8N}/webhook/{regen_path}"}},
     ]}}]}
 
 
@@ -135,14 +148,14 @@ def workflow(name, nodes, connections):
 def build_text_workflow():
     n = [
         cron("Codziennie 7:45", ["45 7 * * *"], [-220, 0]),
-        manual_webhook("Uruchom teraz", "rybnolive-post-tekst", [-220, 180]),
+        manual_webhook("Uruchom teraz", manual_path("post-tekst"), [-220, 180]),
         http_get("Propozycja", f"{API}/proposal?kind=text", [0, 80]),
         node("Do akceptacji (TG)", "n8n-nodes-base.telegram", 1.2, {
             "operation": "sendMessage",
             "chatId": TG_CHAT,
             "text": "={{ '📝 Propozycja posta na FB (' + $json.date + ')\\n\\n' + $json.message }}",
             "replyMarkup": "inlineKeyboard",
-            "inlineKeyboard": tg_buttons("rybnolive-post-tekst"),
+            "inlineKeyboard": tg_buttons(manual_path("post-tekst")),
             # Bez parse_mode: treść jest generowana przez AI i mogłaby zawierać
             # niedomknięte * lub _, na czym Telegram wywala 400.
             "additionalFields": {"appendAttribution": False},
@@ -171,7 +184,7 @@ def build_photo_workflow():
     n = [
         # wtorek i czwartek 17:00
         cron("Wt i czw 17:00", ["0 17 * * 2,4"], [-220, 0]),
-        manual_webhook("Uruchom / ponów", "rybnolive-post-grafika", [-220, 180]),
+        manual_webhook("Uruchom / ponów", manual_path("post-grafika"), [-220, 180]),
         # generowanie grafiki trwa 20-60 s → podniesiony timeout
         http_get("Propozycja + grafika", f"{API}/proposal?kind=photo", [0, 80], timeout_ms=200000),
         node("Do akceptacji (TG)", "n8n-nodes-base.telegram", 1.2, {
@@ -183,7 +196,7 @@ def build_photo_workflow():
                 "appendAttribution": False,
             },
             "replyMarkup": "inlineKeyboard",
-            "inlineKeyboard": tg_buttons("rybnolive-post-grafika", "🎨 Inna grafika"),
+            "inlineKeyboard": tg_buttons(manual_path("post-grafika"), "🎨 Inna grafika"),
         }, [220, 80], creds=CRED_TG),
         wait_for_click("Czekaj na akceptację", [440, 80]),
         fb_publish("Publikuj grafikę na FB", "photos", [

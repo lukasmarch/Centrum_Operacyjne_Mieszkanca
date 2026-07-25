@@ -12,7 +12,7 @@
           ]
         }
       },
-      "id": "6839c9e8-553e-4c6a-ab6f-a128716908a3",
+      "id": "68dc8103-bff1-4ad8-bf18-78a0c600ed9c",
       "name": "Wt i czw 17:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -24,10 +24,10 @@
     {
       "parameters": {
         "httpMethod": "GET",
-        "path": "rybnolive-post-grafika",
+        "path": "rybnolive-post-grafika-3ZJ-4rIGoJv-fvlBKtbhFg",
         "options": {}
       },
-      "id": "aab61460-a590-4f9a-8b0a-5afdcce5809c",
+      "id": "b415a87d-d437-4127-9247-2d9977fc3395",
       "name": "Uruchom / ponów",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -35,7 +35,7 @@
         -220,
         180
       ],
-      "webhookId": "f9416793-1b68-46fe-9762-61bbf8944ab1"
+      "webhookId": "3a45f1ca-69b1-4f3d-93b2-d3ad700bdab1"
     },
     {
       "parameters": {
@@ -46,7 +46,7 @@
           "timeout": 200000
         }
       },
-      "id": "0bd4dd2b-eb46-4053-b2b5-57d7412ce523",
+      "id": "12508153-5391-49d7-9457-3cd1f668bf36",
       "name": "Propozycja + grafika",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -85,7 +85,7 @@
                   {
                     "text": "🎨 Inna grafika",
                     "additionalFields": {
-                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-post-grafika?k=3ZJ-4rIGoJv-fvlBKtbhFg"
+                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-post-grafika-3ZJ-4rIGoJv-fvlBKtbhFg"
                     }
                   }
                 ]
@@ -94,7 +94,7 @@
           ]
         }
       },
-      "id": "ed01473d-0ec1-4a17-9110-d5ea4bd6a974",
+      "id": "f95c23bd-503f-469c-8584-dd77ef55df22",
       "name": "Do akceptacji (TG)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -115,7 +115,7 @@
         "httpMethod": "GET",
         "options": {}
       },
-      "id": "6e4a22f0-58e6-47b6-98b7-2c1eb9592d43",
+      "id": "0725e001-33d2-415b-b115-ba9581636057",
       "name": "Czekaj na akceptację",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -123,7 +123,7 @@
         440,
         80
       ],
-      "webhookId": "ad9e5aaf-3995-46b7-8fa7-ac12cf4bee6c"
+      "webhookId": "e3dd7da3-aa31-41dd-aa21-b18909510a33"
     },
     {
       "parameters": {
@@ -146,7 +146,7 @@
           }
         }
       },
-      "id": "09ee6853-b4b4-4a15-a1b2-d47789869b53",
+      "id": "485a49ba-45f8-4e1f-9eaf-321df0baaff2",
       "name": "Publikuj grafikę na FB",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
@@ -170,7 +170,7 @@
           "appendAttribution": false
         }
       },
-      "id": "29a59f82-d584-4dc7-8bb6-2da722a8fe9b",
+      "id": "e5cdcb4e-741b-4446-8a4d-468d924a8483",
       "name": "Potwierdzenie",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,

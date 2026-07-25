@@ -157,7 +157,20 @@ POST /api/chat/message          # SSE streaming
 GET  /api/stats/variables/list  # GUS tier-based
 GET  /api/stats/variable/{key}
 GET  /api/stats/multi-metric    # Business tier
+GET  /api/social/proposal?kind=text|photo   # gotowy post dla n8n (X-Social-Token)
+GET  /api/social/campaign/due               # kalendarz kampanii
+POST /api/social/media                      # grafika z URL → uploads/social/
 ```
+
+## Automatyzacja social media (2026-07-25)
+**Backend robi treść, n8n tylko akceptuje i publikuje.**
+- `services/social_content.py` — treść postów, prompt graficzny, klient kie.ai (`nano-banana-pro`), `CAMPAIGN_PLAN`
+- Grafiki: **jedno miejsce** `uploads/social/` → `api.rybnolive.pl/uploads/social/…` (wolumen `uploads`).
+  Zlikwidowane duplikaty: `frontend/public/kampania/` i `/campaign/` na wolumenie frontendu
+- n8n: 3 workflowy generowane z `automation/n8n/build_workflows.py` (W1 tekstowy 7:45, W2 graficzny wt+czw 17:00, W3 kampania)
+- Akceptacja przez `$execution.resumeUrl` node'a Wait — jednorazowy, bez timeoutu (**fail-closed**: brak kliknięcia = brak publikacji)
+- Sekrety: `automation/.env` (gitignore); w backendzie `SOCIAL_MEDIA_TOKEN`, `KIE_API_KEY`
+- Klucz Public API n8n wygasa **2026-08-23**; po 10.08 **dezaktywuj W3**
 Docs: http://localhost:8000/docs
 
 ## Stan RAG / Embeddings
