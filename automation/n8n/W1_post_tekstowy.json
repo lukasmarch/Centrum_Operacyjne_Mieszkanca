@@ -1,0 +1,259 @@
+{
+  "name": "RybnoLive — post tekstowy (podsumowanie AI)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "45 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "72c12616-4c90-4aa2-8ea6-217f2733d264",
+      "name": "Codziennie 7:45",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rybnolive-post-tekst",
+        "options": {}
+      },
+      "id": "f998717a-0cc7-4306-860a-eefb3bb02357",
+      "name": "Uruchom teraz",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        180
+      ],
+      "webhookId": "7129be39-3f97-4430-865b-77fcfe5cc226"
+    },
+    {
+      "parameters": {
+        "url": "https://api.rybnolive.pl/api/social/proposal?kind=text",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "a589378e-67ba-4b7a-9c35-0b3ef5443ae3",
+      "name": "Propozycja",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YVBUuGjaUmDG4lzc",
+          "name": "RybnoLive Social Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "7032918706",
+        "text": "={{ '📝 Propozycja posta na FB (' + $json.date + ')\\n\\n' + $json.message }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Publikuj na Facebooku",
+                    "additionalFields": {
+                      "url": "={{ $execution.resumeUrl }}"
+                    }
+                  },
+                  {
+                    "text": "🔄 Wygeneruj ponownie",
+                    "additionalFields": {
+                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-post-tekst?k=3ZJ-4rIGoJv-fvlBKtbhFg"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "9bfeb795-e51e-4d89-a30d-61fb2fac3db1",
+      "name": "Do akceptacji (TG)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        80
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "options": {}
+      },
+      "id": "c824ec90-4e1b-4054-8816-526209e4fbbf",
+      "name": "Czekaj na akceptację",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        80
+      ],
+      "webhookId": "a5a51708-fead-40d6-8541-0b284b6eea94"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "1266427606545851",
+        "edge": "feed",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "message",
+                "value": "={{ $('Propozycja').first().json.message }}"
+              },
+              {
+                "name": "link",
+                "value": "https://rybnolive.pl"
+              }
+            ]
+          }
+        }
+      },
+      "id": "6ab05dd2-03ac-472e-984b-e774ad4cacb4",
+      "name": "Publikuj na FB",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        660,
+        80
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "DtAT3s4jbcSsRr4q",
+          "name": "RybnoLive Page Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "7032918706",
+        "text": "✅ Post tekstowy opublikowany na fanpage'u RybnoLive.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "4b922b39-ca79-43bd-ae07-af84a0dbd794",
+      "name": "Potwierdzenie",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        80
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Codziennie 7:45": {
+      "main": [
+        [
+          {
+            "node": "Propozycja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uruchom teraz": {
+      "main": [
+        [
+          {
+            "node": "Propozycja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propozycja": {
+      "main": [
+        [
+          {
+            "node": "Do akceptacji (TG)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Do akceptacji (TG)": {
+      "main": [
+        [
+          {
+            "node": "Czekaj na akceptację",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Czekaj na akceptację": {
+      "main": [
+        [
+          {
+            "node": "Publikuj na FB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publikuj na FB": {
+      "main": [
+        [
+          {
+            "node": "Potwierdzenie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

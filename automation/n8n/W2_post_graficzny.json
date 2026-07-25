@@ -1,0 +1,260 @@
+{
+  "name": "RybnoLive — post graficzny (kie.ai)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 17 * * 2,4"
+            }
+          ]
+        }
+      },
+      "id": "6839c9e8-553e-4c6a-ab6f-a128716908a3",
+      "name": "Wt i czw 17:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rybnolive-post-grafika",
+        "options": {}
+      },
+      "id": "aab61460-a590-4f9a-8b0a-5afdcce5809c",
+      "name": "Uruchom / ponów",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        180
+      ],
+      "webhookId": "f9416793-1b68-46fe-9762-61bbf8944ab1"
+    },
+    {
+      "parameters": {
+        "url": "https://api.rybnolive.pl/api/social/proposal?kind=photo",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 200000
+        }
+      },
+      "id": "0bd4dd2b-eb46-4053-b2b5-57d7412ce523",
+      "name": "Propozycja + grafika",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YVBUuGjaUmDG4lzc",
+          "name": "RybnoLive Social Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "7032918706",
+        "file": "={{ $json.image_url }}",
+        "additionalFields": {
+          "caption": "={{ ('🖼 Propozycja posta z grafiką\\n\\n' + $json.message).slice(0, 900) }}",
+          "appendAttribution": false
+        },
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Publikuj na Facebooku",
+                    "additionalFields": {
+                      "url": "={{ $execution.resumeUrl }}"
+                    }
+                  },
+                  {
+                    "text": "🎨 Inna grafika",
+                    "additionalFields": {
+                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-post-grafika?k=3ZJ-4rIGoJv-fvlBKtbhFg"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "ed01473d-0ec1-4a17-9110-d5ea4bd6a974",
+      "name": "Do akceptacji (TG)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        80
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "options": {}
+      },
+      "id": "6e4a22f0-58e6-47b6-98b7-2c1eb9592d43",
+      "name": "Czekaj na akceptację",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        80
+      ],
+      "webhookId": "ad9e5aaf-3995-46b7-8fa7-ac12cf4bee6c"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "1266427606545851",
+        "edge": "photos",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "url",
+                "value": "={{ $('Propozycja + grafika').first().json.image_url }}"
+              },
+              {
+                "name": "caption",
+                "value": "={{ $('Propozycja + grafika').first().json.message }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "09ee6853-b4b4-4a15-a1b2-d47789869b53",
+      "name": "Publikuj grafikę na FB",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        660,
+        80
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "DtAT3s4jbcSsRr4q",
+          "name": "RybnoLive Page Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "7032918706",
+        "text": "✅ Post z grafiką opublikowany na fanpage'u RybnoLive.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "29a59f82-d584-4dc7-8bb6-2da722a8fe9b",
+      "name": "Potwierdzenie",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        80
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Wt i czw 17:00": {
+      "main": [
+        [
+          {
+            "node": "Propozycja + grafika",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uruchom / ponów": {
+      "main": [
+        [
+          {
+            "node": "Propozycja + grafika",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propozycja + grafika": {
+      "main": [
+        [
+          {
+            "node": "Do akceptacji (TG)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Do akceptacji (TG)": {
+      "main": [
+        [
+          {
+            "node": "Czekaj na akceptację",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Czekaj na akceptację": {
+      "main": [
+        [
+          {
+            "node": "Publikuj grafikę na FB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publikuj grafikę na FB": {
+      "main": [
+        [
+          {
+            "node": "Potwierdzenie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

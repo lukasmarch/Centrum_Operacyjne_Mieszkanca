@@ -1,0 +1,112 @@
+# Automatyzacja social media RybnoLive (n8n)
+
+> Stan: 2026-07-25, po rewizji flow. Poprzednia wersja tego pliku opisywała workflowy
+> C/D, które nigdy nie zostały zaimportowane, podawała nieaktualną wersję Graph API
+> (v21.0 — na produkcji jest v23.0) i sekret, którego nie ma w żadnym działającym nodzie.
+
+## Podział odpowiedzialności
+
+**Backend robi treść, n8n tylko akceptuje i publikuje.**
+
+```
+backend  → treść posta, prompt, generowanie grafiki w kie.ai, trwałe hostowanie plików
+n8n      → cron, przycisk na Telegramie, wywołanie Facebook Graph API
+```
+
+Wcześniej logika treści siedziała w node'ach Code w n8n i była **zduplikowana**: workflow A
+budował propozycję na Telegram, a workflow B budował ją PONOWNIE (pobierając summary drugi
+raz) przy publikacji — więc opublikowany post nie musiał być tym, co zaakceptowałeś.
+Teraz źródłem jest `backend/src/services/social_content.py`, a zmiana copy czy promptu to
+commit, nie klikanie po UI.
+
+## Endpointy (nagłówek `X-Social-Token`, credential „RybnoLive Social Token”)
+
+| Endpoint | Zwraca |
+|---|---|
+| `GET /api/social/proposal?kind=text` | gotowy post z dziennego podsumowania AI |
+| `GET /api/social/proposal?kind=photo` | post + grafika z kie.ai (20–60 s, timeout noda 200 s) |
+| `GET /api/social/campaign/due` | pozycja kampanii przypadająca na teraz albo `{"due": false}` |
+| `POST /api/social/media` | kopiuje grafikę z URL-a do `uploads/social/` (linki kie.ai żyją ~24 h) |
+| `GET /api/social/media?subdir=kampania` | lista grafik — weryfikacja |
+
+## Workflowy
+
+Każdy to prosta linia bez rozgałęzień, wszystkie o tym samym kształcie:
+
+```
+cron ─────┐
+          ├→ HTTP /api/social/… → Telegram [✅ Publikuj][🔄 Ponów] → Wait → Facebook → Telegram ✔
+webhook ──┘
+```
+
+| Plik | Workflow w n8n | Nodów | Cron |
+|---|---|---|---|
+| `W1_post_tekstowy.json` | RybnoLive — post tekstowy (podsumowanie AI) | 7 | codziennie 7:45 |
+| `W2_post_graficzny.json` | RybnoLive — post graficzny (kie.ai) | 7 | wt i czw 17:00 |
+| `W3_kampania.json` | RybnoLive — kampania 27.07–10.08 | 8 | 9 godzin emisji dziennie |
+
+Źródłem jest `build_workflows.py` — JSON-y są z niego generowane:
+
+```bash
+set -a; . automation/.env; set +a
+python3 automation/n8n/build_workflows.py           # tylko zapis JSON-ów
+python3 automation/n8n/build_workflows.py --push    # utworzenie w n8n (nieaktywne)
+```
+
+### Dlaczego akceptacja działa bez webhooka i bez sekretu
+
+Przycisk „✅ Publikuj” prowadzi do `$execution.resumeUrl` node'a **Wait** — adresu
+jednorazowego i niezgadywalnego, unikalnego dla tej jednej propozycji. Skutki:
+
+- **brak podwójnej publikacji** — drugie kliknięcie nic nie robi (egzekucja już wznowiona),
+- **brak wspólnego sekretu w URL-u**, którym dotąd dało się opublikować cokolwiek,
+- **fail-closed** — node Wait celowo NIE ma limitu czasu. Limit oznaczałby, że po jego
+  upływie przepływ rusza dalej i publikuje post bez akceptacji. Nie klikasz = nic się nie
+  dzieje, egzekucja zostaje w stanie „waiting”.
+
+Przycisk „🔄 Ponów” / „🎨 Inna grafika” wskazuje na webhook uruchomienia tego samego
+workflow — klik startuje nową egzekucję z nową treścią/grafiką, a stara propozycja
+pozostaje niewznowiona. Sekret w tym URL-u pozwala tylko **wygenerować** propozycję,
+nie opublikować ją, więc jego wyciek nic nie daje.
+
+## Grafiki — jedno miejsce
+
+```
+uploads/social/            ← grafiki generowane przez kie.ai (dzienne posty)
+uploads/social/kampania/   ← 11 statycznych grafik kampanii
+        ↓
+https://api.rybnolive.pl/uploads/social/…
+```
+
+Wolumen `uploads` (ten sam wzorzec co logo wizytówek i zdjęcia zgłoszeń, `StaticFiles`
+zamontowane w `main.py`). Publiczne od razu, **bez rebuildu frontendu**.
+
+Zlikwidowane 2026-07-25 — grafiki leżały w dwóch miejscach naraz, w różnych wersjach:
+
+| Było | Problem |
+|---|---|
+| `frontend/public/kampania/` → `rybnolive.pl/kampania/` | 5,1 MB w każdym buildzie; nowa grafika wymagała `npm run build` + rsync + docker cp; grafiki generowane w locie niemożliwe |
+| `rybnolive.pl/campaign/` | 1 plik wprost na wolumenie, poza repo, w innej wersji niż jego odpowiednik w `/kampania/` — i to jego używał działający workflow |
+
+Lokalne kopie źródłowe: `automation/kampania/grafiki/` (poza buildem frontendu).
+
+## Kalendarz kampanii
+
+Siedzi w `backend/src/services/social_content.py` → `CAMPAIGN_PLAN` (copy przeniesione
+1:1 z zatwierdzonego COPY_HARMONOGRAM.md v2.0). n8n odpytuje `campaign/due` o godzinach
+emisji i nie wie nic o datach — **zmiana harmonogramu nie wymaga dotykania n8n**.
+
+Świadome odstępstwo od pierwotnego planu: **karuzela 5 zdjęć z 29.07 została zastąpiona
+pojedynczym postem**. Karuzela w Graph API wymaga 5 uploadów `published=false`, zebrania
+ID i osobnego `/feed` z `attached_media` — 4 dodatkowe nody i najbardziej awaryjny fragment
+starego workflow D. Grafiki `karuzela_2..5` wykorzystane jako osobne posty 5.08 i 7.08.
+
+Po 10.08: **dezaktywuj W3** (przypomnienie przychodzi na Telegram 10.08 o 10:00).
+
+## Sekrety
+
+`automation/.env` (w `.gitignore`, chmod 600): `N8N_API_KEY`, `KIE_API_KEY`,
+`SOCIAL_MEDIA_TOKEN`, `KAMPANIA_SECRET`. Te same wartości po stronie backendu żyją
+w `backend/.env.production` (`SOCIAL_MEDIA_TOKEN`, `KIE_API_KEY`).
+
+Klucz Public API n8n wygasa **2026-08-23** — po tej dacie wygeneruj nowy w Settings → API.

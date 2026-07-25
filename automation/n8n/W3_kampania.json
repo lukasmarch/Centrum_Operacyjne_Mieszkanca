@@ -1,0 +1,367 @@
+{
+  "name": "RybnoLive — kampania 27.07–10.08",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "45 7 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "30 8 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "45 9 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 12 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "45 16 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 17 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "7f5cedd2-aa42-4532-8478-c7ab14e9bb45",
+      "name": "Godziny emisji",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.rybnolive.pl/api/social/campaign/due",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "e1ef1e4c-421f-4b82-ba6a-6265f34bb9a7",
+      "name": "Co dziś?",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YVBUuGjaUmDG4lzc",
+          "name": "RybnoLive Social Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1948f002-f2c0-4d85-abac-b27940d8b4dd",
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "post",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "post"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e76a2055-f35b-4a64-8a75-311988925332",
+                    "leftValue": "={{ $json.kind }}",
+                    "rightValue": "reminder",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reminder"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b0b99444-8c5d-49e3-ad63-db5ea6d1d6ab",
+      "name": "Post czy przypomnienie?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "7032918706",
+        "file": "={{ $json.image_url }}",
+        "additionalFields": {
+          "caption": "={{ ('📣 ' + $json.title + '\\n\\n' + $json.message + ($json.note ? '\\n\\nℹ️ ' + $json.note : '')).slice(0, 900) }}",
+          "appendAttribution": false
+        },
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Publikuj na Facebooku",
+                    "additionalFields": {
+                      "url": "={{ $execution.resumeUrl }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "c10a649a-6797-4491-b7ed-d2a88235ba1d",
+      "name": "Propozycja postu (TG)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        -100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "7032918706",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "appendAttribution": false
+        }
+      },
+      "id": "9382394e-db4d-4bc6-91a9-3bd494734010",
+      "name": "Przypomnienie (TG)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "GET",
+        "options": {}
+      },
+      "id": "3b41d8ec-3d50-472a-9a2e-26074fccf13f",
+      "name": "Czekaj na akceptację",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        -100
+      ],
+      "webhookId": "1a130c7e-0a00-48df-a9e0-c1ac41a72067"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "1266427606545851",
+        "edge": "photos",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "url",
+                "value": "={{ $('Co dziś?').first().json.image_url }}"
+              },
+              {
+                "name": "caption",
+                "value": "={{ $('Co dziś?').first().json.message }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "12c363f7-e015-4890-8e35-f2142fb7dd86",
+      "name": "Publikuj na FB",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -100
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "DtAT3s4jbcSsRr4q",
+          "name": "RybnoLive Page Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "7032918706",
+        "text": "={{ '✅ Opublikowano: ' + $('Co dziś?').first().json.title }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "43e6223a-b700-4f7c-aaca-446e9fc0b349",
+      "name": "Potwierdzenie",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Godziny emisji": {
+      "main": [
+        [
+          {
+            "node": "Co dziś?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Co dziś?": {
+      "main": [
+        [
+          {
+            "node": "Post czy przypomnienie?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post czy przypomnienie?": {
+      "main": [
+        [
+          {
+            "node": "Propozycja postu (TG)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Przypomnienie (TG)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propozycja postu (TG)": {
+      "main": [
+        [
+          {
+            "node": "Czekaj na akceptację",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Czekaj na akceptację": {
+      "main": [
+        [
+          {
+            "node": "Publikuj na FB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publikuj na FB": {
+      "main": [
+        [
+          {
+            "node": "Potwierdzenie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

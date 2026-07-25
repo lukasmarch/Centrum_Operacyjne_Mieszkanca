@@ -75,3 +75,9 @@ backend/logs/*.log
 
 !frontend/lib/
 DESIGN
+# Zrzuty bazy i raporty — nigdy do repo (19MB dump wchodził przy git add -A)
+*.dump
+Raport_Biznesowy_*.pdf
+
+# Sekrety automatyzacji (n8n, kie.ai) — automation/.env
+automation/.env

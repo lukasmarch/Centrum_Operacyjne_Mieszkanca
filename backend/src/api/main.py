@@ -39,6 +39,9 @@ from src.api.endpoints.waste import router as waste_router
 # Health Module (Clinic Schedules + Pharmacy Duties)
 from src.api.endpoints.health import router as health_router
 
+# Social media — propozycje postów dla n8n (backend buduje treść, n8n publikuje)
+from src.api.endpoints.social import router as social_router
+
 # AI Chat + Multi-Agent System (Sprint 6)
 from src.api.endpoints.chat import router as chat_router
 from src.ai.agents import (
@@ -117,6 +120,8 @@ app.include_router(seo_router)
 
 from src.api.endpoints.voice import router as voice_router
 app.include_router(voice_router)  # /api/voice/transcribe
+
+app.include_router(social_router)  # /api/social/* — propozycje postów dla n8n
 
 @app.on_event("startup")
 async def startup_event():

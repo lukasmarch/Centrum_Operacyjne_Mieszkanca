@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     # Token do autoryzacji endpointu /api/cinema/ingest (GitHub Actions → backend)
     CINEMA_INGEST_TOKEN: Optional[str] = None
 
+    # Social media (n8n → Telegram → Facebook). Backend buduje treść i grafiki,
+    # n8n tylko akceptuje i publikuje — patrz services/social_content.py
+    SOCIAL_MEDIA_TOKEN: Optional[str] = None       # None = endpointy /api/social/* wyłączone
+    KIE_API_KEY: Optional[str] = None              # kie.ai — generowanie grafik postów
+    KIE_MODEL: str = "nano-banana-pro"             # model graficzny kie.ai
+
     # Admin alerts (scheduler errors)
     ADMIN_ALERT_EMAIL: Optional[str] = None        # None = alerty wyłączone (dev)
     ADMIN_ALERT_RATE_LIMIT_HOURS: int = 1          # max 1 email/job/godzinę
