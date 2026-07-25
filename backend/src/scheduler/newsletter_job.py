@@ -41,17 +41,19 @@ async def send_weekly_newsletter():
 
     try:
         async with async_session() as session:
-            # Get all active weekly subscribers (confirmed only)
+            # Newsletter tygodniowy jest bazowy dla WSZYSTKICH subskrybentów.
+            # Częstotliwość 'daily' to dodatek premium (poranny briefing Pn-Pt)
+            # nakładany NA tygodniowy, nie zamiast niego — dlatego weekly wysyłamy
+            # także do subskrybentów 'daily' (UI: "Newsletter tygodniowy zawsze aktywny").
             result = await session.execute(
                 select(NewsletterSubscriber)
                 .where(NewsletterSubscriber.status == NewsletterStatus.ACTIVE.value)
-                .where(NewsletterSubscriber.frequency == NewsletterFrequency.WEEKLY.value)
                 .where(NewsletterSubscriber.confirmed_at.isnot(None))
             )
             subscribers = result.scalars().all()
 
             stats["total"] = len(subscribers)
-            logger.info(f"Found {len(subscribers)} weekly subscribers")
+            logger.info(f"Found {len(subscribers)} active confirmed subscribers for weekly newsletter")
 
             if not subscribers:
                 logger.info("No weekly subscribers to send to")
