@@ -6,6 +6,7 @@ Dokumentacja: https://dane.biznes.gov.pl/pl/api
 
 Wymagany token JWT z biznes.gov.pl
 """
+import asyncio
 import os
 import aiohttp
 from typing import Dict, List, Optional, Any
@@ -24,6 +25,13 @@ class CEIDGService:
     # Gmina docelowa
     TARGET_GMINA = "Rybno"
     TARGET_POWIAT = "działdowski"
+
+    # Paginacja po powiecie: ~250 stron po 25 firm. Odstęp chroni przed rate
+    # limitem, limit stron przed pętlą gdyby rejestr nie przestał zwracać `next`.
+    PAGE_DELAY = 0.25
+    MAX_PAGES = 400
+    MAX_RETRIES = 3
+    RETRY_DELAY = 3.0
 
     def __init__(self, token: Optional[str] = None, timeout: int = 60):
         """
@@ -59,30 +67,45 @@ class CEIDGService:
         """
         url = f"{self.BASE_URL}{endpoint}"
 
-        try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                self.logger.info(f"CEIDG API request: {url} | params: {params}")
+        # Pełny przebieg to ~250 stron, więc pojedynczy 429 albo zerwane
+        # połączenie nie może wywracać całej synchronizacji.
+        last_error: Optional[Exception] = None
 
-                async with session.get(url, headers=self.headers, params=params) as response:
-                    if response.status == 401:
-                        raise Exception("Unauthorized - check CEIDG_API_TOKEN")
-                    if response.status == 429:
-                        raise Exception("Rate limit exceeded")
-                    if response.status == 400:
-                        error_text = await response.text()
-                        raise Exception(f"Bad request: {error_text}")
-                    if response.status == 204:
-                        return {"firmy": [], "count": 0, "links": {}}
-                    
-                    response.raise_for_status()
-                    data = await response.json()
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                    self.logger.debug(f"CEIDG API request: {url} | params: {params}")
 
-                    self.logger.info(f"CEIDG API response: {response.status} | count: {data.get('count', 0)}")
-                    return data
+                    async with session.get(url, headers=self.headers, params=params) as response:
+                        if response.status == 401:
+                            raise Exception("Unauthorized - check CEIDG_API_TOKEN")
+                        if response.status == 429:
+                            last_error = Exception("Rate limit exceeded")
+                            self.logger.warning(
+                                f"CEIDG API 429 (próba {attempt}/{self.MAX_RETRIES}) — czekam {self.RETRY_DELAY * attempt}s"
+                            )
+                            await asyncio.sleep(self.RETRY_DELAY * attempt)
+                            continue
+                        if response.status == 400:
+                            error_text = await response.text()
+                            raise Exception(f"Bad request: {error_text}")
+                        if response.status == 204:
+                            return {"firmy": [], "count": 0, "links": {}}
 
-        except aiohttp.ClientError as e:
-            self.logger.error(f"CEIDG API error: {e}")
-            raise Exception(f"CEIDG API request failed: {e}")
+                        response.raise_for_status()
+                        data = await response.json()
+
+                        self.logger.debug(f"CEIDG API response: {response.status} | count: {data.get('count', 0)}")
+                        return data
+
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                last_error = e
+                self.logger.warning(f"CEIDG API error (próba {attempt}/{self.MAX_RETRIES}): {e}")
+                if attempt < self.MAX_RETRIES:
+                    await asyncio.sleep(self.RETRY_DELAY * attempt)
+
+        self.logger.error(f"CEIDG API error: {last_error}")
+        raise Exception(f"CEIDG API request failed: {last_error}")
 
     async def search_by_gmina(
         self,
@@ -114,6 +137,29 @@ class CEIDGService:
 
         return await self._make_request("/firmy", params)
 
+    async def search_by_powiat(
+        self,
+        powiat: str,
+        limit: int = 25,
+        page: int = 1
+    ) -> Dict[str, Any]:
+        """
+        Wyszukaj firmy w danym powiecie
+
+        Args:
+            powiat: Nazwa powiatu (np. "działdowski")
+            limit: Wyniki na stronę (max 25)
+            page: Numer strony (od 1)
+
+        Returns:
+            Dict z 'firmy', 'count', 'links'
+        """
+        return await self._make_request("/firmy", {
+            "powiat": powiat,
+            "limit": min(limit, 25),
+            "page": page
+        })
+
     async def search_by_nip(self, nip: str) -> Dict[str, Any]:
         """Wyszukaj firmę po NIP"""
         # Usuń myślniki jeśli są
@@ -130,51 +176,70 @@ class CEIDGService:
         powiat_filter: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Pobierz wszystkie firmy z danej gminy (z paginacją)
+        Pobierz wszystkie firmy z danej gminy (z paginacją po powiecie)
+
+        Rejestr filtruje po `gmina=` na indeksie, który dla Rybna stoi na wrześniu
+        2024 — wpisy nowsze nie wracają w odpowiedzi w ogóle (zweryfikowane
+        2026-07-25: `gmina=Rybno` → max dataRozpoczecia 2024-09-20, `powiat=działdowski`
+        → 2026-05-21). Dlatego pytamy o cały powiat, który ma aktualny indeks,
+        i zawężamy do gminy po stronie klienta.
+
+        Paginacja rejestru jest niestabilna (ta sama firma potrafi wrócić na dwóch
+        stronach, przez co część rekordów wypada) — dlatego zbieramy do słownika
+        po `id` zamiast doklejać do listy.
 
         Args:
             gmina: Nazwa gminy (np. "Rybno")
-            powiat_filter: Filtruj tylko ten powiat (np. "działdowski")
+            powiat_filter: Powiat, po którym odpytujemy rejestr (np. "działdowski")
 
         Returns:
-            Lista wszystkich firm
+            Lista firm z danej gminy (zdeduplikowana)
         """
-        all_businesses = []
+        if not powiat_filter:
+            raise ValueError(
+                "powiat_filter jest wymagany — rejestr nie zwraca kompletu przy filtrze po samej gminie"
+            )
+
+        gmina_norm = gmina.strip().lower()
+        by_id: Dict[str, Dict[str, Any]] = {}
         page = 1
         total_count = None
 
-        self.logger.info(f"Fetching all businesses for gmina: {gmina}")
+        self.logger.info(f"Fetching businesses: powiat={powiat_filter}, filtering gmina={gmina}")
 
-        while True:
-            self.logger.info(f"Fetching page {page}...")
-            result = await self.search_by_gmina(gmina, limit=25, page=page)
+        while page <= self.MAX_PAGES:
+            result = await self.search_by_powiat(powiat_filter, limit=25, page=page)
 
             firms = result.get("firmy", [])
             if not firms:
                 break
 
-            # Filtruj po powiecie jeśli podano
-            if powiat_filter:
-                firms = [
-                    f for f in firms
-                    if f.get("adresDzialalnosci", {}).get("powiat", "").lower() == powiat_filter.lower()
-                ]
-
-            all_businesses.extend(firms)
+            for firm in firms:
+                adres = firm.get("adresDzialalnosci", {}) or {}
+                if (adres.get("gmina") or "").strip().lower() == gmina_norm:
+                    by_id[firm.get("id")] = firm
 
             if total_count is None:
                 total_count = result.get("count", 0)
-                self.logger.info(f"Total available: {total_count}")
+                self.logger.info(f"Total available in powiat: {total_count}")
 
-            # Sprawdź czy są następne strony
-            links = result.get("links", {})
-            if not links.get("next") or page * 25 >= total_count:
+            if page % 40 == 0:
+                self.logger.info(f"  ...page {page}, {len(by_id)} firm z gminy {gmina}")
+
+            if not result.get("links", {}).get("next"):
                 break
 
             page += 1
+            await asyncio.sleep(self.PAGE_DELAY)
 
-        self.logger.info(f"Fetched {len(all_businesses)} businesses (filtered by powiat: {powiat_filter})")
-        return all_businesses
+        if page > self.MAX_PAGES:
+            self.logger.warning(
+                f"Osiągnięto limit {self.MAX_PAGES} stron — lista może być niepełna"
+            )
+
+        by_id.pop(None, None)
+        self.logger.info(f"Fetched {len(by_id)} businesses (gmina: {gmina}, powiat: {powiat_filter})")
+        return list(by_id.values())
 
     async def get_business_details(self, ceidg_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -271,7 +336,9 @@ class CEIDGService:
         active_count = 0
 
         for b in businesses:
-            miasto = b.get("adresDzialalnosci", {}).get("miasto", "Nieznane")
+            # Ta sama normalizacja co przy zapisie do bazy — inaczej statystyki
+            # dublują kafelki ("HARTOWIEC" obok "Hartowiec").
+            miasto = ((b.get("adresDzialalnosci", {}) or {}).get("miasto") or "Nieznane").title()
             by_miejscowosc[miasto] = by_miejscowosc.get(miasto, 0) + 1
             if b.get("status") == "AKTYWNY":
                 active_count += 1

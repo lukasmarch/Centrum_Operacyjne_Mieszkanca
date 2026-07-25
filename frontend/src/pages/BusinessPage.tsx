@@ -937,6 +937,12 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
     // Suspended count from analytics
     const suspendedCount = analytics?.by_status?.['ZAWIESZONY'] ?? 0;
     const deletedCount = analytics?.by_status?.['WYKRESLONY'] ?? 0;
+    const spolkaCount = analytics?.by_status?.['WYLACZNIE_W_FORMIE_SPOLKI'] ?? 0;
+    const activeCount = analytics?.by_status?.['AKTYWNY'] ?? stats?.active_count ?? 0;
+    // Wpisy istniejące dziś — bez wykreślonych. Wcześniej kafel pokazywał total
+    // z rejestru (660), w którym połowa to firmy wykreślone z CEIDG; czytelnik
+    // odbierał to jako liczbę firm działających w gminie.
+    const registeredCount = activeCount + suspendedCount + spolkaCount;
 
     return (
         <div className="space-y-8 pb-12">
@@ -1077,12 +1083,12 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                 {/* Key stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-white/[0.04] p-4 rounded-xl border border-white/8">
-                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">Wszystkie Firmy</p>
-                        <p className="text-2xl font-black text-neutral-100">{stats?.total_count ?? analytics?.total ?? 0}</p>
+                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">Firmy w rejestrze</p>
+                        <p className="text-2xl font-black text-neutral-100">{registeredCount}</p>
                     </div>
                     <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20">
                         <p className="text-xs text-green-400 font-bold uppercase tracking-wider mb-1">Aktywne</p>
-                        <p className="text-2xl font-black text-green-400">{stats?.active_count ?? analytics?.by_status?.['AKTYWNY'] ?? 0}</p>
+                        <p className="text-2xl font-black text-green-400">{activeCount}</p>
                     </div>
                     <div className="bg-amber-500/10 p-4 rounded-xl border border-amber-500/20">
                         <p className="text-xs text-amber-400 font-bold uppercase tracking-wider mb-1">Zawieszone</p>
@@ -1101,15 +1107,15 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                             {/* Left: title + description + legend */}
                             <div>
                                 <h3 className="text-sm font-bold text-neutral-200 uppercase tracking-wider">
-                                    📈 Rejestracje firm wg roku
+                                    📈 Firmy w rejestrze wg roku założenia
                                 </h3>
                                 <p className="text-xs text-neutral-500 mt-0.5 mb-2">
-                                    Kliknij słupek, aby przefiltrować karty po roku rejestracji
+                                    Wpisy istniejące dziś (bez wykreślonych) — kliknij słupek, aby przefiltrować karty
                                 </p>
                                 <div className="flex gap-4 text-xs">
                                     <span className="flex items-center gap-1.5 text-neutral-400">
                                         <span className="w-3 h-2 rounded-sm bg-blue-500/70 inline-block" />
-                                        Zarejestrowane
+                                        W rejestrze
                                     </span>
                                     <span className="flex items-center gap-1.5 text-amber-400">
                                         <span className="w-3 h-2 rounded-sm bg-amber-500/60 inline-block" />
