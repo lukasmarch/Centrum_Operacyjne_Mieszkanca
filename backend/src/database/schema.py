@@ -406,6 +406,10 @@ class CEIDGBusiness(SQLModel, table=True):
     ceidg_link: Optional[str] = Field(default=None, max_length=500)
     
     # Detailed Data (fetched from /firma/{id})
+    # Minimalizacja danych (RODO art. 5 ust. 1 lit. c): kolumny wyczyszczone
+    # i nieuzupełniane — pozostawione, żeby nie przepisywać schematu. Kontakt
+    # rejestrowy dołączył do nich w 07.2026: nic go nie odczytywało, a katalog
+    # publikuje wyłącznie kontakt podany przez firmę (business_profiles).
     adres_korespondencyjny: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
     spolki: Optional[List[dict]] = Field(default=None, sa_column=Column(JSONB))
     obywatelstwa: Optional[List[dict]] = Field(default=None, sa_column=Column(JSONB))

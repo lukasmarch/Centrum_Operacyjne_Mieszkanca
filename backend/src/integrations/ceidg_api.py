@@ -306,14 +306,12 @@ class CEIDGService:
             # Detailed Fields
             "pkd_main": raw.get("pkdGlowny", {}).get("kod"),
             "pkd_list": raw.get("pkd", []),
-            # Kontakt z rejestru: przechowywany wyłącznie na potrzeby kontaktu
-            # B2B (uzasadniony interes), NIE publikowany przez API.
-            "email": raw.get("email"),
-            "www": raw.get("www"),
-            "telefon": raw.get("telefon"),
 
-            # Minimalizacja danych (RODO art. 5): raw_data, spółki, obywatelstwa
-            # i adres korespondencyjny nie są już zapisywane.
+            # Minimalizacja danych (RODO art. 5 ust. 1 lit. c): raw_data, spółki,
+            # obywatelstwa i adres korespondencyjny nie są zapisywane. Od 07.2026
+            # dotyczy to też kontaktu rejestrowego (email/telefon/www) — żaden
+            # element aplikacji go nie czytał, a kontakt w katalogu pochodzi
+            # wyłącznie z business_profiles, czyli od firmy (zgoda).
             "ceidg_link": link,
             "fetched_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()

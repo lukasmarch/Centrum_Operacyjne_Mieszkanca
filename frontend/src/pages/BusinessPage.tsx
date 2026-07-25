@@ -1363,7 +1363,9 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                 <Info className="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" />
                 <p className="text-xs text-neutral-500 leading-relaxed">
                     Dane firm pochodzą z publicznego rejestru <strong className="text-neutral-400">CEIDG</strong> i
-                    obejmują nazwę, adres wykonywania działalności, NIP i branżę.
+                    obejmują nazwę, adres wykonywania działalności, NIP, REGON, branżę, status wpisu
+                    i rok rozpoczęcia działalności. Danych kontaktowych z rejestru nie pobieramy —
+                    telefon i e-mail widać tylko tam, gdzie firma podała je sama.
                     Szczegóły w{' '}
                     <button
                         onClick={() => onNavigate?.('privacy')}

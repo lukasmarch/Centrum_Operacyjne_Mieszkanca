@@ -9,8 +9,8 @@ katalogu firm (raport strategiczny 07.07.2026, rozdz. 3.3):
     raw_data, spolki, obywatelstwa, adres_korespondencyjny → NULL
     (scraper/job już ich nie zapisuje)
 
-Kontakt rejestrowy (email/www/telefon) zostaje w bazie na potrzeby kontaktu
-B2B (uzasadniony interes), ale nie jest publikowany przez API.
+Kontakt rejestrowy (email/www/telefon) zostawał wtedy w bazie na potrzeby
+kontaktu B2B — wycofane 2026-07-25, patrz ceidg_usun_kontakt_rejestrowy.py.
 
 Migracja jest idempotentna — można uruchamiać wielokrotnie.
 
