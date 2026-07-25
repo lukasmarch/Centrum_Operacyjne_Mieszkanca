@@ -953,16 +953,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                         : '-'}
                     </dd>
                   </div>
-                  <div className="flex justify-between">
-                    <dt className="text-neutral-500">Email zweryfikowany</dt>
-                    <dd className="font-medium">
-                      {user.email_verified ? (
-                        <span className="text-green-600">Tak</span>
-                      ) : (
-                        <span className="text-amber-600">Nie</span>
-                      )}
-                    </dd>
-                  </div>
+                  {/* Wiersz "Email zweryfikowany" ukryty do czasu wdrożenia
+                      pełnej weryfikacji e-mail (mail z linkiem + endpoint /verify).
+                      Obecnie email_verified nigdy nie jest ustawiane, więc pole
+                      pokazywało "Nie" wszystkim. Przywrócić po implementacji. */}
                 </dl>
               </div>
             </div>
