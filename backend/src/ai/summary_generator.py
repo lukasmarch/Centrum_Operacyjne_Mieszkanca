@@ -365,8 +365,8 @@ class SummaryGenerator:
             "",
             "=" * 80,
             "ARTYKUŁY PO KATEGORIACH:",
-            "  [LOKALNY]   = dotyczy bezpośrednio Rybna, Działdowa lub gmin powiatu",
-            "  [REGIONALNY] = dotyczy Warmii i Mazur lub obszarów poza powiatem",
+            "  [LOKALNY]   = dotyczy bezpośrednio gminy Rybno (Rybno i sołectwa) oraz najbliższych okolic",
+            "  [REGIONALNY] = dotyczy sąsiednich gmin, powiatu, Warmii i Mazur lub obszarów dalszych",
             "=" * 80,
             ""
         ]

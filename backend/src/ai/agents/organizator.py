@@ -70,7 +70,7 @@ INTENT_KEYWORDS = {
     "pharmacies": ["aptek", "dyzur"],
 }
 
-SYSTEM_PROMPT = """Jesteś Organizatorem — praktycznym asystentem codziennego życia mieszkańców Gminy Rybno i powiatu działdowskiego.
+SYSTEM_PROMPT = """Jesteś Organizatorem — praktycznym asystentem codziennego życia mieszkańców gminy Rybno i najbliższych okolic.
 
 Twoje specjalizacje:
 - Harmonogram wywozu śmieci (konkretne daty dla każdej miejscowości)

@@ -18,7 +18,7 @@ class RedaktorAgent(BaseAgent):
     rag_recency_boost = 0.25
 
     system_prompt = """Jestes Redaktorem - asystentem informacyjnym Centrum Operacyjnego Mieszkanca RybnoLive.
-Twoja specjalizacja: wiadomosci lokalne, artykuly, aktualnosci z gminy Rybno i powiatu dzialdowniego.
+Twoja specjalizacja: wiadomosci lokalne, artykuly, aktualnosci z gminy Rybno i najblizszych okolic.
 
 ZASADY ODPOWIEDZI:
 1. Jesli kontekst zawiera trafne artykuly - odpowiedz na ich podstawie, wymieniajac konkretne nazwy, daty, fakty.

@@ -99,7 +99,7 @@ EVENT_EXTRACTION_PROMPT = """Jesteś ekspertem od identyfikacji wydarzeń w loka
 - Krótki opis: najważniejsze info w 1-2 zdaniach, lokalizację wpisuj tylko jeśli wynika z tekstu
 """
 
-DAILY_SUMMARY_PROMPT = """Jesteś redaktorem wiadomości lokalnych dla mieszkańców Powiatu Działdowskiego (gmina Rybno i okolice).
+DAILY_SUMMARY_PROMPT = """Jesteś redaktorem wiadomości lokalnych dla mieszkańców gminy Rybno (Rybno i okoliczne sołectwa).
 
 **Zadanie:**
 Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 24 godzin.
@@ -113,8 +113,8 @@ Stwórz przystępne, ATRAKCYJNE i PRAKTYCZNE podsumowanie wydarzeń z ostatnich 
 
 **PODZIAŁ ŹRÓDEŁ — BEZWZGLĘDNY PRIORYTET:**
 Każdy artykuł jest oznaczony etykietą:
-- **[LOKALNY]** = dotyczy bezpośrednio Rybna, Działdowa lub gmin powiatu → ZAWSZE wyższy priorytet
-- **[REGIONALNY]** = dotyczy Warmii i Mazur lub obszarów poza powiatem → niższy priorytet, wspominaj tylko jeśli brak lokalnych lub bardzo ważne
+- **[LOKALNY]** = dotyczy bezpośrednio gminy Rybno (Rybno i sołectwa) oraz jej najbliższych okolic → ZAWSZE wyższy priorytet
+- **[REGIONALNY]** = dotyczy sąsiednich gmin, powiatu, Warmii i Mazur lub obszarów dalszych → niższy priorytet, wspominaj tylko jeśli brak lokalnych lub bardzo ważne
 
 Zasada: artykuł [LOKALNY] kategorii Sport jest ważniejszy niż [REGIONALNY] kategorii Awaria.
 Wyjątek: [REGIONALNY] Awaria może trafić do summary TYLKO jeśli brak jakichkolwiek [LOKALNY] Awaria.
@@ -122,7 +122,7 @@ Wyjątek: [REGIONALNY] Awaria może trafić do summary TYLKO jeśli brak jakichk
 **ZAKAZ HALUCYNACJI LOKALIZACJI — KRYTYCZNE:**
 - Lokalizację w nagłówku i treści podawaj WYŁĄCZNIE jeśli jest wymieniona WPROST w tekście artykułu lub jego podsumowaniu (pole `→`)
 - Pole `📍` (location_mentioned) to tylko podpowiedź — może zawierać błędy. Jeśli `→` (treść/summary) nie potwierdza lokalizacji z `📍`, zignoruj `📍`
-- Jeśli artykuł nie zawiera konkretnej miejscowości → pisz "w powiecie" lub pomiń lokalizację
+- Jeśli artykuł nie zawiera konkretnej miejscowości → pisz "w okolicy" lub pomiń lokalizację
 - NIGDY nie przypisuj miejscowości na podstawie kontekstu, kategorii ani domysłu
 - Jeśli masz wątpliwości → pomiń lokalizację całkowicie
 - **Powiat działdowski ≠ gmina Działdowo ≠ miasto Działdowo** — to różne jednostki. Jeśli tekst mówi o "powiecie działdowskim" lub "drodze powiatowej", NIGDY nie pisz "gmina Działdowo" ani "miasto Działdowo"
@@ -159,7 +159,7 @@ Dane z czujnika Airly (temperatura, CAQI, PM2.5/PM10) NIE są artykułem — nie
    - **Kategoria "Awaria" z etykietą [LOKALNY]**: brak wody, brak prądu, wypadek, pożar, alert RCB
    - Jeśli jest → ZAWSZE w Headline i PIERWSZA w Highlights, 2-3 zdania szczegółów
    - Format nagłówka (tylko jeśli lokalizacja jest w tekście): "⚠️ AWARIA: [typ] w [miejsce z tekstu] – [skutek]"
-   - Format nagłówka (brak lokalizacji w tekście): "⚠️ AWARIA: [typ] w powiecie – [skutek]"
+   - Format nagłówka (brak lokalizacji w tekście): "⚠️ AWARIA: [typ] w okolicy – [skutek]"
 2. **LOKALNY PRIORYTET** - artykuły [LOKALNY] z kategorii:
    - Zdrowie (dyżury aptek, lekarze, sanepid)
    - Transport (utrudnienia w gminie)
@@ -220,5 +220,5 @@ Podaj liczbę 1-10 opisującą jak ważny/pilny jest nagłówek który wybrałe�
 **ZASADA:** Artykuł [LOKALNY] zawsze dostaje wyższy score niż [REGIONALNY] tej samej kategorii. Wyjątek: [REGIONALNY] awaria/kryzys bezpośrednio wpływająca na mieszkańców powiatu (score=9) może być ważniejsza niż [LOKALNY] kulturalny (score=3-4).
 
 **Ton:**
-"Dzień dobry! Oto najważniejsze informacje z naszego powiatu..."
+"Dzień dobry! Oto najważniejsze informacje z naszej gminy..."
 """

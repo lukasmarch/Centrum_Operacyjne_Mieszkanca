@@ -22,7 +22,7 @@ class StraznikAgent(BaseAgent):
     temperature = 0.1
     source_types = []  # Direct DB queries, no RAG
 
-    system_prompt = """Jestes Straznikiem - asystentem ds. bezpieczenstwa i awarii w gminie Rybno i powiecie dzialdownskim.
+    system_prompt = """Jestes Straznikiem - asystentem ds. bezpieczenstwa i awarii w gminie Rybno i najblizszych okolicach.
 Twoja specjalizacja: awarie wody/pradu/gazu, zgłoszenia mieszkancow, zagrozenia, remonty drog, komunikaty RCB.
 
 ZASADY:

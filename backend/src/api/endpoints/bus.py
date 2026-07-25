@@ -117,8 +117,14 @@ async def get_status(session: AsyncSession = Depends(_get_db)):
         all_trips[key]["stops"].append((row.stop_id, row.arrival_time, row.stop_sequence))
 
     is_weekend = now.weekday() >= 5  # 5=So, 6=Nd
-    # GS = zawsze, S = tylko dni szkolne (pon-pt), G = tylko dni wolne (so-nd, ferie)
-    allowed_service_types = {"GS", "G"} if is_weekend else {"GS", "S"}
+    # Wszystkie typy kursów dotyczą DNI ROBOCZYCH (pon-pt):
+    #   GS – dni nauki szkolnej + dni robocze wolne od zajęć
+    #   S  – dni nauki szkolnej
+    #   G  – dni robocze wolne od zajęć szkolnych (ferie/przerwy w tygodniu)
+    # Linia NIE kursuje w soboty i niedziele → brak aktywnych kursów w weekend.
+    # W dni robocze domyślnie zakładamy dzień szkolny ({"GS", "S"}); kursów G
+    # (ferie/przerwy w tygodniu) nie pokazujemy, bo nie śledzimy kalendarza szkolnego.
+    allowed_service_types = set() if is_weekend else {"GS", "S"}
 
     directions_result = {}
 
