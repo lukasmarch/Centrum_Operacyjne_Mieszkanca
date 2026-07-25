@@ -213,7 +213,10 @@ async def get_proposal(
         logger.error(f"[social] kie.ai: {exc}")
         raise HTTPException(status_code=502, detail=f"Nie udało się wygenerować grafiki: {exc}")
 
-    stored = await store_image_from_url(temporary_url, slug=proposal["claim"] or "post")
+    stored = await store_image_from_url(
+        temporary_url,
+        slug=social_content.slugify_pl(proposal["claim"] or "post"),
+    )
     proposal["image_url"] = stored["url"]
     return proposal
 

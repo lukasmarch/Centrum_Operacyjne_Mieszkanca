@@ -1,0 +1,603 @@
+{
+  "updatedAt": "2026-07-18T20:44:16.002Z",
+  "createdAt": "2026-07-18T18:27:31.634Z",
+  "id": "8m8pIlJYqO4sxrak",
+  "name": "RybnoLive — publikacja FB (po kliknięciu w Telegramie)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "rybnolive-fb-publish",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Klik Publikuj",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        0
+      ],
+      "webhookId": "05108aac-3c35-4cef-8ac1-8fdb40caef94",
+      "id": "ac2c2891-cf05-412e-9f36-9101af3c413a"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e287fb5d-4496-44fb-8703-63bb6cf1cbfb",
+              "leftValue": "={{ $json.query.k }}",
+              "rightValue": "3ZJ-4rIGoJv-fvlBKtbhFg",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Sekret OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        32,
+        0
+      ],
+      "id": "48d0da0c-80ec-441d-810f-252ffb0c1588"
+    },
+    {
+      "parameters": {
+        "url": "https://api.rybnolive.pl/api/summary/daily",
+        "options": {}
+      },
+      "name": "Daily summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        -96
+      ],
+      "id": "37231026-aaff-468a-8466-00cc130b6bd9"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst s = $input.first().json;\nconst c = s.content || {};\nlet headline = (c.headline || s.headline || '').replace(/AWARIA:\\s*/, '').trim();\nlet text = (c.highlights || '').replace(/\\*\\*/g, '').trim();\nconst events = (c.upcoming_events || []).slice(0, 3).map(e => '📅 ' + e);\nlet post = headline + '\\n\\n' + text;\nif (events.length) post += '\\n\\nNadchodzące wydarzenia:\\n' + events.join('\\n');\npost += '\\n\\n👉 Więcej na https://rybnolive.pl\\n#Rybno #GminaRybno #PowiatDziałdowski';\nreturn [{ json: { post, date: c.date || s.date, headline } }];\n"
+      },
+      "name": "Przygotuj post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        -96
+      ],
+      "id": "28592ae9-fb4a-4f80-9afb-15de8a12126d"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "1266427606545851",
+        "edge": "feed",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "message",
+                "value": "={{ $('Przygotuj post').first().json.post }}"
+              },
+              {
+                "name": "link",
+                "value": "https://rybnolive.pl"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Publikuj na Facebooku",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        688,
+        -96
+      ],
+      "id": "8bc948b8-5b0b-4a7c-be28-e02f51d05650",
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "DtAT3s4jbcSsRr4q",
+          "name": "RybnoLive Page Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "7032918706",
+        "text": "✅ Opublikowano post na fan page RybnoLive.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Potwierdzenie TG",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        912,
+        -96
+      ],
+      "id": "73382820-d49c-4992-a606-f2494900845e",
+      "webhookId": "71c41f3c-4a2d-4809-b872-e000253c4a2f",
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "✅ Opublikowano na Facebooku. Możesz zamknąć tę kartę.",
+        "options": {}
+      },
+      "name": "Odpowiedź OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        -96
+      ],
+      "id": "d7de4ccc-bffe-478e-8f55-a6f21319606b"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "⛔ Nieprawidłowy link.",
+        "options": {}
+      },
+      "name": "Odpowiedź błąd",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        128
+      ],
+      "id": "962a20ed-ff74-4dac-9106-6b038a3f6d55"
+    }
+  ],
+  "connections": {
+    "Klik Publikuj": {
+      "main": [
+        [
+          {
+            "node": "Sekret OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sekret OK?": {
+      "main": [
+        [
+          {
+            "node": "Daily summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Odpowiedź błąd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily summary": {
+      "main": [
+        [
+          {
+            "node": "Przygotuj post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Przygotuj post": {
+      "main": [
+        [
+          {
+            "node": "Publikuj na Facebooku",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publikuj na Facebooku": {
+      "main": [
+        [
+          {
+            "node": "Potwierdzenie TG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Potwierdzenie TG": {
+      "main": [
+        [
+          {
+            "node": "Odpowiedź OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Warsaw",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "494edb39-02e9-49ee-bcfe-1a80998e3555",
+  "activeVersionId": "d60f50ad-1f1a-48f5-a94a-62642891c51b",
+  "versionCounter": 22,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-07-18T18:27:31.636Z",
+      "createdAt": "2026-07-18T18:27:31.636Z",
+      "role": "workflow:owner",
+      "workflowId": "8m8pIlJYqO4sxrak",
+      "projectId": "aPpwSa0X2plRsSp6",
+      "project": {
+        "updatedAt": "2025-09-26T18:57:38.867Z",
+        "createdAt": "2025-09-26T18:54:54.268Z",
+        "id": "aPpwSa0X2plRsSp6",
+        "name": "lukasmarch luki <lumargo@outlook.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "da33bd48-b266-44f7-a7ec-caec56304ebe",
+        "projectRelations": [
+          {
+            "updatedAt": "2025-09-26T18:54:54.269Z",
+            "createdAt": "2025-09-26T18:54:54.269Z",
+            "userId": "da33bd48-b266-44f7-a7ec-caec56304ebe",
+            "projectId": "aPpwSa0X2plRsSp6",
+            "user": {
+              "updatedAt": "2026-07-25T10:08:00.000Z",
+              "createdAt": "2025-09-26T18:54:53.658Z",
+              "id": "da33bd48-b266-44f7-a7ec-caec56304ebe",
+              "email": "lumargo@outlook.com",
+              "firstName": "lukasmarch",
+              "lastName": "luki",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-26T18:57:45.154Z",
+                "personalization_survey_n8n_version": "1.112.6"
+              },
+              "settings": {
+                "userActivated": true,
+                "easyAIWorkflowOnboarded": true,
+                "firstSuccessfulWorkflowId": "VOqkDQoW12h4N8hq",
+                "userActivatedAt": 1760295422990,
+                "npsSurvey": {
+                  "waitingForResponse": true,
+                  "ignoredCount": 1,
+                  "lastShownAt": 1784407456307
+                },
+                "dismissedCallouts": {
+                  "ragStarterCallout": true,
+                  "aiAgentStarterCallout": true
+                }
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2026-07-24",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-07-18T18:56:00.872Z",
+    "createdAt": "2026-07-18T18:56:00.872Z",
+    "versionId": "d60f50ad-1f1a-48f5-a94a-62642891c51b",
+    "workflowId": "8m8pIlJYqO4sxrak",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rybnolive-fb-publish",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "name": "Klik Publikuj",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -200,
+          0
+        ],
+        "webhookId": "05108aac-3c35-4cef-8ac1-8fdb40caef94",
+        "id": "ac2c2891-cf05-412e-9f36-9101af3c413a"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "e287fb5d-4496-44fb-8703-63bb6cf1cbfb",
+                "leftValue": "={{ $json.query.k }}",
+                "rightValue": "3ZJ-4rIGoJv-fvlBKtbhFg",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "name": "Sekret OK?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          20,
+          0
+        ],
+        "id": "48d0da0c-80ec-441d-810f-252ffb0c1588"
+      },
+      {
+        "parameters": {
+          "url": "https://api.rybnolive.pl/api/summary/daily",
+          "options": {}
+        },
+        "name": "Daily summary",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          240,
+          -100
+        ],
+        "id": "37231026-aaff-468a-8466-00cc130b6bd9"
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst s = $input.first().json;\nconst c = s.content || {};\nlet headline = (c.headline || s.headline || '').replace(/AWARIA:\\s*/, '').trim();\nlet text = (c.highlights || '').replace(/\\*\\*/g, '').trim();\nconst events = (c.upcoming_events || []).slice(0, 3).map(e => '📅 ' + e);\nlet post = headline + '\\n\\n' + text;\nif (events.length) post += '\\n\\nNadchodzące wydarzenia:\\n' + events.join('\\n');\npost += '\\n\\n👉 Więcej na https://rybnolive.pl\\n#Rybno #GminaRybno #PowiatDziałdowski';\nreturn [{ json: { post, date: c.date || s.date, headline } }];\n"
+        },
+        "name": "Przygotuj post",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          460,
+          -100
+        ],
+        "id": "28592ae9-fb4a-4f80-9afb-15de8a12126d"
+      },
+      {
+        "parameters": {
+          "httpRequestMethod": "POST",
+          "graphApiVersion": "v23.0",
+          "node": "1266427606545851",
+          "edge": "feed",
+          "options": {
+            "queryParameters": {
+              "parameter": [
+                {
+                  "name": "message",
+                  "value": "={{ $('Przygotuj post').first().json.post }}"
+                },
+                {
+                  "name": "link",
+                  "value": "https://rybnolive.pl"
+                }
+              ]
+            }
+          }
+        },
+        "name": "Publikuj na Facebooku",
+        "type": "n8n-nodes-base.facebookGraphApi",
+        "typeVersion": 1,
+        "position": [
+          680,
+          -100
+        ],
+        "credentials": {
+          "facebookGraphApi": {
+            "id": "DtAT3s4jbcSsRr4q",
+            "name": "RybnoLive Page Token"
+          }
+        },
+        "id": "8bc948b8-5b0b-4a7c-be28-e02f51d05650"
+      },
+      {
+        "parameters": {
+          "chatId": "7032918706",
+          "text": "✅ Opublikowano post na fan page RybnoLive.",
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "name": "Potwierdzenie TG",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          900,
+          -100
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "6mOEqKTD16kohH87",
+            "name": "RybnoLive Bot"
+          }
+        },
+        "id": "73382820-d49c-4992-a606-f2494900845e"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "✅ Opublikowano na Facebooku. Możesz zamknąć tę kartę.",
+          "options": {}
+        },
+        "name": "Odpowiedź OK",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          1120,
+          -100
+        ],
+        "id": "d7de4ccc-bffe-478e-8f55-a6f21319606b"
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "⛔ Nieprawidłowy link.",
+          "options": {}
+        },
+        "name": "Odpowiedź błąd",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          240,
+          120
+        ],
+        "id": "962a20ed-ff74-4dac-9106-6b038a3f6d55"
+      }
+    ],
+    "connections": {
+      "Klik Publikuj": {
+        "main": [
+          [
+            {
+              "node": "Sekret OK?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sekret OK?": {
+        "main": [
+          [
+            {
+              "node": "Daily summary",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Odpowiedź błąd",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Daily summary": {
+        "main": [
+          [
+            {
+              "node": "Przygotuj post",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Przygotuj post": {
+        "main": [
+          [
+            {
+              "node": "Publikuj na Facebooku",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Publikuj na Facebooku": {
+        "main": [
+          [
+            {
+              "node": "Potwierdzenie TG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Potwierdzenie TG": {
+        "main": [
+          [
+            {
+              "node": "Odpowiedź OK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "lukasmarch luki",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-07-18T18:56:00.990Z",
+        "id": 69,
+        "workflowId": "8m8pIlJYqO4sxrak",
+        "versionId": "d60f50ad-1f1a-48f5-a94a-62642891c51b",
+        "event": "activated",
+        "userId": "da33bd48-b266-44f7-a7ec-caec56304ebe"
+      },
+      {
+        "createdAt": "2026-07-18T18:56:02.740Z",
+        "id": 71,
+        "workflowId": "8m8pIlJYqO4sxrak",
+        "versionId": "d60f50ad-1f1a-48f5-a94a-62642891c51b",
+        "event": "activated",
+        "userId": "da33bd48-b266-44f7-a7ec-caec56304ebe"
+      },
+      {
+        "createdAt": "2026-07-18T18:56:01.364Z",
+        "id": 70,
+        "workflowId": "8m8pIlJYqO4sxrak",
+        "versionId": "d60f50ad-1f1a-48f5-a94a-62642891c51b",
+        "event": "deactivated",
+        "userId": "da33bd48-b266-44f7-a7ec-caec56304ebe"
+      }
+    ]
+  }
+}

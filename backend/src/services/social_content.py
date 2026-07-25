@@ -82,16 +82,35 @@ Na podstawie podsumowania dnia przygotuj materiał do grafiki na Facebooka.
 
 Zwróć WYŁĄCZNIE JSON:
 {
-  "claim": "3-5 słów, DRUKOWANYMI literami, po polsku, bez kropki na końcu",
+  "claim": "hasło na grafikę: 2-4 PEŁNE wyrazy, DRUKOWANYMI literami, bez kropki na końcu",
   "scene": "opis scenerii po ANGIELSKU dla modelu graficznego, 1-2 zdania, konkretny, bez tekstu na obrazku",
   "caption": "treść posta na Facebooka po polsku: 2-3 zdania, konkretnie o tym co się stało, bez hashtagów i bez linku"
 }
 
-Zasady:
-- claim to hasło na grafice — krótkie, rzeczowe (np. "AWARIA WODY W RYBNIE", "WEEKEND W GMINIE")
+ZASADY DLA claim — to najważniejsze pole, bo zostanie WYPALONE na grafice:
+- musi być poprawną polską frazą, zrozumiałą bez kontekstu
+- NIGDY nie skracaj ani nie obcinaj wyrazów; każde słowo w pełnej formie
+- lepiej użyć 2 słów niż 4 pocięte
+- DOBRZE: "AWARIA WODY", "MNIEJ MIESZKAŃCÓW", "WEEKEND W GMINIE", "DNI RYBNA 2026"
+- ŹLE: "SPADK NIKÓW MIESZKAŃCÓW" (pocięte wyrazy), "FACT-CHECKING GMINA RYBNO" (żargon),
+  "SPADEK LICZBY MIESZKAŃCÓW GMINY RYBNO W ROKU 2026" (za długie)
+
+Pozostałe zasady:
 - scene NIE może zawierać żadnego tekstu ani napisów
 - caption pisz naturalnie, po ludzku, bez korporacyjnego żargonu
 - dotyczy WYŁĄCZNIE gminy Rybno i najbliższej okolicy"""
+
+# Transliteracja do nazw plików — bez niej claim „SPADEK LICZBY MIESZKAŃCÓW” dawał
+# nieczytelną nazwę „spadek-liczby-mieszka-c-w” (polskie znaki wypadały jako myślniki).
+PL_TRANSLIT = str.maketrans({
+    "ą": "a", "ć": "c", "ę": "e", "ł": "l", "ń": "n", "ó": "o", "ś": "s", "ź": "z", "ż": "z",
+    "Ą": "A", "Ć": "C", "Ę": "E", "Ł": "L", "Ń": "N", "Ó": "O", "Ś": "S", "Ź": "Z", "Ż": "Z",
+})
+
+
+def slugify_pl(value: str) -> str:
+    """Nazwa pliku z polskiego tekstu — z transliteracją, nie przez wycinanie znaków."""
+    return value.translate(PL_TRANSLIT)
 
 
 async def build_photo_post(summary: dict) -> dict:
@@ -106,8 +125,10 @@ async def build_photo_post(summary: dict) -> dict:
 
     client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
     response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        temperature=0.7,
+        # gpt-4o, nie -mini: mini cięło wyrazy w claimie („SPADK NIKÓW MIESZKAŃCÓW”),
+        # a claim jest wypalany na grafice, więc błąd jest nieodwracalny i widoczny.
+        model="gpt-4o",
+        temperature=0.4,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": CLAIM_SYSTEM_PROMPT},

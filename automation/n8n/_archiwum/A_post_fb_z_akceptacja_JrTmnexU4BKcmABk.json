@@ -1,0 +1,496 @@
+{
+  "updatedAt": "2026-07-18T18:43:02.067Z",
+  "createdAt": "2026-07-18T17:30:20.273Z",
+  "id": "JrTmnexU4BKcmABk",
+  "name": "RybnoLive — post FB z akceptacją (daily briefing)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 7,
+              "triggerAtMinute": 45
+            }
+          ]
+        }
+      },
+      "name": "Codziennie 7:45",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -200,
+        -100
+      ],
+      "id": "d209ef87-cf06-40f7-8f7c-1e291ead8f3b"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rybnolive-fb-post-teraz",
+        "options": {}
+      },
+      "name": "Publikuj teraz (webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        100
+      ],
+      "webhookId": "9dec196a-4c68-4a3f-b39f-4abb366c8fd3",
+      "id": "857e4fc9-2d39-4fc3-acd9-70b4bd932f00"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3a34d746-b49d-482e-b9a7-f4aa78c3d5b5",
+              "name": "pageId",
+              "type": "string",
+              "value": "1266427606545851"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Ustawienia",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        20,
+        0
+      ],
+      "id": "e06fae5f-6a8a-483c-be90-fd7a03ac49f5"
+    },
+    {
+      "parameters": {
+        "url": "https://api.rybnolive.pl/api/summary/daily",
+        "options": {}
+      },
+      "name": "Pobierz daily summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "084df23b-0656-4757-bc82-ade31177bd00"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst s = $input.first().json;\nconst c = s.content || {};\nlet headline = (c.headline || s.headline || '').replace(/AWARIA:\\s*/, '').trim();\nlet text = (c.highlights || '').replace(/\\*\\*/g, '').trim();\nconst events = (c.upcoming_events || []).slice(0, 3).map(e => '📅 ' + e);\nlet post = headline + '\\n\\n' + text;\nif (events.length) post += '\\n\\nNadchodzące wydarzenia:\\n' + events.join('\\n');\npost += '\\n\\n👉 Więcej na https://rybnolive.pl\\n#Rybno #GminaRybno #PowiatDziałdowski';\nreturn [{ json: { post, date: c.date || s.date, headline } }];\n"
+      },
+      "name": "Przygotuj post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "id": "3951dbb6-756e-4be4-919c-f58f54a00589"
+    },
+    {
+      "parameters": {
+        "chatId": "7032918706",
+        "text": "=🔔 *Propozycja posta na FB RybnoLive* ({{ $json.date }})\n\n{{ $json.post }}\n\n———\nKliknij przycisk, aby opublikować. Jeśli nie chcesz — po prostu zignoruj.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Publikuj na Facebooku",
+                    "additionalFields": {
+                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-fb-publish?k=3ZJ-4rIGoJv-fvlBKtbhFg"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "appendAttribution": false
+        }
+      },
+      "name": "Wyślij do akceptacji (TG)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "6mOEqKTD16kohH87",
+          "name": "RybnoLive Bot"
+        }
+      },
+      "id": "8680b7fe-a965-46e5-887a-3338b91cc788"
+    }
+  ],
+  "connections": {
+    "Codziennie 7:45": {
+      "main": [
+        [
+          {
+            "node": "Ustawienia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publikuj teraz (webhook)": {
+      "main": [
+        [
+          {
+            "node": "Ustawienia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ustawienia": {
+      "main": [
+        [
+          {
+            "node": "Pobierz daily summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pobierz daily summary": {
+      "main": [
+        [
+          {
+            "node": "Przygotuj post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Przygotuj post": {
+      "main": [
+        [
+          {
+            "node": "Wyślij do akceptacji (TG)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Warsaw",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Codziennie 7:45": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "c6926b3b-08e7-4ec0-8e91-73786dcd53ec",
+  "activeVersionId": "c6926b3b-08e7-4ec0-8e91-73786dcd53ec",
+  "versionCounter": 37,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-07-18T17:30:20.276Z",
+      "createdAt": "2026-07-18T17:30:20.276Z",
+      "role": "workflow:owner",
+      "workflowId": "JrTmnexU4BKcmABk",
+      "projectId": "aPpwSa0X2plRsSp6",
+      "project": {
+        "updatedAt": "2025-09-26T18:57:38.867Z",
+        "createdAt": "2025-09-26T18:54:54.268Z",
+        "id": "aPpwSa0X2plRsSp6",
+        "name": "lukasmarch luki <lumargo@outlook.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "da33bd48-b266-44f7-a7ec-caec56304ebe",
+        "projectRelations": [
+          {
+            "updatedAt": "2025-09-26T18:54:54.269Z",
+            "createdAt": "2025-09-26T18:54:54.269Z",
+            "userId": "da33bd48-b266-44f7-a7ec-caec56304ebe",
+            "projectId": "aPpwSa0X2plRsSp6",
+            "user": {
+              "updatedAt": "2026-07-25T10:08:00.000Z",
+              "createdAt": "2025-09-26T18:54:53.658Z",
+              "id": "da33bd48-b266-44f7-a7ec-caec56304ebe",
+              "email": "lumargo@outlook.com",
+              "firstName": "lukasmarch",
+              "lastName": "luki",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-09-26T18:57:45.154Z",
+                "personalization_survey_n8n_version": "1.112.6"
+              },
+              "settings": {
+                "userActivated": true,
+                "easyAIWorkflowOnboarded": true,
+                "firstSuccessfulWorkflowId": "VOqkDQoW12h4N8hq",
+                "userActivatedAt": 1760295422990,
+                "npsSurvey": {
+                  "waitingForResponse": true,
+                  "ignoredCount": 1,
+                  "lastShownAt": 1784407456307
+                },
+                "dismissedCallouts": {
+                  "ragStarterCallout": true,
+                  "aiAgentStarterCallout": true
+                }
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2026-07-24",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-07-18T18:43:02.086Z",
+    "createdAt": "2026-07-18T18:43:02.086Z",
+    "versionId": "c6926b3b-08e7-4ec0-8e91-73786dcd53ec",
+    "workflowId": "JrTmnexU4BKcmABk",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "days",
+                "triggerAtHour": 7,
+                "triggerAtMinute": 45
+              }
+            ]
+          }
+        },
+        "name": "Codziennie 7:45",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -200,
+          -100
+        ],
+        "id": "d209ef87-cf06-40f7-8f7c-1e291ead8f3b"
+      },
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rybnolive-fb-post-teraz",
+          "options": {}
+        },
+        "name": "Publikuj teraz (webhook)",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          -200,
+          100
+        ],
+        "webhookId": "9dec196a-4c68-4a3f-b39f-4abb366c8fd3",
+        "id": "857e4fc9-2d39-4fc3-acd9-70b4bd932f00"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "3a34d746-b49d-482e-b9a7-f4aa78c3d5b5",
+                "name": "pageId",
+                "type": "string",
+                "value": "1266427606545851"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Ustawienia",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          20,
+          0
+        ],
+        "id": "e06fae5f-6a8a-483c-be90-fd7a03ac49f5"
+      },
+      {
+        "parameters": {
+          "url": "https://api.rybnolive.pl/api/summary/daily",
+          "options": {}
+        },
+        "name": "Pobierz daily summary",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          240,
+          0
+        ],
+        "id": "084df23b-0656-4757-bc82-ade31177bd00"
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst s = $input.first().json;\nconst c = s.content || {};\nlet headline = (c.headline || s.headline || '').replace(/AWARIA:\\s*/, '').trim();\nlet text = (c.highlights || '').replace(/\\*\\*/g, '').trim();\nconst events = (c.upcoming_events || []).slice(0, 3).map(e => '📅 ' + e);\nlet post = headline + '\\n\\n' + text;\nif (events.length) post += '\\n\\nNadchodzące wydarzenia:\\n' + events.join('\\n');\npost += '\\n\\n👉 Więcej na https://rybnolive.pl\\n#Rybno #GminaRybno #PowiatDziałdowski';\nreturn [{ json: { post, date: c.date || s.date, headline } }];\n"
+        },
+        "name": "Przygotuj post",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          460,
+          0
+        ],
+        "id": "3951dbb6-756e-4be4-919c-f58f54a00589"
+      },
+      {
+        "parameters": {
+          "chatId": "7032918706",
+          "text": "=🔔 *Propozycja posta na FB RybnoLive* ({{ $json.date }})\n\n{{ $json.post }}\n\n———\nKliknij przycisk, aby opublikować. Jeśli nie chcesz — po prostu zignoruj.",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "✅ Publikuj na Facebooku",
+                      "additionalFields": {
+                        "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-fb-publish?k=3ZJ-4rIGoJv-fvlBKtbhFg"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "additionalFields": {
+            "parse_mode": "Markdown",
+            "appendAttribution": false
+          }
+        },
+        "name": "Wyślij do akceptacji (TG)",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          680,
+          0
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "6mOEqKTD16kohH87",
+            "name": "RybnoLive Bot"
+          }
+        },
+        "id": "8680b7fe-a965-46e5-887a-3338b91cc788"
+      }
+    ],
+    "connections": {
+      "Codziennie 7:45": {
+        "main": [
+          [
+            {
+              "node": "Ustawienia",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Publikuj teraz (webhook)": {
+        "main": [
+          [
+            {
+              "node": "Ustawienia",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ustawienia": {
+        "main": [
+          [
+            {
+              "node": "Pobierz daily summary",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Pobierz daily summary": {
+        "main": [
+          [
+            {
+              "node": "Przygotuj post",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Przygotuj post": {
+        "main": [
+          [
+            {
+              "node": "Wyślij do akceptacji (TG)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "lukasmarch luki",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-07-18T18:43:02.531Z",
+        "id": 62,
+        "workflowId": "JrTmnexU4BKcmABk",
+        "versionId": "c6926b3b-08e7-4ec0-8e91-73786dcd53ec",
+        "event": "activated",
+        "userId": "da33bd48-b266-44f7-a7ec-caec56304ebe"
+      },
+      {
+        "createdAt": "2026-07-18T18:43:04.353Z",
+        "id": 64,
+        "workflowId": "JrTmnexU4BKcmABk",
+        "versionId": "c6926b3b-08e7-4ec0-8e91-73786dcd53ec",
+        "event": "activated",
+        "userId": "da33bd48-b266-44f7-a7ec-caec56304ebe"
+      },
+      {
+        "createdAt": "2026-07-18T18:43:02.937Z",
+        "id": 63,
+        "workflowId": "JrTmnexU4BKcmABk",
+        "versionId": "c6926b3b-08e7-4ec0-8e91-73786dcd53ec",
+        "event": "deactivated",
+        "userId": "da33bd48-b266-44f7-a7ec-caec56304ebe"
+      }
+    ]
+  }
+}
