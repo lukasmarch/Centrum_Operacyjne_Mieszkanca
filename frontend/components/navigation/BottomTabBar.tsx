@@ -15,7 +15,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'assistant', label: 'Asystent', icon: Bot },
   { id: 'miasto', label: 'Info', icon: Building2 },
   { id: 'dane', label: 'Firmy', icon: Store },
-  { id: 'zgloszenia', label: 'Zgłoszenia 24', icon: ClipboardList },
+  { id: 'zgloszenia', label: 'Zgłoś usterkę', icon: ClipboardList },
 ];
 
 const BottomTabBar: React.FC<BottomTabBarProps> = React.memo(({ activeTab, onTabChange, isAuthenticated }) => {
@@ -34,7 +34,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = React.memo(({ activeTab, onTab
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                'relative flex flex-col items-center gap-0.5 px-3 py-2 rounded-2xl transition-all duration-200 min-w-[56px]',
+                'relative flex flex-col items-center gap-0.5 px-1.5 sm:px-3 py-2 rounded-2xl transition-all duration-200 min-w-[56px]',
                 isActive
                   ? 'text-white'
                   : 'text-neutral-500 hover:text-neutral-300 active:scale-95'
@@ -52,7 +52,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = React.memo(({ activeTab, onTab
                 />
               </div>
               <span className={cn(
-                'text-[10px] font-medium transition-all duration-200',
+                'text-[10px] font-medium transition-all duration-200 whitespace-nowrap',
                 isActive ? 'text-white' : 'text-neutral-500'
               )}>
                 {tab.label}

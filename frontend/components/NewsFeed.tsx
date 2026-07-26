@@ -145,17 +145,34 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
   const filteredArticles = useMemo(() => {
     if (!articles) return [];
 
-    if (activeCategory === 'Wszystkie') {
-      const uniqueCategories = Array.from(new Set(articles.map(a => a.category).filter(Boolean)));
-      return uniqueCategories.flatMap(cat =>
-        articles.filter(a => a.category === cat).slice(0, 5)
-      );
+    if (activeCategory !== 'Wszystkie') {
+      return articles.filter(a => a.category === activeCategory);
     }
 
-    return articles
-      .filter(a => a.category === activeCategory)
-      .slice(0, 10);
-  }, [articles, activeCategory]);
+    // Widok "Wszystkie": przeplatamy kategorie (Awaria pierwsza), biorąc po jednym
+    // artykule z każdej na rundę. Góra feedu jest zróżnicowana, a żaden artykuł
+    // nie znika — dzięki temu licznik w nagłówku zgadza się z sumą chipów.
+    const byCategory = new Map<string, Article[]>();
+    articles.forEach(a => {
+      const cat = a.category || 'Inne';
+      if (!byCategory.has(cat)) byCategory.set(cat, []);
+      byCategory.get(cat)!.push(a);
+    });
+
+    const interleaved: Article[] = [];
+    for (let round = 0; interleaved.length < articles.length; round++) {
+      let addedInRound = false;
+      for (const cat of sortedCategories) {
+        const list = byCategory.get(cat);
+        if (list && round < list.length) {
+          interleaved.push(list[round]);
+          addedInRound = true;
+        }
+      }
+      if (!addedInRound) break;
+    }
+    return interleaved;
+  }, [articles, activeCategory, sortedCategories]);
 
   // Schema.org ItemList — inject JSON-LD into <head> for Google rich results
   useEffect(() => {
@@ -225,7 +242,8 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
       {/* Title */}
       <div className="flex items-center gap-3">
         <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Aktualności</h2>
-        <span className="text-xs font-bold text-neutral-600 bg-gray-900/50 px-2 py-0.5 rounded-full">{articles.length} artykułów</span>
+        {/* Licznik pokazuje to, co widać na ekranie — inaczej suma chipów nie zgadza się z nagłówkiem */}
+        <span className="text-xs font-bold text-neutral-600 bg-gray-900/50 px-2 py-0.5 rounded-full">{filteredArticles.length} artykułów</span>
       </div>
 
       {/* Categories – compact chips with overflow */}

@@ -8,6 +8,9 @@ kopii ze źródła) i oznacza posty-zapychacze (is_filler).
 
 Użycie:
     cd backend && python -u -m scripts.production.reprocess_recent_articles [--days 14]
+
+`--only-flagged` zawęża przebieg do artykułów oznaczonych jako Awaria lub filler —
+tylko te klasy mogą być fałszywie dodatnie po zaostrzeniu promptu.
 """
 import argparse
 import asyncio
@@ -25,20 +28,23 @@ from src.database.connection import async_session
 from src.database.schema import Article
 
 
-async def reprocess(days: int):
+async def reprocess(days: int, only_flagged: bool = False):
     cutoff = datetime.utcnow() - timedelta(days=days)
     processor = ArticleProcessor()
 
     async with async_session() as session:
-        result = await session.execute(
-            select(Article)
-            .where(
-                or_(
-                    Article.published_at >= cutoff,
-                    Article.scraped_at >= cutoff,
-                )
+        stmt = select(Article).where(
+            or_(
+                Article.published_at >= cutoff,
+                Article.scraped_at >= cutoff,
             )
-            .order_by(Article.published_at.desc().nulls_last())
+        )
+        if only_flagged:
+            stmt = stmt.where(
+                or_(Article.category == "Awaria", Article.is_filler == True)
+            )
+        result = await session.execute(
+            stmt.order_by(Article.published_at.desc().nulls_last())
         )
         articles = result.scalars().all()
         print(f"Artykułów z ostatnich {days} dni: {len(articles)}")
@@ -68,5 +74,6 @@ async def reprocess(days: int):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=14)
+    parser.add_argument("--only-flagged", action="store_true")
     args = parser.parse_args()
-    asyncio.run(reprocess(args.days))
+    asyncio.run(reprocess(args.days, args.only_flagged))

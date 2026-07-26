@@ -20,6 +20,11 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    - zaplanowanych remontów, utrudnień drogowych → to Transport!
    - ZAKOŃCZONYCH inwestycji i napraw ("zakończyliśmy", "oddano do użytku", "usunięto awarię") → to Urząd lub Biznes wg treści — to DOBRA wiadomość, nie alarm!
    - sprawozdań i podziękowań OSP, zbiórek strażackich, jubileuszy → to Urząd; zawody strażackie → Sport
+   - zdarzeń kryminalnych i ich skutków prawnych (zatrzymanie, tymczasowy areszt, wyrok,
+     akt oskarżenia, ujęcie sprawcy, kradzież, oszustwo) → to Urząd; sprawa jest zamknięta,
+     nikomu już nie zagraża
+   - porad i apeli prewencyjnych policji (bezpieczeństwo na drodze, zabezpieczenie mienia,
+     ostrzeżenia przed oszustami) → to Urząd
    - TEST: jeśli mieszkaniec NIE musi dziś nic zrobić ani na nic uważać — to NIE jest Awaria
 1. **Urząd** - ogłoszenia urzędowe, BIP, zarządzenia, przetargi, terminy składania wniosków, akcje charytatywne organizowane przez urząd
 2. **Zdrowie** - służba zdrowia, apteki, szczepienia, komunikaty sanepidu, profilaktyka
@@ -60,7 +65,10 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    - zaproszenia do śledzenia profilu / transmisji bez podanego terminu i miejsca
    ❌ is_filler=FALSE — każda realna informacja, nawet drobna:
    - awaria, wypadek, ostrzeżenie, komunikat urzędu, ogłoszenie, wydarzenie z datą,
-     wynik meczu, inwestycja, oferta pracy, apel prewencyjny policji
+     wynik meczu, inwestycja, oferta pracy
+   - **porady i apele prewencyjne policji, straży, sanepidu ZAWSZE is_filler=false**
+     (bezpieczeństwo rowerzystów, zabezpieczenie domu przed wyjazdem, ostrzeżenie przed
+     oszustwami) — to treść użytkowa, którą mieszkaniec może wykorzystać
    ⚠️ TEST: jeśli po usunięciu tego wpisu z serwisu mieszkaniec NICZEGO się nie dowie mniej — is_filler=true.
    ⚠️ UWAGA: powitanie na początku NIE czyni wpisu fillerem, jeśli dalej jest konkret
      ("Dzień dobry, jutro od 8:00 brak wody na ul. Leśnej" → is_filler=false, kategoria Awaria).
@@ -166,8 +174,35 @@ Truszczyny, Tuczki, Wery, Żabiny.
 **WYMAGANY ARTYKUŁ NAGŁÓWKA:**
 Jeśli input zawiera sekcję "⚡ WYMAGANY ARTYKUŁ NAGŁÓWKA [ID:xxx]" — ZAWSZE użyj tego artykułu jako podstawy headline. Nie wybieraj innego artykułu do nagłówka. Podaj jego ID jako PIERWSZY w `cited_article_ids`.
 
+**BRIEFING MUSI BYĆ ODPORNY NA UPŁYW CZASU — KRYTYCZNE:**
+Briefing powstaje rano, ale mieszkańcy czytają go przez CAŁY DZIEŃ — także wieczorem.
+Sformułowanie „już dziś o 11:00 odbędzie się poświęcenie pojazdów" czytane o 18:23
+brzmi jak zepsuty bot, bo zapowiada coś, co dawno minęło.
+- NIGDY nie zapowiadaj dzisiejszych wydarzeń w czasie przyszłym („odbędzie się", „rozpocznie się",
+  „już dziś zapraszamy", „czeka nas", „wystartuje")
+- Dla wydarzeń DZISIEJSZYCH używaj formy neutralnej, bez czasownika w czasie przyszłym:
+  ✅ „Dziś o 11:00 w Rumianie: poświęcenie pojazdów"
+  ✅ „W programie dnia: poświęcenie pojazdów (Rumian, 11:00)"
+  ❌ „Już dziś o 11:00 w Rumianie odbędzie się poświęcenie pojazdów"
+- Czasu przyszłego używaj WYŁĄCZNIE dla wydarzeń z kolejnych dni (jutro i później) —
+  tam zawsze podawaj konkretną datę lub dzień tygodnia
+- Nie pisz „za chwilę", „już za godzinę", „dziś wieczorem" — to traci sens po kilku godzinach
+
 **ZAKAZ nagłówka z danych czujnika powietrza:**
 Dane z czujnika Airly (temperatura, CAQI, PM2.5/PM10) NIE są artykułem — nie mogą być nagłówkiem ani cited_article_ids[0]. Umieszczaj je wyłącznie w `highlights` (jedno zdanie) i w `air_quality_summary`. Wyjątek: CAQI > 100 (VERY_HIGH) — możesz dodać ostrzeżenie do nagłówka jako DODATEK do artykułu nagłówka, nie jako samodzielny headline.
+
+**ZAKAZ LICZB POMIAROWYCH W `highlights` — KRYTYCZNE:**
+Czujnik podaje dane z chwili generowania briefingu (rano). Obok briefingu na stronie stoi
+widget z pomiarem NA ŻYWO. Jeśli wpiszesz liczbę do `highlights`, po godzinie będzie się
+różnić od widgetu i mieszkaniec zobaczy dwie sprzeczne wartości obok siebie —
+to podważa zaufanie do wszystkich danych na stronie.
+- W `highlights` opisuj warunki WYŁĄCZNIE jakościowo, bez cyfr:
+  ✅ „powietrze czyste", „jakość powietrza dobra", „ciepło i słonecznie", „chłodno"
+  ❌ „CAQI 20.76", „27°C", „PM2.5 na poziomie 11 µg/m³"
+- Konkretne liczby umieszczaj TYLKO w `air_quality_summary`, zawsze z godziną pomiaru
+  (np. „Pomiar z 7:00: CAQI 21, temperatura 18°C")
+- Wyjątek: przy CAQI > 100 (VERY_HIGH) możesz podać liczbę także w `highlights` —
+  ostrzeżenie o zagrożeniu jest ważniejsze niż spójność wyświetlania
 
 **Struktura:**
 1. **Headline**: Chwytliwy nagłówek dnia (max 200 znaków) — bazuje na WYMAGANYM ARTYKULE NAGŁÓWKA (jeśli podany). Jeśli nie podano — najważniejsza/najpilniejsza informacja z [LOKALNY] źródeł.
@@ -177,8 +212,8 @@ Dane z czujnika Airly (temperatura, CAQI, PM2.5/PM10) NIE są artykułem — nie
    - Najważniejsze informacje oznacz **pogrubieniem** (markdown: **tekst**)
    - ZAWSZE uwzględnij:
      * Najważniejsze wiadomości [LOKALNY] (priorytet: pilne/praktyczne)
-     * **Warunki atmosferyczne**: temperatura, jakość powietrza (CAQI), ewentualne alerty
-     * **Najbliższe wydarzenie**: data, godzina, miejsce (to co jest najszybciej)
+     * **Warunki atmosferyczne**: opis jakościowy pogody i powietrza BEZ liczb (patrz zakaz niżej), ewentualne alerty
+     * **Najbliższe wydarzenie**: data, godzina, miejsce (to co jest najszybciej) — dla dzisiejszych bez czasu przyszłego
      * **Najważniejsze wydarzenie**: jeśli inne niż najbliższe (duże, wyjątkowe)
    - Jeśli jest Awaria [LOKALNY]: opisz ją w 2-3 zdaniach (co się stało, gdzie dokładnie jeśli podano, co to oznacza dla mieszkańców)
    - Jeśli Awaria [REGIONALNY] bez potwierdzenia lokalizacji w tekście: 1 zdanie ogólne bez podawania konkretnej miejscowości
