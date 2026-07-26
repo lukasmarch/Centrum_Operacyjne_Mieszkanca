@@ -225,6 +225,9 @@ async def get_articles(
             reverse=True,
         )
 
+    # Przeplot także wewnątrz bloku awarii — trzy wyłączenia prądu z jednego
+    # kanału nie mogą zepchnąć wypadku drogowego pod linię zgięcia
+    pinned = diversify(pinned, key=lambda row: row[0].source_id)
     ordered = pinned + diversify(
         regular, key=lambda row: row[0].source_id, preceding=pinned
     )
