@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, Clock, Sparkles, Megaphone } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, Clock, Sparkles, Megaphone, ExternalLink } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
 import ArticleImage, { getCategoryTheme } from './ArticleImage';
 import { Article } from '../types';
@@ -71,12 +71,13 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
 
       {/* Content */}
       <div className="flex-1 flex flex-col p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] text-neutral-500">
-            <span className="text-neutral-600">Źródło:</span>{' '}
-            <span className="font-bold uppercase tracking-wide">{article.source}</span>
-          </span>
-        </div>
+        {article.sourceLabel && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-wide">
+              {article.sourceLabel}
+            </span>
+          </div>
+        )}
         <h3 className="text-base font-bold text-neutral-200 mb-2 group-hover:text-blue-400 transition-colors leading-snug line-clamp-2">
           {article.title}
         </h3>
@@ -85,14 +86,28 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
             {article.summary}
           </p>
         )}
-        <a
-          href={article.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-2.5 rounded-xl bg-white/5 text-neutral-300 font-bold text-sm hover:bg-blue-600 hover:text-white transition-all text-center border border-white/5 mt-auto"
-        >
-          Czytaj więcej
-        </a>
+        {/* Źródła instytucjonalne warto otworzyć w całości; przy prywatnych profilach FB
+            zostaje drobny link atrybucyjny — treść u nas to własne streszczenie AI */}
+        {article.sourceLabel ? (
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2.5 rounded-xl bg-white/5 text-neutral-300 font-bold text-sm hover:bg-blue-600 hover:text-white transition-all text-center border border-white/5 mt-auto"
+          >
+            Czytaj więcej
+          </a>
+        ) : (
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="inline-flex items-center gap-1 text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors mt-auto"
+          >
+            źródło
+            <ExternalLink size={10} />
+          </a>
+        )}
       </div>
     </div>
   );

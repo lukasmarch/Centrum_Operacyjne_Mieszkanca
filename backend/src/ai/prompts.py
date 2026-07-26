@@ -72,6 +72,18 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    ⚠️ TEST: jeśli po usunięciu tego wpisu z serwisu mieszkaniec NICZEGO się nie dowie mniej — is_filler=true.
    ⚠️ UWAGA: powitanie na początku NIE czyni wpisu fillerem, jeśli dalej jest konkret
      ("Dzień dobry, jutro od 8:00 brak wody na ul. Leśnej" → is_filler=false, kategoria Awaria).
+9. Ustaw is_promotional=true, jeśli wpis jest REKLAMĄ komercyjną prywatnej firmy:
+   ✅ is_promotional=TRUE:
+   - oferta usługi lub produktu z zachętą do zakupu ("czyszczenie kostki brukowej — zadzwoń",
+     "zapraszamy na nasze stoisko", "promocja", cennik, numer telefonu sprzedawcy)
+   - post sponsorowany, polecenie konkretnego usługodawcy, ogłoszenie handlowe
+   ❌ is_promotional=FALSE:
+   - komunikaty instytucji, urzędu, szkoły, OSP, klubu sportowego, parafii
+   - oferty pracy, dotacje, nabory, informacja o otwarciu nowej firmy w gminie
+     (to fakt gospodarczy, nie oferta sprzedaży)
+   - wydarzenia otwarte: festyny, koncerty, jarmarki organizowane przez instytucje
+   ⚠️ TEST: czy ten wpis jest cudzą reklamą, za której publikację normalnie się płaci?
+     Jeśli tak — is_promotional=true.
 
 **Zasady:**
 - Jeśli artykuł pasuje do wielu kategorii, wybierz tę GŁÓWNĄ

@@ -6,6 +6,7 @@ interface ArticleApiResponse {
   id: number;
   source_id: number;
   source_name: string | null;
+  source_label: string | null;
   title: string;
   display_title: string | null;
   summary: string | null;
@@ -76,6 +77,9 @@ export function useArticles(options: UseArticlesOptions = {}) {
           title: item.display_title || item.title,
           summary: item.summary || 'Brak opisu',
           source: item.source_name || 'Nieznane źródło',
+          // Nazwy prywatnych profili FB nie eksponujemy — backend zwraca wtedy null,
+          // atrybucją zostaje sam link „źródło ↗"
+          sourceLabel: item.source_label ?? null,
           category: item.category || 'Wiadomości',
           timestamp: formatTimestamp(item.published_at || item.scraped_at),
           rawTimestamp: item.published_at || item.scraped_at,

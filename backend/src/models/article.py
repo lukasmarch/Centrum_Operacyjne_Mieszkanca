@@ -16,6 +16,7 @@ class ArticleOutput(BaseModel):
     id: int
     source_id: int
     source_name: Optional[str] = None  # Added for frontend
+    source_label: Optional[str] = None  # nazwa źródła do pokazania w UI; None → neutralne „źródło ↗"
     title: str
     display_title: Optional[str] = None  # nagłówek AI — frontend pokazuje go zamiast title
     summary: Optional[str] = None

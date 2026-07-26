@@ -150,18 +150,30 @@ async def get_articles(
 ):
     """
     Get articles with filtering and grouping.
-    
+
+    Kolejność feedu nie jest czysto chronologiczna — liczy się świeżość
+    przemnożona przez wagę źródła, a wpisy z tego samego źródła są przeplatane
+    (src/services/feed_policy.py). Bez tego pierwsza piątka zawsze pochodziła
+    z jednego profilu FB publikującego kilkanaście razy dziennie.
+
     Args:
         limit: Maximum total articles to return (default: 50)
         per_source: Maximum articles per source (default: 5)
         days: Only return articles from the last N days (default: 2)
     """
     from datetime import timedelta
-    from sqlalchemy import func, or_, case
-    
+    from sqlalchemy import func, or_
+
+    from src.services.feed_policy import (
+        article_score,
+        diversify,
+        is_pinned_alert,
+        source_label,
+    )
+
     # Calculate cutoff date (2 days ago)
     cutoff_date = datetime.utcnow() - timedelta(days=days)
-    
+
     # Use window function to rank articles per source
     # ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY published_at DESC)
     row_number = func.row_number().over(
@@ -171,7 +183,7 @@ async def get_articles(
             Article.scraped_at.desc()
         ]
     ).label('row_num')
-    
+
     # Subquery with row numbers
     subquery = (
         select(Article.id, row_number)
@@ -182,28 +194,47 @@ async def get_articles(
             )
         )
         .where(Article.is_filler == False)  # posty powitalne/zapychacze nie trafiają do feedu
+        .where(Article.is_promotional == False)  # cudze reklamy nie są wiadomością
         .subquery()
     )
-    
+
     # Main query - join with subquery to filter by row_num <= per_source
     result = await session.execute(
         select(Article, Source.name)
         .join(Source, Article.source_id == Source.id)
         .join(subquery, Article.id == subquery.c.id)
         .where(subquery.c.row_num <= per_source)
-        .order_by(
-            case((Article.category == 'Awaria', 0), else_=1),
-            Article.published_at.desc().nulls_last(),
-            Article.scraped_at.desc()
+    )
+
+    now = datetime.utcnow()
+    rows = list(result)
+
+    # Awarie z ostatniej doby zostają na górze — reszta wg wagi źródła i świeżości
+    pinned, regular = [], []
+    for article, source_name in rows:
+        bucket = pinned if is_pinned_alert(
+            article.category, article.published_at, article.scraped_at, now
+        ) else regular
+        bucket.append((article, source_name))
+
+    for bucket in (pinned, regular):
+        bucket.sort(
+            key=lambda row: article_score(
+                row[0].published_at, row[0].scraped_at, row[1], now
+            ),
+            reverse=True,
         )
-        .limit(limit)
+
+    ordered = pinned + diversify(
+        regular, key=lambda row: row[0].source_id, preceding=pinned
     )
 
     # Map results to ArticleOutput with source_name
     articles = []
-    for article, source_name in result:
+    for article, source_name in ordered[:limit]:
         article_dict = article.model_dump()
         article_dict['source_name'] = source_name
+        article_dict['source_label'] = source_label(source_name)
         articles.append(ArticleOutput(**article_dict))
 
     return articles

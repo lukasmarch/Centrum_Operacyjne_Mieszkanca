@@ -116,6 +116,7 @@ class ArticleProcessor:
             article.is_filler = category_data.is_filler or _looks_like_filler(
                 article.title, text_content
             )
+            article.is_promotional = category_data.is_promotional
             article.processed = True
 
             usage = result.usage()

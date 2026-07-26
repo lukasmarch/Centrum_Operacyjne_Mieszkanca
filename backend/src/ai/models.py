@@ -56,6 +56,15 @@ class ArticleCategory(BaseModel):
             "False dla każdej realnej informacji lokalnej."
         )
     )
+    is_promotional: bool = Field(
+        default=False,
+        description=(
+            "True, gdy wpis jest reklamą komercyjną prywatnej firmy: oferta usługi lub "
+            "produktu, promocja, cennik, zaproszenie na stoisko, 'polecamy', dane kontaktowe "
+            "sprzedawcy. False dla komunikatów instytucji, ofert pracy, otwarcia nowej firmy "
+            "i wszystkiego, co jest informacją, a nie ofertą sprzedaży."
+        )
+    )
 
 
 class ExtractedEvent(BaseModel):

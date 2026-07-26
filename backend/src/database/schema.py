@@ -176,6 +176,7 @@ class Article(SQLModel, table=True):
     embedded: bool = Field(default=False)  # True when RAG embeddings generated (Sprint 6)
     display_title: Optional[str] = Field(default=None, max_length=200)  # nagłówek AI (bez kopii źródła)
     is_filler: bool = Field(default=False)  # posty powitalne/zapychacze — ukryte w feedzie
+    is_promotional: bool = Field(default=False)  # cudza reklama komercyjna — ukryta w feedzie
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"

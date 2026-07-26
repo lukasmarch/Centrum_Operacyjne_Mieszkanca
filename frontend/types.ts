@@ -6,6 +6,8 @@ export interface Article {
   title: string;
   summary: string;
   source: string;
+  /** Nazwa źródła do pokazania w UI. null → neutralne „źródło ↗" (prywatne profile FB) */
+  sourceLabel: string | null;
   category: string;
   timestamp: string;
   rawTimestamp: string;

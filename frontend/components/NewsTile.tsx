@@ -2,7 +2,7 @@ import React from 'react';
 import { Newspaper, ExternalLink } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
 import ArticleImage, { getCategoryTheme } from './ArticleImage';
-import { AppSection } from '../types';
+import { AppSection, Article } from '../types';
 
 const getTimeAgo = (timestamp: string) => {
   if (!timestamp) return '';
@@ -20,6 +20,24 @@ interface NewsTileProps {
   onNavigate?: (section: AppSection) => void;
 }
 
+/**
+ * Atrybucja źródła: drobny link zamiast podpisu.
+ * Dla prywatnych profili FB backend nie zwraca nazwy (sourceLabel === null) —
+ * zostaje neutralne „źródło ↗", żeby feed nie wyglądał na przedruk cudzego profilu.
+ */
+const SourceLink: React.FC<{ article: Article; className?: string }> = ({ article, className = '' }) => (
+  <a
+    href={article.url}
+    target="_blank"
+    rel="noopener noreferrer nofollow"
+    onClick={e => e.stopPropagation()}
+    className={`inline-flex items-center gap-1 text-neutral-500 hover:text-neutral-300 transition-colors ${className}`}
+  >
+    {article.sourceLabel || 'źródło'}
+    <ExternalLink size={9} />
+  </a>
+);
+
 const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
   const { articles, loading } = useArticles({ limit: 20 });
 
@@ -34,6 +52,12 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
       .sort((a, b) => b[1] - a[1])
       .map(([cat, count]) => ({ category: cat, count, theme: getCategoryTheme(cat) }));
   }, [articles]);
+
+  // Licznik źródeł liczył wcześniej kategorie — stąd „Źródeł: 7" przy jednym widocznym źródle
+  const sourceCount = React.useMemo(
+    () => (articles ? new Set(articles.map(a => a.source)).size : 0),
+    [articles]
+  );
 
   const featured = articles?.[0];
   const restArticles = articles?.slice(1, 5);
@@ -73,10 +97,11 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
             const theme = getCategoryTheme(featured.category);
             const isAwaria = (featured.category || '').toLowerCase().includes('awari');
             return (
-              <a
-                href={featured.url}
-                target="_blank"
-                rel="noopener noreferrer"
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => onNavigate?.('news')}
+                onKeyDown={e => { if (e.key === 'Enter') onNavigate?.('news'); }}
                 className={`relative rounded-xl overflow-hidden group cursor-pointer block flex-shrink-0 mb-2 ${isAwaria ? 'ring-1 ring-red-500/40' : ''}`}
               >
                 <div className="w-full h-[120px] sm:h-[140px] overflow-hidden group-hover:[&_img]:scale-105">
@@ -100,16 +125,9 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                   <h4 className="text-sm sm:text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                     {featured.title}
                   </h4>
-                  {featured.source && (
-                    <p className="text-[9px] text-neutral-400 mt-1">
-                      <span className="text-neutral-500">Źródło:</span> {featured.source}
-                    </p>
-                  )}
+                  <SourceLink article={featured} className="text-[9px] mt-1" />
                 </div>
-                <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ExternalLink size={12} className="text-white/70" />
-                </div>
-              </a>
+              </div>
             );
           })()}
 
@@ -119,12 +137,13 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
               const theme = getCategoryTheme(article.category);
               const isAwaria = (article.category || '').toLowerCase().includes('awari');
               return (
-                <a
+                <div
                   key={article.id}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`flex gap-3 py-2 px-1 hover:bg-white/5 transition-colors group items-center ${isAwaria ? 'bg-red-500/5' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onNavigate?.('news')}
+                  onKeyDown={e => { if (e.key === 'Enter') onNavigate?.('news'); }}
+                  className={`flex gap-3 py-2 px-1 hover:bg-white/5 transition-colors group items-center cursor-pointer ${isAwaria ? 'bg-red-500/5' : ''}`}
                 >
                   {/* Thumbnail */}
                   <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden shrink-0 border border-white/5">
@@ -149,13 +168,9 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                     <p className="text-xs sm:text-sm font-semibold text-neutral-200 leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                       {article.title}
                     </p>
-                    {article.source && (
-                      <p className="text-[9px] text-neutral-500 mt-0.5">
-                        <span className="text-neutral-600">Źródło:</span> {article.source}
-                      </p>
-                    )}
+                    <SourceLink article={article} className="text-[9px] mt-0.5" />
                   </div>
-                </a>
+                </div>
               );
             })}
           </div>
@@ -170,10 +185,10 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
             )}
             <span className="text-neutral-600">·</span>
             <span className="text-[10px] sm:text-xs text-neutral-400">
-              Źródeł: {categoryStats.length}
+              Źródeł: {sourceCount}
             </span>
 
-            {/* Category dots */}
+            {/* Category dots – reszta kategorii w jednym chipie, żeby suma zgadzała się z licznikiem */}
             <span className="text-neutral-600 hidden sm:inline">·</span>
             <div className="hidden sm:flex items-center gap-2.5">
               {categoryStats.slice(0, 5).map(({ category, count, theme }) => (
@@ -187,6 +202,18 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                   <span className="font-black text-neutral-500">{count}</span>
                 </span>
               ))}
+              {categoryStats.length > 5 && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] text-neutral-400"
+                  title={categoryStats.slice(5).map(c => `${c.category}: ${c.count}`).join(', ')}
+                >
+                  <span className="w-2 h-2 rounded-full bg-neutral-500" />
+                  <span className="font-medium uppercase">Inne</span>
+                  <span className="font-black text-neutral-500">
+                    {categoryStats.slice(5).reduce((sum, c) => sum + c.count, 0)}
+                  </span>
+                </span>
+              )}
             </div>
           </div>
         </div>
