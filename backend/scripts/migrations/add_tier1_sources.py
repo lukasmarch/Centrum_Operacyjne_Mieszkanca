@@ -47,13 +47,13 @@ SOURCES = [
         # id=6 = Oddział Płock (Region Mława obsługuje powiat działdowski).
         # Oddział Olsztyn (id=5) NIE obejmuje naszego terenu — stąd zero wpisów
         "url": "https://rss.energa-operator.pl/rss/wylaczenia_biezace?id=6",
-        "config": {"keyword_filter": POWIAT_KEYWORDS},
+        "config": {"keyword_filter": POWIAT_KEYWORDS, "treat_as_fresh": True, "max_age_days": 14},
     },
     {
         "name": "Energa - wyłączenia planowane (RSS)",
         "type": "rss",
         "url": "https://rss.energa-operator.pl/rss/wylaczenia_planowane?id=6",
-        "config": {"keyword_filter": POWIAT_KEYWORDS},
+        "config": {"keyword_filter": POWIAT_KEYWORDS, "treat_as_fresh": True, "max_age_days": 14},
     },
     {
         "name": "Powiat Działdowski (RSS)",

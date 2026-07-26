@@ -87,6 +87,14 @@ class RSSFeedScraper(BaseScraper):
                 ]
                 self.logger.info(f"Keyword filter: {before} → {len(articles)} articles")
 
+            # scraping_config.treat_as_fresh — dla zapowiedzi zdarzeń przyszłych
+            # (wyłączenia prądu) liczy się moment, w którym mieszkaniec się o nich
+            # dowiaduje, nie data ogłoszenia sprzed tygodnia. Bez tego wpis o jutrzejszym
+            # wyłączeniu wypadał z feedu jako „stary"
+            if self.config.get("treat_as_fresh"):
+                for article in articles:
+                    article['published_at'] = None
+
             self.logger.info(f"Successfully parsed {len(articles)} articles")
             return articles
 

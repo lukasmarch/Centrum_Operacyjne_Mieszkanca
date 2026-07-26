@@ -140,8 +140,12 @@ async def update_articles_job(source_filter: str = None, source_prefix: str = No
                     # RSS scrapers use feedparser, not HTML parsing
                     elif isinstance(scraper, RSSFeedScraper):
                         articles = await scraper.scrape_feed(scrape_url)
-                        # Filter articles by date (only last 2 days)
-                        articles = filter_recent_articles(articles, days=2)
+                        # Filter articles by date (only last 2 days).
+                        # `max_age_days` w scraping_config przedłuża okno dla źródeł,
+                        # w których liczy się data zdarzenia, a nie publikacji —
+                        # wyłączenie prądu ogłoszone tydzień wcześniej wciąż dotyczy jutra
+                        max_age_days = (source.get("scraping_config") or {}).get("max_age_days", 2)
+                        articles = filter_recent_articles(articles, days=max_age_days)
                         saved_ids = await scraper.save_to_db(articles, session)
                     else:
                         # Standard HTML scrapers
