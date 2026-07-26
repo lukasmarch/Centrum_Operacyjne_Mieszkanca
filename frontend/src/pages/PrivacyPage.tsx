@@ -19,7 +19,7 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
   <LegalLayout title="Polityka prywatności" updated="7 lipca 2026">
 
     <h2>1. Administrator danych</h2>
-    <p>Administratorem danych osobowych jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: ul. Wyzwolenia, 13-220 Rybno (dalej: „Administrator"). Kontakt we wszystkich sprawach dotyczących danych osobowych: <strong>biuro@lumargo.pl</strong>.</p>
+    <p>Administratorem danych osobowych jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: ul. Wyzwolenia, 13-220 Rybno (dalej: „Administrator"). Kontakt we wszystkich sprawach dotyczących danych osobowych: <strong>biuro@lumargo.pl</strong>, tel. <strong>+48 501 081 723</strong>.</p>
 
     <h2>2. Jakie dane przetwarzamy, po co i na jakiej podstawie</h2>
     <table>

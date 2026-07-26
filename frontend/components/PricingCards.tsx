@@ -224,10 +224,21 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
         })}
       </div>
 
-      <p className="text-center text-xs text-neutral-600">
-        Bezpieczne płatności Przelewy24 (BLIK, karta, przelew) · Anuluj w dowolnym momencie
-        · Plan „Firma lokalna" to usługa B2B (§ 11 Regulaminu) · Faktury dla firm: biuro@lumargo.pl
-      </p>
+      <div className="text-center text-xs text-neutral-600 space-y-1.5">
+        <p>
+          Ceny brutto w PLN · Płatność z góry za wybrany okres · <strong className="text-neutral-500">bez automatycznego odnawiania</strong>
+          {' '}· Dostęp aktywowany od razu po potwierdzeniu płatności
+        </p>
+        <p>
+          Bezpieczne płatności Przelewy24 (BLIK, karta, przelew online) · Faktury dla firm: biuro@lumargo.pl
+          {' '}· Plan „Firma lokalna" to usługa B2B (§ 11 Regulaminu)
+        </p>
+        <p>
+          Szczegóły: <a href="/regulamin" className="text-neutral-500 hover:text-blue-400 underline">Regulamin</a>
+          {' · '}
+          <a href="/polityka-prywatnosci" className="text-neutral-500 hover:text-blue-400 underline">Polityka prywatności</a>
+        </p>
+      </div>
     </div>
   );
 };

@@ -65,37 +65,77 @@ const TAB_DEFAULT_SECTION: Record<TabId, AppSection> = {
     zgloszenia: 'reports',
 };
 
+// Sekcje z własnym adresem URL — muszą być osiągalne bezpośrednim linkiem
+// (weryfikacja Przelewy24 wymaga stałego adresu regulaminu i cennika).
+// Pozostałe sekcje żyją pod "/" jak dotąd.
+export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
+    terms: '/regulamin',
+    privacy: '/polityka-prywatnosci',
+    cookies: '/polityka-cookies',
+    premium: '/cennik',
+};
+
+const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PATH)
+    .reduce((acc, [section, path]) => ({ ...acc, [path]: section as AppSection }), {});
+
+const sectionFromPath = (): AppSection =>
+    PATH_TO_SECTION[window.location.pathname.replace(/\/+$/, '')] ?? 'dashboard';
+
 const AppContent: React.FC = () => {
-    const [activeSection, setActiveSection] = useState<AppSection>('dashboard');
-    const [activeTab, setActiveTab] = useState<TabId>('home');
+    const [activeSection, setActiveSection] = useState<AppSection>(sectionFromPath);
+    const [activeTab, setActiveTab] = useState<TabId>(() => SECTION_TO_TAB[sectionFromPath()]);
     const [initialQuery, setInitialQuery] = useState<string>('');
     const { user, isAuthenticated, isLoading, logout } = useAuth();
 
     const [profileInitialTab, setProfileInitialTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | undefined>(undefined);
+
+    // Adres w pasku przeglądarki podąża za sekcją (tylko dla sekcji z SECTION_TO_PATH)
+    const syncUrl = useCallback((section: AppSection) => {
+        const path = SECTION_TO_PATH[section] ?? '/';
+        if (window.location.pathname !== path) {
+            window.history.pushState({}, '', path);
+        }
+    }, []);
 
     const handleNavigate = useCallback((section: AppSection | 'logout' | 'preferences' | 'subscription') => {
         if (section === 'logout') {
             logout();
             setActiveSection('dashboard');
             setActiveTab('home');
+            syncUrl('dashboard');
         } else if (section === 'preferences') {
             setProfileInitialTab('preferences');
             setActiveSection('profile');
             setActiveTab(SECTION_TO_TAB['profile']);
+            syncUrl('profile');
         } else if (section === 'subscription') {
             setProfileInitialTab('subscription');
             setActiveSection('profile');
             setActiveTab(SECTION_TO_TAB['profile']);
+            syncUrl('profile');
         } else {
             setProfileInitialTab(undefined);
             setActiveSection(section);
             setActiveTab(SECTION_TO_TAB[section]);
+            syncUrl(section);
         }
-    }, [logout]);
+    }, [logout, syncUrl]);
 
     const handleTabChange = useCallback((tab: TabId) => {
         setActiveTab(tab);
         setActiveSection(TAB_DEFAULT_SECTION[tab]);
+        syncUrl(TAB_DEFAULT_SECTION[tab]);
+    }, [syncUrl]);
+
+    // Przycisk wstecz/dalej w przeglądarce
+    useEffect(() => {
+        const handlePopState = () => {
+            const section = sectionFromPath();
+            setActiveSection(section);
+            setActiveTab(SECTION_TO_TAB[section]);
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
     }, []);
 
     // Listen for GUSTierGate subscription navigation events
@@ -105,9 +145,19 @@ const AppContent: React.FC = () => {
         return () => window.removeEventListener('navigate-to-subscription', handleSubscriptionNav);
     }, [handleNavigate]);
 
+    // Odnośniki stopki są prawdziwymi <a href> (widocznymi dla crawlerów i weryfikatorów),
+    // ale nawigują w obrębie SPA — chyba że użytkownik otwiera w nowej karcie.
+    const navLink = useCallback((section: AppSection) => (e: React.MouseEvent) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        handleNavigate(section);
+        window.scrollTo({ top: 0 });
+    }, [handleNavigate]);
+
     const handleSubNavChange = useCallback((id: string) => {
         setActiveSection(id as AppSection);
-    }, []);
+        syncUrl(id as AppSection);
+    }, [syncUrl]);
 
     const renderContent = () => {
         // Auth pages
@@ -261,18 +311,31 @@ const AppContent: React.FC = () => {
             </main>
 
             {/* Footer */}
-            {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-600 text-xs flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
-                <div className="flex flex-col md:flex-row items-center gap-2 md:gap-6">
-                    <p className="font-medium">© 2026 Rybno Live · Ai_lumargo</p>
-                    <div className="flex gap-4">
-                        <button onClick={() => handleNavigate('privacy')} className="hover:text-blue-400 transition-colors">Prywatność</button>
-                        <button onClick={() => handleNavigate('terms')} className="hover:text-blue-400 transition-colors">Regulamin</button>
-                        <button onClick={() => handleNavigate('cookies')} className="hover:text-blue-400 transition-colors">Cookies</button>
+            {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-500 text-xs relative z-10">
+                {/* Dane sprzedawcy i odnośniki prawne — wymagane przy weryfikacji Przelewy24 */}
+                <div className="flex flex-col md:flex-row justify-between gap-6 mb-6">
+                    <div className="space-y-1.5">
+                        <p className="font-medium text-neutral-400">Lumargo Łukasz Marchlewicz</p>
+                        <p>ul. Wyzwolenia, 13-220 Rybno · NIP 571-156-78-15</p>
+                        <p>
+                            <a href="mailto:biuro@lumargo.pl" className="hover:text-blue-400 transition-colors">biuro@lumargo.pl</a>
+                            {' · '}
+                            <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a>
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:text-right text-neutral-400">
+                        <a href={SECTION_TO_PATH.terms} onClick={navLink('terms')} className="hover:text-blue-400 transition-colors">Regulamin</a>
+                        <a href={SECTION_TO_PATH.privacy} onClick={navLink('privacy')} className="hover:text-blue-400 transition-colors">Polityka prywatności</a>
+                        <a href={SECTION_TO_PATH.cookies} onClick={navLink('cookies')} className="hover:text-blue-400 transition-colors">Polityka cookies</a>
+                        <a href={SECTION_TO_PATH.premium} onClick={navLink('premium')} className="hover:text-blue-400 transition-colors">Cennik</a>
                     </div>
                 </div>
-                <div className="flex gap-4 font-mono opacity-50">
-                    <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Rybno-1</span>
-                    <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> API: v2.4</span>
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4 border-t border-white/5">
+                    <p className="font-medium">© 2026 Rybno Live · Ai_lumargo · Płatności: Przelewy24 (BLIK, karta, przelew online)</p>
+                    <div className="flex gap-4 font-mono opacity-50">
+                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Rybno-1</span>
+                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> API: v2.4</span>
+                    </div>
                 </div>
             </footer>}
 

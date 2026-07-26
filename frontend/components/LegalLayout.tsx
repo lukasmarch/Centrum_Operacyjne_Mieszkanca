@@ -20,6 +20,8 @@ export const LegalLayout: React.FC<LegalLayoutProps> = ({ title, updated, childr
       [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-3 [&_ol]:text-sm [&_ol]:space-y-1
       [&_li]:leading-relaxed
       [&_strong]:text-neutral-100
+      [&_blockquote]:border-l-2 [&_blockquote]:border-white/15 [&_blockquote]:bg-white/[0.03]
+      [&_blockquote]:rounded-r-lg [&_blockquote]:pl-4 [&_blockquote]:pr-4 [&_blockquote]:py-4 [&_blockquote]:my-4
       [&_table]:w-full [&_table]:text-xs [&_table]:mb-4 [&_table]:border-collapse
       [&_th]:text-left [&_th]:text-neutral-400 [&_th]:font-semibold [&_th]:py-2 [&_th]:px-2 [&_th]:border-b [&_th]:border-white/10
       [&_td]:py-2 [&_td]:px-2 [&_td]:border-b [&_td]:border-white/5 [&_td]:align-top"

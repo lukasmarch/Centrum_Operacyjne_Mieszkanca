@@ -13,15 +13,15 @@ interface TermsPageProps {
   onNavigate: (section: AppSection) => void;
 }
 
-export const TERMS_VERSION = '2026-07-19';
+export const TERMS_VERSION = '2026-07-26';
 
 const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
-  <LegalLayout title="Regulamin serwisu RybnoLive.pl" updated="18 lipca 2026">
+  <LegalLayout title="Regulamin serwisu RybnoLive.pl" updated="26 lipca 2026">
 
     <h2>§ 1. Postanowienia ogólne</h2>
     <ol>
       <li>Niniejszy Regulamin określa zasady świadczenia usług drogą elektroniczną w serwisie internetowym <strong>RybnoLive.pl — Centrum Operacyjne Mieszkańca</strong> (dalej: „Serwis"), dostępnym pod adresem https://rybnolive.pl.</li>
-      <li>Operatorem Serwisu jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: ul. Wyzwolenia, 13-220 Rybno (dalej: „Operator"). Kontakt: <strong>biuro@lumargo.pl</strong>.</li>
+      <li>Operatorem Serwisu (Sprzedawcą) jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: ul. Wyzwolenia, 13-220 Rybno (dalej: „Operator"). Kontakt: <strong>biuro@lumargo.pl</strong>, tel. <strong>+48 501 081 723</strong>.</li>
       <li>Regulamin jest regulaminem, o którym mowa w art. 8 ustawy z dnia 18 lipca 2002 r. o świadczeniu usług drogą elektroniczną.</li>
       <li>Korzystanie z Serwisu oznacza akceptację Regulaminu. Rejestracja konta wymaga wyraźnej akceptacji Regulaminu oraz zapoznania się z Polityką prywatności.</li>
     </ol>
@@ -66,7 +66,9 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
     <h2>§ 6. Plany płatne i płatności</h2>
     <ol>
       <li>Aktualne ceny Planów płatnych oraz zakres funkcji określa cennik prezentowany w Serwisie przed zawarciem umowy.</li>
-      <li>Płatności obsługuje <strong>PayPro S.A. (Przelewy24)</strong>. Operator nie przechowuje danych kart płatniczych.</li>
+      <li>Płatności obsługuje <strong>PayPro S.A. (Przelewy24)</strong>, ul. Pastelowa 8, 60-198 Poznań, KRS 0000347935, NIP 779-236-98-87 — krajowa instytucja płatnicza nadzorowana przez KNF. Operator nie przechowuje danych kart płatniczych.</li>
+      <li>Dostępne metody płatności: <strong>BLIK, karta płatnicza (Visa, Mastercard), szybki przelew online oraz portfele Google Pay i Apple Pay</strong> — w zakresie udostępnianym każdorazowo przez Przelewy24 na stronie płatności.</li>
+      <li><strong>Termin realizacji:</strong> dostęp do Planu płatnego jest aktywowany automatycznie niezwłocznie po otrzymaniu przez Operatora potwierdzenia płatności od Przelewy24 (zwykle w ciągu kilku minut), nie później niż w ciągu 24 godzin. Potwierdzenie zawarcia umowy wraz z informacją o zakresie i okresie usługi Użytkownik otrzymuje na adres e-mail przypisany do Konta.</li>
       <li>Opłata pobierana jest z góry za wybrany okres rozliczeniowy (miesięczny lub roczny). Plan płatny <strong>nie odnawia się automatycznie</strong> — przedłużenie wymaga ponownej płatności.</li>
       <li>Ceny są cenami brutto, wyrażonymi w złotych polskich (PLN).</li>
       <li>Bezpośrednio przed dokonaniem płatności Użytkownik jest informowany o łącznej cenie i potwierdza zamówienie przyciskiem oznaczonym jako wiążące się z obowiązkiem zapłaty.</li>
@@ -78,6 +80,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
       <li>Konsument ma prawo odstąpić od umowy o dostarczanie Treści cyfrowych w terminie <strong>14 dni</strong> od jej zawarcia, bez podania przyczyny, składając oświadczenie (np. e-mailem na biuro@lumargo.pl).</li>
       <li>Jeżeli Konsument zażąda rozpoczęcia świadczenia usługi (aktywacji Planu płatnego) przed upływem terminu odstąpienia i przyjmie do wiadomości, że utraci w ten sposób prawo odstąpienia (art. 38 ust. 1 pkt 13 ustawy o prawach konsumenta), prawo odstąpienia nie przysługuje po pełnym wykonaniu usługi; w przypadku usług ciągłych Konsument, który odstąpi od umowy, otrzymuje zwrot proporcjonalny do niewykorzystanego okresu.</li>
       <li>Zwrot płatności następuje niezwłocznie, nie później niż w terminie 14 dni od otrzymania oświadczenia, tym samym kanałem płatności.</li>
+      <li>Konsument może skorzystać ze wzoru oświadczenia o odstąpieniu stanowiącego <strong>Załącznik nr 1</strong> do Regulaminu, nie jest to jednak obowiązkowe.</li>
     </ol>
 
     <h2>§ 8. Asystent AI — zastrzeżenia</h2>
@@ -115,7 +118,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
 
     <h2>§ 12. Reklamacje</h2>
     <ol>
-      <li>Reklamacje dotyczące działania Serwisu można składać e-mailem na adres biuro@lumargo.pl.</li>
+      <li>Reklamacje dotyczące działania Serwisu i płatności można składać e-mailem na adres biuro@lumargo.pl lub telefonicznie pod numerem +48 501 081 723.</li>
       <li>Reklamacja powinna zawierać: adres e-mail Użytkownika, opis problemu oraz oczekiwany sposób rozstrzygnięcia.</li>
       <li>Operator rozpatruje reklamacje w terminie <strong>14 dni</strong> od otrzymania i odpowiada na adres e-mail zgłaszającego.</li>
     </ol>
@@ -139,8 +142,23 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
       <li>Operator może zmienić Regulamin z ważnych przyczyn (zmiana przepisów, zakresu usług, względy bezpieczeństwa). O zmianach Użytkownicy zarejestrowani są informowani e-mailem lub komunikatem w Serwisie z co najmniej 14-dniowym wyprzedzeniem. Dalsze korzystanie z Serwisu po wejściu zmian w życie oznacza ich akceptację; Użytkownik może wypowiedzieć umowę usuwając Konto.</li>
       <li>Prawem właściwym jest prawo polskie. Spory z Konsumentami rozstrzygają sądy powszechne właściwe według przepisów ogólnych.</li>
       <li>Konsument może skorzystać z pozasądowych sposobów rozpatrywania reklamacji i dochodzenia roszczeń, m.in. z pomocy powiatowego (miejskiego) rzecznika konsumentów lub platformy ODR (https://ec.europa.eu/consumers/odr).</li>
-      <li>Regulamin obowiązuje od dnia 7 lipca 2026 r. (ostatnia zmiana: 18 lipca 2026 r. — dodanie § 11 o wizytówkach firm).</li>
+      <li>Regulamin obowiązuje od dnia 7 lipca 2026 r. (ostatnia zmiana: 26 lipca 2026 r. — uzupełnienie danych kontaktowych, metod płatności, terminu realizacji oraz dodanie Załącznika nr 1).</li>
     </ol>
+
+    <h2>Załącznik nr 1 — wzór oświadczenia o odstąpieniu od umowy</h2>
+    <p className="text-neutral-400 text-sm">(formularz należy wypełnić i odesłać tylko w przypadku chęci odstąpienia od umowy)</p>
+    <blockquote>
+      <p>Adresat: <strong>Lumargo Łukasz Marchlewicz</strong>, ul. Wyzwolenia, 13-220 Rybno, e-mail: biuro@lumargo.pl</p>
+      <p>Ja/My (*) niniejszym informuję/informujemy (*) o moim/naszym (*) odstąpieniu od umowy o świadczenie następującej usługi:</p>
+      <p>………………………………………………………………………………… (nazwa planu, np. Premium — miesięczny)</p>
+      <p>Data zawarcia umowy / zamówienia: …………………………………</p>
+      <p>Imię i nazwisko konsumenta(-ów): …………………………………</p>
+      <p>Adres e-mail przypisany do Konta: …………………………………</p>
+      <p>Adres konsumenta(-ów): …………………………………</p>
+      <p>Podpis konsumenta(-ów) (tylko jeżeli formularz jest przesyłany w wersji papierowej): …………………………………</p>
+      <p>Data: …………………………………</p>
+      <p className="text-neutral-500 text-sm">(*) Niepotrzebne skreślić.</p>
+    </blockquote>
 
   </LegalLayout>
 );
