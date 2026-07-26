@@ -883,9 +883,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               {/* Newsletter */}
               <NewsletterPrefs isPremium={isPremium} apiBase={API_BASE_URL} />
 
-              {/* Push Notifications — tylko Premium */}
-              {isPremium && (
-                <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
+              {/* Push Notifications — dla WSZYSTKICH.
+                  Alerty o awariach i zagrożeniach nigdy nie trafiają za paywall. */}
+              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
                   <h2 className="text-xl font-bold mb-1">Powiadomienia push</h2>
                   <p className="text-sm text-neutral-500 mb-5">
                     Alerty pilne w czasie rzeczywistym — nie pokrywają się z newsletterem.
@@ -901,7 +901,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                     <div className="space-y-3">
                       <label className="flex items-center justify-between p-4 bg-blue-950/30 border border-blue-800/30 rounded-xl cursor-pointer">
                         <div className="flex-1 pr-4">
-                          <p className="font-semibold">Proaktywny Asystent</p>
+                          <p className="font-semibold">Alerty o awariach i zagrożeniach</p>
                           <p className="text-sm text-neutral-400 mt-0.5">
                             Pożary · Wypadki · Smog · Mróz &lt; −5°C · Nowe awarie
                           </p>
@@ -927,12 +927,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                         </button>
                       </label>
                       {pushSubscribed && (
-                        <p className="text-xs text-neutral-600 px-1">Asystent aktywny — otrzymasz wszystkie pilne alerty.</p>
+                        <p className="text-xs text-neutral-600 px-1">Alerty aktywne — otrzymasz wszystkie pilne powiadomienia.</p>
                       )}
                     </div>
                   )}
-                </div>
-              )}
+              </div>
 
               {/* Account info */}
               <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">

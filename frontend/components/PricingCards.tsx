@@ -26,6 +26,7 @@ const PLANS: Plan[] = [
     price: { monthly: 0, yearly: 0 },
     features: [
       { text: 'Wiadomości i artykuły lokalne' },
+      { text: 'Alerty push o awariach i zagrożeniach', tooltip: 'Pożary, wypadki, awarie prądu i wody, smog — bezpieczeństwo zawsze za darmo' },
       { text: 'Pogoda i jakość powietrza' },
       { text: 'Harmonogram wywozu śmieci' },
       { text: 'Zgłoszenia 24 ze zdjęciem' },
@@ -46,7 +47,6 @@ const PLANS: Plan[] = [
     features: [
       { text: 'Proaktywny Asystent AI — nie pytasz, portal sam Cię uprzedzi', tooltip: 'Powiadomienia bez pytania: jutro wywóz odpadów, mróz na drogach, nowe ogłoszenie BIP' },
       { text: 'Nieograniczone pytania AI' },
-      { text: 'Alerty push w czasie rzeczywistym', tooltip: 'Pożary, wypadki, awarie, smog' },
       { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 6:30' },
       { text: '57 wskaźników GUS', tooltip: 'Demografia, rynek pracy, finanse gminy, mieszkalnictwo, edukacja, zdrowie + dane powiatu działdowskiego' },
       { text: 'Personalizacja dashboardu' },
