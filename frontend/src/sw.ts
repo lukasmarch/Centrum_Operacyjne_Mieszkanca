@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { clientsClaim } from 'workbox-core';
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching';
 
 declare const self: ServiceWorkerGlobalScope;
@@ -6,6 +7,12 @@ declare const self: ServiceWorkerGlobalScope;
 // Precache assets injected by vite-plugin-pwa
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
+
+// registerType: 'autoUpdate' w vite.config nie wystarcza przy strategies: 'injectManifest' —
+// bez tych dwóch wywołań nowy SW czeka, aż użytkownik zamknie wszystkie karty serwisu,
+// więc wdrożone poprawki nie docierają do osób, które już odwiedziły stronę.
+self.skipWaiting();
+clientsClaim();
 
 // ==================== Push Events ====================
 
