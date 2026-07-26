@@ -15,7 +15,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'assistant', label: 'Asystent', icon: Bot },
   { id: 'miasto', label: 'Info', icon: Building2 },
   { id: 'dane', label: 'Firmy', icon: Store },
-  { id: 'zgloszenia', label: 'Zgłoś usterkę', icon: ClipboardList },
+  { id: 'zgloszenia', label: 'Zgłoszenia 24', icon: ClipboardList },
 ];
 
 const BottomTabBar: React.FC<BottomTabBarProps> = React.memo(({ activeTab, onTabChange, isAuthenticated }) => {
