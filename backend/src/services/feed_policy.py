@@ -64,11 +64,25 @@ def source_weight(source_name: Optional[str]) -> float:
     return SOURCE_WEIGHTS.get(source_name or "", DEFAULT_WEIGHT)
 
 
+# Nazwy techniczne z tabeli `sources` nie nadają się do pokazania mieszkańcowi
+# ("Facebook - ZakladGospodarkiKomunalnej"). Sufiks "(RSS)" zdejmowany automatycznie.
+SOURCE_DISPLAY_NAMES: dict[str, str] = {
+    "Facebook - ZakladGospodarkiKomunalnej": "ZGK w Rybnie",
+    "Facebook - Gmina Działdowo": "Gmina Działdowo",
+    "Facebook - Rybno": "Gmina Rybno (Facebook)",
+    "KPP Działdowo (RSS)": "Policja — KPP Działdowo",
+    "Energa - wyłączenia bieżące (RSS)": "Energa Operator",
+    "Energa - wyłączenia planowane (RSS)": "Energa Operator",
+}
+
+
 def source_label(source_name: Optional[str]) -> Optional[str]:
     """Nazwa źródła do pokazania w UI albo None — wtedy front daje 'źródło ↗'."""
     if not source_name or source_name in UNNAMED_SOURCES:
         return None
-    return source_name
+    if source_name in SOURCE_DISPLAY_NAMES:
+        return SOURCE_DISPLAY_NAMES[source_name]
+    return source_name.replace(" (RSS)", "").strip()
 
 
 def article_score(
