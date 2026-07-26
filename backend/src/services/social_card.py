@@ -14,7 +14,6 @@ Wymiary 1200×630 to format karty linku FB/OG; działa też jako zwykłe zdjęci
 """
 import logging
 import re
-import textwrap
 import unicodedata
 from datetime import date
 from functools import lru_cache
@@ -44,10 +43,19 @@ DNI = ["PONIEDZIAŁEK", "WTOREK", "ŚRODA", "CZWARTEK", "PIĄTEK", "SOBOTA", "NI
 MIESIACE = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
             "lipca", "sierpnia", "września", "października", "listopada", "grudnia"]
 
+# Kula: rozmiar i lewy górny róg. Dobrane tak, by cały kadr (kula, poświata, dłoń)
+# zmieścił się z marginesem — prawa krawędź 1160/1200, dolna 545/630.
+ORB_SIZE = 460
+ORB_POS = (700, 85)
+
 VARIATION_SELECTORS = re.compile(r"[︀-️\U000E0100-\U000E01EF]")
 
-# (stopień pisma, znaków w wierszu) — pierwszy układ mieszczący się w 4 wierszach wygrywa
-HEADLINE_STEPS = ((66, 26), (56, 31), (48, 37), (42, 43), (36, 50))
+# Kolumna tekstu kończy się przed kulą — stąd zawijanie po realnej szerokości w pikselach,
+# a nie po liczbie znaków: „Truszczyny-Dębień” zajmuje dwa razy tyle co „Wery w Rybnie”
+# przy tej samej długości w znakach, więc limit znakowy albo marnował miejsce, albo wpuszczał
+# tekst w poświatę.
+TEXT_MAX_WIDTH = ORB_POS[0] - MARGIN - 30
+HEADLINE_SIZES = (66, 58, 50, 44, 38)
 MAX_LINES = 4
 
 
@@ -84,16 +92,34 @@ def _label_for(headline: str, day: date) -> str:
     return f"{DNI[day.weekday()]} · {day.day} {MIESIACE[day.month - 1].upper()}"
 
 
+def _wrap_to_width(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> List[str]:
+    """Zawiń tekst tak, by żaden wiersz nie przekroczył max_width w pikselach."""
+    lines: List[str] = []
+    current = ""
+    for word in text.split():
+        candidate = f"{current} {word}".strip()
+        if not current or font.getlength(candidate) <= max_width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines
+
+
 def _fit_headline(headline: str) -> Tuple[ImageFont.FreeTypeFont, List[str], int]:
-    for size, per_line in HEADLINE_STEPS:
-        lines = textwrap.wrap(headline, width=per_line)
+    for size in HEADLINE_SIZES:
+        font = _font(size, "ExtraBold")
+        lines = _wrap_to_width(headline, font, TEXT_MAX_WIDTH)
         if len(lines) <= MAX_LINES:
-            return _font(size, "ExtraBold"), lines, size
+            return font, lines, size
     # Nagłówek dłuższy niż jakikolwiek układ — przycinamy, wielokropek sygnalizuje ucięcie
-    size, per_line = HEADLINE_STEPS[-1]
-    lines = textwrap.wrap(headline, width=per_line)[:MAX_LINES]
+    size = HEADLINE_SIZES[-1]
+    font = _font(size, "ExtraBold")
+    lines = _wrap_to_width(headline, font, TEXT_MAX_WIDTH)[:MAX_LINES]
     lines[-1] = lines[-1].rstrip(" ,.;–—") + "…"
-    return _font(size, "ExtraBold"), lines, size
+    return font, lines, size
 
 
 def render_daily_card(headline: str, day: Optional[date] = None) -> bytes:
@@ -103,15 +129,17 @@ def render_daily_card(headline: str, day: Optional[date] = None) -> bytes:
 
     img = Image.new("RGB", (WIDTH, HEIGHT), BG)
 
-    # Kula z animacji hero — wtopiona w prawą krawędź, przygaszona, żeby nie zabierała
-    # uwagi nagłówkowi. Maska rozmyta, bo twarda krawędź zdradzałaby wklejony kadr.
+    # Kula z animacji hero — przygaszona, żeby nie zabierała uwagi nagłówkowi.
+    # Mieści się w kadrze W CAŁOŚCI, razem z dłonią: pierwsza wersja wychodziła poza
+    # prawą i dolną krawędź, więc dłoń była ucięta w połowie.
+    # Maska rozmyta, bo twarda krawędź zdradzałaby wklejony kadr.
     # Brak pliku nie może wywrócić karty: bez kuli jest skromniej, ale post wychodzi.
     try:
-        orb = Image.open(ORB_PATH).convert("RGB").resize((520, 520), Image.LANCZOS)
+        orb = Image.open(ORB_PATH).convert("RGB").resize((ORB_SIZE, ORB_SIZE), Image.LANCZOS)
         orb = Image.blend(Image.new("RGB", orb.size, BG), orb, 0.75)
         mask = Image.new("L", orb.size, 0)
-        ImageDraw.Draw(mask).ellipse((8, 8, 512, 512), fill=255)
-        img.paste(orb, (820, 210), mask.filter(ImageFilter.GaussianBlur(45)))
+        ImageDraw.Draw(mask).ellipse((6, 6, ORB_SIZE - 6, ORB_SIZE - 6), fill=255)
+        img.paste(orb, ORB_POS, mask.filter(ImageFilter.GaussianBlur(40)))
     except OSError as exc:
         logger.warning(f"[social_card] Pomijam kulę, nie wczytano {ORB_PATH}: {exc}")
 

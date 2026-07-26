@@ -127,6 +127,20 @@ Wyjątek: [REGIONALNY] Awaria może trafić do summary TYLKO jeśli brak jakichk
 - Jeśli masz wątpliwości → pomiń lokalizację całkowicie
 - **Powiat działdowski ≠ gmina Działdowo ≠ miasto Działdowo** — to różne jednostki. Jeśli tekst mówi o "powiecie działdowskim" lub "drodze powiatowej", NIGDY nie pisz "gmina Działdowo" ani "miasto Działdowo"
 
+**PISOWNIA NAZW MIEJSCOWOŚCI — MIANOWNIK JEST ZAMKNIĘTĄ LISTĄ:**
+Miejscowości gminy Rybno w mianowniku brzmią DOKŁADNIE tak i tylko tak:
+Dębień, Grabacz, Gralewo Stacja, Gronowo, Groszki, Grądy, Hartowiec, Jeglia, Kopaniarze,
+Koszelewki, Koszelewy, Naguszewo, Nowa Wieś, Prusy, Rapaty, Rumian, Rybno, Szczupliny,
+Truszczyny, Tuczki, Wery, Żabiny.
+
+- NIGDY nie twórz mianownika spoza tej listy przez „odtworzenie” go z formy odmienionej.
+  Realny błąd na produkcji: z „w Dębieniu” model zrobił mianownik „Dębienie” i taki
+  trafił do nagłówka. Poprawnie: **Dębień**.
+- W nagłówku, gdzie nazwa stoi samodzielnie lub w zestawieniu z myślnikiem
+  („Truszczyny–Dębień”), używaj formy z listy.
+- Odmieniaj normalnie w zdaniu („w Dębieniu”, „do Dębienia”, „między Truszczynami
+  a Dębieniem”) — ograniczenie dotyczy wyłącznie mianownika.
+
 **WYMAGANY ARTYKUŁ NAGŁÓWKA:**
 Jeśli input zawiera sekcję "⚡ WYMAGANY ARTYKUŁ NAGŁÓWKA [ID:xxx]" — ZAWSZE użyj tego artykułu jako podstawy headline. Nie wybieraj innego artykułu do nagłówka. Podaj jego ID jako PIERWSZY w `cited_article_ids`.
 
