@@ -366,6 +366,12 @@ export interface BusDirectionStatus {
     service_type: BusServiceType;
     in_minutes: number;
   } | null;
+  // Wypełnione tylko gdy dziś nie ma już kursów — np. { day_label: "w poniedziałek", time: "06:20" }
+  next_service: {
+    day_label: string;
+    time: string;
+    service_type: BusServiceType;
+  } | null;
 }
 
 export interface BusStatusResponse {

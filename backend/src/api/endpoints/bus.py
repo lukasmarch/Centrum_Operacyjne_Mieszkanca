@@ -5,7 +5,7 @@ Endpointy:
   GET /api/bus/timetable  – pełny rozkład + przystanki (dla popup + widoku rozkładu)
   GET /api/bus/status     – aktualny status obu kierunków (pozycja autobusu / następny kurs)
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import floor
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,21 @@ async def _get_db():
 def _parse_time(time_str: str, base: datetime) -> datetime:
     h, m = map(int, time_str.split(":"))
     return base.replace(hour=h, minute=m, second=0, microsecond=0)
+
+
+# Etykiety w bierniku — wchodzą wprost do komunikatu "Kursy wracają …"
+_WEEKDAY_LABELS_PL = [
+    "w poniedziałek", "we wtorek", "w środę", "w czwartek",
+    "w piątek", "w sobotę", "w niedzielę",
+]
+
+
+def _next_service_day(now: datetime):
+    """Najbliższy dzień z kursami — linia jeździ wyłącznie od poniedziałku do piątku."""
+    day = now.date() + timedelta(days=1)
+    while day.weekday() >= 5:
+        day += timedelta(days=1)
+    return day
 
 
 @router.get("/timetable")
@@ -182,10 +197,31 @@ async def get_status(session: AsyncSession = Depends(_get_db)):
                     "in_minutes": max(1, floor(diff_sec / 60)),
                 }
 
+        # Brak kursów dziś (weekend albo po ostatnim odjeździe) → powiedz KIEDY wracają.
+        # Pusty komunikat "brak kursów" wygląda jak zepsuty moduł.
+        next_service = None
+        if active_bus is None and next_departure is None:
+            weekday_trips = sorted(
+                (
+                    t for (d, _), t in all_trips.items()
+                    if d == direction and t["service_type"] in {"GS", "S"}
+                ),
+                key=lambda t: t["departure_time"],
+            )
+            if weekday_trips:
+                service_day = _next_service_day(now)
+                is_tomorrow = service_day == now.date() + timedelta(days=1)
+                next_service = {
+                    "day_label": "jutro" if is_tomorrow else _WEEKDAY_LABELS_PL[service_day.weekday()],
+                    "time": weekday_trips[0]["departure_time"],
+                    "service_type": weekday_trips[0]["service_type"],
+                }
+
         directions_result[direction] = {
             "is_active": active_bus is not None,
             "active_bus": active_bus,
             "next_departure": next_departure,
+            "next_service": next_service,
         }
 
     return {

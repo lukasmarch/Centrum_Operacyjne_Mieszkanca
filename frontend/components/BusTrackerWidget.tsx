@@ -122,7 +122,7 @@ const StatusCard: React.FC<{
   stops: BusStop[];
 }> = ({ direction, status, stops }) => {
   const isRybDza = direction === 'RYBNO_DZIALDOWO';
-  const { is_active, active_bus: bus, next_departure: next } = status;
+  const { is_active, active_bus: bus, next_departure: next, next_service: resume } = status;
 
   const nextStopName = bus
     ? stops.find(s => s.stop_id === bus.next_stop_id)?.name ?? bus.next_stop_id
@@ -184,11 +184,23 @@ const StatusCard: React.FC<{
           </div>
         </div>
       ) : (
-        <div className="mt-4 flex items-center gap-2 text-neutral-500">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <p className="text-[10px] font-bold italic">Koniec kursów na dziś</p>
+        <div className="mt-3">
+          <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider mb-1">
+            {resume ? 'Kursy wracają:' : 'Brak kursów'}
+          </p>
+          {resume ? (
+            <>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-sm font-black text-neutral-300 uppercase tracking-tight">{resume.day_label}</span>
+                <span className="text-xl font-black text-neutral-200 tabular-nums tracking-tighter">o {resume.time}</span>
+              </div>
+              <div className="mt-1">
+                <ServiceBadge type={resume.service_type} />
+              </div>
+            </>
+          ) : (
+            <p className="text-[10px] font-bold text-neutral-500">Rozkład niedostępny</p>
+          )}
         </div>
       )}
     </div>
@@ -346,7 +358,7 @@ const BusTrackerWidget: React.FC = () => {
           </div>
           <span className="text-[10px] text-neutral-500 font-bold tabular-nums">{now}</span>
           {isWeekend && (
-            <span className="text-[8px] text-amber-500/80 font-bold uppercase tracking-wide">Weekend – brak kursów</span>
+            <span className="text-[8px] text-neutral-400 font-bold uppercase tracking-wide">Linia kursuje pon–pt</span>
           )}
         </div>
       </div>

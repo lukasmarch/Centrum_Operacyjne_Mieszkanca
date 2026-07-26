@@ -11,8 +11,15 @@ const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000
 ═══════════════════════════════════════════════════════════════ */
 interface AirQualityData {
   pm25: number; pm10: number; caqi: number; caqi_level: string;
-  temperature: number; humidity: number; pressure: number; fetched_at: string;
+  // Czujnik Airly nie zawsze raportuje warunki pogodowe — pola bywają puste
+  temperature: number | null; humidity: number | null; pressure: number | null; fetched_at: string;
 }
+
+/** Sformatuj pomiar lub pokaż kreskę — nigdy "undefined" na ekranie. */
+const fmt = (value: number | null | undefined, digits: number, unit: string): string =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? `${value.toFixed(digits)}${unit}`
+    : '—';
 interface HistoryItem { pm25: number; pm10: number; caqi: number; fetched_at: string; }
 
 const LEVEL_META: Record<string, { label: string; color: string; bg: string; advice: string; emoji: string }> = {
@@ -262,33 +269,28 @@ const AirlyTile: React.FC = () => {
       <GCard className="p-4 flex gap-4 items-center">
         <DonutGauge value={d.caqi} maxValue={100} color={lvl.color} label="CAQI" sublabel={lvl.label} />
 
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-2xl">{lvl.emoji}</span>
-            <div>
-              <p className="text-base font-black text-white leading-tight">{lvl.label}</p>
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full mt-0.5"
-                style={{ background: lvl.bg, border: `1px solid ${lvl.color}22` }}>
-                <div className="w-1 h-1 rounded-full" style={{ background: lvl.color }} />
-                <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: lvl.color }}>
-                  CAQI {Math.round(d.caqi)}
-                </span>
-              </div>
-            </div>
+        <div className="flex-1 min-w-0">
+          {/* Ocena i wartość CAQI są już na tarczy — powtórzenie ich obok rozpychało kafel
+              i łamało "Bardzo Dobra" na dwie linie. Tu zostaje ikona, porada i pomiary. */}
+          <div className="flex items-start gap-2">
+            <span className="text-2xl shrink-0 leading-none">{lvl.emoji}</span>
+            <p className="text-[11px] text-neutral-400 leading-relaxed break-words">{lvl.advice}</p>
           </div>
-          <p className="text-[10px] text-neutral-500 leading-relaxed">{lvl.advice}</p>
 
-          {/* Quick stats */}
-          <div className="flex gap-3 mt-3">
+          {/* Pomiary z czujnika — temperaturę pokazuje kafel pogody, tu tylko to,
+              czego nie ma nigdzie indziej. Puste odczyty chowamy zamiast kreski. */}
+          <div className="flex flex-wrap gap-x-3 gap-y-2 mt-3">
             {[
-              { label: 'Temp', val: `${d.temperature?.toFixed(1)}°C`, icon: '🌡️' },
-              { label: 'Ciśnienie', val: `${d.pressure?.toFixed(0)} hPa`, icon: '⏲️' },
-            ].map(s => (
-              <div key={s.label}>
-                <p className="text-[8px] text-neutral-600 uppercase font-bold">{s.icon} {s.label}</p>
-                <p className="text-xs font-black text-neutral-300">{s.val}</p>
-              </div>
-            ))}
+              { label: 'Ciśnienie', val: d.pressure, formatted: fmt(d.pressure, 0, ' hPa'), icon: '⏲️' },
+              { label: 'Wilgotność', val: d.humidity, formatted: fmt(d.humidity, 0, '%'), icon: '💧' },
+            ]
+              .filter(s => typeof s.val === 'number' && Number.isFinite(s.val))
+              .map(s => (
+                <div key={s.label} className="min-w-0">
+                  <p className="text-[8px] text-neutral-600 uppercase font-bold">{s.icon} {s.label}</p>
+                  <p className="text-xs font-black text-neutral-300">{s.formatted}</p>
+                </div>
+              ))}
           </div>
         </div>
       </GCard>

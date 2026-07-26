@@ -5,11 +5,18 @@ interface AirlyData {
     pm10: number;
     caqi: number;
     caqi_level: string;
-    temperature: number;
-    humidity: number;
-    pressure: number;
+    // Czujnik Airly nie zawsze raportuje warunki pogodowe — pola bywają puste
+    temperature: number | null;
+    humidity: number | null;
+    pressure: number | null;
     fetched_at: string;
 }
+
+/** Sformatuj pomiar lub pokaż kreskę — nigdy "undefined" na ekranie. */
+const fmt = (value: number | null | undefined, digits: number, unit: string): string =>
+    typeof value === 'number' && Number.isFinite(value)
+        ? `${value.toFixed(digits)}${unit}`
+        : '—';
 
 interface AirlyWidgetProps {
     data: AirlyData | null;
@@ -139,24 +146,29 @@ const AirlyWidget: React.FC<AirlyWidgetProps> = ({ data, loading, error }) => {
                         </div>
                     </div>
 
-                    {/* Weather Details */}
-                    <div className="grid grid-cols-3 gap-2 pt-4 border-t border-white/10">
-                        <div className="text-center p-2 rounded-xl bg-white/5">
-                            <div className="text-xl mb-1">🌡️</div>
-                            <div className="text-sm text-neutral-400">Temp</div>
-                            <div className="font-bold">{data.temperature?.toFixed(1)}°C</div>
-                        </div>
-                        <div className="text-center p-2 rounded-xl bg-white/5">
-                            <div className="text-xl mb-1">💧</div>
-                            <div className="text-sm text-neutral-400">Wilgoć</div>
-                            <div className="font-bold">{data.humidity?.toFixed(0)}%</div>
-                        </div>
-                        <div className="text-center p-2 rounded-xl bg-white/5">
-                            <div className="text-xl mb-1">⏲️</div>
-                            <div className="text-sm text-neutral-400">Ciśnienie</div>
-                            <div className="font-bold">{data.pressure?.toFixed(0)} hPa</div>
-                        </div>
-                    </div>
+                    {/* Weather Details — czujnik Airly nie zawsze raportuje wszystkie pomiary;
+                        brakujące chowamy zamiast pokazywać pustą kreskę */}
+                    {(() => {
+                        const readings = [
+                            { key: 'temp', icon: '🌡️', label: 'Temp', value: data.temperature, text: fmt(data.temperature, 1, '°C') },
+                            { key: 'hum', icon: '💧', label: 'Wilgoć', value: data.humidity, text: fmt(data.humidity, 0, '%') },
+                            { key: 'pres', icon: '⏲️', label: 'Ciśnienie', value: data.pressure, text: fmt(data.pressure, 0, ' hPa') },
+                        ].filter(r => typeof r.value === 'number' && Number.isFinite(r.value));
+
+                        if (readings.length === 0) return null;
+
+                        return (
+                            <div className="flex gap-2 pt-4 border-t border-white/10">
+                                {readings.map(r => (
+                                    <div key={r.key} className="flex-1 text-center p-2 rounded-xl bg-white/5">
+                                        <div className="text-xl mb-1">{r.icon}</div>
+                                        <div className="text-sm text-neutral-400">{r.label}</div>
+                                        <div className="font-bold">{r.text}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
 
                 </div>
             </div>

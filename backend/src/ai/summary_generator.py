@@ -418,6 +418,13 @@ class SummaryGenerator:
             lines.append(f"Pyły zawieszone:")
             lines.append(f"  - PM2.5: {air_quality.pm25} µg/m³")
             lines.append(f"  - PM10: {air_quality.pm10} µg/m³")
-            lines.append(f"\nAktualizacja: {air_quality.fetched_at}")
+            # Godzina pomiaru wchodzi do air_quality_summary — dzięki niej liczba
+            # nie kłóci się z widgetem live stojącym obok briefingu
+            measured_at = (
+                air_quality.fetched_at.strftime("%H:%M")
+                if air_quality.fetched_at else "brak danych"
+            )
+            lines.append(f"\nGodzina pomiaru: {measured_at}")
+            lines.append(f"Aktualizacja: {air_quality.fetched_at}")
 
         return "\n".join(lines)

@@ -155,14 +155,17 @@ const WeatherTile: React.FC = () => {
     }
     return slots.slice(start, start + 7).map((s, i) => {
       const d = new Date(s.dt * 1000);
+      const isNow = i === 0;
       return {
-        label: i === 0 ? 'Teraz' : `${d.getHours()}:00`,
-        temp: Math.round(s.temp),
-        icon: s.icon,
-        isNow: i === 0,
+        label: isNow ? 'Teraz' : `${d.getHours()}:00`,
+        // Slot "Teraz" pokazuje pomiar bieżący, nie prognozę na tę godzinę —
+        // inaczej kafelek i prognoza podają dwie różne temperatury "teraz"
+        temp: Math.round(isNow && weather ? weather.temperature : s.temp),
+        icon: isNow && weather ? (weather.icon ?? s.icon) : s.icon,
+        isNow,
       };
     });
-  }, [forecast]);
+  }, [forecast, weather]);
 
   /* ── Wind chart: history (>1 pts) or forecast fallback ─── */
   const windData = useMemo(() => {
