@@ -152,9 +152,14 @@ okrąg + poświata, i to samo powtarza obecna ikona PWA (pierścień na niebiesk
 
 Codzienny post składany lokalnie, bez modelu graficznego — `backend/src/services/social_card.py`.
 Układ 1200×630: pasek `#3a81f6` u góry, pigułka z etykietą (dzień i data, albo „AWARIA"),
-nagłówek dnia w Outfit ExtraBold wyśrodkowany pionowo (auto-dopasowanie stopnia pisma
-66→36 px, maks. 4 wiersze), kadr kuli wtopiony w prawą krawędź na 75% jasności, stopka
-`rybnolive.pl · Twoja gmina. Na żywo.` po lewej.
+nagłówek dnia w Outfit ExtraBold wyśrodkowany pionowo, kula z dłonią w prawej części
+kadru na 75% jasności (**w całości, z marginesem** — ucięta dłoń wygląda na błąd),
+stopka `rybnolive.pl · Twoja gmina. Na żywo.` po lewej.
+
+Nagłówek zawija się po **realnej szerokości w pikselach** (kolumna ~598 px, stopień pisma
+schodzi 66→38 px, maks. 4 wiersze), nie po liczbie znaków — polskie nazwy własne bywają
+dwa razy szersze niż równie długie słowa, więc limit znakowy albo marnował kolumnę,
+albo wpuszczał tekst w poświatę kuli.
 
 Zasada: **tekst na grafice renderujemy dosłownie z bazy, nigdy nie zlecamy go modelowi** —
 kie.ai potrafi pociąć polskie wyrazy, a błąd na wypalonej grafice jest nieodwracalny.
