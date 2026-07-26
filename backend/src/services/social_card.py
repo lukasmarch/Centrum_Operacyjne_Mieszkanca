@@ -13,7 +13,9 @@ Ten moduł (W1, codziennie) robi kartę typograficzną — tego nie warto zleca�
 Wymiary 1200×630 to format karty linku FB/OG; działa też jako zwykłe zdjęcie w poście.
 """
 import logging
+import re
 import textwrap
+import unicodedata
 from datetime import date
 from functools import lru_cache
 from io import BytesIO
@@ -42,6 +44,8 @@ DNI = ["PONIEDZIAŁEK", "WTOREK", "ŚRODA", "CZWARTEK", "PIĄTEK", "SOBOTA", "NI
 MIESIACE = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
             "lipca", "sierpnia", "września", "października", "listopada", "grudnia"]
 
+VARIATION_SELECTORS = re.compile(r"[︀-️\U000E0100-\U000E01EF]")
+
 # (stopień pisma, znaków w wierszu) — pierwszy układ mieszczący się w 4 wierszach wygrywa
 HEADLINE_STEPS = ((66, 26), (56, 31), (48, 37), (42, 43), (36, 50))
 MAX_LINES = 4
@@ -52,6 +56,25 @@ def _font(size: int, weight: str = "Bold") -> ImageFont.FreeTypeFont:
     font = ImageFont.truetype(str(FONT_PATH), size)
     font.set_variation_by_name(weight)
     return font
+
+
+def _strip_emoji(text: str) -> str:
+    """
+    Wytnij emoji — Outfit nie ma dla nich glifów i renderują się jako puste kwadraty.
+
+    Wykryte na produkcji: nagłówek „⚠️ Wypadek na drodze…” dał na karcie dwa „tofu”
+    przed tekstem. W treści posta emoji zostają — Facebook wyświetla je poprawnie,
+    problem dotyczy wyłącznie tego, co wypalamy w grafice.
+
+    Kategorie: So (symbole, w tym emoji), Cf (ZWJ i inne sterujące), Cs (surogaty).
+    Selektory wariantu wycinamy zakresem, a nie kategorią: U+FE0F to `Mn`, tak samo jak
+    łączone znaki diakrytyczne, których wycinać nie chcemy.
+    """
+    cleaned = "".join(
+        ch for ch in text
+        if unicodedata.category(ch) not in ("So", "Cf", "Cs") and not VARIATION_SELECTORS.match(ch)
+    )
+    return re.sub(r"\s+", " ", cleaned).strip(" -–—:·")
 
 
 def _label_for(headline: str, day: date) -> str:
@@ -76,7 +99,7 @@ def _fit_headline(headline: str) -> Tuple[ImageFont.FreeTypeFont, List[str], int
 def render_daily_card(headline: str, day: Optional[date] = None) -> bytes:
     """Zwróć JPEG 1200×630 z nagłówkiem dnia. Bez I/O sieciowego, ~0,2 s."""
     day = day or date.today()
-    headline = (headline or "").strip() or "Centrum Operacyjne Rybna"
+    headline = _strip_emoji(headline or "") or "Centrum Operacyjne Rybna"
 
     img = Image.new("RGB", (WIDTH, HEIGHT), BG)
 
