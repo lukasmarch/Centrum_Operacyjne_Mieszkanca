@@ -62,7 +62,7 @@ export const ShareCard: React.FC = () => {
       `📅 ${stats.events_count} wydarzeń\n` +
       `🚨 ${stats.reports_count} zgłoszeń\n` +
       `🌡️ Temperatura śr. ${stats.weather.temp_avg ?? '—'}°C\n` +
-      `🔗 https://rybno.pl`;
+      `🔗 https://rybnolive.pl`;
 
     if (navigator.share) {
       await navigator.share({ title: 'Gmina w Liczbach — Rybno', text }).catch(() => {});
@@ -94,7 +94,7 @@ export const ShareCard: React.FC = () => {
         <div className="flex items-start justify-between mb-5">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 mb-0.5">
-              Centrum Operacyjne Rybna
+              RybnoLive
             </p>
             <p className="text-base font-bold text-white">Gmina w Liczbach</p>
             <p className="text-xs text-neutral-500 mt-0.5">{stats.period}</p>
@@ -160,7 +160,7 @@ export const ShareCard: React.FC = () => {
         )}
 
         {/* Footer brand */}
-        <p className="text-[10px] text-neutral-700 mt-4 text-right">rybno.pl</p>
+        <p className="text-[10px] text-neutral-700 mt-4 text-right">rybnolive.pl</p>
       </div>
 
       {/* ── Action buttons (outside captured area) ───────────── */}

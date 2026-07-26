@@ -181,6 +181,7 @@ async def get_articles(
                 Article.scraped_at >= cutoff_date
             )
         )
+        .where(Article.is_filler == False)  # posty powitalne/zapychacze nie trafiają do feedu
         .subquery()
     )
     

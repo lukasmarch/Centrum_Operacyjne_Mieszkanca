@@ -4,6 +4,30 @@ import { fetchCinemaRepertoire } from '../src/services/geminiService';
 import { CinemaRepertoire, CinemaLocation } from '../types';
 import { useDataCache } from '../src/context/DataCacheContext';
 
+/** Parse "26.07 14:20" → Date (rok bieżący, z korektą na przełom roku). */
+const parseShowtime = (t: string): Date | null => {
+    const m = t.match(/^(\d{1,2})\.(\d{1,2})\s+(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const now = new Date();
+    let year = now.getFullYear();
+    const month = parseInt(m[2], 10) - 1;
+    // Grudzień pokazuje styczniowe seanse (i odwrotnie) — dopasuj rok
+    if (month < now.getMonth() - 6) year += 1;
+    if (month > now.getMonth() + 6) year -= 1;
+    return new Date(year, month, parseInt(m[1], 10), parseInt(m[3], 10), parseInt(m[4], 10));
+};
+
+/** Ukryj seanse, które już się odbyły, i posortuj chronologicznie. */
+const upcomingShowtimes = (times: string[] | undefined): string[] => {
+    if (!times) return [];
+    const now = Date.now();
+    return times
+        .map(t => ({ t, d: parseShowtime(t) }))
+        .filter(x => x.d === null || x.d.getTime() >= now)
+        .sort((a, b) => (a.d?.getTime() ?? 0) - (b.d?.getTime() ?? 0))
+        .map(x => x.t);
+};
+
 export const CinemaWidget: React.FC = () => {
     const { getCinema, setCinema } = useDataCache();
     const [activeTab, setActiveTab] = useState<CinemaLocation>(CinemaLocation.DZIALDOWO);
@@ -32,6 +56,9 @@ export const CinemaWidget: React.FC = () => {
     }, [activeTab, getCinema, setCinema]);
 
     const currentRepertoire = data[activeTab];
+    const visibleMovies = (currentRepertoire?.movies ?? [])
+        .map(movie => ({ ...movie, time: upcomingShowtimes(movie.time) }))
+        .filter(movie => movie.time.length > 0);
 
     return (
         <div className="overflow-hidden h-full flex flex-col">
@@ -70,8 +97,8 @@ export const CinemaWidget: React.FC = () => {
                         <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
                         <p className="text-[9px] text-neutral-500">Ładowanie repertuaru...</p>
                     </div>
-                ) : currentRepertoire?.movies?.length ? (
-                    currentRepertoire.movies.map((movie, idx) => (
+                ) : visibleMovies.length ? (
+                    visibleMovies.map((movie, idx) => (
                         <div key={idx} className="flex gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer items-start">
                             {/* Poster */}
                             <div className="w-14 flex-shrink-0 rounded-lg overflow-hidden shadow-lg shadow-black/40 aspect-[2/3] border border-white/5">
@@ -109,7 +136,7 @@ export const CinemaWidget: React.FC = () => {
                     ))
                 ) : (
                     <div className="text-center py-8 text-neutral-600 text-[10px]">
-                        Brak seansów na dziś
+                        Brak nadchodzących seansów
                     </div>
                 )}
             </div>

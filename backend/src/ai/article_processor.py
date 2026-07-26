@@ -4,6 +4,8 @@ Article Processor - Kategoryzacja artykułów przez AI
 Używa Pydantic AI do automatycznej kategoryzacji artykułów do 8 modułów tematycznych,
 ekstrakcji tagów, lokalizacji i generowania podsumowań.
 """
+import re
+
 from pydantic_ai import Agent
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +18,27 @@ from src.utils.logger import setup_logger
 from src.config import settings
 
 logger = setup_logger("ArticleProcessor")
+
+# Powitanie + data na początku posta ("Dzień dobry! ☀️ Dziś 26 lipca...") — typowy
+# zapychacz feedu. Bezpiecznik na wypadek, gdy AI go nie oznaczy.
+_GREETING_RE = re.compile(
+    r'^\W*(dzień dobry|dobry wieczór|witajcie|witamy|miłego dnia|dobranoc)\W+'
+    r'.{0,40}?dziś\s+(jest\s+)?\d{1,2}',
+    re.IGNORECASE | re.DOTALL,
+)
+# Słowa, których obecność wyklucza uznanie wpisu za zapychacz — nawet po powitaniu
+_URGENT_WORDS = (
+    'awari', 'brak wody', 'brak prądu', 'wypadek', 'pożar', 'utrudnien',
+    'ostrzeżen', 'alert', 'zamknięt', 'ewakuac', 'zagrożen',
+)
+
+
+def _looks_like_filler(title: str, content: str) -> bool:
+    """Deterministyczny bezpiecznik dla postów powitalnych bez treści informacyjnej."""
+    if not _GREETING_RE.match((title or '').strip()):
+        return False
+    haystack = f"{title}\n{content}".lower()
+    return not any(word in haystack for word in _URGENT_WORDS)
 
 
 class ArticleProcessor:
@@ -89,6 +112,10 @@ class ArticleProcessor:
             article.tags = category_data.tags
             article.location_mentioned = category_data.locations_mentioned
             article.summary = category_data.summary
+            article.display_title = category_data.display_title
+            article.is_filler = category_data.is_filler or _looks_like_filler(
+                article.title, text_content
+            )
             article.processed = True
 
             usage = result.usage()

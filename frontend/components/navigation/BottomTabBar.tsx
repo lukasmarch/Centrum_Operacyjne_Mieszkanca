@@ -11,7 +11,7 @@ interface BottomTabBarProps {
 }
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
-  { id: 'home', label: 'Home', icon: Home },
+  { id: 'home', label: 'Start', icon: Home },
   { id: 'assistant', label: 'Asystent', icon: Bot },
   { id: 'miasto', label: 'Info', icon: Building2 },
   { id: 'dane', label: 'Firmy', icon: Store },

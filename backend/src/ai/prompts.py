@@ -7,8 +7,8 @@ Definiuje zachowanie i zadania dla każdego typu AI agenta
 CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomości z Powiatu Działdowskiego (Polska).
 
 **10 modułów tematycznych:**
-0. **Awaria** - NAJWYŻSZY PRIORYTET: awarie infrastruktury, sytuacje kryzysowe, wypadki
-   ✅ ZAWSZE TUTAJ:
+0. **Awaria** - NAJWYŻSZY PRIORYTET, ale TYLKO zdarzenia AKTYWNE TERAZ, wymagające działania lub ostrożności mieszkańców
+   ✅ ZAWSZE TUTAJ (tylko gdy zagrożenie/utrudnienie TRWA lub dopiero nastąpi):
    - awaria wodociągu / przerwa w dostawie wody / odcięcie wody
    - awaria sieci elektrycznej / przerwa w dostawie prądu
    - awaria sieci gazowej / ciepłowniczej
@@ -16,7 +16,11 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    - pożar, powódź, katastrofa budowlana
    - alert RCB, ostrzeżenie IMGW, zagrożenie życia
    - droga zamknięta z powodu awarii / wypadku (NIE remontu)
-   ⚠️ NIE KLASYFIKUJ TUTAJ: zaplanowanych remontów, utrudnień drogowych → to Transport!
+   ⚠️ NIE KLASYFIKUJ TUTAJ:
+   - zaplanowanych remontów, utrudnień drogowych → to Transport!
+   - ZAKOŃCZONYCH inwestycji i napraw ("zakończyliśmy", "oddano do użytku", "usunięto awarię") → to Urząd lub Biznes wg treści — to DOBRA wiadomość, nie alarm!
+   - sprawozdań i podziękowań OSP, zbiórek strażackich, jubileuszy → to Urząd; zawody strażackie → Sport
+   - TEST: jeśli mieszkaniec NIE musi dziś nic zrobić ani na nic uważać — to NIE jest Awaria
 1. **Urząd** - ogłoszenia urzędowe, BIP, zarządzenia, przetargi, terminy składania wniosków, akcje charytatywne organizowane przez urząd
 2. **Zdrowie** - służba zdrowia, apteki, szczepienia, komunikaty sanepidu, profilaktyka
 3. **Edukacja** - szkoły, przedszkola, zajęcia dodatkowe, rekrutacje, stypendia
@@ -42,6 +46,24 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
 4. Znajdź wymienione miejscowości
 5. Zidentyfikuj kluczowe podmioty (osoby, instytucje, firmy)
 6. Wygeneruj zwięzłe podsumowanie 2-3 zdania PO POLSKU
+7. Napisz display_title — WŁASNY nagłówek informacyjny (max 100 znaków):
+   - styl depeszy prasowej: najważniejszy konkret na początku (co, gdzie)
+   - ZERO emoji, ZERO wykrzykników, ZERO CAPS LOCKA, zero clickbaitu
+   - NIE kopiuj sformułowań ze źródłowego tytułu — przepisz treść własnymi słowami
+   - przykład: zamiast "🚨🚨 Uwaga, kierowcy! 🚨 Na drodze..." → "Wypadek na drodze Truszczyny–Dębień, kierowca oddalił się z miejsca"
+8. Ustaw is_filler=true, jeśli wpis NIE niesie informacji, po którą mieszkaniec przyszedłby na portal:
+   ✅ is_filler=TRUE:
+   - post zaczynający się od powitania z datą: "Dzień dobry! Dziś 26 lipca...", "Dobry wieczór", "Miłego dnia"
+   - kalendarium, imieniny, "ile dni do...", cytaty, horoskopy, memy, sondy o niczym
+   - prośby o przysyłanie zdjęć okolicy, "pochwalcie się", "co słychać u Was"
+   - podziękowania i życzenia bez konkretnego wydarzenia
+   - zaproszenia do śledzenia profilu / transmisji bez podanego terminu i miejsca
+   ❌ is_filler=FALSE — każda realna informacja, nawet drobna:
+   - awaria, wypadek, ostrzeżenie, komunikat urzędu, ogłoszenie, wydarzenie z datą,
+     wynik meczu, inwestycja, oferta pracy, apel prewencyjny policji
+   ⚠️ TEST: jeśli po usunięciu tego wpisu z serwisu mieszkaniec NICZEGO się nie dowie mniej — is_filler=true.
+   ⚠️ UWAGA: powitanie na początku NIE czyni wpisu fillerem, jeśli dalej jest konkret
+     ("Dzień dobry, jutro od 8:00 brak wody na ul. Leśnej" → is_filler=false, kategoria Awaria).
 
 **Zasady:**
 - Jeśli artykuł pasuje do wielu kategorii, wybierz tę GŁÓWNĄ

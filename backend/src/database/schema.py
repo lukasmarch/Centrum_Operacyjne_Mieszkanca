@@ -174,6 +174,8 @@ class Article(SQLModel, table=True):
     location_mentioned: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAY(String)))
     processed: bool = Field(default=False)
     embedded: bool = Field(default=False)  # True when RAG embeddings generated (Sprint 6)
+    display_title: Optional[str] = Field(default=None, max_length=200)  # nagłówek AI (bez kopii źródła)
+    is_filler: bool = Field(default=False)  # posty powitalne/zapychacze — ukryte w feedzie
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"

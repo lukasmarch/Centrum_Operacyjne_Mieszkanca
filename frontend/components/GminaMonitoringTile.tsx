@@ -145,10 +145,18 @@ const GminaMonitoringTile: React.FC<GminaMonitoringTileProps> = ({ onNavigate })
             {/* Footer */}
             <div className="flex items-center justify-between pt-2 mt-auto border-t border-white/5">
                 <div className="flex items-center gap-1.5">
-                    <AlertTriangle size={10} className="text-amber-400" />
-                    <span className="text-[9px] font-bold text-neutral-500">
-                        {activeCount} aktywn{activeCount === 1 ? 'e' : 'ych'}
-                    </span>
+                    {activeCount > 0 ? (
+                        <>
+                            <AlertTriangle size={10} className="text-amber-400" />
+                            <span className="text-[9px] font-bold text-neutral-500">
+                                {activeCount} aktywn{activeCount === 1 ? 'e' : 'ych'}
+                            </span>
+                        </>
+                    ) : (
+                        <span className="text-[9px] font-bold text-emerald-400 flex items-center gap-1">
+                            ✓ Brak zgłoszeń w gminie
+                        </span>
+                    )}
                 </div>
                 <span
                     className="text-[9px] text-blue-400 font-semibold cursor-pointer hover:text-blue-300 transition-colors"

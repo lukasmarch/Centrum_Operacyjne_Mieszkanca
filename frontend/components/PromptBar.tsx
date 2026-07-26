@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Send } from 'lucide-react';
+import { Bot, Send, Loader2 } from 'lucide-react';
 import { AppSection } from '../types';
 import { useVoiceInput } from '../src/hooks/useVoiceInput';
 import { VoiceMicButton } from './VoiceMicButton';
@@ -74,7 +74,7 @@ const PromptBar: React.FC<PromptBarProps> = ({ onNavigate, onSubmit }) => {
           </div>
           <div className="ml-auto hidden sm:flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            5 agentów aktywnych
+            Na żywo · 24/7
           </div>
         </div>
 

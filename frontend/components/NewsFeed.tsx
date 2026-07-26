@@ -176,11 +176,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
         headline: a.title,
         url: a.url,
         datePublished: a.rawTimestamp || a.timestamp,
-        image: a.imageUrl || 'https://rybno.pl/icon-512.png',
+        image: a.imageUrl || 'https://rybnolive.pl/og-image.jpg',
         publisher: {
           '@type': 'Organization',
-          name: 'Centrum Operacyjne Rybna',
-          logo: { '@type': 'ImageObject', url: 'https://rybno.pl/icon-512.png' },
+          name: 'RybnoLive',
+          logo: { '@type': 'ImageObject', url: 'https://rybnolive.pl/og-image.jpg' },
         },
       },
     }));

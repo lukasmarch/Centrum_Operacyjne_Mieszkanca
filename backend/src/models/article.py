@@ -17,6 +17,7 @@ class ArticleOutput(BaseModel):
     source_id: int
     source_name: Optional[str] = None  # Added for frontend
     title: str
+    display_title: Optional[str] = None  # nagłówek AI — frontend pokazuje go zamiast title
     summary: Optional[str] = None
     url: str
     image_url: Optional[str] = None

@@ -7,6 +7,7 @@ interface ArticleApiResponse {
   source_id: number;
   source_name: string | null;
   title: string;
+  display_title: string | null;
   summary: string | null;
   url: string;
   image_url: string | null;
@@ -68,9 +69,11 @@ export function useArticles(options: UseArticlesOptions = {}) {
         const data: ArticleApiResponse[] = await response.json();
 
         // Map backend data to frontend format
+        // Nagłówek AI (display_title) zamiast tytułu kopiowanego ze źródła —
+        // surowy title zostaje tylko jako fallback dla nieprzetworzonych artykułów
         const mappedArticles: Article[] = data.map(item => ({
           id: String(item.id),
-          title: item.title,
+          title: item.display_title || item.title,
           summary: item.summary || 'Brak opisu',
           source: item.source_name || 'Nieznane źródło',
           category: item.category || 'Wiadomości',

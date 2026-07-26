@@ -40,6 +40,22 @@ class ArticleCategory(BaseModel):
         max_length=500,
         description="Podsumowanie 2-3 zdania po polsku"
     )
+    display_title: str = Field(
+        max_length=120,
+        description=(
+            "WŁASNY nagłówek informacyjny (max 100 znaków) napisany od zera na podstawie treści. "
+            "Styl depeszy: konkret na początku, bez emoji, bez wykrzykników, bez CAPS LOCKA, "
+            "bez kopiowania sformułowań ze źródła."
+        )
+    )
+    is_filler: bool = Field(
+        default=False,
+        description=(
+            "True, gdy wpis NIE jest wiadomością: powitania typu 'Dzień dobry, dziś...', "
+            "życzenia, kalendarium, horoskopy, grafiki dnia, posty czysto towarzyskie. "
+            "False dla każdej realnej informacji lokalnej."
+        )
+    )
 
 
 class ExtractedEvent(BaseModel):

@@ -270,7 +270,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
                 style={{ background: 'var(--chart-2)' }}
               />
             </span>
-            5 agentów AI aktywnych
+            Na żywo · 24/7
           </div>
 
           {/* H1 */}
@@ -279,13 +279,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
             style={{ fontSize: 'clamp(44px, 5.5vw, 88px)' }}
           >
             <span className="text-white drop-shadow-xl">
-              Centrum
-              <br />
-              Operacyjne
+              Twoja gmina.
               <br />
             </span>
             <span style={{ color: '#5b9cf6', filter: 'drop-shadow(0 0 20px rgba(91,156,246,0.35))' }}>
-              Rybna
+              Na żywo.
             </span>
           </h1>
 
@@ -293,7 +291,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
             className="mb-10 leading-relaxed font-medium"
             style={{ fontSize: 'clamp(15px, 1.1vw, 18px)', color: 'var(--muted-foreground)', maxWidth: '32rem' }}
           >
-            Zapytaj o wiadomości, urząd, statystyki lub wydarzenia gminy Rybno
+            Wiadomości, alerty, pogoda i&nbsp;wydarzenia z&nbsp;gminy Rybno — wszystko w&nbsp;jednym miejscu.
           </p>
 
           <p className="font-semibold mb-3 text-white" style={{ fontSize: 'clamp(16px, 1.3vw, 20px)' }}>

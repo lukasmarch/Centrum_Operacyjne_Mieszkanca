@@ -5,7 +5,7 @@ GET /api/health/today    → who's on duty today (main widget endpoint)
 GET /api/health/clinics  → full weekly schedule (future use)
 """
 import re
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -20,6 +20,43 @@ DAY_NAMES_PL = [
     "poniedziałek", "wtorek", "środa", "czwartek",
     "piątek", "sobota", "niedziela"
 ]
+
+def _easter_date(year: int) -> date:
+    """Easter Sunday (Gauss algorithm) — needed for movable Polish holidays."""
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
+
+
+def _is_polish_holiday(d: date) -> bool:
+    """Dni ustawowo wolne od pracy w Polsce (stałe + ruchome)."""
+    fixed = {
+        (1, 1), (1, 6), (5, 1), (5, 3), (8, 15),
+        (11, 1), (11, 11), (12, 24), (12, 25), (12, 26),
+    }
+    if (d.month, d.day) in fixed:
+        return True
+    easter = _easter_date(d.year)
+    movable = {
+        easter,
+        easter + timedelta(days=1),   # Poniedziałek Wielkanocny
+        easter + timedelta(days=49),  # Zielone Świątki
+        easter + timedelta(days=60),  # Boże Ciało
+    }
+    return d in movable
+
 
 # Matches day ranges like "02-03.03" or "2-3.03"
 _RANGE_RE = re.compile(r'(\d{1,2})-(\d{1,2})\.(\d{2})')
@@ -116,32 +153,45 @@ async def get_health_today(session: AsyncSession = Depends(get_session)):
         for name, doctors in clinics_map.items()
     ]
 
-    # 2. Pharmacies active today
+    # 2. Pharmacies active today — exactly ONE duty type applies per day:
+    #    holiday (dni świąteczne) > weekend (niedziela) > weekday (pn–sob)
     result = await session.execute(
         text("""
-            SELECT pharmacy_name, address, phone, hours_from, hours_to, duty_type, notes
+            SELECT pharmacy_name, address, phone, hours_from, hours_to, duty_type, notes, day_of_week
             FROM pharmacy_duties
             WHERE valid_year = :year
-              AND (
-                  duty_type = 'weekday'
-                  OR (duty_type = 'weekend' AND (:dow = 5 OR :dow = 6))
-                  OR (duty_type = 'holiday' AND :dow = 6)
-                  OR day_of_week = :dow
-              )
             ORDER BY pharmacy_name
         """),
-        {"year": today.year, "dow": day_of_week},
+        {"year": today.year},
     )
     pharmacy_rows = result.fetchall()
 
+    if _is_polish_holiday(today):
+        wanted_duty = "holiday"
+    elif day_of_week == 6:
+        wanted_duty = "weekend"
+    else:
+        wanted_duty = "weekday"
+
+    def _row_matches(row) -> bool:
+        duty_type, row_dow = row[5], row[7]
+        if duty_type == wanted_duty:
+            return True
+        # Explicit day-of-week assignment wins regardless of duty_type label
+        return row_dow is not None and row_dow == day_of_week
+
+    matched = [row for row in pharmacy_rows if _row_matches(row)]
+    # Fallback: holiday without dedicated duty entry → treat like Sunday
+    if not matched and wanted_duty == "holiday":
+        matched = [row for row in pharmacy_rows if row[5] == "weekend"]
+
     pharmacies = []
     seen_pharmacies = set()
-    for row in pharmacy_rows:
-        name, address, phone, hours_from, hours_to, duty_type, notes = row
-        key = f"{name}_{hours_from}"
-        if key in seen_pharmacies:
+    for row in matched:
+        name, address, phone, hours_from, hours_to, duty_type, notes, _ = row
+        if name in seen_pharmacies:
             continue
-        seen_pharmacies.add(key)
+        seen_pharmacies.add(name)
         entry = {
             "name": name,
             "address": address,
