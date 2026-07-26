@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Store, Phone, Clock, Sparkles, ArrowRight, Tag } from 'lucide-react';
 import {
-  fetchCatalog, fetchActiveAnnouncements, trackBusinessView, getAssetUrl,
+  fetchCatalog, fetchActiveAnnouncements, trackBusinessView, getAssetUrl, promotableCards,
   CatalogCard, ActiveAnnouncement,
 } from '../src/services/businessApi';
 import { AppSection } from '../types';
@@ -20,7 +20,7 @@ const PromotedBusinessesTile: React.FC<{ onNavigate?: (section: AppSection) => v
     Promise.allSettled([fetchCatalog(), fetchActiveAnnouncements(6)])
       .then(([catalogRes, annRes]) => {
         if (catalogRes.status === 'fulfilled') {
-          setPremium(catalogRes.value.filter(c => c.profile.is_premium).slice(0, 4));
+          setPremium(promotableCards(catalogRes.value).slice(0, 4));
         }
         if (annRes.status === 'fulfilled') {
           setOkazje(annRes.value.filter(a => a.type === 'okazja').slice(0, 2));
@@ -58,21 +58,24 @@ const PromotedBusinessesTile: React.FC<{ onNavigate?: (section: AppSection) => v
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Store size={14} className="text-amber-400" />
-          <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Polecane w Rybnie</p>
+          {/* Nagłówek „Polecane" tylko wtedy, gdy naprawdę jest kogo polecić */}
+          <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            {hasContent ? 'Polecane w Rybnie' : 'Firmy lokalne'}
+          </p>
         </div>
         {hasContent && (
           <span className="text-[9px] text-neutral-600 uppercase tracking-wider">Materiał promocyjny</span>
         )}
       </div>
 
-      {/* Fallback: brak wizytówek premium — kafel sprzedaje sam plan */}
+      {/* Brak wizytówek do pokazania — kafel sprzedaje pierwszeństwo zamiast udawać pełny katalog */}
       {!hasContent && (
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 px-2">
           <span className="text-4xl">🏪</span>
-          <p className="text-sm font-bold text-neutral-200">Twoja firma może być tutaj</p>
+          <p className="text-sm font-bold text-neutral-200">Bądź pierwszy i przejmij swoją wizytówkę</p>
           <p className="text-xs text-neutral-500 leading-relaxed">
-            Wizytówki lokalnych firm z planu „Firma lokalna" trafiają na stronę główną,
-            do feedu i newslettera. Przejęcie wizytówki jest darmowe.
+            To miejsce czeka na pierwszą firmę z gminy. Wizytówki trafiają na stronę główną,
+            do feedu i newslettera. Przejęcie jest darmowe.
           </p>
           <button
             onClick={goToBusinesses}

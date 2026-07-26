@@ -6,7 +6,7 @@ import {
     fetchCatalog, claimBusiness, fetchMyClaims, updateBusinessProfile, uploadBusinessLogo,
     trackBusinessView, fetchPendingClaims, moderateClaim,
     fetchActiveAnnouncements, fetchMyAnnouncements, createAnnouncement, deactivateAnnouncement,
-    getAssetUrl,
+    getAssetUrl, isOwnerBusiness,
     CatalogCard, MyClaim, PendingClaim, ActiveAnnouncement, BusinessAnnouncement, AnnouncementType,
 } from '../services/businessApi';
 
@@ -143,7 +143,9 @@ const CatalogBusinessCard: React.FC<{
     onAnnouncements?: () => void;
     announcements?: ActiveAnnouncement[];
 }> = ({ card, isOwner, onEdit, onAnnouncements, announcements }) => {
-    const premium = card.profile.is_premium;
+    // Wizytówka właściciela portalu nie dostaje odznaki „Polecane w Rybnie" —
+    // katalog polecający wyłącznie firmę właściciela podważa całą ofertę B2B
+    const premium = card.profile.is_premium && !isOwnerBusiness(card.nazwa);
 
     useEffect(() => {
         trackBusinessView(card.id);
@@ -955,7 +957,10 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                         </h2>
                         <p className="text-neutral-400 mt-2">
                             {view === 'katalog'
-                                ? 'Sprawdzone lokalne firmy z Gminy Rybno — z kontaktem i godzinami otwarcia'
+                                // Liczba mnoga przy jednej wizytówce obiecuje więcej, niż katalog ma do pokazania
+                                ? (catalog.length > 2
+                                    ? 'Sprawdzone lokalne firmy z Gminy Rybno — z kontaktem i godzinami otwarcia'
+                                    : 'Katalog firm z Gminy Rybno właśnie startuje — przejmij wizytówkę swojej firmy za darmo')
                                 : 'Rejestr CEIDG: statystyki, sołectwa, branże i trendy rejestracji firm'}
                         </p>
                     </div>
@@ -1029,7 +1034,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                     ) : (
                         <div className="text-center py-14 bg-white/[0.03] border border-white/5 rounded-3xl">
                             <p className="text-4xl mb-3">🏪</p>
-                            <h3 className="text-lg font-bold text-neutral-200 mb-2">Twoja firma może być pierwsza</h3>
+                            <h3 className="text-lg font-bold text-neutral-200 mb-2">Bądź pierwszy i przejmij swoją wizytówkę</h3>
                             <p className="text-sm text-neutral-500 max-w-md mx-auto">
                                 Katalog wizytówek właśnie startuje. Przejmij kartę swojej firmy za darmo
                                 i bądź widoczny dla mieszkańców całej gminy.

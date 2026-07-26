@@ -42,6 +42,27 @@ export interface CatalogCard {
     profile: BusinessProfilePublic;
 }
 
+/**
+ * Firma właściciela portalu — nie pokazujemy jej jako „Polecane w Rybnie".
+ *
+ * Dopóki katalog jest pusty, wyróżniona wizytówka właściciela czyta się jako reklama
+ * samego siebie — a to pierwsza rzecz, którą zobaczy przedsiębiorca, któremu sprzedajemy
+ * plan Firma lokalna. Wizytówka zostaje w katalogu jako zwykła; traci tylko status
+ * promowanej. Regułę usuwamy, gdy w katalogu będzie kilka realnych firm.
+ */
+const OWNER_BUSINESS_PATTERNS = ['lu-mar-go', 'lumargo', 'lu mar go'];
+
+export function isOwnerBusiness(nazwa?: string | null): boolean {
+    if (!nazwa) return false;
+    const normalized = nazwa.toLowerCase();
+    return OWNER_BUSINESS_PATTERNS.some(pattern => normalized.includes(pattern));
+}
+
+/** Wizytówki nadające się do ekspozycji „Polecane" — premium i nie należące do właściciela. */
+export function promotableCards(cards: CatalogCard[]): CatalogCard[] {
+    return cards.filter(c => c.profile.is_premium && !isOwnerBusiness(c.nazwa));
+}
+
 export interface MyClaim {
     claim_id: number;
     business_id: number;
