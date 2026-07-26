@@ -312,15 +312,17 @@ const AppContent: React.FC = () => {
 
             {/* Footer */}
             {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-500 text-xs relative z-10">
-                {/* Dane sprzedawcy i odnośniki prawne — wymagane przy weryfikacji Przelewy24 */}
+                {/* Odnośniki prawne. Pełne dane rejestrowe operatora są w Regulaminie
+                    i Polityce prywatności — nie powielamy ich na każdej podstronie */}
                 <div className="flex flex-col md:flex-row justify-between gap-6 mb-6">
                     <div className="space-y-1.5">
-                        <p className="font-medium text-neutral-400">Lumargo Łukasz Marchlewicz</p>
-                        <p>ul. Wyzwolenia, 13-220 Rybno · NIP 571-156-78-15</p>
+                        <p className="font-medium text-neutral-400">Operator serwisu: Lumargo</p>
+                        <p>
+                            Dane rejestrowe:{' '}
+                            <a href={SECTION_TO_PATH.terms} onClick={navLink('terms')} className="hover:text-blue-400 transition-colors">Regulamin</a>
+                        </p>
                         <p>
                             <a href="mailto:biuro@lumargo.pl" className="hover:text-blue-400 transition-colors">biuro@lumargo.pl</a>
-                            {' · '}
-                            <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a>
                         </p>
                     </div>
                     <div className="flex flex-col gap-1.5 md:text-right text-neutral-400">
