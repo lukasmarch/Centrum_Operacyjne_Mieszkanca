@@ -40,3 +40,6 @@ pdfplumber>=0.11.0
 
 # Gemini Maps grounding (Sprint 8)
 google-genai>=1.47.0
+
+# Karta dnia na Facebooka — grafika składana lokalnie (services/social_card.py)
+pillow>=10.0.0

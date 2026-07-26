@@ -12,7 +12,7 @@
           ]
         }
       },
-      "id": "464bd9f1-2d1a-45dc-824c-24e31b0a8d35",
+      "id": "1295156b-0ffc-41bf-8b96-9215d017442a",
       "name": "Codziennie 7:45",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -27,7 +27,7 @@
         "path": "rybnolive-post-tekst-3ZJ-4rIGoJv-fvlBKtbhFg",
         "options": {}
       },
-      "id": "75c50000-826c-4ad1-99d2-0d4c7529585e",
+      "id": "d15ea71d-6eb3-4ef7-b44d-33c556b4e7d0",
       "name": "Uruchom teraz",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -35,7 +35,7 @@
         -220,
         180
       ],
-      "webhookId": "d84b7e9f-042a-40a2-a3f7-bc50ecf64a5b"
+      "webhookId": "88a0e544-e9c9-44e1-ba57-ca043c05f716"
     },
     {
       "parameters": {
@@ -46,7 +46,7 @@
           "timeout": 30000
         }
       },
-      "id": "b49f2f79-5088-4b18-a0e5-8c1cb6beb43f",
+      "id": "8cab1443-b740-42eb-a4a0-12595f0474d6",
       "name": "Propozycja",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -63,9 +63,13 @@
     },
     {
       "parameters": {
-        "operation": "sendMessage",
+        "operation": "sendPhoto",
         "chatId": "7032918706",
-        "text": "={{ '📝 Propozycja posta na FB (' + $json.date + ')\\n\\n' + $json.message }}",
+        "file": "={{ $json.image_url }}",
+        "additionalFields": {
+          "caption": "={{ ('📝 Propozycja posta na FB (' + $json.date + ')\\n\\n' + $json.message).slice(0, 900) }}",
+          "appendAttribution": false
+        },
         "replyMarkup": "inlineKeyboard",
         "inlineKeyboard": {
           "rows": [
@@ -88,12 +92,9 @@
               }
             }
           ]
-        },
-        "additionalFields": {
-          "appendAttribution": false
         }
       },
-      "id": "73fe8785-1477-496c-b91e-9e3b90fd292a",
+      "id": "79accb9d-fa35-412a-9eb2-b24f689b9dd9",
       "name": "Do akceptacji (TG)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -114,7 +115,7 @@
         "httpMethod": "GET",
         "options": {}
       },
-      "id": "a0310052-b5d3-4d70-9268-81ed7c77cc50",
+      "id": "aa93ca57-f510-4424-ada3-8998364d8d94",
       "name": "Czekaj na akceptację",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -122,30 +123,30 @@
         440,
         80
       ],
-      "webhookId": "2f711ab0-d7b5-4394-98bc-eb8f18e86c35"
+      "webhookId": "350cc8e0-c529-49d4-bf18-48d37f904acc"
     },
     {
       "parameters": {
         "httpRequestMethod": "POST",
         "graphApiVersion": "v23.0",
         "node": "1266427606545851",
-        "edge": "feed",
+        "edge": "photos",
         "options": {
           "queryParameters": {
             "parameter": [
               {
-                "name": "message",
-                "value": "={{ $('Propozycja').first().json.message }}"
+                "name": "url",
+                "value": "={{ $('Propozycja').first().json.image_url }}"
               },
               {
-                "name": "link",
-                "value": "https://rybnolive.pl"
+                "name": "caption",
+                "value": "={{ $('Propozycja').first().json.message }}"
               }
             ]
           }
         }
       },
-      "id": "5c7dce00-26d6-485a-a6d2-8018c9b31933",
+      "id": "8f0a50ef-d2ae-42f8-855f-0f5e67aa851c",
       "name": "Publikuj na FB",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
@@ -169,7 +170,7 @@
           "appendAttribution": false
         }
       },
-      "id": "92f27e78-838e-4b22-ae38-dea8cfdc6359",
+      "id": "bd09888f-ae8b-4477-849d-91e0432b0926",
       "name": "Potwierdzenie",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,

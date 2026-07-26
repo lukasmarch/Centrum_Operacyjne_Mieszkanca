@@ -40,7 +40,7 @@ from sqlmodel import select
 from src.config import settings
 from src.database import DailySummary
 from src.database.connection import async_session
-from src.services import social_content
+from src.services import social_card, social_content
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,14 @@ def _constant_time_eq(a: str, b: str) -> bool:
 def _slugify(value: str) -> str:
     slug = SLUG_RE.sub("-", value.strip().lower()).strip("-")
     return slug[:60] or "post"
+
+
+def _parse_iso_date(value: Optional[str]) -> date:
+    """Data z podsumowania na kartę; gdy brak lub w innym formacie — dzisiejsza."""
+    try:
+        return date.fromisoformat((value or "")[:10])
+    except ValueError:
+        return date.today()
 
 
 def _validate_source_url(url: str) -> None:
@@ -166,6 +174,22 @@ async def store_image_from_url(source_url: str, slug: str, subdir: Optional[str]
     return {"url": _public_url(relative), "path": f"/uploads/social/{relative}", "bytes": len(chunks)}
 
 
+def store_image_bytes(content: bytes, slug: str, ext: str = ".jpg", subdir: Optional[str] = None) -> dict:
+    """
+    Zapisz grafikę wygenerowaną lokalnie (karta dnia) w tym samym miejscu co pobrane z kie.ai.
+
+    Osobna funkcja od store_image_from_url, bo tamta cały wysiłek wkłada w bezpieczne
+    pobranie z obcego hosta — tutaj bajty pochodzą z naszego procesu.
+    """
+    target_dir = _target_dir(subdir)
+    filename = f"{date.today().isoformat()}_{_slugify(slug)}_{uuid.uuid4().hex[:6]}{ext}"
+    (target_dir / filename).write_bytes(content)
+
+    relative = f"{subdir}/{filename}" if subdir else filename
+    logger.info(f"[social] Zapisano kartę {relative} ({len(content)} B)")
+    return {"url": _public_url(relative), "path": f"/uploads/social/{relative}", "bytes": len(content)}
+
+
 async def _latest_summary() -> dict:
     """Najnowsze dzienne podsumowanie — to samo źródło co GET /api/summary/daily."""
     async with async_session() as session:
@@ -196,15 +220,36 @@ async def get_proposal(
     """
     Gotowa propozycja posta — n8n wysyła `message` na Telegram i po akceptacji na FB.
 
-    kind=text   → szybkie, samo podsumowanie dnia
+    kind=text   → podsumowanie dnia + karta typograficzna składana lokalnie (szybkie, 0 zł)
     kind=photo  → wywołuje kie.ai i czeka na grafikę (zwykle 20-60 s, limit 180 s),
                   więc node HTTP w n8n musi mieć podniesiony timeout
+
+    Oba rodzaje zwracają `image_url` — n8n publikuje je tym samym wywołaniem /photos.
+    Post ze zdjęciem bije w feedzie post z kartą linku, a przy okazji znika problem
+    pustej miniatury OG, który obserwowaliśmy na fanpage'u.
     """
     _require_token(x_social_token)
     summary = await _latest_summary()
 
     if kind == "text":
-        return social_content.build_text_post(summary)
+        proposal = social_content.build_text_post(summary)
+        try:
+            card = social_card.render_daily_card(
+                proposal["headline"],
+                day=_parse_iso_date(proposal.get("date")),
+            )
+        except Exception as exc:
+            # Świadomie fail-closed: awaria renderu to brak fontu lub błąd deployu, więc
+            # jest trwała, nie chwilowa. Cichy fallback do posta bez grafiki kosztowałby
+            # rozgałęzienie w każdym przebiegu n8n, a wada i tak zostałaby niezauważona.
+            logger.error(f"[social] Nie udało się złożyć karty dnia: {exc}", exc_info=True)
+            raise HTTPException(status_code=502, detail=f"Nie udało się złożyć karty dnia: {exc}")
+
+        stored = store_image_bytes(
+            card, slug=social_content.slugify_pl(proposal["headline"] or "karta-dnia")
+        )
+        proposal["image_url"] = stored["url"]
+        return proposal
 
     proposal = await social_content.build_photo_post(summary)
     try:

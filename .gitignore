@@ -74,7 +74,12 @@ backend/data/cache/
 backend/logs/*.log
 
 !frontend/lib/
-DESIGN
+# DESIGN/ to ciężkie materiały (wideo, audio, PSD) — poza repo.
+# Wyjątek: BRAND.md, bo to dokumentacja identyfikacji, a nie asset.
+# Musi być `DESIGN/*`, nie `DESIGN` — do ignorowanego katalogu git nie zagląda,
+# więc wyjątek na plik w środku by nie zadziałał.
+DESIGN/*
+!DESIGN/BRAND.md
 # Zrzuty bazy i raporty — nigdy do repo (19MB dump wchodził przy git add -A)
 *.dump
 Raport_Biznesowy_*.pdf

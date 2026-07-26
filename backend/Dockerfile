@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ src/
 COPY data/ data/
 COPY scripts/ scripts/
+COPY assets/ assets/
 
 RUN mkdir -p uploads/reports logs
 

@@ -151,19 +151,29 @@ def build_text_workflow():
         manual_webhook("Uruchom teraz", manual_path("post-tekst"), [-220, 180]),
         http_get("Propozycja", f"{API}/proposal?kind=text", [0, 80]),
         node("Do akceptacji (TG)", "n8n-nodes-base.telegram", 1.2, {
-            "operation": "sendMessage",
+            # sendPhoto, nie sendMessage: od 26.07 backend dołącza kartę dnia (grafika
+            # składana lokalnie z nagłówka), więc na Telegramie ma być widać dokładnie
+            # to, co pójdzie na fanpage — razem z obrazkiem.
+            "operation": "sendPhoto",
             "chatId": TG_CHAT,
-            "text": "={{ '📝 Propozycja posta na FB (' + $json.date + ')\\n\\n' + $json.message }}",
-            "replyMarkup": "inlineKeyboard",
-            "inlineKeyboard": tg_buttons(manual_path("post-tekst")),
+            "file": "={{ $json.image_url }}",
+            "additionalFields": {
+                # Limit podpisu na Telegramie to 1024 znaki; podsumowanie bywa dłuższe.
+                "caption": "={{ ('📝 Propozycja posta na FB (' + $json.date + ')\\n\\n' + $json.message).slice(0, 900) }}",
+                "appendAttribution": False,
+            },
             # Bez parse_mode: treść jest generowana przez AI i mogłaby zawierać
             # niedomknięte * lub _, na czym Telegram wywala 400.
-            "additionalFields": {"appendAttribution": False},
+            "replyMarkup": "inlineKeyboard",
+            "inlineKeyboard": tg_buttons(manual_path("post-tekst")),
         }, [220, 80], creds=CRED_TG),
         wait_for_click("Czekaj na akceptację", [440, 80]),
-        fb_publish("Publikuj na FB", "feed", [
-            {"name": "message", "value": "={{ $('Propozycja').first().json.message }}"},
-            {"name": "link", "value": "https://rybnolive.pl"},
+        # photos, nie feed: post ze zdjęciem bije w feedzie kartę linku, a przy okazji
+        # znika pusta miniatura OG, którą FB rysował dla parametru `link`.
+        # Adres rybnolive.pl zostaje w treści posta (dokłada go build_text_post).
+        fb_publish("Publikuj na FB", "photos", [
+            {"name": "url", "value": "={{ $('Propozycja').first().json.image_url }}"},
+            {"name": "caption", "value": "={{ $('Propozycja').first().json.message }}"},
         ], [660, 80]),
         tg_confirm("Potwierdzenie", "✅ Post tekstowy opublikowany na fanpage'u RybnoLive.", [880, 80]),
     ]

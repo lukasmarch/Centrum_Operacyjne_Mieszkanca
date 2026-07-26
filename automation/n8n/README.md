@@ -69,10 +69,42 @@ workflow — klik startuje nową egzekucję z nową treścią/grafiką, a stara 
 pozostaje niewznowiona. Sekret w tym URL-u pozwala tylko **wygenerować** propozycję,
 nie opublikować ją, więc jego wyciek nic nie daje.
 
+## Każdy post ma grafikę (od 2026-07-26)
+
+Do 26.07 W1 publikował przez `/feed` z parametrem `link=https://rybnolive.pl`. Facebook
+rysował wtedy kartę linku z tagów OG strony — a te wskazywały **nieistniejącą domenę
+`rybno.pl`**, więc pod każdym postem wisiał pusty biały kwadrat 512×512. Poprawka jest
+dwutorowa:
+
+1. `frontend/index.html` — OG i canonical na `rybnolive.pl`, `og:image` = dedykowany
+   `og-image.jpg` 1200×630, `twitter:card` = `summary_large_image`. Działa wszędzie tam,
+   gdzie ktoś wkleja link ręcznie (Messenger, WhatsApp, komentarze).
+2. W1 publikuje przez `/photos`, nie `/feed` — zdjęcie zamiast karty linku. Adres
+   rybnolive.pl zostaje w treści posta.
+
+Skąd grafika w poście tekstowym — **z `services/social_card.py`, nie z kie.ai**:
+
+| | Karta dnia (W1, codziennie) | Ilustracja AI (W2, wt/czw) |
+|---|---|---|
+| Powstaje | Pillow, lokalnie, ~0,1 s | kie.ai `nano-banana-pro`, ~47 s |
+| Koszt | 0 | ~22 kredyty |
+| Tekst na grafice | `headline` renderowany dosłownie | generowany przez model |
+| Ryzyko | brak | pocięte wyrazy („SPADK NIKÓW MIESZKAŃCÓW”) |
+
+Karta składa się z fontu `backend/assets/fonts/Outfit.ttf` (OFL) i kadru kuli
+`backend/assets/social/orb.jpg` — obie rzeczy leżą w repo i trafiają do obrazu przez
+`COPY assets/ assets/` w `backend/Dockerfile`. Kolory pochodzą z `DESIGN/BRAND.md`.
+
+Render jest **fail-closed**: gdy się nie powiedzie, `/proposal?kind=text` zwraca 502
+i propozycja nie przychodzi na Telegram. Awaria renderu oznacza brak fontu albo błąd
+deployu — jest trwała, więc cichy fallback do posta bez grafiki tylko ukryłby wadę,
+a kosztowałby rozgałęzienie w każdym przebiegu. Wyjątkiem jest sam kadr kuli: jego brak
+tylko loguje ostrzeżenie i karta wychodzi bez tła.
+
 ## Grafiki — jedno miejsce
 
 ```
-uploads/social/            ← grafiki generowane przez kie.ai (dzienne posty)
+uploads/social/            ← karty dnia (W1) + grafiki kie.ai (W2)
 uploads/social/kampania/   ← 11 statycznych grafik kampanii
         ↓
 https://api.rybnolive.pl/uploads/social/…

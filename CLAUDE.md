@@ -162,9 +162,12 @@ GET  /api/social/campaign/due               # kalendarz kampanii
 POST /api/social/media                      # grafika z URL → uploads/social/
 ```
 
-## Automatyzacja social media (2026-07-25)
+## Automatyzacja social media (2026-07-25, grafiki w każdym poście 2026-07-26)
 **Backend robi treść, n8n tylko akceptuje i publikuje.**
 - `services/social_content.py` — treść postów, prompt graficzny, klient kie.ai (`nano-banana-pro`), `CAMPAIGN_PLAN`
+- `services/social_card.py` — **karta dnia**: grafika 1200×630 składana lokalnie (Pillow) z `headline`; 0 zł, ~0,1 s; font `backend/assets/fonts/Outfit.ttf` + kadr `backend/assets/social/orb.jpg` (`COPY assets/` w Dockerfile)
+- **Oba rodzaje postów idą jako `/photos`** (nie `/feed`) — zdjęcie zamiast karty linku; `rybnolive.pl` zostaje w treści
+- OG w `frontend/index.html`: domena `rybnolive.pl` + `og-image.jpg` 1200×630 (było `rybno.pl/icon-512.png` → pusty kwadrat pod postami)
 - Grafiki: **jedno miejsce** `uploads/social/` → `api.rybnolive.pl/uploads/social/…` (wolumen `uploads`).
   Zlikwidowane duplikaty: `frontend/public/kampania/` i `/campaign/` na wolumenie frontendu
 - n8n: 3 workflowy generowane z `automation/n8n/build_workflows.py` (W1 tekstowy 7:45, W2 graficzny wt+czw 17:00, W3 kampania)
