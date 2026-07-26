@@ -107,7 +107,7 @@
                   {
                     "text": "✅ Publikuj na Facebooku",
                     "additionalFields": {
-                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-fb-publish?k=3ZJ-4rIGoJv-fvlBKtbhFg"
+                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-fb-publish?k=__KAMPANIA_SECRET__"
                     }
                   }
                 ]
@@ -376,7 +376,7 @@
                     {
                       "text": "✅ Publikuj na Facebooku",
                       "additionalFields": {
-                        "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-fb-publish?k=3ZJ-4rIGoJv-fvlBKtbhFg"
+                        "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-fb-publish?k=__KAMPANIA_SECRET__"
                       }
                     }
                   ]

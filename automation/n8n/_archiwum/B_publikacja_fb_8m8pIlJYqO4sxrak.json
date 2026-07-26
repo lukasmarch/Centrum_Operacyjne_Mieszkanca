@@ -36,7 +36,7 @@
             {
               "id": "e287fb5d-4496-44fb-8703-63bb6cf1cbfb",
               "leftValue": "={{ $json.query.k }}",
-              "rightValue": "3ZJ-4rIGoJv-fvlBKtbhFg",
+              "rightValue": "__KAMPANIA_SECRET__",
               "operator": {
                 "type": "string",
                 "operation": "equals"
@@ -357,7 +357,7 @@
               {
                 "id": "e287fb5d-4496-44fb-8703-63bb6cf1cbfb",
                 "leftValue": "={{ $json.query.k }}",
-                "rightValue": "3ZJ-4rIGoJv-fvlBKtbhFg",
+                "rightValue": "__KAMPANIA_SECRET__",
                 "operator": {
                   "type": "string",
                   "operation": "equals"

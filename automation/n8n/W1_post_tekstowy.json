@@ -12,7 +12,7 @@
           ]
         }
       },
-      "id": "1295156b-0ffc-41bf-8b96-9215d017442a",
+      "id": "33376836-11ab-42cf-ae87-0858212f3939",
       "name": "Codziennie 7:45",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -24,10 +24,10 @@
     {
       "parameters": {
         "httpMethod": "GET",
-        "path": "rybnolive-post-tekst-3ZJ-4rIGoJv-fvlBKtbhFg",
+        "path": "rybnolive-post-tekst-__KAMPANIA_SECRET__",
         "options": {}
       },
-      "id": "d15ea71d-6eb3-4ef7-b44d-33c556b4e7d0",
+      "id": "b4f3ed72-0a2d-499e-b4da-6920500d8111",
       "name": "Uruchom teraz",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -35,7 +35,7 @@
         -220,
         180
       ],
-      "webhookId": "88a0e544-e9c9-44e1-ba57-ca043c05f716"
+      "webhookId": "0bf74e73-69a6-4c3a-b4fe-6df5cb141a19"
     },
     {
       "parameters": {
@@ -46,7 +46,7 @@
           "timeout": 30000
         }
       },
-      "id": "8cab1443-b740-42eb-a4a0-12595f0474d6",
+      "id": "3ac6fa38-994d-4220-8b5c-8fd9a900bfc4",
       "name": "Propozycja",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -85,7 +85,7 @@
                   {
                     "text": "🔄 Wygeneruj ponownie",
                     "additionalFields": {
-                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-post-tekst-3ZJ-4rIGoJv-fvlBKtbhFg"
+                      "url": "https://n8n.srv1031112.hstgr.cloud/webhook/rybnolive-post-tekst-__KAMPANIA_SECRET__"
                     }
                   }
                 ]
@@ -94,7 +94,7 @@
           ]
         }
       },
-      "id": "79accb9d-fa35-412a-9eb2-b24f689b9dd9",
+      "id": "5c4e5591-fdee-4c98-b732-f5c5d7f07c5d",
       "name": "Do akceptacji (TG)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -115,7 +115,7 @@
         "httpMethod": "GET",
         "options": {}
       },
-      "id": "aa93ca57-f510-4424-ada3-8998364d8d94",
+      "id": "5695c591-cc3e-40aa-9b96-65e307b2003f",
       "name": "Czekaj na akceptację",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -123,7 +123,7 @@
         440,
         80
       ],
-      "webhookId": "350cc8e0-c529-49d4-bf18-48d37f904acc"
+      "webhookId": "1a39c394-44f3-4b96-8880-3193d4dd7ed2"
     },
     {
       "parameters": {
@@ -146,7 +146,7 @@
           }
         }
       },
-      "id": "8f0a50ef-d2ae-42f8-855f-0f5e67aa851c",
+      "id": "db020e52-d474-457a-9e17-2f6fd59c701f",
       "name": "Publikuj na FB",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
@@ -170,7 +170,7 @@
           "appendAttribution": false
         }
       },
-      "id": "bd09888f-ae8b-4477-849d-91e0432b0926",
+      "id": "b1eba5fc-64fd-4e58-8fc2-03144985238e",
       "name": "Potwierdzenie",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,

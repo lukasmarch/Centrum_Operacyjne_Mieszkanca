@@ -44,7 +44,7 @@
           ]
         }
       },
-      "id": "bc43ae30-89f2-4a76-829d-385657938751",
+      "id": "81546ec2-f7c5-4a48-b577-27f99b700a82",
       "name": "Godziny emisji",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -62,7 +62,7 @@
           "timeout": 30000
         }
       },
-      "id": "3dbff5b4-d5ee-4ae3-bcba-d8f903644e5a",
+      "id": "8f56e7fb-9547-4158-931e-2af297f7e8ec",
       "name": "Co dziś?",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -91,7 +91,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "3ac6705b-f132-4758-9aeb-ffaef1154c85",
+                    "id": "e804811d-2c51-434d-9d45-400517b13209",
                     "leftValue": "={{ $json.kind }}",
                     "rightValue": "post",
                     "operator": {
@@ -115,7 +115,7 @@
                 },
                 "conditions": [
                   {
-                    "id": "76a21951-ada9-44ab-8774-561b301247e2",
+                    "id": "a370c7d2-cdd4-45db-a3ce-bf39b5946d6f",
                     "leftValue": "={{ $json.kind }}",
                     "rightValue": "reminder",
                     "operator": {
@@ -133,7 +133,7 @@
         },
         "options": {}
       },
-      "id": "1fbbcbe3-03bf-4ab3-97fe-5ded0de9d9bb",
+      "id": "446e0a9c-abee-4d31-8b86-dd9e57849222",
       "name": "Post czy przypomnienie?",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
@@ -169,7 +169,7 @@
           ]
         }
       },
-      "id": "e6ccb886-eaaa-45d8-bb52-8278ab8a0776",
+      "id": "2bc08cfd-89d6-440f-94f6-b4292f31ffc4",
       "name": "Propozycja postu (TG)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -194,7 +194,7 @@
           "appendAttribution": false
         }
       },
-      "id": "730ad704-7424-4cd9-bbdb-eac82ffdc812",
+      "id": "eac8d272-a65d-4ec0-b8bc-34a98017a515",
       "name": "Przypomnienie (TG)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -215,7 +215,7 @@
         "httpMethod": "GET",
         "options": {}
       },
-      "id": "9596598e-0bad-413b-8913-7a714a36163c",
+      "id": "26f0ecad-a094-46eb-bd67-12763371bab1",
       "name": "Czekaj na akceptację",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -223,7 +223,7 @@
         660,
         -100
       ],
-      "webhookId": "d1b4a718-355b-4365-8066-bab2059cd77b"
+      "webhookId": "32caa5f6-de3c-4f47-974a-d379e7a02a7c"
     },
     {
       "parameters": {
@@ -246,7 +246,7 @@
           }
         }
       },
-      "id": "291ea1c5-2e27-4cf4-95a5-0f5ae960ef62",
+      "id": "da7b7eca-48ea-465e-abf0-9f1040697587",
       "name": "Publikuj na FB",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
@@ -270,7 +270,7 @@
           "appendAttribution": false
         }
       },
-      "id": "977b375b-1c01-404c-9d37-3f2e70c0d4d6",
+      "id": "2559087c-ada6-446a-86c2-0dd0b80f4fdb",
       "name": "Potwierdzenie",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,

@@ -17,7 +17,12 @@ wygenerować nową propozycję — nie opublikować, więc jego wyciek nic nie d
 
 Użycie:
     python3 automation/n8n/build_workflows.py            # zapisz JSON-y lokalnie
-    python3 automation/n8n/build_workflows.py --push     # wyślij do n8n (nieaktywne)
+    python3 automation/n8n/build_workflows.py --update   # nadpisz workflowy żyjące w n8n
+    python3 automation/n8n/build_workflows.py --push     # utwórz NOWE (nieaktywne)
+
+Do zmian w istniejących flow służy `--update`, nie `--push`: ten drugi tworzy duplikaty,
+a sprzątanie po nim to trwały DELETE w n8n API. Sekret nie trafia do plików — w JSON-ach
+siedzi placeholder, podstawiany dopiero przy wysyłce.
 """
 import json
 import os
@@ -33,6 +38,7 @@ HERE = Path(__file__).parent
 API = "https://api.rybnolive.pl/api/social"
 N8N = os.environ.get("N8N_BASE_URL", "https://n8n.srv1031112.hstgr.cloud")
 SECRET = os.environ.get("KAMPANIA_SECRET", "")
+SECRET_PLACEHOLDER = "__KAMPANIA_SECRET__"  # w plikach; podstawiany dopiero w drodze do n8n
 
 PAGE_ID = "1266427606545851"
 TG_CHAT = "7032918706"
@@ -75,11 +81,14 @@ def manual_path(slug: str) -> str:
 
     Przycisk w Telegramie to zwykły link — nie da się wysłać nagłówka, a walidacja
     parametru wymagałaby dodatkowego noda IF w każdym workflow. Ścieżka z sekretem
-    jest niezgadywalna i kosztuje zero nodów. Uruchomienie i tak tylko GENERUJE
-    propozycję (publikować może wyłącznie jednorazowy resumeUrl), więc najgorsze,
-    co daje wyciek, to zbędna wiadomość na Telegramie i kilka kredytów kie.ai.
+    jest niezgadywalna i kosztuje zero nodów.
+
+    W plikach zostaje PLACEHOLDER, nie sekret. Do 26.07 generator wpisywał tu prawdziwą
+    wartość i JSON-y lądowały z nią w publicznym repo. Publikować się tym nie dało
+    (chroni jednorazowy resumeUrl), ale dało się uruchamiać W2 w pętli — a to gpt-4o
+    plus ~22 kredyty kie.ai za każdym razem.
     """
-    return f"rybnolive-{slug}-{SECRET}"
+    return f"rybnolive-{slug}-{SECRET_PLACEHOLDER}"
 
 
 def manual_webhook(name, path, pos):
@@ -319,20 +328,43 @@ BUILDERS = {
     "W3_kampania.json": build_campaign_workflow,
 }
 
+# ID workflowów żyjących w n8n — cel dla `--update`. Bez nich każda wysyłka tworzyłaby
+# duplikat, a starą wersję trzeba by kasować ręcznie (DELETE w n8n API jest trwały).
+LIVE_IDS = {
+    "W1_post_tekstowy.json": "XVyOeaFWiNuESBkZ",
+    "W2_post_graficzny.json": "UoR37sQDJniUJJw4",
+    "W3_kampania.json": "ZgLqKnVckwmCema8",
+}
 
-def push(payload: dict) -> str:
-    key = os.environ["N8N_API_KEY"]
+
+def with_secret(payload: dict) -> dict:
+    """Podstaw prawdziwy sekret w miejsce placeholdera — tylko w drodze do n8n."""
+    filled = json.dumps(payload, ensure_ascii=False).replace(SECRET_PLACEHOLDER, SECRET)
+    return json.loads(filled)
+
+
+def _send(url: str, payload: dict, method: str) -> dict:
     request = urllib.request.Request(
-        f"{N8N}/api/v1/workflows",
-        data=json.dumps(payload).encode(),
-        headers={"X-N8N-API-KEY": key, "Content-Type": "application/json"},
-        method="POST",
+        url,
+        data=json.dumps(with_secret(payload), ensure_ascii=False).encode(),
+        headers={"X-N8N-API-KEY": os.environ["N8N_API_KEY"], "Content-Type": "application/json"},
+        method=method,
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
-            return json.load(response)["id"]
+            return json.load(response)
     except urllib.error.HTTPError as exc:
         raise SystemExit(f"n8n odrzuciło {payload['name']}: {exc.read().decode()[:400]}")
+
+
+def push(payload: dict) -> str:
+    """Utwórz NOWY workflow (nieaktywny). Duplikuje, jeśli taki już istnieje."""
+    return _send(f"{N8N}/api/v1/workflows", payload, "POST")["id"]
+
+
+def update(workflow_id: str, payload: dict) -> str:
+    """Nadpisz istniejący workflow. Zachowuje id i stan aktywności."""
+    return _send(f"{N8N}/api/v1/workflows/{workflow_id}", payload, "PUT")["id"]
 
 
 if __name__ == "__main__":
@@ -340,10 +372,13 @@ if __name__ == "__main__":
         raise SystemExit("Brak KAMPANIA_SECRET w środowisku — załaduj automation/.env")
 
     do_push = "--push" in sys.argv
+    do_update = "--update" in sys.argv
     for filename, builder in BUILDERS.items():
         wf = builder()
         (HERE / filename).write_text(json.dumps(wf, ensure_ascii=False, indent=2), encoding="utf-8")
         line = f"✔ {filename:26} {len(wf['nodes'])} nodów"
+        if do_update:
+            line += f"  →  zaktualizowany w n8n ({update(LIVE_IDS[filename], wf)})"
         if do_push:
             line += f"  →  n8n id {push(wf)}"
         print(line)

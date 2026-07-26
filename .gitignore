@@ -84,8 +84,9 @@ DESIGN/*
 *.dump
 Raport_Biznesowy_*.pdf
 
-# Sekrety automatyzacji (n8n, kie.ai) — automation/.env
+# Sekrety automatyzacji (n8n, kie.ai) — automation/.env i jego kopie
 automation/.env
+automation/.env.*
 
 # Kopie workflowów pobrane z n8n — zawierają sekret w ścieżce webhooka
 automation/n8n/_backup/

@@ -141,4 +141,25 @@ Po 10.08: **dezaktywuj W3** (przypomnienie przychodzi na Telegram 10.08 o 10:00)
 `SOCIAL_MEDIA_TOKEN`, `KAMPANIA_SECRET`. Te same wartości po stronie backendu żyją
 w `backend/.env.production` (`SOCIAL_MEDIA_TOKEN`, `KIE_API_KEY`).
 
+**W plikach workflowów sekretu nie ma** — jest `__KAMPANIA_SECRET__`, podstawiany dopiero
+przy wysyłce (`with_secret()`). Do 26.07 generator wpisywał prawdziwą wartość, więc JSON-y
+leżały z nią w publicznym repo. Opublikować niczego się tym nie dało (chroni jednorazowy
+`resumeUrl`), ale dało się **uruchamiać** W2 w pętli, a to gpt-4o plus ~22 kredyty kie.ai
+za każdym wywołaniem. Sekret zrotowany 26.07, stare ścieżki webhooków już nie działają.
+
+Historia gita zostaje publiczna — stary sekret traktuj jako spalony na zawsze. Kopie
+pobierane z n8n trzymaj w `automation/n8n/_backup/` (poza repo), nigdy obok plików
+generowanych.
+
+## Zmiana workflow
+
+```bash
+set -a; . automation/.env; set +a
+python3 automation/n8n/build_workflows.py --update    # nadpisuje po ID z LIVE_IDS
+```
+
+`--update` (PUT) zachowuje id i stan aktywności. `--push` (POST) tworzy **nowy** workflow —
+używaj tylko dla czegoś, czego jeszcze nie ma w n8n, bo sprzątanie duplikatu to trwały
+DELETE.
+
 Klucz Public API n8n wygasa **2026-08-23** — po tej dacie wygeneruj nowy w Settings → API.
