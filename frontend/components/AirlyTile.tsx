@@ -266,10 +266,12 @@ const AirlyTile: React.FC = () => {
       </div>
 
       {/* ── Main: Gauge + level info ────────────────────────────── */}
-      <GCard className="p-4 flex gap-4 items-center">
+      {/* flex-wrap + min-w na kolumnie: w wąskim kaflu tekst schodzi pod tarczę,
+          zamiast zwężać się do jednego słowa w linii */}
+      <GCard className="p-4 flex flex-wrap gap-4 items-center justify-center">
         <DonutGauge value={d.caqi} maxValue={100} color={lvl.color} label="CAQI" sublabel={lvl.label} />
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-[170px]">
           {/* Ocena i wartość CAQI są już na tarczy — powtórzenie ich obok rozpychało kafel
               i łamało "Bardzo Dobra" na dwie linie. Tu zostaje ikona, porada i pomiary. */}
           <div className="flex items-start gap-2">
