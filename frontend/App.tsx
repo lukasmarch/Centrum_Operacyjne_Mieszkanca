@@ -312,16 +312,16 @@ const AppContent: React.FC = () => {
 
             {/* Footer */}
             {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-500 text-xs relative z-10">
-                {/* Odnośniki prawne. Pełne dane rejestrowe operatora są w Regulaminie
-                    i Polityce prywatności — nie powielamy ich na każdej podstronie */}
-                <div className="flex flex-col md:flex-row justify-between gap-6 mb-6">
-                    <div className="space-y-1.5">
-                        <p className="font-medium text-neutral-400">Operator serwisu: Lumargo</p>
-                        <p>
-                            Dane rejestrowe:{' '}
-                            <a href={SECTION_TO_PATH.terms} onClick={navLink('terms')} className="hover:text-blue-400 transition-colors">Regulamin</a>
-                        </p>
-                        <p>
+                {/* Blok danych sprzedawcy — identyfikacja wymagana przy sprzedaży online.
+                    Imię, nazwisko i telefon wyłącznie w Regulaminie i Polityce prywatności */}
+                <div className="flex flex-col md:flex-row justify-between gap-8 mb-6">
+                    <div className="leading-relaxed">
+                        <p className="font-medium text-neutral-400 mb-1">© 2026 Rybno Live</p>
+                        <p>Lumargo</p>
+                        <p>Żabiny 96</p>
+                        <p>13-220 Rybno</p>
+                        <p>NIP: 571-156-78-15</p>
+                        <p className="mt-1">
                             <a href="mailto:biuro@lumargo.pl" className="hover:text-blue-400 transition-colors">biuro@lumargo.pl</a>
                         </p>
                     </div>
@@ -333,7 +333,7 @@ const AppContent: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4 border-t border-white/5">
-                    <p className="font-medium">© 2026 Rybno Live · Ai_lumargo · Płatności: Przelewy24 (BLIK, karta, przelew online)</p>
+                    <p>Płatności: Przelewy24 (BLIK, karta, przelew online)</p>
                     <div className="flex gap-4 font-mono opacity-50">
                         <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Rybno-1</span>
                         <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> API: v2.4</span>
