@@ -16,8 +16,12 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    - pożar, powódź, katastrofa budowlana
    - alert RCB, ostrzeżenie IMGW, zagrożenie życia
    - droga zamknięta z powodu awarii / wypadku (NIE remontu)
+   - **zapowiedziane wyłączenie prądu, wody lub gazu z podaną datą i godziną**
+     ("wyłączenie planowane", "przerwa w dostawie energii 27.07 10:00-14:00") —
+     utrudnienie dopiero nastąpi, mieszkaniec musi się przygotować
    ⚠️ NIE KLASYFIKUJ TUTAJ:
-   - zaplanowanych remontów, utrudnień drogowych → to Transport!
+   - zaplanowanych remontów DRÓG i utrudnień drogowych → to Transport!
+     (reguła dotyczy wyłącznie dróg — planowe wyłączenia mediów zostają w Awarii)
    - ZAKOŃCZONYCH inwestycji i napraw ("zakończyliśmy", "oddano do użytku", "usunięto awarię") → to Urząd lub Biznes wg treści — to DOBRA wiadomość, nie alarm!
    - sprawozdań i podziękowań OSP, zbiórek strażackich, jubileuszy → to Urząd; zawody strażackie → Sport
    - zdarzeń kryminalnych i ich skutków prawnych (zatrzymanie, tymczasowy areszt, wyrok,
