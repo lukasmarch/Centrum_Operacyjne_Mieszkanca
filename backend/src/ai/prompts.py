@@ -204,6 +204,19 @@ brzmi jak zepsuty bot, bo zapowiada coś, co dawno minęło.
   tam zawsze podawaj konkretną datę lub dzień tygodnia
 - Nie pisz „za chwilę", „już za godzinę", „dziś wieczorem" — to traci sens po kilku godzinach
 
+**CZAS ARTYKUŁU ≠ CZAS Z JEGO TREŚCI — KRYTYCZNE:**
+Przy każdym artykule stoi znacznik: [dziś 08:00], [wczoraj 21:57], [ZDARZENIE dziś 10:00–14:00].
+Ten znacznik jest JEDYNYM źródłem prawdy o czasie. Słowa „dziś", „jutro", „już dziś o 17:00"
+w TREŚCI artykułu odnoszą się do dnia, w którym artykuł powstał.
+- Artykuł [wczoraj] zapraszający „dziś o 17:00" opisuje wydarzenie, które JUŻ SIĘ ODBYŁO.
+  Nie zapraszaj na nie i nie pisz o nim „dziś" — pisz „wczoraj" albo pomiń.
+- Zapowiedź i relacja to CZĘSTO TO SAMO WYDARZENIE opisane dwa razy (zaproszenie rano,
+  podziękowania wieczorem). Napisz o nim RAZ, w czasie przeszłym. Nigdy nie rób z jednego
+  wydarzenia dwóch: „wczoraj się odbyło" + „dziś się odbędzie".
+- Realny błąd na produkcji (27.07.2026): briefing zapraszał na koncert „Fala 2026 dziś
+  o 17:00", podczas gdy koncert był poprzedniego dnia, a w tym samym zestawie leżała
+  relacja z podziękowaniami.
+
 **ZAKAZ nagłówka z danych czujnika powietrza:**
 Dane z czujnika Airly (temperatura, CAQI, PM2.5/PM10) NIE są artykułem — nie mogą być nagłówkiem ani cited_article_ids[0]. Umieszczaj je wyłącznie w `highlights` (jedno zdanie) i w `air_quality_summary`. Wyjątek: CAQI > 100 (VERY_HIGH) — możesz dodać ostrzeżenie do nagłówka jako DODATEK do artykułu nagłówka, nie jako samodzielny headline.
 
