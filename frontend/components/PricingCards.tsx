@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { CheckCircle, Zap, Crown, Store } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type Frequency = 'monthly' | 'yearly';
+export type Frequency = 'monthly' | 'yearly';
 
-interface Plan {
+export interface Plan {
   id: string;
   name: string;
   icon: React.ElementType;
@@ -16,7 +16,8 @@ interface Plan {
   tierKey: string;
 }
 
-const PLANS: Plan[] = [
+// Eksportowane — strona podsumowania zamówienia (CheckoutPage) korzysta z tych samych cen
+export const PLANS: Plan[] = [
   {
     id: 'free',
     name: 'Dla Każdego',

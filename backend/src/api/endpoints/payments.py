@@ -152,6 +152,18 @@ async def create_transaction(
             detail="Złożenie zamówienia wymaga akceptacji Regulaminu (zamówienie z obowiązkiem zapłaty)",
         )
 
+    # Bramka niegotowa (brak kluczy P24) — odrzuć zanim powstanie osierocona subskrypcja PENDING
+    if not p24_service.is_configured():
+        logger.warning("create-transaction: Przelewy24 nieskonfigurowane (brak P24_MERCHANT_ID/CRC/API_KEY)")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Płatności online są w tej chwili uruchamiane u operatora płatności. "
+                "Napisz na biuro@lumargo.pl lub zadzwoń pod +48 501 081 723 — przyjmiemy zamówienie "
+                "i aktywujemy plan."
+            ),
+        )
+
     # Rozliczalność zgody (RODO art. 7) — odśwież datę akceptacji regulaminu przy zakupie
     user.consent_terms_at = datetime.utcnow()
 

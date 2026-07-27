@@ -764,7 +764,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                     });
                     if (!res.ok) {
                       const err = await res.json().catch(() => ({}));
-                      alert(err.detail || 'Błąd podczas tworzenia płatności.');
+                      // 503 = bramka jeszcze nieaktywna; komunikat z backendu podaje drogę do zakupu
+                      setLocalError(err.detail || 'Błąd podczas tworzenia płatności.');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
                       return;
                     }
                     const data = await res.json();

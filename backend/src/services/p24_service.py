@@ -36,7 +36,8 @@ class P24Service:
         self.sandbox = settings.P24_SANDBOX
         self.base_url = P24_BASE_URL_SANDBOX if self.sandbox else P24_BASE_URL_PROD
 
-    def _is_configured(self) -> bool:
+    def is_configured(self) -> bool:
+        """Czy komplet kluczy z panelu P24 jest w środowisku (bez nich nie da się zarejestrować transakcji)"""
         return bool(self.merchant_id and self.crc_key and self.api_key)
 
     def _auth(self) -> HTTPBasicAuth:
@@ -81,7 +82,7 @@ class P24Service:
         Returns:
             {"token": "...", "redirect_url": "...", "order_id": "..."}
         """
-        if not self._is_configured():
+        if not self.is_configured():
             raise RuntimeError("Przelewy24 nie jest skonfigurowane (brak P24_MERCHANT_ID/P24_CRC_KEY/P24_API_KEY w .env)")
 
         sign = self._sign_transaction(session_id, amount, currency)
@@ -139,7 +140,7 @@ class P24Service:
         Returns:
             True jeśli transakcja zweryfikowana poprawnie
         """
-        if not self._is_configured():
+        if not self.is_configured():
             raise RuntimeError("Przelewy24 nie jest skonfigurowane")
 
         sign = self._sign_verify(session_id, order_id, amount, currency)
@@ -176,7 +177,7 @@ class P24Service:
 
     def get_transaction_status(self, session_id: str) -> Optional[dict]:
         """Sprawdza status transakcji po session_id"""
-        if not self._is_configured():
+        if not self.is_configured():
             return None
         try:
             resp = requests.get(

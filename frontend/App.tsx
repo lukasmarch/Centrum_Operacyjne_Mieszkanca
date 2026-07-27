@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Dashboard from './components/Dashboard';
 import NewsFeed from './components/NewsFeed';
@@ -12,7 +12,7 @@ import BottomTabBar from './components/navigation/BottomTabBar';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import CookieConsent from './components/CookieConsent';
 import PaymentReturnBanner from './components/PaymentReturnBanner';
-import PricingCards from './components/PricingCards';
+import PricingCards, { Frequency } from './components/PricingCards';
 import SubNavBar from './components/navigation/SubNavBar';
 import TopBar from './components/navigation/TopBar';
 import { BeamsBackground } from './components/ui/beams-background';
@@ -27,6 +27,7 @@ const AssistantPage = lazy(() => import('./src/pages/AssistantPage'));
 const TermsPage        = lazy(() => import('./src/pages/TermsPage'));
 const PrivacyPage      = lazy(() => import('./src/pages/PrivacyPage'));
 const CookiePolicyPage = lazy(() => import('./src/pages/CookiePolicyPage'));
+const CheckoutPage     = lazy(() => import('./src/pages/CheckoutPage'));
 
 const MIASTO_ITEMS = [
     { id: 'news', label: 'Wiadomości' },
@@ -48,6 +49,7 @@ const SECTION_TO_TAB: Record<AppSection, TabId> = {
     stats: 'dane',
     business: 'dane',
     premium: 'home',
+    checkout: 'home',
     profile: 'home',
     login: 'home',
     register: 'home',
@@ -73,6 +75,7 @@ export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
     privacy: '/polityka-prywatnosci',
     cookies: '/polityka-cookies',
     premium: '/cennik',
+    checkout: '/zamowienie',
 };
 
 const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PATH)
@@ -81,6 +84,17 @@ const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PA
 const sectionFromPath = (): AppSection =>
     PATH_TO_SECTION[window.location.pathname.replace(/\/+$/, '')] ?? 'dashboard';
 
+// Wybrany plan żyje w adresie (/zamowienie?plan=premium&okres=yearly), żeby zamówienie
+// przetrwało odświeżenie strony i drogę przez rejestrację konta
+type CheckoutSelection = { tier: string; frequency: Frequency };
+
+const checkoutFromUrl = (): CheckoutSelection | null => {
+    const params = new URLSearchParams(window.location.search);
+    const tier = params.get('plan');
+    if (tier !== 'premium' && tier !== 'business') return null;
+    return { tier, frequency: params.get('okres') === 'yearly' ? 'yearly' : 'monthly' };
+};
+
 const AppContent: React.FC = () => {
     const [activeSection, setActiveSection] = useState<AppSection>(sectionFromPath);
     const [activeTab, setActiveTab] = useState<TabId>(() => SECTION_TO_TAB[sectionFromPath()]);
@@ -88,14 +102,19 @@ const AppContent: React.FC = () => {
     const { user, isAuthenticated, isLoading, logout } = useAuth();
 
     const [profileInitialTab, setProfileInitialTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | undefined>(undefined);
+    const [checkoutSelection, setCheckoutSelection] = useState<CheckoutSelection | null>(checkoutFromUrl);
 
     // Adres w pasku przeglądarki podąża za sekcją (tylko dla sekcji z SECTION_TO_PATH)
-    const syncUrl = useCallback((section: AppSection) => {
+    const syncUrl = useCallback((section: AppSection, selection?: CheckoutSelection | null) => {
         const path = SECTION_TO_PATH[section] ?? '/';
-        if (window.location.pathname !== path) {
-            window.history.pushState({}, '', path);
+        const sel = selection !== undefined ? selection : checkoutSelection;
+        const url = section === 'checkout' && sel
+            ? `${path}?plan=${sel.tier}&okres=${sel.frequency}`
+            : path;
+        if (window.location.pathname + window.location.search !== url) {
+            window.history.pushState({}, '', url);
         }
-    }, []);
+    }, [checkoutSelection]);
 
     const handleNavigate = useCallback((section: AppSection | 'logout' | 'preferences' | 'subscription') => {
         if (section === 'logout') {
@@ -120,6 +139,29 @@ const AppContent: React.FC = () => {
             syncUrl(section);
         }
     }, [logout, syncUrl]);
+
+    // Wybór planu w cenniku → podsumowanie zamówienia (dostępne bez konta)
+    const startCheckout = useCallback((tier: string, frequency: Frequency) => {
+        if (tier !== 'premium' && tier !== 'business') return;
+        const selection = { tier, frequency };
+        setCheckoutSelection(selection);
+        setActiveSection('checkout');
+        setActiveTab('home');
+        syncUrl('checkout', selection);
+        window.scrollTo({ top: 0 });
+    }, [syncUrl]);
+
+    // Po założeniu konta lub zalogowaniu wracamy do rozpoczętego zamówienia,
+    // zamiast zostawiać kupującego na kokpicie
+    const wasAuthenticated = useRef(isAuthenticated);
+    useEffect(() => {
+        if (isAuthenticated && !wasAuthenticated.current && checkoutSelection) {
+            setActiveSection('checkout');
+            setActiveTab('home');
+            syncUrl('checkout', checkoutSelection);
+        }
+        wasAuthenticated.current = isAuthenticated;
+    }, [isAuthenticated, checkoutSelection, syncUrl]);
 
     const handleTabChange = useCallback((tab: TabId) => {
         setActiveTab(tab);
@@ -212,6 +254,14 @@ const AppContent: React.FC = () => {
                 return <PrivacyPage onNavigate={handleNavigate} />;
             case 'cookies':
                 return <CookiePolicyPage onNavigate={handleNavigate} />;
+            case 'checkout':
+                return (
+                    <CheckoutPage
+                        tierKey={checkoutSelection?.tier ?? 'premium'}
+                        frequency={checkoutSelection?.frequency ?? 'monthly'}
+                        onNavigate={handleNavigate}
+                    />
+                );
             case 'premium':
                 return (
                     <div className="max-w-4xl mx-auto py-12">
@@ -221,11 +271,50 @@ const AppContent: React.FC = () => {
                         </div>
                         <PricingCards
                             currentTier={user?.tier || 'free'}
-                            onSelect={() => {
-                                // Checkout (z wymaganą akceptacją regulaminu) mieszka w Profil → Subskrypcja
-                                handleNavigate(isAuthenticated ? 'subscription' : 'register');
-                            }}
+                            onSelect={startCheckout}
                         />
+
+                        {/* Przebieg zakupu opisany jawnie — kupujący (i weryfikator Przelewy24)
+                            musi znać kolejne kroki i warunki przed założeniem konta */}
+                        <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6">
+                                <h3 className="text-lg font-bold mb-4">Jak kupić dostęp</h3>
+                                <ol className="space-y-3 text-sm text-neutral-400">
+                                    <li><span className="text-blue-400 font-bold mr-2">1.</span>Wybierz plan powyżej (Premium lub Firma lokalna) i okres rozliczeniowy — miesięczny albo roczny.</li>
+                                    <li><span className="text-blue-400 font-bold mr-2">2.</span>Na stronie <strong className="text-neutral-300">Podsumowanie zamówienia</strong> sprawdź cenę i zakres planu, po czym zaakceptuj Regulamin.</li>
+                                    <li><span className="text-blue-400 font-bold mr-2">3.</span>Załóż konto lub zaloguj się — dostęp do planu jest przypisany do konta w serwisie.</li>
+                                    <li><span className="text-blue-400 font-bold mr-2">4.</span>Potwierdź zamówienie z obowiązkiem zapłaty i przejdź do bramki Przelewy24 — BLIK, karta lub przelew online.</li>
+                                    <li><span className="text-blue-400 font-bold mr-2">5.</span>Po zaksięgowaniu płatności plan aktywuje się automatycznie, a potwierdzenie trafia na Twój e-mail.</li>
+                                </ol>
+                            </div>
+
+                            <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 text-sm text-neutral-400 space-y-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white mb-2">Sprzedawca</h3>
+                                    <p className="leading-relaxed">
+                                        Studio Kamienia Naturalnego Lu-Mar-Go<br />
+                                        Żabiny 96, 13-220 Rybno<br />
+                                        NIP: 571-156-78-15<br />
+                                        <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a>
+                                        {' · '}
+                                        <a href="mailto:biuro@lumargo.pl" className="hover:text-blue-400 transition-colors">biuro@lumargo.pl</a>
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-neutral-300 mb-1">Płatności i rezygnacja</h4>
+                                    <p className="leading-relaxed">
+                                        Płatności obsługuje PayPro S.A. (Przelewy24). Ceny są cenami brutto w złotych.
+                                        Płacisz z góry za wybrany okres — subskrypcja nie odnawia się automatycznie i wygasa po jego upływie.
+                                        Konsumentowi przysługuje prawo odstąpienia od umowy w terminie 14 dni (szczegóły i wzór oświadczenia w Regulaminie).
+                                    </p>
+                                </div>
+                                <p className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                                    <a href={SECTION_TO_PATH.terms} onClick={navLink('terms')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">Regulamin</a>
+                                    <a href={SECTION_TO_PATH.privacy} onClick={navLink('privacy')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">Polityka prywatności</a>
+                                    <a href={SECTION_TO_PATH.cookies} onClick={navLink('cookies')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">Polityka cookies</a>
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 );
             default:
@@ -313,15 +402,19 @@ const AppContent: React.FC = () => {
             {/* Footer */}
             {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-500 text-xs relative z-10">
                 {/* Blok danych sprzedawcy — identyfikacja wymagana przy sprzedaży online.
-                    Imię, nazwisko i telefon wyłącznie w Regulaminie i Polityce prywatności */}
+                    Pełna nazwa firmy i telefon kontaktowy — wymóg weryfikacji Przelewy24.
+                    Imię i nazwisko właściciela pozostaje w Regulaminie i Polityce prywatności */}
                 <div className="flex flex-col md:flex-row justify-between gap-8 mb-6">
                     <div className="leading-relaxed">
                         <p className="font-medium text-neutral-400 mb-1">© 2026 Rybno Live</p>
-                        <p>Lumargo</p>
+                        <p>Studio Kamienia Naturalnego Lu-Mar-Go</p>
                         <p>Żabiny 96</p>
                         <p>13-220 Rybno</p>
                         <p>NIP: 571-156-78-15</p>
                         <p className="mt-1">
+                            <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a>
+                        </p>
+                        <p>
                             <a href="mailto:biuro@lumargo.pl" className="hover:text-blue-400 transition-colors">biuro@lumargo.pl</a>
                         </p>
                     </div>

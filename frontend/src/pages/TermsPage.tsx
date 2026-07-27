@@ -21,7 +21,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
     <h2>§ 1. Postanowienia ogólne</h2>
     <ol>
       <li>Niniejszy Regulamin określa zasady świadczenia usług drogą elektroniczną w serwisie internetowym <strong>RybnoLive.pl — Centrum Operacyjne Mieszkańca</strong> (dalej: „Serwis"), dostępnym pod adresem https://rybnolive.pl.</li>
-      <li>Operatorem Serwisu (Sprzedawcą) jest <strong>Lumargo Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: Żabiny 96, 13-220 Rybno (dalej: „Operator"). Kontakt: <strong>biuro@lumargo.pl</strong>, tel. <strong>+48 501 081 723</strong>.</li>
+      <li>Operatorem Serwisu (Sprzedawcą) jest <strong>Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: Żabiny 96, 13-220 Rybno (dalej: „Operator"). Kontakt: <strong>biuro@lumargo.pl</strong>, tel. <strong>+48 501 081 723</strong>.</li>
       <li>Regulamin jest regulaminem, o którym mowa w art. 8 ustawy z dnia 18 lipca 2002 r. o świadczeniu usług drogą elektroniczną.</li>
       <li>Korzystanie z Serwisu oznacza akceptację Regulaminu. Rejestracja konta wymaga wyraźnej akceptacji Regulaminu oraz zapoznania się z Polityką prywatności.</li>
     </ol>
@@ -148,7 +148,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
     <h2>Załącznik nr 1 — wzór oświadczenia o odstąpieniu od umowy</h2>
     <p className="text-neutral-400 text-sm">(formularz należy wypełnić i odesłać tylko w przypadku chęci odstąpienia od umowy)</p>
     <blockquote>
-      <p>Adresat: <strong>Lumargo Łukasz Marchlewicz</strong>, Żabiny 96, 13-220 Rybno, e-mail: biuro@lumargo.pl</p>
+      <p>Adresat: <strong>Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz</strong>, Żabiny 96, 13-220 Rybno, e-mail: biuro@lumargo.pl</p>
       <p>Ja/My (*) niniejszym informuję/informujemy (*) o moim/naszym (*) odstąpieniu od umowy o świadczenie następującej usługi:</p>
       <p>………………………………………………………………………………… (nazwa planu, np. Premium — miesięczny)</p>
       <p>Data zawarcia umowy / zamówienia: …………………………………</p>
