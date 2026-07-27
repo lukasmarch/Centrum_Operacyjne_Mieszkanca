@@ -84,12 +84,26 @@ dwutorowa:
 
 Skąd grafika w poście tekstowym — **z `services/social_card.py`, nie z kie.ai**:
 
-| | Karta dnia (W1, codziennie) | Ilustracja AI (W2, wt/czw) |
+| | Karta dnia (W1, codziennie) | Ilustracja AI (W2, wtorki) |
 |---|---|---|
-| Powstaje | Pillow, lokalnie, ~0,1 s | kie.ai `nano-banana-pro`, ~47 s |
-| Koszt | 0 | ~22 kredyty |
-| Tekst na grafice | `headline` renderowany dosłownie | generowany przez model |
-| Ryzyko | brak | pocięte wyrazy („SPADK NIKÓW MIESZKAŃCÓW”) |
+| Powstaje | Pillow, lokalnie, ~0,1 s | kie.ai `nano-banana-pro` + Pillow, ~50 s |
+| Format | 1200×630 (karta OG) | 1080×1920 (9:16, model renderuje w 2K) |
+| Koszt | 0 | ~18 kredytów |
+| Tekst na grafice | `headline` renderowany dosłownie | `claim` renderowany dosłownie |
+| Rola modelu | — | rysuje **wyłącznie scenę**, ani jednej litery |
+
+### Dlaczego model nie pisze na grafice (od 2026-07-27)
+
+Do 27.07 claim wypalał model i to było widać: pocięte wyrazy („SPADK NIKÓW
+MIESZKAŃCÓW”), gubione ogonki, inny krój w każdym poście. Teraz `BRAND_STYLE` zabrania
+modelowi jakiegokolwiek tekstu, a `social_card.compose_photo_card` nakłada na gotową
+ilustrację nagłówek, pigułkę i stopkę — fontem Outfit i kolorami z `DESIGN/BRAND.md`,
+identycznie jak na karcie dnia. Powtarzalność marki bierze się właśnie z tego podziału:
+model odpowiada za scenę, my za wszystko, co ma stały kształt.
+
+Scena ma **pokazywać sytuację, nie jej symbol** — zawsze z ludźmi i zawsze w działaniu
+(`CLAIM_SYSTEM_PROMPT`). Awaria prądu to rodzina przy świecy w ciemnej kuchni, festyn to
+tańczący mieszkańcy — nie ikona żarówki i nie pusty krajobraz.
 
 Karta składa się z fontu `backend/assets/fonts/Outfit.ttf` (OFL) i kadru kuli
 `backend/assets/social/orb.jpg` — obie rzeczy leżą w repo i trafiają do obrazu przez

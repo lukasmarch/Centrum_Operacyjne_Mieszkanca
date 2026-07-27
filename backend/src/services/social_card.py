@@ -108,16 +108,21 @@ def _wrap_to_width(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> L
     return lines
 
 
-def _fit_headline(headline: str) -> Tuple[ImageFont.FreeTypeFont, List[str], int]:
-    for size in HEADLINE_SIZES:
+def _fit_headline(
+    headline: str,
+    max_width: int = TEXT_MAX_WIDTH,
+    sizes: Tuple[int, ...] = HEADLINE_SIZES,
+    max_lines: int = MAX_LINES,
+) -> Tuple[ImageFont.FreeTypeFont, List[str], int]:
+    for size in sizes:
         font = _font(size, "ExtraBold")
-        lines = _wrap_to_width(headline, font, TEXT_MAX_WIDTH)
-        if len(lines) <= MAX_LINES:
+        lines = _wrap_to_width(headline, font, max_width)
+        if len(lines) <= max_lines:
             return font, lines, size
     # Nagłówek dłuższy niż jakikolwiek układ — przycinamy, wielokropek sygnalizuje ucięcie
-    size = HEADLINE_SIZES[-1]
+    size = sizes[-1]
     font = _font(size, "ExtraBold")
-    lines = _wrap_to_width(headline, font, TEXT_MAX_WIDTH)[:MAX_LINES]
+    lines = _wrap_to_width(headline, font, max_width)[:max_lines]
     lines[-1] = lines[-1].rstrip(" ,.;–—") + "…"
     return font, lines, size
 
@@ -173,4 +178,84 @@ def render_daily_card(headline: str, day: Optional[date] = None) -> bytes:
 
     buffer = BytesIO()
     img.save(buffer, format="JPEG", quality=90, optimize=True)
+    return buffer.getvalue()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Post graficzny (W2) — ilustracja z kie.ai + nasza typografia
+# ──────────────────────────────────────────────────────────────────────────────
+
+PHOTO_WIDTH, PHOTO_HEIGHT = 1080, 1920
+PHOTO_MARGIN = 84
+PHOTO_TEXT_WIDTH = PHOTO_WIDTH - 2 * PHOTO_MARGIN
+PHOTO_CLAIM_SIZES = (128, 112, 96, 84, 72)
+PHOTO_MAX_LINES = 3
+
+# Gradient zaczyna się w połowie kadru — niżej napis wchodziłby w ilustrację, wyżej
+# gradient zjadałby scenę, którą model dostał w zadaniu do pokazania.
+GRADIENT_TOP = int(PHOTO_HEIGHT * 0.50)
+
+
+def _cover(image: Image.Image, width: int, height: int) -> Image.Image:
+    """Przeskaluj z zachowaniem proporcji i przytnij do kadru (jak CSS object-fit: cover)."""
+    scale = max(width / image.width, height / image.height)
+    resized = image.resize((max(1, round(image.width * scale)), max(1, round(image.height * scale))), Image.LANCZOS)
+    left = (resized.width - width) // 2
+    top = (resized.height - height) // 2
+    return resized.crop((left, top, left + width, top + height))
+
+
+def compose_photo_card(illustration: bytes, claim: str, day: Optional[date] = None) -> bytes:
+    """
+    Zwróć JPEG 1080×1920: ilustracja z kie.ai pod spodem, nasza typografia na wierzchu.
+
+    Model rysuje wyłącznie scenę — ani jednej litery (patrz BRAND_STYLE). Nagłówek,
+    pigułkę i stopkę składamy tutaj, fontem Outfit i kolorami z DESIGN/BRAND.md.
+    Dzięki temu każdy post ma ten sam krój, te same kolory i poprawne ogonki,
+    niezależnie od tego, co model zrobiłby z polskim tekstem.
+    """
+    day = day or date.today()
+    claim = _strip_emoji(claim or "").upper() or "RYBNO NA ŻYWO"
+
+    img = _cover(Image.open(BytesIO(illustration)).convert("RGB"), PHOTO_WIDTH, PHOTO_HEIGHT)
+
+    # Przyciemnienie od dołu — bez niego biały nagłówek ginie na jasnych fragmentach
+    # ilustracji (niebo, poświata). Kolor gradientu to tło marki, więc dolna krawędź
+    # kadru zlewa się z resztą identyfikacji.
+    overlay = Image.new("RGBA", (PHOTO_WIDTH, PHOTO_HEIGHT), BG + (0,))
+    draw_overlay = ImageDraw.Draw(overlay)
+    for y in range(GRADIENT_TOP, PHOTO_HEIGHT):
+        progress = (y - GRADIENT_TOP) / (PHOTO_HEIGHT - GRADIENT_TOP)
+        draw_overlay.line([(0, y), (PHOTO_WIDTH, y)], fill=BG + (int(245 * progress ** 1.6),))
+    img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, PHOTO_WIDTH, 8), fill=BLUE)
+
+    # Pigułka: ta sama logika co na karcie dnia (awaria ma pierwszeństwo nad datą),
+    # żeby oba rodzaje postów czytało się jak jedną serię.
+    label = _label_for(claim, day)
+    label_font = _font(30, "ExtraBold")
+    label_width = draw.textlength(label, font=label_font)
+    draw.rounded_rectangle((PHOTO_MARGIN, 88, PHOTO_MARGIN + label_width + 64, 156), radius=34, fill=BLUE)
+    draw.text((PHOTO_MARGIN + 32 + label_width / 2, 122), label, font=label_font, fill=WHITE, anchor="mm")
+
+    # Blok tekstu kotwiczony do DOŁU kadru: nagłówek rośnie w górę, więc stopka zostaje
+    # w tym samym miejscu niezależnie od tego, czy claim ma jedną linię czy trzy.
+    claim_font, lines, size = _fit_headline(claim, PHOTO_TEXT_WIDTH, PHOTO_CLAIM_SIZES, PHOTO_MAX_LINES)
+    line_height = int(size * 1.14)
+    footer_top = PHOTO_HEIGHT - 232
+    block_bottom = footer_top - 56
+    for index, line in enumerate(reversed(lines)):
+        draw.text((PHOTO_MARGIN, block_bottom - index * line_height), line,
+                  font=claim_font, fill=WHITE, anchor="ls")
+
+    draw.line((PHOTO_MARGIN, footer_top, PHOTO_MARGIN + 72, footer_top), fill=BLUE, width=6)
+    domain_font = _font(50, "SemiBold")
+    draw.text((PHOTO_MARGIN, footer_top + 34), "rybnolive.pl", font=domain_font, fill=GLOW, anchor="la")
+    draw.text((PHOTO_MARGIN, footer_top + 106), "Twoja gmina. Na żywo.",
+              font=_font(34, "Medium"), fill=GREY, anchor="la")
+
+    buffer = BytesIO()
+    img.save(buffer, format="JPEG", quality=92, optimize=True)
     return buffer.getvalue()

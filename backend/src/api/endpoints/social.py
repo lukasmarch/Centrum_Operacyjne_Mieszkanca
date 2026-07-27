@@ -29,7 +29,7 @@ import socket
 import uuid
 from datetime import date
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from urllib.parse import urlparse
 
 import httpx
@@ -133,15 +133,14 @@ def _public_url(relative: str) -> str:
     return f"{settings.API_URL.rstrip('/')}/uploads/social/{relative}"
 
 
-async def store_image_from_url(source_url: str, slug: str, subdir: Optional[str] = None) -> dict:
+async def download_image(source_url: str) -> Tuple[bytes, str]:
     """
-    Pobierz grafikę i zapisz na stałe w uploads/social/. Zwraca {url, path, bytes}.
+    Pobierz grafikę z obcego hosta i zwróć (bajty, rozszerzenie) — bez zapisu na dysk.
 
-    Wołane z endpointu /media (ręcznie, z n8n) oraz wewnętrznie po generowaniu w kie.ai,
-    którego linki wygasają po ~24h.
+    Wydzielone ze store_image_from_url, bo grafiki z kie.ai nie trafiają już na dysk
+    w postaci surowej: najpierw nakładamy na nie typografię (social_card).
     """
     _validate_source_url(source_url)
-    target_dir = _target_dir(subdir)
 
     try:
         async with httpx.AsyncClient(timeout=DOWNLOAD_TIMEOUT, follow_redirects=True) as client:
@@ -166,27 +165,28 @@ async def store_image_from_url(source_url: str, slug: str, subdir: Optional[str]
     if not chunks:
         raise HTTPException(status_code=502, detail="Źródło zwróciło pusty plik")
 
-    filename = f"{date.today().isoformat()}_{_slugify(slug)}_{uuid.uuid4().hex[:6]}{ext}"
-    (target_dir / filename).write_bytes(bytes(chunks))
+    return bytes(chunks), ext
 
-    relative = f"{subdir}/{filename}" if subdir else filename
-    logger.info(f"[social] Zapisano {relative} ({len(chunks)} B)")
-    return {"url": _public_url(relative), "path": f"/uploads/social/{relative}", "bytes": len(chunks)}
+
+async def store_image_from_url(source_url: str, slug: str, subdir: Optional[str] = None) -> dict:
+    """
+    Pobierz grafikę i zapisz na stałe w uploads/social/. Zwraca {url, path, bytes}.
+
+    Wołane z endpointu /media (ręcznie, z n8n) — kopiuje grafikę pod nasz adres,
+    bo linki źródłowe (np. z kie.ai) wygasają po ~24h.
+    """
+    content, ext = await download_image(source_url)
+    return store_image_bytes(content, slug=slug, ext=ext, subdir=subdir)
 
 
 def store_image_bytes(content: bytes, slug: str, ext: str = ".jpg", subdir: Optional[str] = None) -> dict:
-    """
-    Zapisz grafikę wygenerowaną lokalnie (karta dnia) w tym samym miejscu co pobrane z kie.ai.
-
-    Osobna funkcja od store_image_from_url, bo tamta cały wysiłek wkłada w bezpieczne
-    pobranie z obcego hosta — tutaj bajty pochodzą z naszego procesu.
-    """
+    """Zapisz gotowe bajty grafiki w uploads/social/ i zwróć jej publiczny adres."""
     target_dir = _target_dir(subdir)
     filename = f"{date.today().isoformat()}_{_slugify(slug)}_{uuid.uuid4().hex[:6]}{ext}"
     (target_dir / filename).write_bytes(content)
 
     relative = f"{subdir}/{filename}" if subdir else filename
-    logger.info(f"[social] Zapisano kartę {relative} ({len(content)} B)")
+    logger.info(f"[social] Zapisano {relative} ({len(content)} B)")
     return {"url": _public_url(relative), "path": f"/uploads/social/{relative}", "bytes": len(content)}
 
 
@@ -258,10 +258,21 @@ async def get_proposal(
         logger.error(f"[social] kie.ai: {exc}")
         raise HTTPException(status_code=502, detail=f"Nie udało się wygenerować grafiki: {exc}")
 
-    stored = await store_image_from_url(
-        temporary_url,
-        slug=social_content.slugify_pl(proposal["claim"] or "post"),
-    )
+    illustration, _ = await download_image(temporary_url)
+    try:
+        card = social_card.compose_photo_card(
+            illustration,
+            proposal["claim"],
+            day=_parse_iso_date(proposal.get("date")),
+        )
+    except Exception as exc:
+        # Fail-closed jak przy karcie dnia: post bez nagłówka byłby nieczytelny
+        # (model nie rysuje już żadnego tekstu), więc lepiej brak propozycji niż
+        # goła ilustracja wypuszczona na fanpage.
+        logger.error(f"[social] Nie udało się złożyć karty z ilustracją: {exc}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Nie udało się złożyć grafiki: {exc}")
+
+    stored = store_image_bytes(card, slug=social_content.slugify_pl(proposal["claim"] or "post"))
     proposal["image_url"] = stored["url"]
     return proposal
 

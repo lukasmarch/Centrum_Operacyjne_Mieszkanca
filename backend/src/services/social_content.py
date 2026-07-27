@@ -66,15 +66,23 @@ def build_text_post(summary: dict) -> dict:
 # Post graficzny (kie.ai)
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Stały blok stylu — trzyma grafiki w jednej estetyce marki (granatowe tło z niebieską
-# poświatą, jak animowana kula na stronie głównej). Zmiana tutaj zmienia wszystkie
-# przyszłe grafiki, bez klikania po n8n.
+# Stały blok stylu — trzyma grafiki w jednej estetyce marki. Zmiana tutaj zmienia
+# wszystkie przyszłe grafiki, bez klikania po n8n.
+#
+# Model NIE pisze na grafice ani jednej litery: claim i stopkę nakłada u nas
+# social_card.compose_photo_card, naszym fontem i naszymi kolorami. Wcześniej tekst
+# wypalał model — stąd pocięte wyrazy („SPADK NIKÓW MIESZKAŃCÓW”), gubione ogonki
+# i inny krój w każdym poście. Powtarzalność marki zaczyna się od tego podziału.
 BRAND_STYLE = (
-    "Modern editorial illustration for a Polish local-news brand. "
-    "Deep navy background (#020617) with a soft glowing blue-cyan light source, "
-    "subtle grain, cinematic rim light, clean minimal composition, "
-    "rural Masurian setting (fields, lake, small village architecture), "
-    "no people's faces in close-up, no watermarks, no logos other than requested text."
+    "Flat cartoon illustration for a Polish local-news brand: rounded shapes, "
+    "bold clean outlines, simple cel shading, warm and human, no photorealism, no 3D render. "
+    "Rural Masurian setting (fields, lake, small village houses, church tower). "
+    "Strict brand palette: deep navy background (#05080f), electric blue (#3a81f6) "
+    "and light blue glow (#91c5ff) as dominant accents, warm amber only as a small "
+    "light source inside the scene. Cinematic rim light, subtle grain. "
+    "Keep the lower third of the frame calm and uncluttered — a headline goes there. "
+    "ABSOLUTELY NO text, letters, numbers, signage, captions, logos or watermarks. "
+    "No glowing orb, no globe, no giant hand."
 )
 
 CLAIM_SYSTEM_PROMPT = """Jesteś dyrektorem kreatywnym lokalnego serwisu informacyjnego RybnoLive (gmina Rybno, powiat działdowski).
@@ -83,11 +91,11 @@ Na podstawie podsumowania dnia przygotuj materiał do grafiki na Facebooka.
 Zwróć WYŁĄCZNIE JSON:
 {
   "claim": "hasło na grafikę: 2-4 PEŁNE wyrazy, DRUKOWANYMI literami, bez kropki na końcu",
-  "scene": "opis scenerii po ANGIELSKU dla modelu graficznego, 1-2 zdania, konkretny, bez tekstu na obrazku",
+  "scene": "scena po ANGIELSKU dla modelu graficznego: KTO i CO robi, 1-2 zdania, bez tekstu na obrazku",
   "caption": "treść posta na Facebooka po polsku: 2-3 zdania, konkretnie o tym co się stało, bez hashtagów i bez linku"
 }
 
-ZASADY DLA claim — to najważniejsze pole, bo zostanie WYPALONE na grafice:
+ZASADY DLA claim — to nagłówek nakładany na grafikę:
 - musi być poprawną polską frazą, zrozumiałą bez kontekstu
 - NIGDY nie skracaj ani nie obcinaj wyrazów; każde słowo w pełnej formie
 - lepiej użyć 2 słów niż 4 pocięte
@@ -95,8 +103,23 @@ ZASADY DLA claim — to najważniejsze pole, bo zostanie WYPALONE na grafice:
 - ŹLE: "SPADK NIKÓW MIESZKAŃCÓW" (pocięte wyrazy), "FACT-CHECKING GMINA RYBNO" (żargon),
   "SPADEK LICZBY MIESZKAŃCÓW GMINY RYBNO W ROKU 2026" (za długie)
 
+ZASADY DLA scene — grafika ma POKAZAĆ SYTUACJĘ, nie jej symbol:
+- ZAWSZE są na niej ludzie i ZAWSZE coś robią; scena bez postaci jest błędem
+- czynność musi wynikać wprost ze zdarzenia i oddawać jego realia:
+  • awaria, utrudnienie, ostrzeżenie → widać SKUTEK dla mieszkańców
+    (wyłączony prąd: rodzina w ciemnej kuchni przy świecach i latarce w telefonie;
+     awaria wody: sąsiedzi z kanistrami przy beczkowozie;
+     objazd: kierowcy zawracający przed zamkniętą drogą)
+  • wydarzenie, sukces, dobra wiadomość → mieszkańcy biorą w nim CZYNNY udział
+    (festyn: ludzie tańczą przy scenie, dzieci z watą cukrową;
+     inwestycja: robotnicy i mieszkańcy oglądający nowy chodnik)
+- konkret zamiast metafory: NIE "a symbol of a power outage", tylko
+  "a family sitting around a candle in a dark kitchen, one child holding a phone torch"
+- nastrój zgodny ze zdarzeniem — przy awarii spokojna powaga, nie panika ani nie zabawa
+- bez tekstu, napisów, tablic i szyldów w kadrze
+- dolna część kadru spokojna (tam wchodzi nagłówek)
+
 Pozostałe zasady:
-- scene NIE może zawierać żadnego tekstu ani napisów
 - caption pisz naturalnie, po ludzku, bez korporacyjnego żargonu
 - dotyczy WYŁĄCZNIE gminy Rybno i najbliższej okolicy"""
 
@@ -141,15 +164,10 @@ async def build_photo_post(summary: dict) -> dict:
     scene = (data.get("scene") or "A quiet Masurian village at golden hour").strip()
     caption = (data.get("caption") or highlights[:300]).strip()
 
-    # Claim wypalamy na grafice — dlatego podajemy go modelowi dosłownie, w cudzysłowie,
-    # i wymuszamy polskie znaki diakrytyczne (modele lubią je gubić).
-    prompt = (
-        f"{scene} {BRAND_STYLE} "
-        f'Render exactly this Polish headline text in the lower part of the image, '
-        f'in a bold clean sans-serif, white with a soft blue glow: "{claim}". '
-        f'Below it, smaller, render exactly: "rybnolive.pl". '
-        f"Preserve Polish diacritics precisely (ą ć ę ł ń ó ś ź ż). No other text anywhere."
-    )
+    # Model dostaje wyłącznie scenę i styl — żadnego tekstu do narysowania. Claim
+    # nakładamy potem sami (social_card.compose_photo_card), więc polskie znaki
+    # i krój są pewne, a nie zależne od tego, co model zrozumie z liter.
+    prompt = f"Vertical 9:16 composition. {scene} {BRAND_STYLE}"
 
     # Claim NIE wchodzi do treści posta — jest już wypalony na grafice, a powtórzenie
     # wyglądałoby jak błąd. (Nie używamy tu capitalize(): psuje nazwy własne — „w rybnie”.)
@@ -173,7 +191,7 @@ KIE_POLL_INTERVAL = 5.0
 KIE_TIMEOUT_SECONDS = 180
 
 
-async def generate_image(prompt: str, aspect_ratio: str = "4:5") -> str:
+async def generate_image(prompt: str, aspect_ratio: str = "9:16", resolution: str = "2K") -> str:
     """
     Wygeneruj grafikę w kie.ai i zwróć jej (tymczasowy!) URL.
 
@@ -189,7 +207,7 @@ async def generate_image(prompt: str, aspect_ratio: str = "4:5") -> str:
         "input": {
             "prompt": prompt,
             "aspect_ratio": aspect_ratio,
-            "resolution": "1K",
+            "resolution": resolution,
             "output_format": "png",
         },
     }
