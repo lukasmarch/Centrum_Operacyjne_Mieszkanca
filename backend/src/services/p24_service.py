@@ -73,8 +73,7 @@ class P24Service:
         return_url: str,
         notify_url: str,
         currency: str = "PLN",
-        first_name: str = "",
-        last_name: str = "",
+        client_name: str = "",
     ) -> dict:
         """
         Rejestruje transakcję w P24 i zwraca token do przekierowania.
@@ -102,10 +101,10 @@ class P24Service:
             "sign": sign,
             "encoding": "UTF-8",
         }
-        if first_name:
-            payload["firstName"] = first_name
-        if last_name:
-            payload["lastName"] = last_name
+        # Imię i nazwisko idzie jednym polem "client" (max 50 znaków) — API v1 nie zna
+        # firstName/lastName i odrzuca cały request z "Invalid request!"
+        if client_name:
+            payload["client"] = client_name[:50]
 
         try:
             resp = requests.post(
@@ -114,7 +113,12 @@ class P24Service:
                 auth=self._auth(),
                 timeout=15,
             )
-            resp.raise_for_status()
+            # Przy 4xx P24 opisuje przyczynę w treści odpowiedzi — bez niej zostaje
+            # samo "400 Bad Request" i nie wiadomo, które pole jest wadliwe
+            if not resp.ok:
+                logger.error(f"P24 register HTTP {resp.status_code}: {resp.text[:500]}")
+                raise RuntimeError(f"Przelewy24 odrzuciło zamówienie (HTTP {resp.status_code}): {resp.text[:200]}")
+
             data = resp.json()
 
             if data.get("error"):

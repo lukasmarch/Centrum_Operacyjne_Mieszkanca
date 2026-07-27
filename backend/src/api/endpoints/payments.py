@@ -198,8 +198,7 @@ async def create_transaction(
             description=description,
             return_url=return_url,
             notify_url=notify_url,
-            first_name=user.full_name.split()[0] if user.full_name else "",
-            last_name=" ".join(user.full_name.split()[1:]) if user.full_name and " " in user.full_name else "",
+            client_name=user.full_name or "",
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
