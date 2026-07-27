@@ -168,6 +168,11 @@ class Article(SQLModel, table=True):
     image_url: Optional[str] = None
     author: Optional[str] = Field(default=None, max_length=255)
     published_at: Optional[datetime] = None
+    # Termin zdarzenia, którego wpis dotyczy (wyłączenie prądu) — inny niż data
+    # publikacji. Bez niego ranking liczył wiek OGŁOSZENIA, więc zapowiedź na
+    # przyszły tydzień wypadała z feedu, zanim zdarzenie nastąpiło.
+    event_at: Optional[datetime] = None
+    event_until: Optional[datetime] = None
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
     category: Optional[str] = Field(default=None, max_length=100)
     tags: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAY(String)))

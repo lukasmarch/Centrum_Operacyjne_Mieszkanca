@@ -56,12 +56,16 @@ def filter_recent_articles(articles: list, days: int = 2) -> list:
     return filtered
 
 
-async def update_articles_job(source_filter: str = None, source_prefix: str = None):
+async def update_articles_job(source_filter: str = None, source_prefix: str = None, exclude_types: list = None):
     """Job to scrape and update articles from all active sources.
 
     Args:
         source_filter: If provided, only scrape the source with this name.
         source_prefix: If provided, only scrape sources whose name starts with it.
+        exclude_types: Pomiń źródła tych typów. Południowy przebieg pomija
+            `social_media`, bo Facebook chodzi przez płatne Apify, a profile FB
+            i tak publikują rano — dokładając przebieg dla darmowych RSS/HTML
+            (urząd, BIP, ZGK, Powiat, Energa) nie ruszamy rachunku.
     """
     logger.info("=" * 60)
     logger.info("Starting article update job...")
@@ -78,6 +82,8 @@ async def update_articles_job(source_filter: str = None, source_prefix: str = No
     async with async_session() as session:
         # Fetch active sources (optionally filtered by name)
         query = select(Source).where(Source.status == "active")
+        if exclude_types:
+            query = query.where(Source.type.notin_(exclude_types))
         if source_filter:
             query = query.where(Source.name == source_filter)
         elif source_prefix:
@@ -189,6 +195,16 @@ async def update_articles_job(source_filter: str = None, source_prefix: str = No
 def run_article_job():
     """Sync wrapper for async job"""
     asyncio.run(update_articles_job())
+
+
+def run_midday_article_job():
+    """Południowy przebieg — tylko źródła darmowe (RSS/HTML).
+
+    Poranny scraping o 6:00 zastaje urząd, BIP, ZGK i Powiat jeszcze przed
+    publikacją, więc briefing z 7:00 powstawał wyłącznie z materiału wczorajszego.
+    Facebook pomijamy: chodzi przez płatne Apify, a profile publikują rano.
+    """
+    asyncio.run(update_articles_job(exclude_types=["social_media"]))
 
 
 def run_energa_job():

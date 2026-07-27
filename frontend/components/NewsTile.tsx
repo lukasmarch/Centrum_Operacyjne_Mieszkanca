@@ -21,21 +21,15 @@ interface NewsTileProps {
 }
 
 /**
- * Atrybucja źródła: drobny link zamiast podpisu.
- * Dla prywatnych profili FB backend nie zwraca nazwy (sourceLabel === null) —
- * zostaje neutralne „źródło ↗", żeby feed nie wyglądał na przedruk cudzego profilu.
+ * Atrybucja źródła jako podpis, nie osobny link — cały kafelek prowadzi już do
+ * artykułu, a <a> w <a> jest nieprawidłowe. Dla prywatnych profili FB backend
+ * nie zwraca nazwy (sourceLabel === null) i zostaje neutralne „źródło".
  */
-const SourceLink: React.FC<{ article: Article; className?: string }> = ({ article, className = '' }) => (
-  <a
-    href={article.url}
-    target="_blank"
-    rel="noopener noreferrer nofollow"
-    onClick={e => e.stopPropagation()}
-    className={`inline-flex items-center gap-1 text-neutral-500 hover:text-neutral-300 transition-colors ${className}`}
-  >
+const SourceCaption: React.FC<{ article: Article; className?: string }> = ({ article, className = '' }) => (
+  <span className={`inline-flex items-center gap-1 text-neutral-500 ${className}`}>
     {article.sourceLabel || 'źródło'}
     <ExternalLink size={9} />
-  </a>
+  </span>
 );
 
 const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
@@ -97,11 +91,10 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
             const theme = getCategoryTheme(featured.category);
             const isAwaria = (featured.category || '').toLowerCase().includes('awari');
             return (
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => onNavigate?.('news')}
-                onKeyDown={e => { if (e.key === 'Enter') onNavigate?.('news'); }}
+              <a
+                href={featured.url}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`relative rounded-xl overflow-hidden group cursor-pointer block flex-shrink-0 mb-2 ${isAwaria ? 'ring-1 ring-red-500/40' : ''}`}
               >
                 <div className="w-full h-[120px] sm:h-[140px] overflow-hidden group-hover:[&_img]:scale-105">
@@ -125,9 +118,9 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                   <h4 className="text-sm sm:text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                     {featured.title}
                   </h4>
-                  <SourceLink article={featured} className="text-[9px] mt-1" />
+                  <SourceCaption article={featured} className="text-[9px] mt-1" />
                 </div>
-              </div>
+              </a>
             );
           })()}
 
@@ -137,12 +130,11 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
               const theme = getCategoryTheme(article.category);
               const isAwaria = (article.category || '').toLowerCase().includes('awari');
               return (
-                <div
+                <a
                   key={article.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onNavigate?.('news')}
-                  onKeyDown={e => { if (e.key === 'Enter') onNavigate?.('news'); }}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`flex gap-3 py-2 px-1 hover:bg-white/5 transition-colors group items-center cursor-pointer ${isAwaria ? 'bg-red-500/5' : ''}`}
                 >
                   {/* Thumbnail */}
@@ -168,9 +160,9 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                     <p className="text-xs sm:text-sm font-semibold text-neutral-200 leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                       {article.title}
                     </p>
-                    <SourceLink article={article} className="text-[9px] mt-0.5" />
+                    <SourceCaption article={article} className="text-[9px] mt-0.5" />
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>

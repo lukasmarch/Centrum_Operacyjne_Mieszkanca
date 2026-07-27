@@ -14,7 +14,7 @@ from src.utils.logger import setup_logger
 logger = setup_logger("SummaryScheduler")
 
 
-async def run_daily_summary():
+async def run_daily_summary(force_refresh: bool = False):
     """
     Generuj dzienne podsumowanie
 
@@ -25,7 +25,9 @@ async def run_daily_summary():
     4. Wygeneruj AI summary
     5. Zapisz do bazy
 
-    Uruchamiany przez scheduler codziennie o 6:45 (po AI processing)
+    Uruchamiany przez scheduler codziennie o 7:00 (po AI processing) i ponownie
+    o 13:30 z force_refresh — poranny briefing powstaje z materiału wczorajszego,
+    bo o świcie źródła urzędowe jeszcze nic nie opublikowały.
     """
     logger.info("="*60)
     logger.info("Starting daily summary generation...")
@@ -42,8 +44,9 @@ async def run_daily_summary():
         try:
             generator = SummaryGenerator()
 
-            # Generuj podsumowanie dla wczorajszego dnia
-            summary = await generator.generate_daily_summary(session)
+            summary = await generator.generate_daily_summary(
+                session, force_refresh=force_refresh
+            )
 
             if summary:
                 logger.info(f"✓ SUCCESS: Generated daily summary")
@@ -51,15 +54,20 @@ async def run_daily_summary():
                 logger.info(f"  Headline: {summary.headline}")
                 logger.info(f"  Date: {summary.date.date()}")
                 logger.info(f"  Generated at: {summary.generated_at}")
-                logger.info(f"  Articles count: {len(summary.headline.split())}")  # Approximate
+                stats = (summary.content or {}).get("stats", {})
+                logger.info(f"  Articles count: {stats.get('total_articles', '?')}")
 
-                # Trigger push notification for daily summary
-                try:
-                    from src.services.push_service import push_service
-                    sent = await push_service.send_daily_summary_push(session, summary.headline)
-                    logger.info(f"Push sent to {sent} subscribers (daily summary)")
-                except Exception as push_err:
-                    logger.error(f"Daily summary push failed: {push_err}")
+                # Push tylko przy porannym briefingu — odświeżenie o 13:30 zmienia
+                # treść na stronie, ale nie jest nowym powiadomieniem dla mieszkańca
+                if force_refresh:
+                    logger.info("Refresh run — push skipped")
+                else:
+                    try:
+                        from src.services.push_service import push_service
+                        sent = await push_service.send_daily_summary_push(session, summary.headline)
+                        logger.info(f"Push sent to {sent} subscribers (daily summary)")
+                    except Exception as push_err:
+                        logger.error(f"Daily summary push failed: {push_err}")
             else:
                 logger.warning("⚠ SUMMARY IS NONE - Possible reasons:")
                 logger.warning("  1. Summary for this date already exists in database")
@@ -94,3 +102,8 @@ def run_summary_job():
     wymaganym przez APScheduler
     """
     asyncio.run(run_daily_summary())
+
+
+def run_summary_refresh_job():
+    """Popołudniowe odświeżenie briefingu — nadpisuje wpis z rana, bez pusha."""
+    asyncio.run(run_daily_summary(force_refresh=True))

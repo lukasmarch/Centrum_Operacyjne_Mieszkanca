@@ -165,9 +165,13 @@ async def get_articles(
     from sqlalchemy import func, or_
 
     from src.services.feed_policy import (
+        MAX_PINNED,
         article_score,
+        collapse_duplicates,
+        dedup_text,
         diversify,
         is_pinned_alert,
+        publishable_conditions,
         source_label,
     )
 
@@ -176,25 +180,31 @@ async def get_articles(
 
     # Use window function to rank articles per source
     # ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY published_at DESC)
+    # Limit per źródło liczony od momentu, który się liczy: dla zapowiedzi zdarzeń
+    # (wyłączenia prądu) jest nim termin, nie data ogłoszenia
     row_number = func.row_number().over(
         partition_by=Article.source_id,
         order_by=[
-            Article.published_at.desc().nulls_last(),
+            func.coalesce(Article.event_at, Article.published_at).desc().nulls_last(),
             Article.scraped_at.desc()
         ]
     ).label('row_num')
 
     # Subquery with row numbers
+    now = datetime.utcnow()
+
     subquery = (
         select(Article.id, row_number)
         .where(
             or_(
                 Article.published_at >= cutoff_date,
-                Article.scraped_at >= cutoff_date
+                Article.scraped_at >= cutoff_date,
+                # zapowiedziane zdarzenie zostaje w feedzie do swojego terminu,
+                # choćby ogłoszenie miało trzy tygodnie
+                Article.event_until >= now,
             )
         )
-        .where(Article.is_filler == False)  # posty powitalne/zapychacze nie trafiają do feedu
-        .where(Article.is_promotional == False)  # cudze reklamy nie są wiadomością
+        .where(*publishable_conditions(Article))  # filler i cudze reklamy poza feedem
         .subquery()
     )
 
@@ -206,24 +216,44 @@ async def get_articles(
         .where(subquery.c.row_num <= per_source)
     )
 
-    now = datetime.utcnow()
     rows = list(result)
 
-    # Awarie z ostatniej doby zostają na górze — reszta wg wagi źródła i świeżości
+    # Ten sam materiał z dwóch źródeł (oba kanały Energi, przedruki) — raz.
+    # Kolejność wejściowa musi już być rankingiem, więc najpierw sortujemy.
+    rows.sort(
+        key=lambda row: article_score(
+            row[0].published_at, row[0].scraped_at, row[1], now,
+            row[0].event_at, row[0].event_until,
+        ),
+        reverse=True,
+    )
+    rows = collapse_duplicates(
+        rows,
+        text_of=lambda row: dedup_text(row[0]),
+    )
+
+    # Awarie dotyczące najbliższych godzin zostają na górze — reszta wg rankingu
     pinned, regular = [], []
     for article, source_name in rows:
         bucket = pinned if is_pinned_alert(
-            article.category, article.published_at, article.scraped_at, now
+            article.category, article.published_at, article.scraped_at, now,
+            article.event_at, article.event_until,
         ) else regular
         bucket.append((article, source_name))
 
-    for bucket in (pinned, regular):
-        bucket.sort(
-            key=lambda row: article_score(
-                row[0].published_at, row[0].scraped_at, row[1], now
-            ),
-            reverse=True,
-        )
+    # Blok przypięty ma twardy limit: przy wichurze Energa wypuszcza kilkanaście
+    # wyłączeń naraz i feed zamieniał się w listę awarii. Nadmiar nie znika —
+    # wraca do zwykłego rankingu, gdzie i tak stoi wysoko.
+    overflow = pinned[MAX_PINNED:]
+    pinned = pinned[:MAX_PINNED]
+    regular = sorted(
+        regular + overflow,
+        key=lambda row: article_score(
+            row[0].published_at, row[0].scraped_at, row[1], now,
+            row[0].event_at, row[0].event_until,
+        ),
+        reverse=True,
+    )
 
     # Przeplot także wewnątrz bloku awarii — trzy wyłączenia prądu z jednego
     # kanału nie mogą zepchnąć wypadku drogowego pod linię zgięcia

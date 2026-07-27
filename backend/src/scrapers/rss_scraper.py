@@ -87,22 +87,16 @@ class RSSFeedScraper(BaseScraper):
                 ]
                 self.logger.info(f"Keyword filter: {before} → {len(articles)} articles")
 
-            # scraping_config.content_prefix — kontekst, którego nie ma w samym wpisie.
-            # Feed Energi podaje tylko "Działdowo gmina wiejska 31.07 10:00-15:00 - Turza
-            # Wielka 40/0" — bez słowa "prąd" AI zgadywało (wyłączenie drogi, wody)
-            prefix = self.config.get("content_prefix")
-            if prefix:
-                for article in articles:
-                    body = article.get('content') or article.get('summary') or ''
-                    article['content'] = f"{prefix}\n\n{body}".strip()
-
-            # scraping_config.treat_as_fresh — dla zapowiedzi zdarzeń przyszłych
-            # (wyłączenia prądu) liczy się moment, w którym mieszkaniec się o nich
-            # dowiaduje, nie data ogłoszenia sprzed tygodnia. Bez tego wpis o jutrzejszym
-            # wyłączeniu wypadał z feedu jako „stary"
-            if self.config.get("treat_as_fresh"):
-                for article in articles:
-                    article['published_at'] = None
+            # scraping_config.item_parser — normalizacja specyficzna dla źródła.
+            # Feed Energi wymaga wyciągnięcia terminu wyłączenia z treści, wspólnego
+            # identyfikatora zdarzenia dla obu kanałów i dopisania kontekstu („prąd"
+            # nie pada w treści, więc kategoryzacja AI zgadywała). Szczegóły i powody:
+            # src/services/energa.py
+            if self.config.get("item_parser") == "energa":
+                from src.services.energa import enrich
+                before = len(articles)
+                articles = enrich(articles)
+                self.logger.info(f"Energa parser: {before} → {len(articles)} articles")
 
             self.logger.info(f"Successfully parsed {len(articles)} articles")
             return articles

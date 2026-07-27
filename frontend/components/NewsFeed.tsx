@@ -86,28 +86,18 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
             {article.summary}
           </p>
         )}
-        {/* Źródła instytucjonalne warto otworzyć w całości; przy prywatnych profilach FB
-            zostaje drobny link atrybucyjny — treść u nas to własne streszczenie AI */}
-        {article.sourceLabel ? (
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-2.5 rounded-xl bg-white/5 text-neutral-300 font-bold text-sm hover:bg-blue-600 hover:text-white transition-all text-center border border-white/5 mt-auto"
-          >
-            Czytaj więcej
-          </a>
-        ) : (
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
-            className="inline-flex items-center gap-1 text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors mt-auto"
-          >
-            źródło
-            <ExternalLink size={10} />
-          </a>
-        )}
+        {/* Każdy wpis prowadzi do pełnej treści u źródła. Przy prywatnych profilach FB
+            nie pokazujemy nazwy (sourceLabel === null), ale link zostaje — to atrybucja,
+            a mieszkaniec i tak chce doczytać oryginał */}
+        <a
+          href={article.url}
+          target="_blank"
+          rel={article.sourceLabel ? 'noopener noreferrer' : 'noopener noreferrer nofollow'}
+          className="w-full py-2.5 rounded-xl bg-white/5 text-neutral-300 font-bold text-sm hover:bg-blue-600 hover:text-white transition-all text-center border border-white/5 mt-auto inline-flex items-center justify-center gap-1.5"
+        >
+          Czytaj więcej
+          <ExternalLink size={12} />
+        </a>
       </div>
     </div>
   );

@@ -24,6 +24,8 @@ class ArticleOutput(BaseModel):
     image_url: Optional[str] = None
     author: Optional[str] = None
     published_at: Optional[datetime] = None
+    event_at: Optional[datetime] = None      # termin zdarzenia (wyłączenie prądu)
+    event_until: Optional[datetime] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     scraped_at: datetime

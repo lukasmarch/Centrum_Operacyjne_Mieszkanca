@@ -6,18 +6,65 @@ a następnie generuje przyjazne podsumowanie dla mieszkańców.
 """
 from datetime import datetime, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 from pydantic_ai import Agent
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.models import DailySummary as DailySummaryModel
 from src.ai.prompts import DAILY_SUMMARY_PROMPT
-from src.database.schema import Article, Event, AirQuality, DailySummary
+from src.database.schema import Article, Event, AirQuality, DailySummary, Source
+from src.services.feed_policy import (
+    collapse_duplicates,
+    dedup_text,
+    is_local_source,
+    publishable_conditions,
+)
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 from src.config import settings
 
 logger = setup_logger("SummaryGenerator")
+
+# Baza trzyma naiwny UTC, mieszkaniec myśli czasem lokalnym — briefing pisze
+# o godzinach, więc konwersja musi być jawna
+LOCAL_TZ = ZoneInfo("Europe/Warsaw")
+
+
+def _local(stamp: datetime) -> datetime:
+    return stamp.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ)
+
+
+def _day_word(day_offset: int) -> Optional[str]:
+    return {0: "dziś", 1: "jutro", -1: "wczoraj"}.get(day_offset)
+
+
+def _time_label(article, now: datetime) -> str:
+    """
+    Znacznik czasu przy artykule w prompcie. Bez niego model nie odróżniał
+    wpisu sprzed godziny od wpisu sprzed doby i przepisywał „dziś o 17:00"
+    z wczorajszego zaproszenia na koncert, który już się odbył.
+    """
+    today = _local(now).date()
+
+    event_at = getattr(article, "event_at", None)
+    if event_at:
+        start = _local(event_at)
+        end = getattr(article, "event_until", None)
+        span = f"{start:%H:%M}"
+        if end:
+            span += f"–{_local(end):%H:%M}"
+        word = _day_word((start.date() - today).days)
+        when = f"{word} {span}" if word else f"{start:%d.%m} {span}"
+        ongoing = end and event_at <= now <= end
+        return f"[ZDARZENIE {when}{' — TRWA TERAZ' if ongoing else ''}]"
+
+    if not article.published_at:
+        return "[bez daty]"
+
+    published = _local(article.published_at)
+    word = _day_word((published.date() - today).days)
+    return f"[{word} {published:%H:%M}]" if word else f"[{published:%d.%m} {published:%H:%M}]"
 
 
 class SummaryGenerator:
@@ -41,14 +88,18 @@ class SummaryGenerator:
     async def generate_daily_summary(
         self,
         session: AsyncSession,
-        target_date: Optional[datetime] = None
+        target_date: Optional[datetime] = None,
+        force_refresh: bool = False,
     ) -> Optional[DailySummary]:
         """
         Wygeneruj dzienne podsumowanie dla określonej daty
 
         Args:
             session: Async database session
-            target_date: Data podsumowania (domyślnie wczoraj)
+            target_date: Data podsumowania (domyślnie dziś)
+            force_refresh: nadpisz istniejący wpis zamiast go pominąć. Briefing
+                z 7:00 powstaje z materiału wczorajszego (o świcie nic jeszcze
+                nie wyszło); po południowym scrapingu ma czym się odświeżyć.
 
         Returns:
             DailySummary object lub None jeśli brak danych
@@ -71,22 +122,25 @@ class SummaryGenerator:
         self.logger.info(f"Generating daily summary for {date_start.date()}")
 
         # Sprawdź czy podsumowanie już istnieje
-        existing = await session.execute(
+        existing_result = await session.execute(
             select(DailySummary).where(DailySummary.date == date_start)
         )
-        if existing.scalar_one_or_none():
+        existing_summary = existing_result.scalar_one_or_none()
+        if existing_summary and not force_refresh:
             self.logger.warning(f"Summary for {date_start.date()} already exists")
             return None
 
-        # 1. Pobierz artykuły z dziś (tylko przetworzone, po dacie PUBLIKACJI)
-        articles_result = await session.execute(
-            select(Article)
-            .where(Article.published_at >= date_start)
-            .where(Article.published_at < date_end)
-            .where(Article.processed == True)
-            .order_by(Article.published_at.desc())
-        )
-        articles = articles_result.scalars().all()
+        # Lokalność źródeł mieszka w feed_policy — wspólnie z feedem. Wcześniej
+        # briefing trzymał własną listę ID-ków, która po dodaniu Energi, KPP,
+        # Powiatu i profilu gminy przestała je uznawać za lokalne.
+        source_rows = (await session.execute(select(Source.id, Source.name))).all()
+        self._source_names = {row.id: row.name for row in source_rows}
+        self._local_ids = {
+            sid for sid, name in self._source_names.items() if is_local_source(name)
+        }
+
+        # 1. Pobierz artykuły z dziś (tylko przetworzone i nadające się do publikacji)
+        articles = await self._fetch_articles(session, date_start, date_end)
 
         # Fallback: jeśli mało artykułów z dziś, rozszerz okno o wczoraj
         extended = False
@@ -95,19 +149,21 @@ class SummaryGenerator:
             self.logger.info(
                 f"Only {len(articles)} articles for today – extending window to yesterday ({yesterday_start.date()})"
             )
-            articles_result = await session.execute(
-                select(Article)
-                .where(Article.published_at >= yesterday_start)
-                .where(Article.published_at < date_end)
-                .where(Article.processed == True)
-                .order_by(Article.published_at.desc())
-            )
-            articles = articles_result.scalars().all()
+            articles = await self._fetch_articles(session, yesterday_start, date_end)
             extended = True
 
         if not articles:
             self.logger.warning(f"No articles found for {date_start.date()}")
             return None
+
+        # Ten sam materiał z dwóch źródeł idzie do AI raz — inaczej wraca
+        # w briefingu jako dwie osobne „wiadomości"
+        before_collapse = len(articles)
+        articles = collapse_duplicates(articles, text_of=dedup_text)
+        if len(articles) < before_collapse:
+            self.logger.info(
+                f"Duplicates collapsed: {before_collapse} → {len(articles)} articles"
+            )
 
         if extended:
             self.logger.info(f"Extended window: {len(articles)} articles (today + yesterday)")
@@ -144,7 +200,7 @@ class SummaryGenerator:
         # 5. Przygotuj dane wejściowe dla AI
         top_article = self._select_top_article(articles_by_category)
         if top_article:
-            locality = "LOKALNY" if top_article.source_id in self.LOCAL_SOURCE_IDS else "REGIONALNY"
+            locality = "LOKALNY" if self._is_local(top_article) else "REGIONALNY"
             self.logger.info(
                 f"Top article (deterministic): [ID:{top_article.id}] [{locality}] "
                 f"cat={top_article.category} '{top_article.title[:60]}'"
@@ -154,7 +210,9 @@ class SummaryGenerator:
             articles_by_category,
             events,
             air_quality,
-            top_article=top_article
+            top_article=top_article,
+            now=now,
+            extended=extended,
         )
 
         try:
@@ -204,33 +262,43 @@ class SummaryGenerator:
                         "published_at": art.published_at.isoformat() if art.published_at else None,
                     })
 
-            # 8. Zapisz do bazy
-            db_summary = DailySummary(
-                date=date_start,
-                headline=summary_data.headline,
-                content={
-                    "date": summary_data.date,
-                    "headline": summary_data.headline,
-                    "highlights": summary_data.highlights,
-                    "summary_by_category": summary_data.summary_by_category,
-                    "upcoming_events": summary_data.upcoming_events,
-                    "air_quality_summary": summary_data.air_quality_summary,
-                    "cited_articles": cited_articles,
-                    "stats": {
-                        "total_articles": len(articles),
-                        "categories_count": len(articles_by_category),
-                        "events_count": len(events)
-                    }
-                },
-                generated_at=datetime.utcnow()
-            )
+            # 8. Zapisz do bazy — przy odświeżeniu nadpisujemy istniejący wpis
+            # (`date` ma indeks unikalny, drugi wiersz na ten sam dzień nie powstanie)
+            content = {
+                "date": summary_data.date,
+                "headline": summary_data.headline,
+                "highlights": summary_data.highlights,
+                "summary_by_category": summary_data.summary_by_category,
+                "upcoming_events": summary_data.upcoming_events,
+                "air_quality_summary": summary_data.air_quality_summary,
+                "cited_articles": cited_articles,
+                "stats": {
+                    "total_articles": len(articles),
+                    "categories_count": len(articles_by_category),
+                    "events_count": len(events)
+                }
+            }
+
+            if existing_summary:
+                existing_summary.headline = summary_data.headline
+                existing_summary.content = content
+                existing_summary.generated_at = datetime.utcnow()
+                db_summary = existing_summary
+            else:
+                db_summary = DailySummary(
+                    date=date_start,
+                    headline=summary_data.headline,
+                    content=content,
+                    generated_at=datetime.utcnow()
+                )
 
             session.add(db_summary)
             await session.commit()
             await session.refresh(db_summary)
 
             self.logger.info(
-                f"✓ Generated daily summary for {date_start.date()} "
+                f"✓ {'Refreshed' if existing_summary else 'Generated'} daily summary "
+                f"for {date_start.date()} "
                 f"(articles: {len(articles)}, categories: {len(articles_by_category)})"
             )
 
@@ -241,10 +309,53 @@ class SummaryGenerator:
             await session.rollback()
             raise
 
-    # source_ids bezpośrednio powiązane z Rybnem i gminami powiatu
-    LOCAL_SOURCE_IDS = {2, 3, 5, 6, 11, 12, 13}
-    # source_ids regionalne (Warmia i Mazury, nie specyficznie powiat)
-    REGIONAL_SOURCE_IDS = {1, 9, 10}
+    # Ile godzin do przodu briefing patrzy na zdarzenia z terminem (wyłączenia prądu)
+    EVENT_LOOKAHEAD_H = 36
+
+    # Wypełniane na starcie każdego przebiegu z tabeli `sources` + feed_policy
+    _source_names: dict = {}
+    _local_ids: set = set()
+
+    async def _fetch_articles(
+        self,
+        session: AsyncSession,
+        window_start: datetime,
+        window_end: datetime,
+    ) -> list:
+        """
+        Materiał do briefingu: to, co opublikowano w oknie, PLUS to, co dopiero
+        nastąpi. Wyłączenie prądu ogłoszone trzy tygodnie temu, a zaplanowane na
+        dziś na 10:00, nie mieściło się w żadnym oknie publikacji — briefing
+        w dniu premiery nie wspomniał o nim ani słowem.
+        """
+        from sqlalchemy import func, or_
+
+        lookahead_end = window_end + timedelta(hours=self.EVENT_LOOKAHEAD_H)
+
+        result = await session.execute(
+            select(Article)
+            .where(Article.processed == True)  # noqa: E712
+            .where(*publishable_conditions(Article))
+            .where(
+                or_(
+                    (Article.published_at >= window_start)
+                    & (Article.published_at < window_end),
+                    (Article.event_at >= window_start)
+                    & (Article.event_at < lookahead_end),
+                )
+            )
+            .order_by(func.coalesce(Article.event_at, Article.published_at).desc())
+        )
+        return list(result.scalars().all())
+
+    def _is_local(self, article) -> bool:
+        return article.source_id in self._local_ids
+
+    @staticmethod
+    def _sort_ts(article) -> float:
+        """Moment, którym artykuł konkuruje: termin zdarzenia przed datą publikacji."""
+        stamp = getattr(article, "event_at", None) or article.published_at
+        return stamp.timestamp() if stamp else 0.0
 
     # Hierarchia ważności kategorii (niższy = ważniejszy)
     CATEGORY_PRIORITY = {
@@ -273,9 +384,11 @@ class SummaryGenerator:
         for category, arts in articles_by_category.items():
             cat_prio = self.CATEGORY_PRIORITY.get(category, 10)
             for art in arts:
-                is_local = art.source_id in self.LOCAL_SOURCE_IDS
+                is_local = self._is_local(art)
                 locality_key = 0 if is_local else 1
-                ts = art.published_at.timestamp() if art.published_at else 0
+                # przy zdarzeniach z terminem liczy się termin, nie data ogłoszenia:
+                # wyłączenie prądu dziś o 10:00 bije wiadomość sprzed godziny
+                ts = self._sort_ts(art)
                 key = (locality_key, cat_prio, -ts)  # lokalność absolutny priorytet
                 if key < best_key:
                     best_key = key
@@ -316,11 +429,11 @@ class SummaryGenerator:
         headline_art = articles_map.get(summary_output.cited_article_ids[0])
         if headline_art is None:
             return False
-        return headline_art.source_id in self.LOCAL_SOURCE_IDS
+        return self._is_local(headline_art)
 
     def _get_locality_label(self, article) -> str:
         """Zwróć etykietę [LOKALNY] lub [REGIONALNY] dla artykułu"""
-        if article.source_id in self.LOCAL_SOURCE_IDS:
+        if self._is_local(article):
             return "[LOKALNY]"
         return "[REGIONALNY]"
 
@@ -330,13 +443,16 @@ class SummaryGenerator:
         articles_by_category: dict,
         events: list,
         air_quality: Optional[AirQuality],
-        top_article=None
+        top_article=None,
+        now: Optional[datetime] = None,
+        extended: bool = False,
     ) -> str:
         """Przygotuj sformatowany tekst dla AI"""
+        now = now or datetime.utcnow()
 
         local_count = sum(
             1 for arts in articles_by_category.values()
-            for a in arts if a.source_id in self.LOCAL_SOURCE_IDS
+            for a in arts if self._is_local(a)
         )
         total_count = sum(len(arts) for arts in articles_by_category.values())
 
@@ -344,7 +460,7 @@ class SummaryGenerator:
 
         # Sekcja WYMAGANY ARTYKUŁ NAGŁÓWKA — kod decyduje deterministycznie
         if top_article:
-            locality = "LOKALNY" if top_article.source_id in self.LOCAL_SOURCE_IDS else "REGIONALNY"
+            locality = "LOKALNY" if self._is_local(top_article) else "REGIONALNY"
             lines += [
                 "=" * 80,
                 f"⚡ WYMAGANY ARTYKUŁ NAGŁÓWKA [ID:{top_article.id}]:",
@@ -360,33 +476,48 @@ class SummaryGenerator:
             ]
 
         lines += [
-            f"Data: {date.strftime('%Y-%m-%d')}",
+            f"Data: {date.strftime('%Y-%m-%d')}, teraz jest godzina {_local(now):%H:%M}",
             f"Liczba artykułów: {total_count} (lokalnych: {local_count}, regionalnych: {total_count - local_count})",
             "",
             "=" * 80,
             "ARTYKUŁY PO KATEGORIACH:",
             "  [LOKALNY]   = dotyczy bezpośrednio gminy Rybno (Rybno i sołectwa) oraz najbliższych okolic",
             "  [REGIONALNY] = dotyczy sąsiednich gmin, powiatu, Warmii i Mazur lub obszarów dalszych",
+            "",
+            # Bez dat przy artykułach model przepisywał „dziś o 17:00" z wpisu sprzed
+            # doby i briefing zapraszał na wczorajszy koncert.
+            '  Przy każdym artykule stoi CZAS: [wczoraj 22:18], [dziś 08:00],',
+            '  a przy zdarzeniach z terminem — [ZDARZENIE …].',
+            '  ⚠️ Słowa „dziś", „jutro", „już za chwilę" w TREŚCI artykułu odnoszą się',
+            '  do dnia jego publikacji, nie do dzisiaj. Artykuł [wczoraj] piszący',
+            '  „dziś o 17:00" opisuje wydarzenie, które JUŻ SIĘ ODBYŁO — nie zapraszaj na nie.',
             "=" * 80,
             ""
         ]
+        if extended:
+            lines += [
+                "UWAGA: dzisiejszy materiał był zbyt skąpy, więc zestaw obejmuje także",
+                "artykuły z wczoraj. Sprawdzaj czas przy każdym z nich.",
+                "",
+            ]
 
         # Dodaj artykuły pogrupowane po kategoriach
         # W każdej kategorii: najpierw [LOKALNY], potem [REGIONALNY]
         for category, arts in sorted(articles_by_category.items()):
             sorted_arts = sorted(
                 arts,
-                key=lambda a: (0 if a.source_id in self.LOCAL_SOURCE_IDS else 1, -a.published_at.timestamp() if a.published_at else 0)
+                key=lambda a: (0 if self._is_local(a) else 1, -self._sort_ts(a))
             )
             lines.append(f"\n## {category.upper()} ({len(sorted_arts)} artykułów):\n")
             for i, article in enumerate(sorted_arts[:10], 1):  # max 10 per kategoria
                 label = self._get_locality_label(article)
-                lines.append(f"{i}. {label} [ID:{article.id}] {article.title}")
+                when = _time_label(article, now)
+                lines.append(f"{i}. {label} {when} [ID:{article.id}] {article.title}")
                 if article.summary:
                     lines.append(f"   → {article.summary}")
                 # Lokalizację pokazuj tylko dla artykułów LOKALNYCH - dla regionalnych
                 # może być halucynowana przez AI kategoryzacji
-                if article.location_mentioned and article.source_id in self.LOCAL_SOURCE_IDS:
+                if article.location_mentioned and self._is_local(article):
                     lines.append(f"   📍 {', '.join(article.location_mentioned)}")
                 lines.append("")
 

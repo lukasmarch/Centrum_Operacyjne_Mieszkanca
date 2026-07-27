@@ -12,9 +12,9 @@ import threading
 from datetime import datetime, timedelta
 
 from src.scheduler.weather_job import run_weather_job
-from src.scheduler.article_job import run_article_job, run_energa_job
+from src.scheduler.article_job import run_article_job, run_energa_job, run_midday_article_job
 from src.scheduler.ai_jobs import run_ai_job
-from src.scheduler.summary_job import run_summary_job
+from src.scheduler.summary_job import run_summary_job, run_summary_refresh_job
 from src.scheduler.gus_job import run_gus_job
 from src.scheduler.cinema_job import run_cinema_job
 from src.scheduler.traffic_job import run_traffic_job
@@ -220,6 +220,43 @@ def start_scheduler():
         trigger=CronTrigger(hour='9,12,15,18,21', minute=5),
         id='energa_update',
         name='Update Energa outages (RSS, co 3h)',
+        replace_existing=True
+    )
+
+    # ── Popołudniowy przebieg (13:00–13:45) ────────────────────────────────
+    # Poranny pipeline o 6:00 zastaje urząd, BIP, ZGK i Powiat przed publikacją:
+    # briefing z 7:00 składał się w całości z materiału wczorajszego, a strona
+    # do następnego ranka nie pokazywała nic z bieżącego dnia. Tylko źródła
+    # darmowe (RSS/HTML) — Facebook chodzi przez płatne Apify i publikuje rano.
+    scheduler.add_job(
+        func=run_midday_article_job,
+        trigger=CronTrigger(hour=13, minute=0),
+        id='article_update_midday',
+        name='Update articles — midday (bez Apify)',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        func=run_ai_job,
+        trigger=CronTrigger(hour=13, minute=15),
+        id='ai_processing_midday',
+        name='AI article processing — midday',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        func=run_summary_refresh_job,
+        trigger=CronTrigger(hour=13, minute=30),
+        id='daily_summary_refresh',
+        name='Refresh daily summary (nadpisuje poranny, bez pusha)',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        func=run_embedding_job,
+        trigger=CronTrigger(hour=13, minute=45),
+        id='embedding_update_midday',
+        name='Embed midday articles for RAG',
         replace_existing=True
     )
 
