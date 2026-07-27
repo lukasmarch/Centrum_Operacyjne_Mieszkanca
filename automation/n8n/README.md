@@ -42,7 +42,7 @@ webhook ──┘
 | Plik | Workflow w n8n | Nodów | Cron |
 |---|---|---|---|
 | `W1_post_tekstowy.json` | RybnoLive — post tekstowy (podsumowanie AI) | 7 | codziennie 7:45 |
-| `W2_post_graficzny.json` | RybnoLive — post graficzny (kie.ai) | 7 | wt i czw 17:00 |
+| `W2_post_graficzny.json` | RybnoLive — post graficzny (kie.ai) | 7 | wtorki 17:00 (do 10.08; potem wróć do wt+czw) |
 | `W3_kampania.json` | RybnoLive — kampania 27.07–10.08 | 8 | 9 godzin emisji dziennie |
 
 Źródłem jest `build_workflows.py` — JSON-y są z niego generowane:
@@ -133,7 +133,8 @@ pojedynczym postem**. Karuzela w Graph API wymaga 5 uploadów `published=false`,
 ID i osobnego `/feed` z `attached_media` — 4 dodatkowe nody i najbardziej awaryjny fragment
 starego workflow D. Grafiki `karuzela_2..5` wykorzystane jako osobne posty 5.08 i 7.08.
 
-Po 10.08: **dezaktywuj W3** (przypomnienie przychodzi na Telegram 10.08 o 10:00).
+Po 10.08: **dezaktywuj W3** (przypomnienie przychodzi na Telegram 10.08 o 10:00)
+i **przywróć czwartek w W2** (`["0 17 * * 2,4"]` w `build_photo_workflow`).
 
 ## Sekrety
 

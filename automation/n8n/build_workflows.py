@@ -201,8 +201,12 @@ def build_text_workflow():
 
 def build_photo_workflow():
     n = [
-        # wtorek i czwartek 17:00
-        cron("Wt i czw 17:00", ["0 17 * * 2,4"], [-220, 0]),
+        # Na czas kampanii (do 10.08) tylko wtorek. Czwartkowy przebieg o 17:00 wchodził
+        # dokładnie na Reels animowany publikowany ręcznie 30.07 o 17:00, a kampania i tak
+        # zapełnia czwartek i piątek — czwartkowa grafika kosztowałaby ~22 kredyty kie.ai
+        # za post, który konkuruje o zasięg z własnym Reelsem.
+        # Po 10.08 (razem z dezaktywacją W3) przywróć: ["0 17 * * 2,4"].
+        cron("Wtorki 17:00", ["0 17 * * 2"], [-220, 0]),
         manual_webhook("Uruchom / ponów", manual_path("post-grafika"), [-220, 180]),
         # generowanie grafiki trwa 20-60 s → podniesiony timeout
         http_get("Propozycja + grafika", f"{API}/proposal?kind=photo", [0, 80], timeout_ms=200000),
@@ -225,7 +229,7 @@ def build_photo_workflow():
         tg_confirm("Potwierdzenie", "✅ Post z grafiką opublikowany na fanpage'u RybnoLive.", [880, 80]),
     ]
     c = wire(
-        ("Wt i czw 17:00", "Propozycja + grafika"),
+        ("Wtorki 17:00", "Propozycja + grafika"),
         ("Uruchom / ponów", "Propozycja + grafika"),
         ("Propozycja + grafika", "Do akceptacji (TG)"),
         ("Do akceptacji (TG)", "Czekaj na akceptację"),
