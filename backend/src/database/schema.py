@@ -182,10 +182,6 @@ class Article(SQLModel, table=True):
     display_title: Optional[str] = Field(default=None, max_length=200)  # nagłówek AI (bez kopii źródła)
     is_filler: bool = Field(default=False)  # posty powitalne/zapychacze — ukryte w feedzie
     is_promotional: bool = Field(default=False)  # cudza reklama komercyjna — ukryta w feedzie
-    # Moment wysłania alertu push. Znacznik, nie log: Energa aktualizuje ten sam
-    # wpis co 3h (wspólny external_id), więc bez niego każde odświeżenie źródła
-    # wysyłałoby powiadomienie o tym samym wyłączeniu od nowa.
-    alert_pushed_at: Optional[datetime] = Field(default=None)
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"

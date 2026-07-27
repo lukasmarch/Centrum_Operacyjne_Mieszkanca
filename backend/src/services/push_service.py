@@ -204,7 +204,7 @@ class PushService:
             title=title,
             body=body,
             url=url,
-            icon="/icon-192.png",
+            icon="/icon-alert-192.png",
         )
 
     async def send_daily_summary_push(
@@ -231,7 +231,7 @@ class PushService:
             title=f"Alert smogowy – Rybno",
             body=f"Stężenie PM2.5: {pm25_value:.0f} µg/m³ ({level}). Ogranicz wychodzenie na zewnątrz.",
             url="/pogoda",
-            icon="/icon-192.png",
+            icon="/icon-smog-192.png",
         )
 
     async def send_proactive_reminder(

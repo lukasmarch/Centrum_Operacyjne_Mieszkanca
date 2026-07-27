@@ -5,15 +5,10 @@ ZASADA KANAŁÓW (brak duplikatów):
 - Newsletter dzienny (email 6:30) = pełny briefing: newsy, śmietnik, BIP, pogoda
 - Push proaktywny = TYLKO rzeczy pilne i nieplanowane, których newsletter nie obejmuje:
     1. Mróz < -5°C (pogoda tej nocy — pilna, time-sensitive)
-    2. Śmietnik jutro — dla Premium bez newslettera dziennego
+    2. Nowa awaria z artykułów (ostatnie 2h — pilna, nie czeka do rana)
 
 Śmietnik i BIP NIE są wysyłane push jeśli user ma newsletter dzienny (duplikat).
-
-Awarie NIE są tu obsługiwane — od 27.07.2026 robi to `alert_push_job` (co 15 min,
-dla wszystkich subskrybentów, nie tylko Premium). Ścieżka, która stała w tym
-miejscu, szukała artykułów z ostatnich 2 h według `published_at` i przy raz
-dziennym przebiegu o 6:50 nie wysłała ani jednego powiadomienia o wyłączeniu
-prądu: Energa datuje ogłoszenia kilka dni wstecz, a wpisy wpadają w ciągu dnia.
+Śmietnik push → tylko dla Premium bez newslettera dziennego.
 
 Odbiorca: Premium/Business userzy z aktywną subskrypcją push.
 """
@@ -88,6 +83,37 @@ async def _send_frost_alert(session, premium_ids: List[int]) -> int:
         body="Możliwe silne oblodzenie dróg i chodników. Jedź ostrożnie.",
         url="/pogoda",
         icon="/icon-192.png",
+    )
+
+
+async def _send_emergency_article_alert(session, premium_ids: List[int]) -> int:
+    """
+    Nowa awaria/alert z ostatnich 2h — PILNE, nie czeka do rana.
+    Newsletter wysyłany jest o 6:30 — awaria z 5:00 dotrze dopiero za 90 min.
+    Push wypełnia tę lukę.
+    """
+    from src.database.schema import Article
+
+    two_hours_ago = datetime.utcnow() - timedelta(hours=2)
+    result = await session.execute(
+        select(Article).where(
+            Article.category == "Awaria",
+            Article.published_at >= two_hours_ago,
+            Article.processed == True,
+        ).order_by(Article.published_at.desc()).limit(1)
+    )
+    article = result.scalar_one_or_none()
+    if not article:
+        return 0
+
+    logger.info(f"Emergency article push: {article.title[:50]}")
+    return await push_service.send_proactive_reminder(
+        session=session,
+        user_ids=premium_ids,
+        title="Nowy alert w gminie",
+        body=article.title[:100],
+        url="/",
+        icon="/icon-alert-192.png",
     )
 
 
@@ -167,7 +193,11 @@ async def run_proactive_alerts_async():
         sent = await _send_frost_alert(session, premium_ids)
         total_sent += sent
 
-        # 2. Śmietnik jutro — TYLKO Premium bez newslettera dziennego (reszta dostaje w emailu)
+        # 2. Nowa awaria z ostatnich 2h — push do WSZYSTKICH Premium
+        sent = await _send_emergency_article_alert(session, premium_ids)
+        total_sent += sent
+
+        # 3. Śmietnik jutro — TYLKO Premium bez newslettera dziennego (reszta dostaje w emailu)
         sent = await _send_waste_reminder_no_newsletter(session, premium_ids, newsletter_ids)
         total_sent += sent
 
