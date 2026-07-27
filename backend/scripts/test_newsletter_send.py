@@ -6,6 +6,9 @@ Użycie:
     python scripts/test_newsletter_send.py twoj@email.com
     python scripts/test_newsletter_send.py twoj@email.com --type weekly
     python scripts/test_newsletter_send.py twoj@email.com --type daily
+
+    # podgląd bez wysyłki — zapisuje HTML do plików i nic nie wychodzi na świat
+    python scripts/test_newsletter_send.py podglad@example.com --preview-dir /tmp/newsletter
 """
 
 import asyncio
@@ -22,6 +25,24 @@ from sqlalchemy.orm import sessionmaker
 from src.config import settings
 from src.newsletter.generator import NewsletterGenerator
 from src.newsletter.email_service import EmailService
+
+
+def enable_preview_mode(preview_dir: Path):
+    """Podmienia wysyłkę na zapis HTML do pliku — nic nie idzie do Resend."""
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    counter = {"n": 0}
+
+    async def save_instead_of_send(self, to_email, subject, html_content,
+                                   reply_to=None, unsubscribe_url=None):
+        counter["n"] += 1
+        path = preview_dir / f"newsletter_{counter['n']}.html"
+        path.write_text(html_content)
+        print(f"   💾 Podgląd zapisany: {path}")
+        print(f"      temat: {subject}")
+        print(f"      wypis: {unsubscribe_url}")
+        return {"status": "sent", "id": "preview", "to": to_email}
+
+    EmailService.send_email = save_instead_of_send
 
 
 async def test_weekly_newsletter(session: AsyncSession, to_email: str):
@@ -100,6 +121,8 @@ async def main():
     parser.add_argument('email', help='Adres email do testu')
     parser.add_argument('--type', choices=['weekly', 'daily', 'both'],
                         default='both', help='Typ newslettera (default: both)')
+    parser.add_argument('--preview-dir', default=None,
+                        help='Zapisz HTML do katalogu zamiast wysyłać maila')
 
     args = parser.parse_args()
 
@@ -109,13 +132,15 @@ async def main():
     print(f"\n📬 Email: {args.email}")
     print(f"📝 Typ: {args.type}")
 
-    # Sprawdź RESEND_API_KEY
-    if not settings.RESEND_API_KEY:
+    if args.preview_dir:
+        enable_preview_mode(Path(args.preview_dir))
+        print(f"👀 Tryb podglądu — nic nie zostanie wysłane ({args.preview_dir})")
+    elif not settings.RESEND_API_KEY:
         print("\n❌ BŁĄD: Brak RESEND_API_KEY w .env!")
         print("   Dodaj: RESEND_API_KEY=re_xxx")
         return
-
-    print(f"🔑 Resend API: {settings.RESEND_API_KEY[:10]}...")
+    else:
+        print(f"🔑 Resend API: {settings.RESEND_API_KEY[:10]}...")
 
     # Połącz z bazą
     engine = create_async_engine(settings.DATABASE_URL, echo=False)

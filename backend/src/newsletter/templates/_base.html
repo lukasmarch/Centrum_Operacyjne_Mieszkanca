@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pl" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>{{ subject }}</title>
+<!--[if mso]>
+<xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+<![endif]-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&amp;display=swap">
+<style type="text/css">
+  body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+  a { color: #91c5ff; }
+  @media only screen and (max-width: 620px) {
+    .rl-wrap { width: 100% !important; }
+    .rl-pad { padding-left: 18px !important; padding-right: 18px !important; }
+    .rl-stack { display: block !important; width: 100% !important; }
+    .rl-gutter { display: none !important; height: 12px !important; }
+    .rl-h1 { font-size: 25px !important; }
+    .rl-big { font-size: 32px !important; }
+  }
+</style>
+</head>
+<body style="margin:0; padding:0; background-color:#020617; -webkit-font-smoothing:antialiased;">
+
+<div style="display:none; font-size:1px; color:#020617; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden; mso-hide:all;">{{ preheader }}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#020617;">
+<tr>
+<td align="center" style="padding:24px 12px 40px;">
+
+<table role="presentation" class="rl-wrap" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px; max-width:600px; background-color:#05080f; border:1px solid #262626; border-radius:24px; overflow:hidden;">
+
+  <!-- HEADER -->
+  <tr>
+  <td class="rl-pad" bgcolor="#071021" style="padding:26px 24px 24px; background-color:#071021; background-image:linear-gradient(135deg,#0f2044 0%,#05080f 72%);">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td align="left" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:21px; font-weight:800; line-height:24px; mso-line-height-rule:exactly; color:#fafafa; letter-spacing:-0.4px;">
+          Rybno<span style="color:#91c5ff;">Live</span>
+          <span style="font-size:9px; font-weight:700; letter-spacing:1.2px; color:#a1a1a1; text-transform:uppercase; padding-left:10px;">{% block kicker %}Briefing{% endblock %}</span>
+        </td>
+        <td align="right" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; color:#34d399; text-transform:uppercase; white-space:nowrap;">
+          <span style="font-size:11px; color:#10b981;">&#9679;</span>&nbsp;Na &#380;ywo
+        </td>
+      </tr>
+    </table>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:22px;">
+      <tr><td style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:11px; line-height:16px; mso-line-height-rule:exactly; color:#91c5ff; letter-spacing:1px; text-transform:uppercase; padding-bottom:8px;">{{ date_header }}</td></tr>
+      <tr><td class="rl-h1" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:30px; font-weight:800; line-height:34px; mso-line-height-rule:exactly; color:#fafafa; letter-spacing:-0.6px; padding-bottom:8px;">{% block headline %}{% endblock %}</td></tr>
+      {% if status_line %}
+      <tr><td style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; font-weight:400; line-height:23px; mso-line-height-rule:exactly; color:#a1a1a1;">{{ status_line }}</td></tr>
+      {% endif %}
+    </table>
+  </td>
+  </tr>
+
+  {% block content %}{% endblock %}
+
+  <!-- CTA -->
+  <tr>
+  <td class="rl-pad" align="center" bgcolor="#0b1424" style="padding:28px 24px; background-color:#0b1424; border-top:1px solid #1f2937; text-align:center;">
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:18px; font-weight:700; line-height:24px; mso-line-height-rule:exactly; color:#fafafa;">{% block cta_title %}Pe&#322;ny obraz gminy &mdash; na &#380;ywo{% endblock %}</div>
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:14px; line-height:21px; mso-line-height-rule:exactly; color:#a1a1a1; padding:6px 0 18px;">{% block cta_text %}Pogoda, powietrze, zg&#322;oszenia i asystent AI w jednym panelu.{% endblock %}</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>
+      <td bgcolor="#3a81f6" style="background-color:#3a81f6; border-radius:12px;">
+        <a href="{% block cta_href %}{{ url_dashboard }}{% endblock %}" style="display:block; padding:14px 26px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; font-weight:700; line-height:20px; mso-line-height-rule:exactly; color:#ffffff; text-decoration:none; white-space:nowrap;">{% block cta_button %}Otw&oacute;rz dashboard &rarr;{% endblock %}</a>
+      </td>
+    </tr></table>
+  </td>
+  </tr>
+
+  <!-- STOPKA -->
+  <tr>
+  <td class="rl-pad" align="center" bgcolor="#03060d" style="padding:22px 24px 26px; background-color:#03060d; border-top:1px solid #262626; text-align:center;">
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:14px; font-weight:800; line-height:18px; mso-line-height-rule:exactly; color:#d4d4d4; letter-spacing:-0.3px;">Rybno<span style="color:#91c5ff;">Live</span></div>
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#737373; padding-top:8px;">{% block footer_tagline %}Poranny briefing &middot; Twoja gmina. Na &#380;ywo.{% endblock %}</div>
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; padding-top:10px;">
+      <a href="{{ url_dashboard }}" style="color:#91c5ff; text-decoration:none;">Otw&oacute;rz serwis</a>
+      <span style="color:#525252;">&nbsp;&middot;&nbsp;</span>
+      <a href="{{ url_terms }}" style="color:#91c5ff; text-decoration:none;">Regulamin</a>
+      <span style="color:#525252;">&nbsp;&middot;&nbsp;</span>
+      <a href="{{ unsubscribe_url }}" style="color:#8f8f8f; text-decoration:underline;">Wypisz si&#281;</a>
+    </div>
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:11px; line-height:17px; mso-line-height-rule:exactly; color:#525252; padding-top:12px;">
+      Wydawca: Studio Kamienia Naturalnego Lu-Mar-Go &middot; &#379;abiny 96, 13-220 Rybno<br>
+      Serwis niezale&#380;ny, nieprowadzony przez Urz&#261;d Gminy Rybno<br>
+      Wys&#322;ano {{ sent_at_label }} &middot; odbiorca: {{ recipient_email }}
+    </div>
+  </td>
+  </tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>

@@ -162,6 +162,15 @@ GET  /api/social/campaign/due               # kalendarz kampanii
 POST /api/social/media                      # grafika z URL → uploads/social/
 ```
 
+## Newsletter — szata graficzna marki (2026-07-27)
+- Szablony: `templates/_base.html` (nagłówek, CTA, stopka) + `daily.html` / `weekly.html` dziedziczą przez Jinja `{% extends %}`
+- Ciemna paleta jak w serwisie (#020617 / #0d1117), font Outfit + monospace na liczbach, układ na `<table>` (Outlook), 600 px, ~25 KB
+- Briefing: temat i nagłówek **składane w kodzie** (`Rybno, pon. 27 lipca · 18° · powietrze bardzo dobre`) — model potrafił wstawić złą datę; AI daje tylko `status_line` + `highlights` z polem `agent` (Redaktor/Urzędnik/Strażnik/Przewodnik/Organizator → kolor karty; walidacja w `email_service.AGENT_COLORS`, fallback Redaktor)
+- Wypis działa: `GET /api/newsletter/unsubscribe?token=` (strona z przyciskiem, sam GET nic nie zmienia — skanery poczty odwiedzają linki) + `POST` (formularz, JSON, one-click). Mail wysyłany z nagłówkami `List-Unsubscribe` / `List-Unsubscribe-Post`
+- Stopka: wydawca Lu-Mar-Go, Żabiny 96 + „serwis niezależny, nieprowadzony przez Urząd Gminy Rybno" (makieta miała adres urzędu)
+- Sekcja „Polecane firmy" wyłączona flagą `NEWSLETTER_ADS_ENABLED=false` — wraca po pierwszej sprzedaży planu Firma lokalna
+- Podgląd bez wysyłki: `python scripts/test_newsletter_send.py x@example.com --preview-dir /tmp/nl`
+
 ## Automatyzacja social media (2026-07-25, grafiki w każdym poście 2026-07-26)
 **Backend robi treść, n8n tylko akceptuje i publikuje.**
 - `services/social_content.py` — treść postów, prompt graficzny, klient kie.ai (`nano-banana-pro`), `CAMPAIGN_PLAN`

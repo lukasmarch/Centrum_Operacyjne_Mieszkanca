@@ -15,6 +15,55 @@ logger = logging.getLogger("Newsletter.Email")
 # Template directory
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
+DAYS_PL = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
+MONTHS_PL = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+             "lipca", "sierpnia", "września", "października", "listopada", "grudnia"]
+
+# Paleta systemu (ciemne tło maila) — te same kolory co w makiecie briefingu
+CAQI_COLORS = {
+    "VERY_LOW": "#34d399",
+    "LOW": "#34d399",
+    "MEDIUM": "#fbbf24",
+    "HIGH": "#f87171",
+    "VERY_HIGH": "#f87171",
+}
+
+AGENT_COLORS = {
+    "Redaktor": "#0ea5e9",
+    "Urzędnik": "#f59e0b",
+    "Strażnik": "#ef4444",
+    "Przewodnik": "#10b981",
+    "Organizator": "#06b6d4",
+}
+DEFAULT_AGENT = "Redaktor"
+
+REPORT_CATEGORIES = {
+    "emergency": ("Alarm / wypadek", "#ef4444"),
+    "fire": ("Pożar", "#f97316"),
+    "infrastructure": ("Infrastruktura", "#3b82f6"),
+    "waste": ("Odpady", "#a78bfa"),
+    "greenery": ("Zieleń", "#10b981"),
+    "safety": ("Bezpieczeństwo", "#f59e0b"),
+    "water": ("Woda / kanalizacja", "#06b6d4"),
+    "other": ("Inne", "#8f8f8f"),
+}
+
+
+def plural_pl(n: int, one: str, few: str, many: str) -> str:
+    """Polska odmiana rzeczownika po liczebniku (1 wydarzenie / 2 wydarzenia / 5 wydarzeń)."""
+    if n == 1:
+        return one
+    if 12 <= n % 100 <= 14:
+        return many
+    return few if 2 <= n % 10 <= 4 else many
+
+
+def app_link(path: str = "/", campaign: str = "briefing") -> str:
+    """Link do serwisu z parametrami UTM. Ścieżki muszą istnieć w SECTION_TO_PATH (App.tsx)."""
+    base = settings.APP_URL.rstrip("/")
+    sep = "&" if "?" in path else "?"
+    return f"{base}{path}{sep}utm_source=newsletter&utm_medium=email&utm_campaign={campaign}"
+
 
 class EmailService:
     """Email sending service using Resend"""
@@ -66,7 +115,8 @@ class EmailService:
         to_email: str,
         subject: str,
         html_content: str,
-        reply_to: Optional[str] = None
+        reply_to: Optional[str] = None,
+        unsubscribe_url: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Send an email via Resend.
@@ -76,6 +126,10 @@ class EmailService:
             subject: Email subject line
             html_content: HTML content of the email
             reply_to: Optional reply-to address
+            unsubscribe_url: Adres wypisu — trafia do nagłówka List-Unsubscribe,
+                dzięki czemu Gmail/Outlook pokazują własny przycisk „Wypisz się"
+                (bez tego skrzynki traktują newsletter jak zwykłą pocztę i częściej
+                lądujemy w spamie)
 
         Returns:
             Dict with send result (id, status)
@@ -91,6 +145,12 @@ class EmailService:
                 "subject": subject,
                 "html": html_content,
             }
+
+            if unsubscribe_url:
+                params["headers"] = {
+                    "List-Unsubscribe": f"<{unsubscribe_url}>",
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                }
 
             if reply_to:
                 params["reply_to"] = reply_to
@@ -113,6 +173,30 @@ class EmailService:
                 "to": to_email
             }
 
+    def _common_context(
+        self,
+        to_email: str,
+        unsubscribe_token: str,
+        campaign: str,
+    ) -> Dict[str, Any]:
+        """Kontekst wspólny dla obu newsletterów: linki, stopka, przełącznik reklam."""
+        now = datetime.now()
+        return {
+            "recipient_email": to_email,
+            # Wypis obsługuje backend (frontend nie ma takiej strony) — patrz
+            # newsletter/routes.py: GET/POST /api/newsletter/unsubscribe
+            "unsubscribe_url": (
+                f"{settings.API_URL.rstrip('/')}/api/newsletter/unsubscribe?token={unsubscribe_token}"
+            ),
+            "url_dashboard": app_link("/", campaign),
+            "url_premium": app_link("/cennik", campaign),
+            "url_terms": app_link("/regulamin", campaign),
+            "url_reports": app_link("/zgloszenia", campaign),
+            "sent_at_label": f"{now.day} {MONTHS_PL[now.month - 1]} {now.year}",
+            # Reklama firm wraca dopiero, gdy sprzedamy plan „Firma lokalna"
+            "ads_enabled": settings.NEWSLETTER_ADS_ENABLED,
+        }
+
     async def send_weekly_newsletter(
         self,
         to_email: str,
@@ -130,22 +214,36 @@ class EmailService:
         Returns:
             Send result
         """
+        now = datetime.now()
+        weekly_weather = content.get("weekly_weather")
+        if weekly_weather and weekly_weather.get("caqi_level"):
+            weekly_weather["color"] = CAQI_COLORS.get(weekly_weather["caqi_level"], "#a1a1a1")
+
+        weekly_reports = content.get("weekly_reports")
+        if weekly_reports and weekly_reports.get("by_category"):
+            weekly_reports["categories"] = [
+                {
+                    "label": REPORT_CATEGORIES.get(cat, (cat, "#8f8f8f"))[0],
+                    "color": REPORT_CATEGORIES.get(cat, (cat, "#8f8f8f"))[1],
+                    "count": count,
+                }
+                for cat, count in weekly_reports["by_category"].items()
+            ]
+
         # Build context for template
         context = {
+            **self._common_context(to_email, unsubscribe_token, "weekly"),
             "subject": content.get("subject", "Tydzień w gminie Rybno"),
-            "date": datetime.now().strftime("%d.%m.%Y"),
+            "preheader": content.get("preview_text", ""),
+            "date_header": f"{DAYS_PL[now.weekday()]} · {now.day} {MONTHS_PL[now.month - 1]} {now.year}",
+            "status_line": content.get("sections", {}).get("greeting"),
             "sections": content.get("sections", {}),
-            "unsubscribe_url": f"{settings.APP_URL}/newsletter/unsubscribe?token={unsubscribe_token}",
-            "preferences_url": f"{settings.APP_URL}/newsletter/preferences?token={unsubscribe_token}",
-            "premium_url": f"{settings.APP_URL}/premium",
-            "weekly_weather": content.get("weekly_weather"),
-            "weekly_reports": content.get("weekly_reports"),
+            "weekly_weather": weekly_weather,
+            "weekly_reports": weekly_reports,
             "puls": content.get("puls"),
-            "events_db": content.get("events_db", []),
             # Sekcja reklamowa „Polecane firmy" (plan Firma lokalna)
             "promoted_businesses": content.get("promoted_businesses", []),
             "business_announcements": content.get("business_announcements", []),
-            "businesses_url": f"{settings.APP_URL}/business",
         }
 
         # Process events to extract day/month for display
@@ -187,16 +285,22 @@ class EmailService:
                     continue
             return None
 
-        events = context["sections"].get("events", [])
-        for event in events:
-            if "date" in event:
-                parsed = parse_event_date(event["date"])
-                if parsed:
-                    event["day"] = parsed.day
-                    event["month"] = MONTHS_PL_SHORT[parsed.month - 1]
-                else:
-                    event["day"] = "?"
-                    event["month"] = "?"
+        # Wydarzenia liczymy z bazy; lista od AI to tylko fallback (może mieć zmyślone daty)
+        events = content.get("events_db") or []
+        if not events:
+            events = context["sections"].get("events", [])
+            for event in events:
+                if "date" in event:
+                    parsed = parse_event_date(event["date"])
+                    if parsed:
+                        event["day"] = parsed.day
+                        event["month"] = MONTHS_PL_SHORT[parsed.month - 1]
+                    else:
+                        event["day"] = "?"
+                        event["month"] = "?"
+
+        context["events"] = events
+        context["events_word"] = plural_pl(len(events), "wydarzenie", "wydarzenia", "wydarzeń")
 
         # Render template
         html = self.render_template("weekly.html", context)
@@ -205,7 +309,8 @@ class EmailService:
         return await self.send_email(
             to_email=to_email,
             subject=context["subject"],
-            html_content=html
+            html_content=html,
+            unsubscribe_url=context["unsubscribe_url"]
         )
 
     async def send_daily_newsletter(
@@ -213,7 +318,8 @@ class EmailService:
         to_email: str,
         content: Dict[str, Any],
         unsubscribe_token: str,
-        weather_temp: Optional[float] = None
+        weather_temp: Optional[float] = None,
+        recipient_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Send daily newsletter to a Premium subscriber.
@@ -223,28 +329,64 @@ class EmailService:
             content: Newsletter content from generator
             unsubscribe_token: Token for unsubscribe link
             weather_temp: Current temperature
+            recipient_name: Imię odbiorcy do powitania (mianownik — inne przypadki
+                wymagałyby odmiany, więc imię pada tylko w „Dzień dobry, X.")
 
         Returns:
             Send result
         """
-        # Build context
         air_quality = content.get("air_quality")
+        if air_quality:
+            air_quality["color"] = CAQI_COLORS.get(air_quality.get("caqi_level"), "#a1a1a1")
+
+        weather = content.get("weather")
+        if not weather and weather_temp is not None:
+            weather = {"temperature": round(weather_temp), "description": None,
+                       "temp_min": None, "temp_max": None, "wind_kmh": None}
+
+        # Wnioski AI jako karty agentów — kolor i nazwa muszą pochodzić z naszej
+        # listy, nie z odpowiedzi modelu (fallback: Redaktor)
+        highlights = []
+        for item in content.get("sections", {}).get("highlights", []) or []:
+            agent = item.get("agent") if item.get("agent") in AGENT_COLORS else DEFAULT_AGENT
+            highlights.append({
+                "agent": agent,
+                "color": AGENT_COLORS[agent],
+                "meta": item.get("meta") or "",
+                "text": item.get("text", ""),
+            })
+
+        reports = []
+        for r in content.get("reports_today", []) or []:
+            label, color = REPORT_CATEGORIES.get(r.get("category"), REPORT_CATEGORIES["other"])
+            reports.append({**r, "category_label": label, "color": color})
+
+        events = content.get("events_today_db") or content.get("sections", {}).get("events_today", [])
+        sources_count = content.get("sources_count") or 0
+
         context = {
-            "subject": content.get("subject", "Dzień Dobry!"),
+            **self._common_context(to_email, unsubscribe_token, "briefing"),
+            "subject": content.get("subject", "Poranny briefing"),
+            "preheader": content.get("preview_text", ""),
+            "date_header": content.get("date_header", ""),
+            "status_line": content.get("sections", {}).get("status_line")
+                           or content.get("sections", {}).get("greeting"),
+            "recipient_name": recipient_name,
             "sections": content.get("sections", {}),
-            "weather_temp": weather_temp or (air_quality or {}).get("temperature") or "?",
+            "weather": weather,
             "air_quality": air_quality,
             "name_days": content.get("name_days", []),
             "special_day": content.get("special_day", ""),
+            "highlights": highlights,
+            "sources_count": sources_count,
+            "sources_word": plural_pl(sources_count, "źródło", "źródła", "źródeł"),
             "cinema_evening": content.get("cinema_evening", []),
-            "reports_today": content.get("reports_today", []),
+            "reports_today": reports,
             "reports_date_label": content.get("reports_date_label", "dzisiaj"),
-            "weather": content.get("weather"),
-            "events_today_db": content.get("events_today_db", []),
+            "events": events,
+            "events_word": plural_pl(len(events), "wydarzenie", "wydarzenia", "wydarzeń"),
             "promoted_businesses": content.get("promoted_businesses", []),
             "business_announcements": content.get("business_announcements", []),
-            "unsubscribe_url": f"{settings.APP_URL}/newsletter/unsubscribe?token={unsubscribe_token}",
-            "preferences_url": f"{settings.APP_URL}/newsletter/preferences?token={unsubscribe_token}",
         }
 
         # Render template
@@ -254,7 +396,8 @@ class EmailService:
         return await self.send_email(
             to_email=to_email,
             subject=context["subject"],
-            html_content=html
+            html_content=html,
+            unsubscribe_url=context["unsubscribe_url"]
         )
 
     async def send_batch(

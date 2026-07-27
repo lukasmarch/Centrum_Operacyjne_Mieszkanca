@@ -66,9 +66,11 @@ async def send_weekly_newsletter():
                 logger.error(f"Failed to generate weekly newsletter: {str(e)}")
                 return stats
 
-            # Sekcja „Polecane firmy" (plan Firma lokalna) — reklama w newsletterze
-            from src.newsletter.promo import get_newsletter_promo
-            content.update(await get_newsletter_promo(session))
+            # Sekcja „Polecane firmy" (plan Firma lokalna) — reklama w newsletterze.
+            # Wyłączona flagą do czasu pierwszej sprzedaży planu.
+            if settings.NEWSLETTER_ADS_ENABLED:
+                from src.newsletter.promo import get_newsletter_promo
+                content.update(await get_newsletter_promo(session))
 
             # Send to each subscriber
             for subscriber in subscribers:
@@ -181,8 +183,10 @@ async def send_daily_newsletter():
                     logger.error(f"Failed to generate weekly card: {str(e)}")
 
             # Sekcja „Polecane firmy" — wspólna dla wszystkich lokalizacji
-            from src.newsletter.promo import get_newsletter_promo
-            promo = await get_newsletter_promo(session)
+            promo = {}
+            if settings.NEWSLETTER_ADS_ENABLED:
+                from src.newsletter.promo import get_newsletter_promo
+                promo = await get_newsletter_promo(session)
 
             # Generate and send per location
             for location, subs in by_location.items():
@@ -208,11 +212,15 @@ async def send_daily_newsletter():
                         weather = weather_result.scalar_one_or_none()
                         weather_temp = weather.temperature if weather else None
 
+                        # Imię w mianowniku — tylko do powitania „Dzień dobry, X."
+                        first_name = (user.full_name or "").strip().split(" ")[0] or None
+
                         result = await email_service.send_daily_newsletter(
                             to_email=subscriber.email,
                             content=content,
                             unsubscribe_token=subscriber.unsubscribe_token,
-                            weather_temp=weather_temp
+                            weather_temp=weather_temp,
+                            recipient_name=first_name
                         )
 
                         if result["status"] == "sent":

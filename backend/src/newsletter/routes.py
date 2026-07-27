@@ -2,19 +2,24 @@
 Newsletter API routes
 """
 
+import html
 import secrets
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, func
 
+from src.config import settings
 from src.database import (
     get_session, NewsletterSubscriber, NewsletterLog, User,
     NewsletterFrequency, NewsletterStatus, UserTier
 )
 from src.auth.dependencies import get_current_active_user, get_optional_user
 from .schemas import (
-    NewsletterSubscribe, NewsletterUnsubscribe, NewsletterConfirm,
+    NewsletterSubscribe, NewsletterConfirm,
     NewsletterPreferencesUpdate, SubscriberResponse, SubscriptionStats, MessageResponse
 )
 from .email_service import EmailService
@@ -130,28 +135,105 @@ async def confirm_subscription(
     return MessageResponse(message="Newsletter subscription confirmed!")
 
 
-@router.post("/unsubscribe", response_model=MessageResponse)
+def _unsubscribe_page(title: str, body: str, form_token: Optional[str] = None) -> HTMLResponse:
+    """Strona wypisu w kolorystyce newslettera — bez logowania i bez frontendu."""
+    button = ""
+    if form_token:
+        button = f"""
+      <form method="post" action="/api/newsletter/unsubscribe">
+        <input type="hidden" name="token" value="{html.escape(form_token)}">
+        <button type="submit" style="margin-top:22px; padding:13px 26px; background:#3a81f6; color:#fff; border:0; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer;">Potwierdzam wypisanie</button>
+      </form>"""
+
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="pl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RybnoLive — newsletter</title></head>
+<body style="margin:0; background:#020617; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif; color:#fafafa;">
+  <div style="max-width:520px; margin:0 auto; padding:64px 24px;">
+    <div style="font-size:21px; font-weight:800; letter-spacing:-0.4px;">Rybno<span style="color:#91c5ff;">Live</span></div>
+    <div style="margin-top:32px; background:#0d1117; border:1px solid #1f2937; border-radius:20px; padding:28px;">
+      <h1 style="margin:0; font-size:22px; line-height:29px;">{html.escape(title)}</h1>
+      <p style="margin:10px 0 0; font-size:15px; line-height:23px; color:#a1a1a1;">{html.escape(body)}</p>{button}
+    </div>
+    <p style="margin-top:24px; font-size:13px; color:#525252;">
+      <a href="{settings.APP_URL}" style="color:#91c5ff; text-decoration:none;">Wróć do rybnolive.pl</a>
+    </p>
+  </div>
+</body></html>""")
+
+
+@router.get("/unsubscribe", response_class=HTMLResponse)
+async def unsubscribe_page(token: str):
+    """
+    Strona wypisu otwierana z linku w stopce newslettera.
+
+    Sam GET niczego nie zmienia — skanery antyspamowe i podglądy linków w klientach
+    pocztowych odwiedzają adresy z maila, więc wypis następuje dopiero po kliknięciu
+    przycisku (POST).
+    """
+    return _unsubscribe_page(
+        "Wypisać Cię z newslettera?",
+        "Przestaniemy wysyłać briefing i podsumowanie tygodnia. Konto w serwisie zostaje bez zmian.",
+        form_token=token,
+    )
+
+
+@router.post("/unsubscribe")
 async def unsubscribe(
-    data: NewsletterUnsubscribe,
+    request: Request,
     session: AsyncSession = Depends(get_session)
 ):
     """
     Unsubscribe from newsletter via token.
+
+    Token przyjmujemy trzema drogami, bo ten sam adres obsługuje:
+    - JSON `{"token": ...}` — wywołania z aplikacji (odpowiedź JSON),
+    - formularz ze strony wypisu,
+    - one-click z nagłówka List-Unsubscribe (Gmail/Outlook wysyłają POST na adres
+      z maila, token siedzi w query stringu).
     """
+    token = request.query_params.get("token")
+    wants_json = False
+    content_type = request.headers.get("content-type", "")
+
+    if not token and content_type.startswith("application/json"):
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        token = payload.get("token")
+        wants_json = True
+    elif not token:
+        form = await request.form()
+        token = form.get("token")
+
+    if not token:
+        if wants_json:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Missing token")
+        return _unsubscribe_page("Brak tokenu", "Link jest niekompletny. Otwórz go ponownie z wiadomości e-mail.")
+
     result = await session.execute(
         select(NewsletterSubscriber)
-        .where(NewsletterSubscriber.unsubscribe_token == data.token)
+        .where(NewsletterSubscriber.unsubscribe_token == token)
     )
     subscriber = result.scalar_one_or_none()
 
     if not subscriber:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invalid unsubscribe token"
+        if wants_json:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invalid unsubscribe token"
+            )
+        return _unsubscribe_page(
+            "Nie znaleźliśmy tej subskrypcji",
+            "Link wygasł albo został już użyty. Jeśli nadal dostajesz wiadomości, napisz na biuro@lumargo.pl.",
         )
 
     if subscriber.status == NewsletterStatus.UNSUBSCRIBED.value:
-        return MessageResponse(message="Already unsubscribed")
+        if wants_json:
+            return MessageResponse(message="Already unsubscribed")
+        return _unsubscribe_page("Już Cię wypisaliśmy", "Ten adres nie otrzymuje newslettera RybnoLive.")
 
     subscriber.status = NewsletterStatus.UNSUBSCRIBED.value
     subscriber.unsubscribed_at = datetime.utcnow()
@@ -159,7 +241,13 @@ async def unsubscribe(
 
     await session.commit()
 
-    return MessageResponse(message="Successfully unsubscribed from newsletter")
+    if wants_json:
+        return MessageResponse(message="Successfully unsubscribed from newsletter")
+
+    return _unsubscribe_page(
+        "Wypisaliśmy Cię z newslettera",
+        "Nie wyślemy już briefingu ani podsumowania tygodnia. Możesz zapisać się ponownie w każdej chwili w serwisie.",
+    )
 
 
 @router.get("/preferences", response_model=SubscriberResponse)

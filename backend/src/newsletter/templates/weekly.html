@@ -1,508 +1,275 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>{{ subject }}</title>
-    <!--[if mso]>
-    <noscript>
-        <xml>
-            <o:OfficeDocumentSettings>
-                <o:PixelsPerInch>96</o:PixelsPerInch>
-            </o:OfficeDocumentSettings>
-        </xml>
-    </noscript>
-    <![endif]-->
-    <style>
-        /* Reset */
-        body, table, td, p, a, li {
-            -webkit-text-size-adjust: 100%;
-            -ms-text-size-adjust: 100%;
-        }
-        table, td {
-            mso-table-lspace: 0pt;
-            mso-table-rspace: 0pt;
-        }
-        img {
-            -ms-interpolation-mode: bicubic;
-            border: 0;
-            height: auto;
-            line-height: 100%;
-            outline: none;
-            text-decoration: none;
-        }
+{% extends "_base.html" %}
 
-        /* Base Styles */
-        body {
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-            background-color: #f4f4f4;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
+{% block kicker %}Tydzie&#324; w gminie{% endblock %}
 
-        .wrapper {
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-        }
+{% block headline %}Tydzie&#324; w skr&oacute;cie.{% endblock %}
 
-        .header {
-            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
-            padding: 30px 20px;
-            text-align: center;
-        }
+{% block footer_tagline %}Newsletter tygodniowy &middot; Twoja gmina. Na &#380;ywo.{% endblock %}
 
-        .header h1 {
-            color: #ffffff;
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-        }
+{% block cta_title %}Chcesz to samo ka&#380;dego ranka?{% endblock %}
+{% block cta_text %}{% if sections.premium_cta %}{{ sections.premium_cta }}{% else %}Poranny briefing Pn&ndash;Pt, asystent AI bez limitu i pe&#322;ne dane o gminie.{% endif %}{% endblock %}
+{% block cta_href %}{{ url_premium }}{% endblock %}
+{% block cta_button %}Sprawd&#378; Premium &rarr;{% endblock %}
 
-        .header .date {
-            color: #a8c5de;
-            font-size: 14px;
-            margin-top: 8px;
-        }
+{% block content %}
 
-        .section {
-            padding: 25px 30px;
-            border-bottom: 1px solid #eee;
-        }
+  {% if puls %}
+  <!-- PULS TYGODNIA -->
+  <tr>
+  <td class="rl-pad" style="padding:20px 24px 4px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td align="left" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:16px; font-weight:700; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">Gmina w liczbach</td>
+        <td align="right" style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:12px; color:#737373; white-space:nowrap;">{{ puls.period }}</td>
+      </tr>
+    </table>
+  </td>
+  </tr>
 
-        .section-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1e3a5f;
-            margin: 0 0 15px 0;
-        }
-
-        .news-item {
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .news-item:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
-        }
-
-        .news-item h3 {
-            margin: 0 0 8px 0;
-            font-size: 16px;
-            color: #333;
-        }
-
-        .news-item h3 a {
-            color: #1e3a5f;
-            text-decoration: none;
-        }
-
-        .news-item h3 a:hover {
-            text-decoration: underline;
-        }
-
-        .news-item p {
-            margin: 0;
-            color: #666;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-
-        .event-item {
-            display: flex;
-            margin-bottom: 15px;
-            padding: 12px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .event-date {
-            flex-shrink: 0;
-            width: 50px;
-            text-align: center;
-            padding-right: 15px;
-            border-right: 2px solid #1e3a5f;
-            margin-right: 15px;
-        }
-
-        .event-date .day {
-            font-size: 24px;
-            font-weight: 700;
-            color: #1e3a5f;
-            line-height: 1;
-        }
-
-        .event-date .month {
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-        }
-
-        .event-details h4 {
-            margin: 0 0 5px 0;
-            font-size: 15px;
-            color: #333;
-        }
-
-        .event-details .location {
-            font-size: 13px;
-            color: #666;
-        }
-
-        .weather-box {
-            background: linear-gradient(135deg, #4a90d9 0%, #67b8de 100%);
-            border-radius: 12px;
-            padding: 20px;
-            color: white;
-            text-align: center;
-        }
-
-        .weather-temp {
-            font-size: 48px;
-            font-weight: 300;
-            margin: 0;
-        }
-
-        .weather-desc {
-            font-size: 16px;
-            opacity: 0.9;
-        }
-
-        .premium-box {
-            background: linear-gradient(135deg, #ffd700 0%, #ffb800 100%);
-            border-radius: 12px;
-            padding: 25px;
-            text-align: center;
-        }
-
-        .premium-box h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 18px;
-        }
-
-        .premium-box p {
-            margin: 0 0 15px 0;
-            color: #555;
-            font-size: 14px;
-        }
-
-        .premium-btn {
-            display: inline-block;
-            background-color: #1e3a5f;
-            color: #ffffff !important;
-            padding: 12px 30px;
-            border-radius: 25px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .footer {
-            background-color: #f8f9fa;
-            padding: 25px 30px;
-            text-align: center;
-        }
-
-        .footer p {
-            margin: 0 0 10px 0;
-            color: #888;
-            font-size: 12px;
-        }
-
-        .footer a {
-            color: #1e3a5f;
-            text-decoration: none;
-        }
-
-        .unsubscribe {
-            font-size: 11px;
-            color: #aaa;
-        }
-
-        /* Category badges */
-        .category-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin: 2px; }
-        .category-emergency { background: #ffebee; color: #c62828; }
-        .category-fire { background: #fff3e0; color: #e65100; }
-        .category-infrastructure { background: #e3f2fd; color: #1565c0; }
-        .category-waste { background: #f3e5f5; color: #6a1b9a; }
-        .category-safety { background: #fff8e1; color: #f57f17; }
-        .category-water { background: #e0f7fa; color: #006064; }
-        .category-greenery { background: #e8f5e9; color: #2e7d32; }
-        .category-other { background: #f5f5f5; color: #424242; }
-
-        /* Responsive */
-        @media screen and (max-width: 600px) {
-            .wrapper {
-                width: 100% !important;
-            }
-            .section {
-                padding: 20px !important;
-            }
-            .header h1 {
-                font-size: 20px !important;
-            }
-        }
-    </style>
-</head>
-<body>
-    <center>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
-            <tr>
-                <td align="center" style="padding: 20px 10px;">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="wrapper">
-
-                        <!-- Header -->
-                        <tr>
-                            <td class="header">
-                                <div style="font-family: Georgia, serif; font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">Rybno<span style="color: #ff9500;">Live</span> <span style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #a8c5de; font-weight: 600;">&nbsp;Tygodnik</span></div>
-                                <p class="date" style="margin-top: 6px;">{{ date }} · Twoja gmina. Na żywo.</p>
-                            </td>
-                        </tr>
-
-                        <!-- Greeting -->
-                        <tr>
-                            <td class="section">
-                                <p style="font-size: 16px; color: #333; line-height: 1.6; margin: 0;">
-                                    {{ sections.greeting }}
-                                </p>
-                            </td>
-                        </tr>
-
-                        <!-- Puls tygodnia (analityka DB) -->
-                        {% if puls %}
-                        <tr>
-                            <td class="section" style="background: linear-gradient(180deg, #fffdf9, #f7f1e6);">
-                                <p style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; color: #d9862b; margin: 0 0 2px;">Puls tygodnia</p>
-                                <h2 class="section-title" style="margin-top: 0;">📊 Gmina w liczbach</h2>
-                                <table width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: separate; border-spacing: 6px 0;">
-                                    <tr>
-                                        <td width="33%" style="background: #ffffff; border: 1px solid #e7e0d3; border-radius: 10px; padding: 12px; text-align: center; vertical-align: top;">
-                                            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7680; font-weight: 600;">Wiadomości</div>
-                                            <div style="font-family: Georgia, serif; font-size: 26px; color: #16324f; margin: 3px 0;">{{ puls.articles_count }}</div>
-                                            {% if puls.articles_trend is not none %}
-                                            <div style="font-size: 12px; font-weight: 700; color: {{ '#4e8a5b' if puls.articles_trend >= 0 else '#c0392b' }};">{{ '▲' if puls.articles_trend >= 0 else '▼' }} {{ puls.articles_trend }}% do zeszłego tyg.</div>
-                                            {% endif %}
-                                        </td>
-                                        <td width="33%" style="background: #ffffff; border: 1px solid #e7e0d3; border-radius: 10px; padding: 12px; text-align: center; vertical-align: top;">
-                                            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7680; font-weight: 600;">Wydarzenia</div>
-                                            <div style="font-family: Georgia, serif; font-size: 26px; color: #16324f; margin: 3px 0;">{{ puls.events_count }}</div>
-                                            {% if puls.events_trend is not none %}
-                                            <div style="font-size: 12px; font-weight: 700; color: {{ '#4e8a5b' if puls.events_trend >= 0 else '#c0392b' }};">{{ '▲' if puls.events_trend >= 0 else '▼' }} {{ puls.events_trend }}% do zeszłego tyg.</div>
-                                            {% endif %}
-                                        </td>
-                                        <td width="33%" style="background: #ffffff; border: 1px solid #e7e0d3; border-radius: 10px; padding: 12px; text-align: center; vertical-align: top;">
-                                            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7680; font-weight: 600;">Aura</div>
-                                            <div style="font-family: Georgia, serif; font-size: 26px; color: #16324f; margin: 3px 0;">{% if puls.weather.temp_avg is not none %}{{ puls.weather.temp_avg }}°{% else %}—{% endif %}</div>
-                                            {% if puls.air_quality.caqi_avg is not none %}
-                                            <div style="font-size: 12px; font-weight: 700; color: #4e8a5b;">CAQI {{ puls.air_quality.caqi_avg }}</div>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                </table>
-                                {% if puls.top_categories %}
-                                <p style="font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; color: #d9862b; margin: 18px 0 8px;">O czym mówił tydzień</p>
-                                <table width="100%" cellspacing="0" cellpadding="0" border="0">
-                                    {% for cat in puls.top_categories %}
-                                    <tr>
-                                        <td width="90" style="font-size: 13px; color: #22303c; font-weight: 600; padding: 4px 0;">{{ cat.category }}</td>
-                                        <td style="padding: 4px 0;">
-                                            <div style="background: #ede6d8; border-radius: 4px; height: 14px; width: 100%;">
-                                                <div style="background: #d9862b; border-radius: 4px; height: 14px; width: {{ cat.pct }}%;"></div>
-                                            </div>
-                                        </td>
-                                        <td width="30" style="font-size: 13px; color: #6b7680; text-align: right; font-weight: 600; padding: 4px 0 4px 8px;">{{ cat.count }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </table>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endif %}
-
-                        <!-- Top News -->
-                        <tr>
-                            <td class="section">
-                                <h2 class="section-title">📰 TOP 5 Wiadomości Tygodnia</h2>
-                                {% for news in sections.top_news %}
-                                <div class="news-item">
-                                    <h3><a href="{{ news.url }}">{{ news.title }}</a></h3>
-                                    <p>{{ news.summary }}</p>
-                                </div>
-                                {% endfor %}
-                            </td>
-                        </tr>
-
-                        <!-- Events -->
-                        <tr>
-                            <td class="section">
-                                <h2 class="section-title">📅 Nadchodzące Wydarzenia</h2>
-                                {% for event in (events_db if events_db else sections.events) %}
-                                <div class="event-item">
-                                    <div class="event-date">
-                                        <span class="day">{{ event.day }}</span>
-                                        <span class="month">{{ event.month }}</span>
-                                    </div>
-                                    <div class="event-details">
-                                        <h4>{{ event.title }}</h4>
-                                        <p class="location">{% if event.is_local %}<span style="color: #4e8a5b; font-weight: 700;">● {{ event.location }}</span>{% else %}📍 {{ event.location }}{% endif %}{% if event.time %} · {{ event.time }}{% endif %}</p>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                                {% if not events_db and not sections.events %}
-                                <p style="color: #888; font-size: 14px; margin: 0;">Brak zaplanowanych wydarzeń.</p>
-                                {% endif %}
-                            </td>
-                        </tr>
-
-                        <!-- Weekly Weather -->
-                        <tr>
-                            <td class="section">
-                                <h2 class="section-title">🌤️ Pogoda w Tygodniu</h2>
-                                {% if weekly_weather and (weekly_weather.temp_avg or weekly_weather.caqi_avg) %}
-                                <table width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; font-size: 14px;">
-                                    <tr>
-                                        {% if weekly_weather.temp_min is not none %}
-                                        <td style="padding: 8px; text-align: center; background: #f0f4f8; border-radius: 8px; width: 25%;">
-                                            <div style="font-size: 24px; color: #1e3a5f; font-weight: 300;">{{ weekly_weather.temp_min }}°C</div>
-                                            <div style="color: #888; font-size: 12px;">Min</div>
-                                        </td>
-                                        {% endif %}
-                                        {% if weekly_weather.temp_avg is not none %}
-                                        <td style="padding: 8px; text-align: center;">
-                                            <div style="font-size: 24px; color: #1e3a5f; font-weight: 300;">{{ weekly_weather.temp_avg }}°C</div>
-                                            <div style="color: #888; font-size: 12px;">Średnia</div>
-                                        </td>
-                                        {% endif %}
-                                        {% if weekly_weather.temp_max is not none %}
-                                        <td style="padding: 8px; text-align: center; background: #f0f4f8; border-radius: 8px; width: 25%;">
-                                            <div style="font-size: 24px; color: #1e3a5f; font-weight: 300;">{{ weekly_weather.temp_max }}°C</div>
-                                            <div style="color: #888; font-size: 12px;">Max</div>
-                                        </td>
-                                        {% endif %}
-                                        {% if weekly_weather.humidity_avg is not none %}
-                                        <td style="padding: 8px; text-align: center; width: 25%;">
-                                            <div style="font-size: 24px; color: #1e3a5f; font-weight: 300;">{{ weekly_weather.humidity_avg }}%</div>
-                                            <div style="color: #888; font-size: 12px;">Wilgotność</div>
-                                        </td>
-                                        {% endif %}
-                                    </tr>
-                                </table>
-                                {% if weekly_weather.caqi_avg %}
-                                <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center; font-size: 14px;">
-                                    <strong>Jakość powietrza w tygodniu:</strong>
-                                    CAQI {{ weekly_weather.caqi_avg }}
-                                    &nbsp;({{ weekly_weather.caqi_level_pl }})
-                                </div>
-                                {% endif %}
-                                {% else %}
-                                <div class="weather-box">
-                                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">{{ sections.weather }}</p>
-                                </div>
-                                {% endif %}
-                            </td>
-                        </tr>
-
-                        <!-- Weekly Reports -->
-                        {% if weekly_reports and weekly_reports.total > 0 %}
-                        <tr>
-                            <td class="section">
-                                <h2 class="section-title">📢 Zgłoszenia Tygodnia</h2>
-                                <p style="color: #666; font-size: 14px; margin: 0 0 10px 0;">
-                                    W tym tygodniu mieszkańcy zgłosili <strong>{{ weekly_reports.total }}</strong> zdarzeń:
-                                </p>
-                                {% for category, count in weekly_reports.by_category.items() %}
-                                <span class="category-badge category-{{ category }}">{{ category }}: {{ count }}</span>
-                                {% endfor %}
-                                {% if weekly_reports.top_reports %}
-                                <div style="margin-top: 12px;">
-                                    {% for report in weekly_reports.top_reports[:3] %}
-                                    <div style="margin-top: 8px; padding: 8px 10px; border-left: 3px solid #ff9500; background: #fff8f0;">
-                                        <strong style="font-size: 14px;">{{ report.title }}</strong>
-                                        {% if report.address %}
-                                        <div style="font-size: 12px; color: #888;">📍 {{ report.address }}</div>
-                                        {% endif %}
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-                                <a href="{{ app_url }}/reports" style="font-size: 13px; color: #1e3a5f; text-decoration: none; display: inline-block; margin-top: 10px;">
-                                    Wszystkie zgłoszenia na naszej stronie →
-                                </a>
-                            </td>
-                        </tr>
-                        {% endif %}
-
-                        <!-- Polecane firmy (plan Firma lokalna) -->
-                        {% if promoted_businesses or business_announcements %}
-                        <tr>
-                            <td class="section">
-                                <h2 class="section-title">🏪 Polecane firmy z gminy</h2>
-                                <p style="color: #999; font-size: 11px; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px;">Materiał reklamowy</p>
-                                {% for ann in business_announcements %}
-                                <div style="margin-top: 8px; padding: 10px 12px; border-left: 3px solid #f59e0b; background: #fffbeb;">
-                                    <strong style="font-size: 14px;">{{ ann.title }}</strong>
-                                    {% if ann.valid_until_label %}
-                                    <span style="font-size: 12px; color: #b45309;"> · do {{ ann.valid_until_label }}</span>
-                                    {% endif %}
-                                    <div style="font-size: 13px; color: #555; margin-top: 3px;">{{ ann.body }}</div>
-                                    <div style="font-size: 12px; color: #888; margin-top: 4px;">
-                                        {{ ann.nazwa }} · {{ ann.miasto }}{% if ann.telefon %} · 📞 {{ ann.telefon }}{% endif %}
-                                    </div>
-                                </div>
-                                {% endfor %}
-                                {% for biz in promoted_businesses %}
-                                <div style="margin-top: 8px; padding: 10px 12px; border: 1px solid #fde68a; border-radius: 8px; background: #fffdf5;">
-                                    <strong style="font-size: 14px;">{{ biz.nazwa }}</strong>
-                                    {% if biz.branza %}<span style="font-size: 12px; color: #888;"> · {{ biz.branza }}</span>{% endif %}
-                                    {% if biz.description %}
-                                    <div style="font-size: 13px; color: #555; margin-top: 3px;">{{ biz.description }}</div>
-                                    {% endif %}
-                                    <div style="font-size: 12px; color: #888; margin-top: 4px;">
-                                        📍 {{ biz.miasto }}{% if biz.telefon %} · 📞 {{ biz.telefon }}{% endif %}{% if biz.godziny %} · 🕐 {{ biz.godziny }}{% endif %}
-                                    </div>
-                                </div>
-                                {% endfor %}
-                                <a href="{{ businesses_url }}" style="font-size: 13px; color: #1e3a5f; text-decoration: none; display: inline-block; margin-top: 10px;">
-                                    Katalog lokalnych firm →
-                                </a>
-                            </td>
-                        </tr>
-                        {% endif %}
-
-                        <!-- Premium CTA -->
-                        <tr>
-                            <td class="section" style="border-bottom: none;">
-                                <div class="premium-box">
-                                    <h3>💎 Zostań Premium!</h3>
-                                    <p>{{ sections.premium_cta }}</p>
-                                    <a href="{{ premium_url }}" class="premium-btn">Sprawdź Premium</a>
-                                </div>
-                            </td>
-                        </tr>
-
-                        <!-- Footer -->
-                        <tr>
-                            <td class="footer">
-                                <p><strong>RybnoLive</strong> · Twoja gmina. Na żywo.</p>
-                                <p>Twoje lokalne centrum informacyjne dla gminy Rybno</p>
-                                <p class="unsubscribe">
-                                    <a href="{{ unsubscribe_url }}">Wypisz się z newslettera</a> |
-                                    <a href="{{ preferences_url }}">Zmień preferencje</a>
-                                </p>
-                            </td>
-                        </tr>
-
-                    </table>
-                </td>
-            </tr>
+  <tr>
+  <td class="rl-pad" style="padding:12px 24px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+      <td class="rl-stack" width="176" valign="top" style="width:176px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="background-color:#0d1117; border:1px solid #1f2937; border-radius:18px;">
+        <tr><td style="padding:14px 16px;">
+          <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#a1a1a1; padding-bottom:6px;">Wiadomo&#347;ci</div>
+          <div style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:30px; font-weight:500; line-height:32px; mso-line-height-rule:exactly; color:#fafafa;">{{ puls.articles_count }}</div>
+          {% if puls.articles_trend is not none %}
+          <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:11px; font-weight:700; line-height:16px; mso-line-height-rule:exactly; color:{{ '#34d399' if puls.articles_trend >= 0 else '#f87171' }}; padding-top:4px;">{{ '▲' if puls.articles_trend >= 0 else '▼' }} {{ puls.articles_trend }}% do zesz&#322;ego tyg.</div>
+          {% endif %}
+        </td></tr>
         </table>
-    </center>
-</body>
-</html>
+      </td>
+      <td class="rl-gutter" width="10" style="width:10px; font-size:0; line-height:0;">&nbsp;</td>
+      <td class="rl-stack" width="176" valign="top" style="width:176px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="background-color:#0d1117; border:1px solid #1f2937; border-radius:18px;">
+        <tr><td style="padding:14px 16px;">
+          <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#a1a1a1; padding-bottom:6px;">Wydarzenia</div>
+          <div style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:30px; font-weight:500; line-height:32px; mso-line-height-rule:exactly; color:#fafafa;">{{ puls.events_count }}</div>
+          {% if puls.events_trend is not none %}
+          <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:11px; font-weight:700; line-height:16px; mso-line-height-rule:exactly; color:{{ '#34d399' if puls.events_trend >= 0 else '#f87171' }}; padding-top:4px;">{{ '▲' if puls.events_trend >= 0 else '▼' }} {{ puls.events_trend }}% do zesz&#322;ego tyg.</div>
+          {% endif %}
+        </td></tr>
+        </table>
+      </td>
+      <td class="rl-gutter" width="10" style="width:10px; font-size:0; line-height:0;">&nbsp;</td>
+      <td class="rl-stack" width="176" valign="top" style="width:176px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="background-color:#0d1117; border:1px solid #1f2937; border-radius:18px;">
+        <tr><td style="padding:14px 16px;">
+          <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#a1a1a1; padding-bottom:6px;">&#346;rednia temp.</div>
+          <div style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:30px; font-weight:500; line-height:32px; mso-line-height-rule:exactly; color:#fafafa;">{% if puls.weather.temp_avg is not none %}{{ puls.weather.temp_avg }}&deg;{% else %}&mdash;{% endif %}</div>
+          {% if puls.air_quality.caqi_avg is not none %}
+          <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:11px; font-weight:700; line-height:16px; mso-line-height-rule:exactly; color:#34d399; padding-top:4px;">CAQI {{ puls.air_quality.caqi_avg }}</div>
+          {% endif %}
+        </td></tr>
+        </table>
+      </td>
+    </tr>
+    </table>
+  </td>
+  </tr>
+
+  {% if puls.top_categories %}
+  <tr>
+  <td class="rl-pad" style="padding:14px 24px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="background-color:#0d1117; border:1px solid #1f2937; border-radius:18px;">
+    <tr><td style="padding:14px 16px;">
+      <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#a1a1a1; padding-bottom:10px;">O czym by&#322;o g&#322;o&#347;no</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      {% for cat in puls.top_categories %}
+      <tr>
+        <td width="120" style="width:120px; padding:4px 0; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:13px; font-weight:600; line-height:18px; mso-line-height-rule:exactly; color:#e5e5e5;">{{ cat.category }}</td>
+        <td style="padding:4px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#161b24" style="background-color:#161b24; border-radius:5px;">
+          <tr><td width="{{ cat.pct }}%" height="10" bgcolor="#3a81f6" style="width:{{ cat.pct }}%; height:10px; background-color:#3a81f6; border-radius:5px; font-size:0; line-height:10px;">&nbsp;</td><td style="font-size:0; line-height:10px;">&nbsp;</td></tr>
+          </table>
+        </td>
+        <td width="34" align="right" style="width:34px; padding:4px 0 4px 10px; font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:13px; color:#a1a1a1;">{{ cat.count }}</td>
+      </tr>
+      {% endfor %}
+      </table>
+    </td></tr>
+    </table>
+  </td>
+  </tr>
+  {% endif %}
+  {% endif %}
+
+  {% if sections.top_news %}
+  <!-- NAJWAŻNIEJSZE W TYGODNIU -->
+  <tr>
+  <td class="rl-pad" style="padding:24px 24px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #262626;">
+      <tr>
+        <td align="left" style="padding-top:22px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:16px; font-weight:700; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">Najwa&#380;niejsze w tygodniu</td>
+      </tr>
+    </table>
+
+    {% for news in sections.top_news %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:6px; border-bottom:1px solid #17181c;">
+    <tr>
+      <td width="30" valign="top" style="width:30px; padding:14px 0; font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:13px; line-height:21px; mso-line-height-rule:exactly; color:#3a81f6;">{{ "%02d" | format(loop.index) }}</td>
+      <td valign="top" style="padding:14px 0;">
+        <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; font-weight:600; line-height:21px; mso-line-height-rule:exactly;">
+          {% if news.url %}<a href="{{ news.url }}" style="color:#fafafa; text-decoration:none;">{{ news.title }}</a>{% else %}<span style="color:#fafafa;">{{ news.title }}</span>{% endif %}
+        </div>
+        {% if news.summary %}
+        <div style="padding-top:5px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:13px; line-height:19px; mso-line-height-rule:exactly; color:#a1a1a1;">{{ news.summary }}</div>
+        {% endif %}
+      </td>
+    </tr>
+    </table>
+    {% endfor %}
+  </td>
+  </tr>
+  {% endif %}
+
+  <!-- NAJBLIŻSZE WYDARZENIA -->
+  <tr>
+  <td class="rl-pad" style="padding:24px 24px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #262626;">
+      <tr>
+        <td align="left" style="padding-top:22px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:16px; font-weight:700; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">Najbli&#380;sze wydarzenia</td>
+        <td align="right" style="padding-top:22px; font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:12px; color:#737373; white-space:nowrap;">{{ events | length }} {{ events_word }}</td>
+      </tr>
+    </table>
+
+    {% for event in events %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:6px; border-bottom:1px solid #17181c;">
+    <tr>
+      <td width="58" valign="top" style="width:58px; padding:12px 0;">
+        <div style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:19px; font-weight:500; line-height:22px; mso-line-height-rule:exactly; color:#91c5ff;">{{ event.day }}</div>
+        <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373;">{{ event.month }}</div>
+      </td>
+      <td valign="top" style="padding:12px 0;">
+        <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; font-weight:600; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">{{ event.title }}</div>
+        {% if event.location or event.time %}
+        <div style="padding-top:5px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#a1a1a1;">
+          {% if event.is_local %}<span style="display:inline-block; border:1px solid #10b981; border-radius:6px; padding:2px 6px; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#10b981;">Gmina Rybno</span>&nbsp;&nbsp;{% endif %}{{ event.location }}{% if event.time %} <span style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; color:#91c5ff;">&nbsp;{{ event.time }}</span>{% endif %}
+        </div>
+        {% endif %}
+      </td>
+    </tr>
+    </table>
+    {% endfor %}
+
+    {% if not events %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:12px; border:1px dashed #303030; border-radius:14px;">
+    <tr><td style="padding:16px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:14px; line-height:20px; mso-line-height-rule:exactly; color:#a1a1a1;">Na najbli&#380;sze dni nie zapowiedziano jeszcze wydarze&#324;.</td></tr>
+    </table>
+    {% endif %}
+  </td>
+  </tr>
+
+  {% if weekly_weather and (weekly_weather.temp_avg is not none or weekly_weather.caqi_avg is not none) %}
+  <!-- POGODA TYGODNIA -->
+  <tr>
+  <td class="rl-pad" style="padding:24px 24px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #262626;">
+      <tr>
+        <td align="left" style="padding-top:22px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:16px; font-weight:700; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">Pogoda tygodnia</td>
+        {% if weekly_weather.caqi_level_pl %}
+        <td align="right" style="padding-top:22px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; font-weight:700; color:{{ weekly_weather.color if weekly_weather.color else '#a1a1a1' }}; white-space:nowrap;">Powietrze: {{ weekly_weather.caqi_level_pl }}</td>
+        {% endif %}
+      </tr>
+    </table>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="margin-top:12px; background-color:#0d1117; border:1px solid #1f2937; border-radius:18px;">
+    <tr><td style="padding:14px 16px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td width="25%" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373;">Min<br><span style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:19px; font-weight:500; letter-spacing:0; text-transform:none; color:#fafafa;">{% if weekly_weather.temp_min is not none %}{{ weekly_weather.temp_min }}&deg;{% else %}&mdash;{% endif %}</span></td>
+        <td width="25%" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373;">&#346;rednia<br><span style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:19px; font-weight:500; letter-spacing:0; text-transform:none; color:#fafafa;">{% if weekly_weather.temp_avg is not none %}{{ weekly_weather.temp_avg }}&deg;{% else %}&mdash;{% endif %}</span></td>
+        <td width="25%" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373;">Max<br><span style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:19px; font-weight:500; letter-spacing:0; text-transform:none; color:#fafafa;">{% if weekly_weather.temp_max is not none %}{{ weekly_weather.temp_max }}&deg;{% else %}&mdash;{% endif %}</span></td>
+        <td width="25%" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373;">Wilgotno&#347;&#263;<br><span style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:19px; font-weight:500; letter-spacing:0; text-transform:none; color:#fafafa;">{% if weekly_weather.humidity_avg is not none %}{{ weekly_weather.humidity_avg }}%{% else %}&mdash;{% endif %}</span></td>
+      </tr>
+      </table>
+    </td></tr>
+    </table>
+  </td>
+  </tr>
+  {% endif %}
+
+  {% if weekly_reports and weekly_reports.total > 0 %}
+  <!-- ZGŁOSZENIA TYGODNIA -->
+  <tr>
+  <td class="rl-pad" style="padding:24px 24px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #262626;">
+      <tr>
+        <td align="left" style="padding-top:22px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:16px; font-weight:700; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">Zg&#322;oszenia mieszka&#324;c&oacute;w</td>
+        <td align="right" style="padding-top:22px; font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:12px; color:#737373; white-space:nowrap;">{{ weekly_reports.total }} w tygodniu</td>
+      </tr>
+    </table>
+
+    {% if weekly_reports.categories %}
+    <div style="padding-top:12px;">
+      {% for cat in weekly_reports.categories %}
+      <span style="display:inline-block; border:1px solid {{ cat.color }}; border-radius:6px; padding:3px 8px; margin:0 6px 6px 0; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:{{ cat.color }};">{{ cat.label }} {{ cat.count }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% for report in weekly_reports.top_reports[:3] %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:6px; border-bottom:1px solid #17181c;">
+    <tr>
+      <td valign="top" style="padding:12px 0;">
+        <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; font-weight:600; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">{{ report.title }}</div>
+        {% if report.address %}
+        <div style="padding-top:5px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#a1a1a1;">{{ report.address }}</div>
+        {% endif %}
+      </td>
+    </tr>
+    </table>
+    {% endfor %}
+  </td>
+  </tr>
+  {% endif %}
+
+  {% if ads_enabled and (promoted_businesses or business_announcements) %}
+  <!-- POLECANE FIRMY (plan Firma lokalna) -->
+  <tr>
+  <td class="rl-pad" style="padding:24px 24px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-top:1px solid #262626;">
+      <tr>
+        <td align="left" style="padding-top:22px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:16px; font-weight:700; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">Polecane firmy</td>
+        <td align="right" style="padding-top:22px;">
+          <span style="display:inline-block; border:1px solid #303030; border-radius:6px; padding:3px 7px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373; white-space:nowrap;">Materia&#322; reklamowy</span>
+        </td>
+      </tr>
+    </table>
+
+    {% for ann in business_announcements %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="margin-top:12px; background-color:#0d1117; border:1px solid #1f2937; border-left:3px solid #a78bfa; border-radius:14px;">
+    <tr><td style="padding:13px 15px;">
+      <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; font-weight:600; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">{{ ann.title }}{% if ann.valid_until_label %} <span style="font-size:12px; font-weight:400; color:#a78bfa;">&middot; do {{ ann.valid_until_label }}</span>{% endif %}</div>
+      <div style="padding-top:4px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:13px; line-height:19px; mso-line-height-rule:exactly; color:#a1a1a1;">{{ ann.body }}</div>
+      <div style="padding-top:6px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#737373;">{{ ann.nazwa }}{% if ann.miasto %} &middot; {{ ann.miasto }}{% endif %}{% if ann.telefon %} &middot; <span style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace;">{{ ann.telefon }}</span>{% endif %}</div>
+    </td></tr>
+    </table>
+    {% endfor %}
+
+    {% for biz in promoted_businesses %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="margin-top:12px; background-color:#0d1117; border:1px solid #3a2d5c; border-radius:20px;">
+    <tr>
+      <td width="88" valign="top" style="width:88px; padding:16px 0 16px 16px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="72" style="width:72px; height:72px; background-color:#111318; border:1px solid #262a35; border-radius:10px;">
+        <tr><td align="center" valign="middle" height="70" style="height:70px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:20px; font-weight:700; color:#a78bfa;">{{ biz.inicjaly }}</td></tr>
+        </table>
+      </td>
+      <td valign="top" style="padding:16px 16px 16px 14px;">
+        <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; font-weight:700; line-height:21px; mso-line-height-rule:exactly; color:#fafafa;">{{ biz.nazwa }}</div>
+        {% if biz.branza %}<div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#a78bfa; padding-top:3px;">{{ biz.branza }}</div>{% endif %}
+        {% if biz.description %}<div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:13px; line-height:19px; mso-line-height-rule:exactly; color:#a1a1a1; padding-top:6px;">{{ biz.description }}</div>{% endif %}
+        <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#a1a1a1; padding-top:8px;">{{ biz.miasto }}{% if biz.telefon %} &nbsp;&middot;&nbsp; <span style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace;">{{ biz.telefon }}</span>{% endif %}</div>
+      </td>
+    </tr>
+    </table>
+    {% endfor %}
+  </td>
+  </tr>
+  {% endif %}
+
+  <tr><td style="height:24px; font-size:0; line-height:24px;">&nbsp;</td></tr>
+
+{% endblock %}

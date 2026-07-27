@@ -76,6 +76,8 @@ export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
     cookies: '/polityka-cookies',
     premium: '/cennik',
     checkout: '/zamowienie',
+    // Newsletter linkuje do zgłoszeń — bez własnej ścieżki mail lądował na dashboardzie
+    reports: '/zgloszenia',
 };
 
 const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PATH)

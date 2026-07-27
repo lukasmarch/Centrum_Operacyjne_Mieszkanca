@@ -20,6 +20,7 @@ logger = logging.getLogger("Newsletter")
 POLAND_TZ = timezone(timedelta(hours=1))
 
 DAYS_PL = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
+DAYS_PL_SHORT = ["pon.", "wt.", "śr.", "czw.", "pt.", "sob.", "niedz."]
 MONTHS_PL = [
     "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
     "lipca", "sierpnia", "września", "października", "listopada", "grudnia"
@@ -95,20 +96,30 @@ Zwróć treść w formacie JSON:
 DAILY_NEWSLETTER_PROMPT = """Jesteś redaktorem porannego briefingu RybnoLive dla mieszkańców gminy Rybno.
 Przygotuj krótki, rzeczowy poranny newsletter w języku polskim.
 
-**Styl:** Zwięzły, praktyczny, na start dnia. "Dzień Dobry!" vibe.
-
-**Struktura:**
-1. **Powitanie** - krótkie "Dzień Dobry" z datą (użyj podanej daty: {current_date})
-2. **Pogoda i jakość powietrza** - co dziś na zewnątrz (dane Airly: {air_quality_summary})
-3. **Co ważnego dziś** - 3-5 najważniejszych spraw na dziś
-4. **Nadchodzące wydarzenia** - co dziś/jutro w okolicy
+**Styl:** Zwięzły, praktyczny, na start dnia. Bez powitań i bez emotikon — powitanie
+i datę dokłada szablon. Piszesz jak lokalna redakcja, nie jak asystent.
 
 **Priorytet informacji:**
 1. Awarie, utrudnienia, ważne ogłoszenia
-2. Wydarzenia urzędowe
-3. Kultura i rozrywka
+2. Sprawy urzędowe
+3. Kultura, wydarzenia, rozrywka
 
-WAŻNE: W sekcji "subject" wpisz dokładną datę: {current_date}
+**status_line:** jedno zdanie (max 140 znaków) opisujące stan gminy na dziś —
+to, co czytelnik ma wiedzieć, zanim wyjdzie z domu. Bez daty, bez powitania.
+
+**highlights:** 3-5 wniosków. Każdy przypisz do agenta, który by go zgłosił:
+- "Redaktor" — wiadomości lokalne, sprawy bieżące
+- "Urzędnik" — urząd, BIP, przetargi, komunikaty gminy
+- "Strażnik" — awarie, bezpieczeństwo, utrudnienia, pogoda groźna
+- "Przewodnik" — wydarzenia, kultura, rekreacja, gastronomia
+- "Organizator" — odpady, harmonogramy, sprawy porządkowe
+Pole "meta" to krótka etykieta kontekstu (max 30 znaków), np. "Komunikat urzędowy",
+"Droga wojewódzka 538", "Kultura · Rybno". Pole "text" to jedno-dwa zdania konkretu.
+
+**Ważne wytyczne:**
+- Nie wymyślaj informacji — korzystaj wyłącznie z podanych danych
+- Nazwy miejsc podawaj tylko jeśli są w danych
+- Trzymaj się gminy Rybno; sprawy powiatowe tylko gdy realnie dotyczą mieszkańców
 
 Dane wejściowe:
 - Data: {current_date}
@@ -121,16 +132,11 @@ Dane wejściowe:
 
 Zwróć treść w formacie JSON:
 {{
-    "subject": "☀️ Dzień Dobry! [{current_date}]",
-    "preview_text": "Krótki tekst preview (max 100 znaków)",
+    "preview_text": "Krótki tekst preview (max 90 znaków, bez emotikon)",
     "sections": {{
-        "greeting": "Dzień Dobry! Dziś jest {current_date}...",
-        "weather_brief": "🌡️ X°C | Jakość powietrza: Dobra",
+        "status_line": "Jedno zdanie o stanie gminy na dziś",
         "highlights": [
-            {{"icon": "🚗", "text": "..."}}
-        ],
-        "events_today": [
-            {{"title": "...", "time": "...", "location": "..."}}
+            {{"agent": "Strażnik", "meta": "Droga 538", "text": "..."}}
         ]
     }}
 }}
@@ -562,6 +568,24 @@ class NewsletterGenerator:
 
         import json
         content = json.loads(response.choices[0].message.content)
+
+        # Temat i nagłówek składamy sami — model potrafił wstawić złą datę,
+        # a temat maila decyduje o otwarciu wiadomości
+        caqi_label = (
+            CAQI_LABELS.get(air_quality.caqi_level, air_quality.caqi_level).lower()
+            if air_quality else None
+        )
+        subject_parts = [f"Rybno, {DAYS_PL_SHORT[now_pl.weekday()]} {now_pl.day} {MONTHS_PL[now_pl.month - 1]}"]
+        if weather and weather.temperature is not None:
+            subject_parts.append(f"{round(weather.temperature)}°")
+        if caqi_label:
+            subject_parts.append(f"powietrze {caqi_label}")
+        content["subject"] = " · ".join(subject_parts)
+        content["date_header"] = (
+            f"{DAYS_PL[now_pl.weekday()]} · {now_pl.day} {MONTHS_PL[now_pl.month - 1]} "
+            f"{now_pl.year} · {now_pl.strftime('%H:%M')}"
+        )
+        content["sources_count"] = len(articles) + len(events) + len(reports)
 
         # Attach extra data for email template
         content["air_quality"] = {

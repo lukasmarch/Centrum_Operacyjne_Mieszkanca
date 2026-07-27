@@ -25,6 +25,7 @@ from src.scheduler.embedding_job import run_embedding_job
 from src.scheduler.places_job import run_places_job
 from src.scheduler.health_job import run_health_job
 from src.scheduler.proactive_alerts_job import run_proactive_alerts
+from src.scheduler.alert_push_job import run_alert_push
 from src.scheduler.trial_expiry_job import run_trial_expiry
 from src.scheduler.business_report_job import run_business_reports
 from src.scheduler.retention_job import run_retention_job
@@ -367,12 +368,23 @@ def start_scheduler():
     )
 
     # Proactive AI Asystent — codziennie o 6:50 (po summary 6:45, przed newsletterem 7:15)
-    # Wysyła spersonalizowane push dla Premium: wywóz śmieci, mróz, awarie, BIP
+    # Wysyła spersonalizowane push dla Premium: wywóz śmieci, mróz
     scheduler.add_job(
         func=run_proactive_alerts,
         trigger=CronTrigger(hour=6, minute=50),
         id='proactive_alerts',
         name='Proactive AI Asystent (Premium push)',
+        replace_existing=True
+    )
+
+    # Alerty o awariach — co 15 minut, całą dobę, do WSZYSTKICH subskrybentów.
+    # Awaria nie czeka na okno pipeline'u: wyłączenie prądu ogłoszone o 15:05
+    # dotyczy dzisiejszego wieczoru, a najbliższy przebieg AI jest nazajutrz.
+    scheduler.add_job(
+        func=run_alert_push,
+        trigger=IntervalTrigger(minutes=15),
+        id='alert_push',
+        name='Alerty push o awariach (prąd, woda, pożar, wypadek)',
         replace_existing=True
     )
 
