@@ -61,21 +61,41 @@ cd frontend && npm run dev   # port 3001
 docker-compose up -d
 ```
 
-## Scheduler Timeline (12 jobów)
+## Scheduler Timeline (13 jobów)
 ```
 6:00  → Article Scraping
 6:15  → AI Processing (batch=100, kategoryzacja)
 6:20  → Embedding Job (RAG, text-embedding-3-small)
+6:50  → Proactive Alerts (Premium: mróz, śmietnik)
 7:00  → Daily Summary
+Co 15 min → Alerty push o awariach (prąd, woda, pożar, wypadek)
 Co 1h → Weather Update
 Co 4h → Air Quality (Airly)
+9/12/15/18/21:05 → Energa (wyłączenia prądu)
 2/6/10/14/18/22h → Traffic Cache (Gemini)
+13:00–13:45 → Popołudniowy przebieg (scraping → AI → summary → embedding)
 8:00  → Cinema Repertoire
 Niedz 3:00 → CEIDG Sync
 Sob 10:00 → Newsletter Weekly
 Pn-Pt 7:15 → Newsletter Daily (Premium)
 1.01/04/07/10 → GUS Statistics
 ```
+
+## Alerty push (2026-07-28)
+**Awaria nie czeka na okno pipeline'u.** `alert_push_job` chodzi co 15 min i wysyła
+do WSZYSTKICH subskrybentów (kategoria `alerty` — plan Dla Każdego, nie Premium).
+- `services/alert_policy.py` — trzy bramki: **rodzaj** (prąd/woda/pożar/wypadek/gaz —
+  zamknięta lista wzorców, NIE kategoria z AI, bo ta powstaje o 6:15 i 13:15),
+  **miejsce** (musi paść nazwa z gminy Rybno — feed Energi jest zawężony do całego
+  powiatu, więc bez tego szło powiadomienie o Płośnicy), **czas** (36 h do przodu
+  dla zdarzeń z terminem, 24 h wstecz dla reszty)
+- `articles.alert_pushed_at` — Energa odświeża ten sam wpis co 3 h pod wspólnym
+  `external_id`; bez znacznika jedno wyłączenie budziłoby telefon kilkanaście razy
+- Limit 2 powiadomienia / przebieg (`MAX_ALERTS_PER_RUN`)
+- `_flat()` podmienia `ł`→`l` ręcznie: to jedyna polska litera, która NIE rozkłada
+  się w NFKD — bez tego wzorzec na „wyłączenie" nie trafiał w nic
+- Test: `cd backend && python -m scripts.test_alert_policy [--db]`
+- Zgoda na push: `AlertPushPrompt` w feedzie przy realnej awarii (nie tylko w profilu)
 
 ## Struktura Backend
 
