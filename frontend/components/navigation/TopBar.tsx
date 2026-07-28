@@ -146,6 +146,13 @@ const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate }) =>
                 {/* Menu items */}
                 <div className="py-2">
                   <button
+                    onClick={() => handleNavigate('premium')}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    <Crown size={15} className="text-neutral-500" />
+                    Cennik i plany
+                  </button>
+                  <button
                     onClick={() => handleNavigate('profile')}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-white/5 transition-colors"
                   >
@@ -175,6 +182,19 @@ const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate }) =>
           </div>
         ) : (
           <div className="flex items-center gap-2">
+            {/* Oferta płatna dostępna z każdej podstrony, także bez konta —
+                wymóg weryfikacji Przelewy24 (oferta + przejście przez zakup) */}
+            <a
+              href="/cennik"
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                onNavigate('premium');
+              }}
+              className="text-neutral-400 hover:text-white px-3 py-1.5 rounded-full transition-colors font-medium text-sm"
+            >
+              Cennik
+            </a>
             <button
               onClick={() => onNavigate('login')}
               className="text-neutral-400 hover:text-white px-3 py-1.5 rounded-full transition-colors font-medium text-sm"

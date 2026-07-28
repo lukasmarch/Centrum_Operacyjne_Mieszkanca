@@ -182,7 +182,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ tierKey, frequency, onNavig
         <div>
           <h3 className="font-bold text-neutral-300 mb-2">Sprzedawca</h3>
           <p className="leading-relaxed">
-            Studio Kamienia Naturalnego Lu-Mar-Go<br />
+            Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz<br />
             Żabiny 96, 13-220 Rybno<br />
             NIP: 571-156-78-15<br />
             <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a><br />

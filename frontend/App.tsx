@@ -294,7 +294,7 @@ const AppContent: React.FC = () => {
                                 <div>
                                     <h3 className="text-lg font-bold text-white mb-2">Sprzedawca</h3>
                                     <p className="leading-relaxed">
-                                        Studio Kamienia Naturalnego Lu-Mar-Go<br />
+                                        Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz<br />
                                         Żabiny 96, 13-220 Rybno<br />
                                         NIP: 571-156-78-15<br />
                                         <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a>
@@ -404,12 +404,12 @@ const AppContent: React.FC = () => {
             {/* Footer */}
             {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-500 text-xs relative z-10">
                 {/* Blok danych sprzedawcy — identyfikacja wymagana przy sprzedaży online.
-                    Pełna nazwa firmy i telefon kontaktowy — wymóg weryfikacji Przelewy24.
-                    Imię i nazwisko właściciela pozostaje w Regulaminie i Polityce prywatności */}
+                    Nazwa firmy w brzmieniu z CEIDG (z imieniem i nazwiskiem — dla działalności
+                    jednoosobowej jest ono częścią firmy) — wymóg weryfikacji Przelewy24 */}
                 <div className="flex flex-col md:flex-row justify-between gap-8 mb-6">
                     <div className="leading-relaxed">
                         <p className="font-medium text-neutral-400 mb-1">© 2026 Rybno Live</p>
-                        <p>Studio Kamienia Naturalnego Lu-Mar-Go</p>
+                        <p>Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz</p>
                         <p>Żabiny 96</p>
                         <p>13-220 Rybno</p>
                         <p>NIP: 571-156-78-15</p>

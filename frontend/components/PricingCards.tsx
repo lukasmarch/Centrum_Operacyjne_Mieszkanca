@@ -202,9 +202,11 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
 
               {/* CTA */}
               <div className={cn('p-4 border-t', plan.highlighted ? 'border-blue-500/20' : 'border-white/6')}>
-                {isCurrent ? (
+                {/* Plan darmowy nie jest do kupienia — nigdy nie dostaje przycisku,
+                    inaczej „Aktualny plan" świeci się także u kogoś z Premium */}
+                {isCurrent || plan.tierKey === 'free' ? (
                   <div className="w-full py-2.5 rounded-xl text-center text-sm font-semibold text-neutral-500 border border-white/8">
-                    Aktualny plan
+                    {isCurrent ? 'Aktualny plan' : 'Dostępny bez opłat'}
                   </div>
                 ) : (
                   <button
