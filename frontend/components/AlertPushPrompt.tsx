@@ -1,0 +1,111 @@
+/**
+ * Prośba o zgodę na powiadomienia — pokazywana PRZY AWARII, nie w ustawieniach.
+ *
+ * Do 27.07.2026 jedyny włącznik push siedział w Profil → Preferencje. Skutek:
+ * dwie subskrypcje w całej bazie produkcyjnej, obie należące do administratora.
+ * Najlepszy mechanizm alertów wysyła do zera osób, jeśli nikt nie wie, że
+ * istnieje — a nikt nie wchodzi w ustawienia konta, żeby szukać powiadomień.
+ *
+ * Prosimy w jedynym momencie, w którym wartość jest oczywista: gdy w feedzie
+ * naprawdę stoi awaria. Obietnica jest wąska (prąd, woda, pożar, wypadek
+ * w gminie Rybno) i dokładnie tyle wysyła `alert_push_job` — subskrypcja idzie
+ * z kategorią „alerty", więc zapis tutaj NIE zapisuje na dzienne podsumowanie.
+ */
+import React, { useState } from 'react';
+import { BellRing, X } from 'lucide-react';
+import { usePushNotifications } from '../src/hooks/usePushNotifications';
+
+const DISMISS_KEY = 'rl_push_prompt_dismissed_at';
+
+// Po zamknięciu nie wracamy przez miesiąc. Baner przy każdej awarii byłby
+// dokładnie tym rodzajem natręctwa, przed którym alerty mają chronić.
+const DISMISS_DAYS = 30;
+
+function wasDismissed(): boolean {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY);
+    if (!raw) return false;
+    const days = (Date.now() - Number(raw)) / 86400000;
+    return days < DISMISS_DAYS;
+  } catch {
+    return false;
+  }
+}
+
+const AlertPushPrompt: React.FC = () => {
+  const { status, isSubscribed, isSupported, subscribe } = usePushNotifications();
+  const [dismissed, setDismissed] = useState(wasDismissed);
+  const [busy, setBusy] = useState(false);
+  const [justEnabled, setJustEnabled] = useState(false);
+
+  const hide =
+    dismissed ||
+    !isSupported ||
+    isSubscribed ||
+    status === 'denied' ||
+    status === 'loading';
+
+  if (justEnabled) {
+    return (
+      <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-950/30 border border-emerald-800/30 text-sm text-emerald-300">
+        <BellRing size={15} className="flex-shrink-0" />
+        Gotowe — o kolejnej awarii w gminie Rybno dowiesz się od razu.
+      </div>
+    );
+  }
+
+  if (hide) return null;
+
+  const close = () => {
+    try {
+      localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    } catch {
+      /* tryb prywatny — baner wróci przy następnej wizycie, trudno */
+    }
+    setDismissed(true);
+  };
+
+  const enable = async () => {
+    setBusy(true);
+    // Sama kategoria „alerty": obiecujemy awarie, więc nie dopisujemy nikogo
+    // przy okazji do porannego podsumowania ani do alertów smogowych.
+    const ok = await subscribe(['alerty']);
+    setBusy(false);
+    if (ok) setJustEnabled(true);
+  };
+
+  return (
+    <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-red-950/40 to-white/[0.02] border border-red-500/20">
+      <div className="flex items-start gap-3 flex-1 pr-6">
+        <BellRing size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-bold text-neutral-100">
+            O następnej awarii dowiedz się bez wchodzenia na stronę
+          </p>
+          <p className="text-xs text-neutral-400 mt-0.5">
+            Powiadomimy o wyłączeniach prądu, braku wody, pożarach i wypadkach
+            w gminie Rybno. Za darmo, bez konta — i nic poza tym.
+          </p>
+        </div>
+      </div>
+
+      <button
+        onClick={enable}
+        disabled={busy}
+        className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
+      >
+        {busy ? 'Włączam…' : 'Włącz alerty'}
+      </button>
+
+      <button
+        onClick={close}
+        aria-label="Zamknij"
+        className="absolute top-2.5 right-2.5 p-1 rounded-lg text-neutral-600 hover:text-neutral-300 hover:bg-white/5 transition-colors"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  );
+};
+
+export default AlertPushPrompt;

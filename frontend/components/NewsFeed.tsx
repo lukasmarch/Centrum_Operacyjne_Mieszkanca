@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronDown, ChevronUp, AlertTriangle, Clock, Sparkles, Megaphone, ExternalLink } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
 import ArticleImage, { getCategoryTheme } from './ArticleImage';
+import AlertPushPrompt from './AlertPushPrompt';
 import { Article } from '../types';
 import { fetchActiveAnnouncements, ActiveAnnouncement } from '../src/services/businessApi';
 
@@ -125,6 +126,12 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
     });
     return counts;
   }, [articles]);
+
+  // Czy w feedzie stoi awaria — od tego zależy, czy w ogóle pytamy o zgodę na push
+  const hasAwaria = useMemo(
+    () => (articles || []).some(a => (a.category || '').toLowerCase().includes('awari')),
+    [articles]
+  );
 
   // Sorted categories: Awaria first, then by count desc
   const sortedCategories = useMemo(() => {
@@ -301,6 +308,10 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
           </button>
         )}
       </div>
+
+      {/* Zgoda na powiadomienia — prosimy tylko wtedy, gdy w feedzie stoi awaria.
+          Wartość alertu jest wtedy widoczna, a nie deklarowana. */}
+      {hasAwaria && <AlertPushPrompt />}
 
       {/* Ogłoszenia firm (plan Firma lokalna) — oznaczone jako materiał reklamowy */}
       {announcements.length > 0 && (

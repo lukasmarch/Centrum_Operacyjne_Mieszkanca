@@ -905,7 +905,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                         <div className="flex-1 pr-4">
                           <p className="font-semibold">Alerty o awariach i zagrożeniach</p>
                           <p className="text-sm text-neutral-400 mt-0.5">
-                            Pożary · Wypadki · Smog · Mróz &lt; −5°C · Nowe awarie
+                            Prąd · Woda · Pożary · Wypadki · Smog · Mróz &lt; −5°C
+                          </p>
+                          <p className="text-xs text-neutral-600 mt-1">
+                            Tylko zdarzenia z gminy Rybno — sąsiednie gminy pomijamy.
                           </p>
                         </div>
                         <button

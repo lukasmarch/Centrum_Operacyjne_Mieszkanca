@@ -35,7 +35,7 @@ self.addEventListener('push', (event: PushEvent) => {
   const options: NotificationOptions = {
     body: data.body,
     icon: data.icon || '/icon-192.png',
-    badge: '/badge-72.png',
+    badge: '/icon-72.png',
     data: { url: data.url || '/' },
   };
 
