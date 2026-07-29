@@ -17,7 +17,8 @@ from src.database.schema import Article, Event, AirQuality, DailySummary, Source
 from src.services.feed_policy import (
     collapse_duplicates,
     dedup_text,
-    is_local_source,
+    is_local_article,
+    is_pinned_alert,
     publishable_conditions,
 )
 from src.utils.cost_tracker import log_api_cost
@@ -130,14 +131,11 @@ class SummaryGenerator:
             self.logger.warning(f"Summary for {date_start.date()} already exists")
             return None
 
-        # Lokalność źródeł mieszka w feed_policy — wspólnie z feedem. Wcześniej
-        # briefing trzymał własną listę ID-ków, która po dodaniu Energi, KPP,
-        # Powiatu i profilu gminy przestała je uznawać za lokalne.
+        # Lokalność mieszka w feed_policy — wspólnie z feedem. Wcześniej briefing
+        # trzymał własną listę ID-ków, która po dodaniu Energi, KPP, Powiatu
+        # i profilu gminy przestała je uznawać za lokalne.
         source_rows = (await session.execute(select(Source.id, Source.name))).all()
         self._source_names = {row.id: row.name for row in source_rows}
-        self._local_ids = {
-            sid for sid, name in self._source_names.items() if is_local_source(name)
-        }
 
         # 1. Pobierz artykuły z dziś (tylko przetworzone i nadające się do publikacji)
         articles = await self._fetch_articles(session, date_start, date_end)
@@ -167,6 +165,18 @@ class SummaryGenerator:
 
         if extended:
             self.logger.info(f"Extended window: {len(articles)} articles (today + yesterday)")
+
+        # Lokalność liczona raz na przebieg: przy źródłach powiatowych rozstrzyga
+        # ją treść wpisu, a `_is_local` pyta o nią przy każdym sortowaniu
+        self._local_article_ids = {
+            article.id
+            for article in articles
+            if is_local_article(
+                self._source_names.get(article.source_id),
+                article.title,
+                article.content,
+            )
+        }
 
         # 2. Pogrupuj artykuły po kategoriach
         articles_by_category = {}
@@ -198,13 +208,21 @@ class SummaryGenerator:
         air_quality = air_quality_result.scalar_one_or_none()
 
         # 5. Przygotuj dane wejściowe dla AI
-        top_article = self._select_top_article(articles_by_category)
+        previous_headline_id = await self._previous_headline_id(session, date_start)
+        top_article = self._select_top_article(
+            articles_by_category, now, previous_headline_id
+        )
         if top_article:
             locality = "LOKALNY" if self._is_local(top_article) else "REGIONALNY"
             self.logger.info(
                 f"Top article (deterministic): [ID:{top_article.id}] [{locality}] "
                 f"cat={top_article.category} '{top_article.title[:60]}'"
             )
+            if top_article.id == previous_headline_id:
+                self.logger.info(
+                    f"Headline repeats previous briefing [ID:{previous_headline_id}] "
+                    "— brak innego kandydata"
+                )
         input_data = self._prepare_input_for_ai(
             date_start,
             articles_by_category,
@@ -312,9 +330,10 @@ class SummaryGenerator:
     # Ile godzin do przodu briefing patrzy na zdarzenia z terminem (wyłączenia prądu)
     EVENT_LOOKAHEAD_H = 36
 
-    # Wypełniane na starcie każdego przebiegu z tabeli `sources` + feed_policy
+    # Wypełniane na każdym przebiegu: nazwy źródeł z tabeli `sources`, a po
+    # zebraniu materiału — ID wpisów, które feed_policy uznaje za lokalne
     _source_names: dict = {}
-    _local_ids: set = set()
+    _local_article_ids: set = set()
 
     async def _fetch_articles(
         self,
@@ -348,14 +367,45 @@ class SummaryGenerator:
         )
         return list(result.scalars().all())
 
+    async def _previous_headline_id(
+        self,
+        session: AsyncSession,
+        date_start: datetime,
+    ) -> Optional[int]:
+        """
+        Artykuł, który był nagłówkiem poprzedniego briefingu — albo None.
+
+        Okno materiału sięga wczoraj (fallback przy chudym dniu), więc bez tej
+        pamięci ten sam wpis potrafi otworzyć briefing dwa poranki z rzędu:
+        wyłączenie prądu ogłoszone 28.07.2026 wróciło jako nagłówek 29.07.
+        """
+        result = await session.execute(
+            select(DailySummary)
+            .where(DailySummary.date < date_start)
+            .order_by(DailySummary.date.desc())
+            .limit(1)
+        )
+        previous = result.scalar_one_or_none()
+        cited = (previous.content or {}).get("cited_articles") if previous else None
+        return cited[0].get("id") if cited else None
+
     def _is_local(self, article) -> bool:
-        return article.source_id in self._local_ids
+        return article.id in self._local_article_ids
 
     @staticmethod
-    def _sort_ts(article) -> float:
-        """Moment, którym artykuł konkuruje: termin zdarzenia przed datą publikacji."""
+    def _time_distance_h(article, now: datetime) -> float:
+        """
+        Ile godzin dzieli mieszkańca od momentu, którym artykuł konkuruje:
+        terminu zdarzenia, a w jego braku — publikacji.
+
+        Liczy się odległość, nie kierunek. Wyłączenie prądu jutro jest pilniejsze
+        niż wyłączenie za dziewięć dni, tak samo jak wiadomość sprzed godziny
+        bije wczorajszą.
+        """
         stamp = getattr(article, "event_at", None) or article.published_at
-        return stamp.timestamp() if stamp else 0.0
+        if stamp is None:
+            return float("inf")
+        return abs((stamp - now).total_seconds()) / 3600
 
     # Hierarchia ważności kategorii (niższy = ważniejszy)
     CATEGORY_PRIORITY = {
@@ -371,28 +421,78 @@ class SummaryGenerator:
         "Nieruchomości": 9,
     }
 
-    def _select_top_article(self, articles_by_category: dict):
+    # Kategoria spoza tabeli — za wszystkim, co potrafimy nazwać
+    UNKNOWN_CATEGORY_PRIORITY = 10
+
+    # Awaria, która nie jest sprawą najbliższych godzin. Zapowiedź zostaje
+    # w briefingu, ale przestaje być kandydatem na nagłówek — o remis z równie
+    # odległą kategorią rozstrzyga bliskość w czasie.
+    DISTANT_ALERT_PRIORITY = 9
+
+    def _headline_priority(self, category: str, article, now: datetime) -> int:
+        """
+        Waga kategorii przy wyborze nagłówka.
+
+        Awaria stoi na szczycie tylko dopóki jest sprawą najbliższych godzin —
+        próg jest ten sam, na którym feed przypina ją nad wiadomościami. Bez tego
+        zapowiedź żyje w materiale tygodniami i wygrywa nagłówek każdego dnia:
+        28 i 29.07.2026 briefing otworzył się wyłączeniem prądu zaplanowanym
+        dopiero na 7 sierpnia, choć w gminie działo się w tym czasie co innego.
+        """
+        priority = self.CATEGORY_PRIORITY.get(category, self.UNKNOWN_CATEGORY_PRIORITY)
+        if priority != self.CATEGORY_PRIORITY["Awaria"]:
+            return priority
+
+        is_now = is_pinned_alert(
+            category,
+            article.published_at,
+            article.scraped_at,
+            now,
+            article.event_at,
+            article.event_until,
+        )
+        return priority if is_now else self.DISTANT_ALERT_PRIORITY
+
+    def _select_top_article(
+        self,
+        articles_by_category: dict,
+        now: datetime,
+        previous_headline_id: Optional[int] = None,
+    ):
         """Deterministycznie wybierz artykuł do nagłówka.
 
-        Priorytet: lokalny > regionalny, Awaria > Zdrowie > Transport > ...
-        Wśród artykułów tej samej kategorii i źródła: najnowszy.
-        Regionalne mogą wygrać tylko jeśli brak jakichkolwiek lokalnych.
+        Kolejność rozstrzygania:
+        1. lokalny przed regionalnym — regionalny wygrywa tylko przy braku lokalnych,
+        2. nagłówek poprzedniego briefingu na końcu swojej grupy,
+        3. ważność kategorii (`_headline_priority`),
+        4. bliskość w czasie.
+
+        Punkt 2 nie wyklucza artykułu — przepuszcza przed nim każdego innego
+        kandydata o tej samej lokalności. Gdy dzień jest chudy i alternatywy nie
+        ma, ten sam wpis otworzy briefing ponownie; to wciąż lepsze niż zejście
+        na nagłówek regionalny. Wyjątkiem jest awaria, która wciąż trwa: przerwa
+        w dostawie wody drugiego dnia jest nadal najważniejszą rzeczą w gminie
+        i nie ustępuje miejsca wiadomości tylko dlatego, że była wczoraj.
         """
         best = None
-        best_key = (999, 1, 0)  # (priorytet kategorii, 0=lokalny/1=regionalny, -timestamp)
+        best_key = (2, 2, 999, float("inf"))
 
         for category, arts in articles_by_category.items():
-            cat_prio = self.CATEGORY_PRIORITY.get(category, 10)
-            for art in arts:
-                is_local = self._is_local(art)
-                locality_key = 0 if is_local else 1
-                # przy zdarzeniach z terminem liczy się termin, nie data ogłoszenia:
-                # wyłączenie prądu dziś o 10:00 bije wiadomość sprzed godziny
-                ts = self._sort_ts(art)
-                key = (locality_key, cat_prio, -ts)  # lokalność absolutny priorytet
+            for article in arts:
+                priority = self._headline_priority(category, article, now)
+                repeats = (
+                    article.id == previous_headline_id
+                    and priority != self.CATEGORY_PRIORITY["Awaria"]
+                )
+                key = (
+                    0 if self._is_local(article) else 1,
+                    1 if repeats else 0,
+                    priority,
+                    self._time_distance_h(article, now),
+                )
                 if key < best_key:
                     best_key = key
-                    best = art
+                    best = article
 
         return best
 
@@ -502,11 +602,12 @@ class SummaryGenerator:
             ]
 
         # Dodaj artykuły pogrupowane po kategoriach
-        # W każdej kategorii: najpierw [LOKALNY], potem [REGIONALNY]
+        # W każdej kategorii: najpierw [LOKALNY], potem [REGIONALNY],
+        # a w obu grupach — najbliżej dzisiejszego dnia (lista bywa ucinana do 10)
         for category, arts in sorted(articles_by_category.items()):
             sorted_arts = sorted(
                 arts,
-                key=lambda a: (0 if self._is_local(a) else 1, -self._sort_ts(a))
+                key=lambda a: (0 if self._is_local(a) else 1, self._time_distance_h(a, now))
             )
             lines.append(f"\n## {category.upper()} ({len(sorted_arts)} artykułów):\n")
             for i, article in enumerate(sorted_arts[:10], 1):  # max 10 per kategoria

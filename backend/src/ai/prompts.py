@@ -169,6 +169,7 @@ Wyjątek: [REGIONALNY] Awaria może trafić do summary TYLKO jeśli brak jakichk
 - Lokalizację w nagłówku i treści podawaj WYŁĄCZNIE jeśli jest wymieniona WPROST w tekście artykułu lub jego podsumowaniu (pole `→`)
 - Pole `📍` (location_mentioned) to tylko podpowiedź — może zawierać błędy. Jeśli `→` (treść/summary) nie potwierdza lokalizacji z `📍`, zignoruj `📍`
 - Jeśli artykuł nie zawiera konkretnej miejscowości → pisz "w okolicy" lub pomiń lokalizację
+  (wyjątek: nagłówek awarii nigdy nie brzmi "w okolicy" — patrz zasady priorytetyzacji)
 - NIGDY nie przypisuj miejscowości na podstawie kontekstu, kategorii ani domysłu
 - Jeśli masz wątpliwości → pomiń lokalizację całkowicie
 - **Powiat działdowski ≠ gmina Działdowo ≠ miasto Działdowo** — to różne jednostki. Jeśli tekst mówi o "powiecie działdowskim" lub "drodze powiatowej", NIGDY nie pisz "gmina Działdowo" ani "miasto Działdowo"
@@ -258,8 +259,13 @@ to podważa zaufanie do wszystkich danych na stronie.
 1. **AWARIA/KRYZYS [LOKALNY]** - natychmiastowe działanie mieszkańców:
    - **Kategoria "Awaria" z etykietą [LOKALNY]**: brak wody, brak prądu, wypadek, pożar, alert RCB
    - Jeśli jest → ZAWSZE w Headline i PIERWSZA w Highlights, 2-3 zdania szczegółów
-   - Format nagłówka (tylko jeśli lokalizacja jest w tekście): "⚠️ AWARIA: [typ] w [miejsce z tekstu] – [skutek]"
-   - Format nagłówka (brak lokalizacji w tekście): "⚠️ AWARIA: [typ] w okolicy – [skutek]"
+   - Format nagłówka: "⚠️ AWARIA: [typ] w [miejsce z tekstu] – [skutek]"
+   - **Nagłówek awarii MUSI nazwać miejscowość.** „⚠️ AWARIA: wyłączenie planowane w okolicy"
+     nie mówi mieszkańcowi Rybna niczego: nie wie, czy chodzi o jego dom, czy o wieś
+     40 km dalej — a to jedyne pytanie, które sobie zadaje (realny nagłówek z 29.07.2026).
+     Artykuł wskazany jako WYMAGANY ARTYKUŁ NAGŁÓWKA z kategorii Awaria zawsze ma nazwę
+     miejscowości w tekście — użyj jej. Jeśli mimo to nie potrafisz jej wskazać, nie
+     zgaduj: napisz nagłówek o innym aspekcie tego samego artykułu (np. terminie).
 2. **LOKALNY PRIORYTET** - artykuły [LOKALNY] z kategorii:
    - Zdrowie (dyżury aptek, lekarze, sanepid)
    - Transport (utrudnienia w gminie)

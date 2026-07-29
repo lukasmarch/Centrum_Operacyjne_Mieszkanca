@@ -97,6 +97,25 @@ do WSZYSTKICH subskrybentów (kategoria `alerty` — plan Dla Każdego, nie Prem
 - Test: `cd backend && python -m scripts.test_alert_policy [--db]`
 - Zgoda na push: `AlertPushPrompt` w feedzie przy realnej awarii (nie tylko w profilu)
 
+## Nagłówek briefingu (2026-07-29)
+**Nagłówek wskazuje kod, nie model** (`_select_top_article`), AI dostaje go jako
+„WYMAGANY ARTYKUŁ NAGŁÓWKA". Klucz: **lokalność → nie-powtórka → kategoria → bliskość w czasie**.
+- **Awaria traci priorytet 0**, gdy nie jest sprawą najbliższych godzin — próg wspólny
+  z feedem (`is_pinned_alert`). Bez tego zapowiedź wyłączenia żyła w materiale tygodniami
+  i wygrywała nagłówek co dzień (28 i 29.07 briefing otwierał się wyłączeniem z 7 sierpnia)
+- **Lokalność wpisu, nie tylko źródła** (`feed_policy.is_local_article`): dla `COUNTY_WIDE_SOURCES`
+  (oba kanały Energi, zasięg = powiat) musi paść nazwa z gminy Rybno — listę sołectw
+  trzyma `alert_policy.places_in`, jedna na projekt. Wcześniej wyłączenie w Płośnicy
+  szło do briefingu jako lokalna awaria
+- **Bliskość, nie „najdalej w przyszłość"**: `_time_distance_h` liczy odległość od teraz
+  w obie strony — wyłączenie jutro bije wyłączenie za dziewięć dni
+- **Pamięć poprzedniego dnia**: `_previous_headline_id` odsuwa wczorajszy nagłówek na koniec
+  jego grupy (nie wyklucza — przy chudym dniu wraca, bo to lepsze niż nagłówek regionalny).
+  Refresh o 13:30 patrzy na dzień wcześniejszy, więc nagłówek jest stabilny w ciągu dnia
+- Prompt: nagłówek awarii MUSI nazwać miejscowość — „AWARIA: wyłączenie w okolicy" nie mówi
+  mieszkańcowi, czy chodzi o jego dom
+- Test: `cd backend && python -m scripts.test_summary_headline [--db]`
+
 ## Struktura Backend
 
 ```

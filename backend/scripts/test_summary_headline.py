@@ -1,0 +1,250 @@
+"""
+Weryfikacja wyboru nagłówka briefingu (`ai/summary_generator.SummaryGenerator`).
+
+Nagłówek nie jest wyborem modelu — wskazuje go kod, a AI dostaje ten artykuł
+jako „WYMAGANY ARTYKUŁ NAGŁÓWKA". Reguły są krótkie, ale zazębiają się z polityką
+feedu (lokalność wpisu, próg „awaria jest sprawą teraz"), więc łatwo je zepsuć
+niepozorną zmianą — stąd ten test.
+
+Dwie części:
+  1. przypadki brzegowe — kto MUSI wygrać nagłówek w danym układzie materiału;
+  2. przebieg po realnym materiale z bazy (`--db`) — pokazuje ranking kandydatów
+     na dziś, żeby zobaczyć decyzję, zanim job ruszy o 7:00.
+
+Użycie:
+    cd backend && python -m scripts.test_summary_headline          # same przypadki
+    cd backend && python -m scripts.test_summary_headline --db     # + realny materiał
+"""
+import asyncio
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
+from typing import List, Optional, Tuple
+
+backend_path = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_path))
+
+from src.ai.summary_generator import SummaryGenerator
+from src.services.feed_policy import is_local_article
+
+NOW = datetime(2026, 7, 29, 12, 0)
+
+ENERGA = "Energa - wyłączenia planowane (RSS)"
+RYBNO = "Facebook - Rybno"
+OLSZTYN = "Radio Olsztyn (RSS)"
+
+
+def article(
+    id: int,
+    category: str,
+    title: str,
+    source: str = RYBNO,
+    published_h: Optional[float] = None,
+    event_h: Optional[float] = None,
+    until_h: Optional[float] = None,
+) -> SimpleNamespace:
+    """Wpis w postaci, jakiej potrzebuje wybór nagłówka. Godziny względem NOW."""
+    return SimpleNamespace(
+        id=id,
+        source_id=id,
+        source_name=source,
+        category=category,
+        title=title,
+        content="",
+        summary=None,
+        published_at=NOW - timedelta(hours=published_h) if published_h is not None else None,
+        scraped_at=NOW - timedelta(hours=published_h or 0),
+        event_at=NOW + timedelta(hours=event_h) if event_h is not None else None,
+        event_until=NOW + timedelta(hours=until_h) if until_h is not None else None,
+    )
+
+
+# (opis, materiał, nagłówek poprzedniego briefingu, ID, które ma wygrać)
+CASES: List[Tuple[str, List[SimpleNamespace], Optional[int], int]] = [
+    (
+        "awaria dziś (za 4 h) bije lokalną kulturę",
+        [article(1, "Awaria", "Wyłączenie planowane w Rybnie", ENERGA, 20, 4, 9),
+         article(2, "Kultura", "Koncert w świetlicy", published_h=2)],
+        None, 1,
+    ),
+    (
+        "awaria za dziewięć dni przegrywa z dzisiejszym transportem",
+        [article(1, "Awaria", "Wyłączenie w Rybnie 7 sierpnia", ENERGA, 26, 216, 221),
+         article(2, "Transport", "Zamknięcie drogi Tuczki – Koszelewy", published_h=3)],
+        None, 2,
+    ),
+    (
+        "awaria za dziewięć dni wygrywa, gdy nie ma nic innego",
+        [article(1, "Awaria", "Wyłączenie w Rybnie 7 sierpnia", ENERGA, 26, 216, 221)],
+        None, 1,
+    ),
+    (
+        "zakończone wyłączenie nie jest nagłówkiem",
+        [article(1, "Awaria", "Wyłączenie planowane w Rybnie", ENERGA, 30, -8, -2),
+         article(2, "Sport", "Turniej w Rumianie", published_h=5)],
+        None, 2,
+    ),
+    (
+        "wyłączenie trwające od dwóch godzin wygrywa",
+        [article(1, "Awaria", "Wyłączenie planowane w Rybnie", ENERGA, 30, -2, 3),
+         article(2, "Transport", "Zamknięcie drogi", published_h=1)],
+        None, 1,
+    ),
+    (
+        "pożar bez terminu, sprzed dwóch godzin, wygrywa",
+        [article(1, "Awaria", "Pożar stodoły w Naguszewie", published_h=2),
+         article(2, "Zdrowie", "Dyżur apteki", published_h=1)],
+        None, 1,
+    ),
+    (
+        "wyłączenie w Płośnicy (feed powiatowy) przegrywa z lokalnym sportem",
+        [article(1, "Awaria", "Wyłączenie - Region Mława - Płośnica gmina wiejska", ENERGA, 20, 4, 9),
+         article(2, "Sport", "Turniej w Rumianie", published_h=6)],
+        None, 2,
+    ),
+    (
+        "wczorajszy nagłówek ustępuje innemu lokalnemu kandydatowi",
+        [article(1, "Transport", "Zamknięcie drogi Tuczki – Koszelewy", published_h=1),
+         article(2, "Urząd", "Nabór wniosków w gminie", published_h=6)],
+        1, 2,
+    ),
+    (
+        "wczorajszy nagłówek wraca, gdy alternatywą jest tylko regionalny",
+        [article(1, "Transport", "Zamknięcie drogi Tuczki – Koszelewy", published_h=1),
+         article(2, "Urząd", "Sesja rady w Olsztynie", OLSZTYN, published_h=2)],
+        1, 1,
+    ),
+    (
+        "trwająca awaria zostaje nagłówkiem, choć była nim wczoraj",
+        [article(1, "Awaria", "Brak wody w Rybnie", ENERGA, 26, -20, 6),
+         article(2, "Transport", "Zamknięcie drogi", published_h=1)],
+        1, 1,
+    ),
+    (
+        "bez wpisów lokalnych wygrywa regionalny o wyższym priorytecie",
+        [article(1, "Kultura", "Festyn w Mławie", OLSZTYN, published_h=2),
+         article(2, "Zdrowie", "Nowy oddział szpitala", OLSZTYN, published_h=8)],
+        None, 2,
+    ),
+]
+
+
+def _generator(source_names: dict) -> SummaryGenerator:
+    """
+    Generator gotowy do samego wyboru nagłówka.
+
+    `__new__` zamiast `SummaryGenerator()` — konstruktor stawia klienta OpenAI,
+    a wybór nagłówka jest czystą arytmetyką na wpisach i o model nie pyta.
+    """
+    generator = SummaryGenerator.__new__(SummaryGenerator)
+    generator._source_names = source_names
+    return generator
+
+
+def _mark_local(generator: SummaryGenerator, articles: List) -> None:
+    """To samo, co briefing robi po zebraniu materiału."""
+    generator._local_article_ids = {
+        a.id for a in articles
+        if is_local_article(generator._source_names.get(a.source_id), a.title, a.content)
+    }
+
+
+def _by_category(articles: List) -> dict:
+    grouped: dict = {}
+    for item in articles:
+        grouped.setdefault(item.category or "Inne", []).append(item)
+    return grouped
+
+
+def run_cases() -> int:
+    print("=" * 78)
+    print("Przypadki brzegowe wyboru nagłówka")
+    print("=" * 78)
+
+    failures = 0
+    for label, articles, previous_headline_id, expected in CASES:
+        generator = _generator({a.source_id: a.source_name for a in articles})
+        _mark_local(generator, articles)
+        chosen = generator._select_top_article(
+            _by_category(articles), NOW, previous_headline_id
+        )
+        got = chosen.id if chosen else None
+        ok = got == expected
+        failures += not ok
+        detail = f"ID:{got}" + (f" (oczekiwano ID:{expected})" if not ok else "")
+        print(f"{'✓' if ok else '✗'} {label:.<62} {detail}")
+
+    print("-" * 78)
+    print(f"{len(CASES) - failures}/{len(CASES)} zgodnych z oczekiwaniem")
+    return failures
+
+
+async def run_db():
+    """Ranking kandydatów na nagłówek z materiału, który briefing ma dziś na stole."""
+    from src.database.connection import async_session
+
+    print()
+    print("=" * 78)
+    print("Realny materiał z bazy")
+    print("=" * 78)
+
+    now = datetime.utcnow()
+    date_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    async with async_session() as session:
+        from sqlmodel import select
+        from src.database.schema import Source
+
+        rows = (await session.execute(select(Source.id, Source.name))).all()
+        generator = _generator({row.id: row.name for row in rows})
+
+        articles = await generator._fetch_articles(session, date_start, now)
+        if len(articles) < 10:  # ten sam fallback co w briefingu
+            articles = await generator._fetch_articles(
+                session, date_start - timedelta(days=1), now
+            )
+        previous_headline_id = await generator._previous_headline_id(session, date_start)
+
+    if not articles:
+        print("Brak materiału — briefing nie powstałby.")
+        return
+
+    _mark_local(generator, articles)
+
+    grouped = _by_category(articles)
+    print(f"Materiał: {len(articles)} wpisów w {len(grouped)} kategoriach")
+    print(f"Nagłówek poprzedniego briefingu: "
+          f"{f'ID:{previous_headline_id}' if previous_headline_id else '—'}\n")
+
+    ranking = sorted(
+        (
+            (
+                0 if generator._is_local(a) else 1,
+                1 if a.id == previous_headline_id else 0,
+                generator._headline_priority(category, a, now),
+                generator._time_distance_h(a, now),
+                category,
+                a,
+            )
+            for category, arts in grouped.items()
+            for a in arts
+        )
+    )
+
+    print("  lokalny powtórka priorytet  dystans  kategoria")
+    for locality, repeat, priority, distance, category, item in ranking[:8]:
+        print(f"  {'lok' if not locality else 'reg':>7} {repeat:>9} {priority:>9} "
+              f"{distance:>7.1f}h  {category:<12} ID:{item.id} {(item.title or '')[:44]}")
+
+    top = generator._select_top_article(grouped, now, previous_headline_id)
+    print(f"\n→ NAGŁÓWEK: [ID:{top.id}] "
+          f"[{'LOKALNY' if generator._is_local(top) else 'REGIONALNY'}] "
+          f"kat={top.category}\n  {(top.title or '')[:100]}")
+
+
+if __name__ == "__main__":
+    failed = run_cases()
+    if "--db" in sys.argv:
+        asyncio.run(run_db())
+    sys.exit(1 if failed else 0)

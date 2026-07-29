@@ -19,6 +19,8 @@ import unicodedata
 from datetime import datetime
 from typing import Callable, Iterable, Optional, TypeVar
 
+from src.services.alert_policy import places_in
+
 # Rozpad połowiczny świeżości: po 18 h wpis waży połowę tego, co świeży
 FRESHNESS_HALFLIFE_H = 18.0
 
@@ -68,11 +70,21 @@ SOURCE_WEIGHTS: dict[str, float] = {
     "Facebook - Panorama Regionu": 0.85,
 }
 
+# Feedy wojewódzkie zawężone filtrem słów kluczowych do powiatu — o lokalności
+# pojedynczego wpisu rozstrzyga jego treść, nie nazwa źródła. Feed Energi obejmuje
+# Region Mława (Płośnica, Iłowo, Lidzbark…), więc samo „to Energa" nie znaczy
+# „to nasze": 29.07.2026 briefing zapowiedział mieszkańcom Rybna wyłączenie prądu
+# w Płośnicy jako lokalną awarię.
+COUNTY_WIDE_SOURCES: frozenset[str] = frozenset({
+    "Energa - wyłączenia bieżące (RSS)",
+    "Energa - wyłączenia planowane (RSS)",
+})
+
 # Źródła dotyczące bezpośrednio gminy Rybno i powiatu działdowskiego.
 # Briefing trzymał tę wiedzę osobno, w postaci ID-ków (`LOCAL_SOURCE_IDS`),
 # i przy każdym nowym źródle zostawała nieaktualna: Energa, KPP, Powiat i profil
 # gminy liczyły się jako „regionalne", więc nie mogły wygrać nagłówka dnia.
-LOCAL_SOURCES: frozenset[str] = frozenset({
+LOCAL_SOURCES: frozenset[str] = COUNTY_WIDE_SOURCES | {
     "Gmina Rybno",
     "BIP Gminy Rybno",
     "Facebook - Rybno",
@@ -83,10 +95,7 @@ LOCAL_SOURCES: frozenset[str] = frozenset({
     "Moje Działdowo",
     "Powiat Działdowski (RSS)",
     "KPP Działdowo (RSS)",
-    # feedy wojewódzkie zawężone filtrem słów kluczowych do powiatu działdowskiego
-    "Energa - wyłączenia bieżące (RSS)",
-    "Energa - wyłączenia planowane (RSS)",
-})
+}
 
 # Źródła, których nazw NIE eksponujemy w interfejsie.
 # Prywatne profile FB pokazujemy jako neutralne „źródło ↗" z linkiem do oryginału:
@@ -104,6 +113,25 @@ def source_weight(source_name: Optional[str]) -> float:
 
 def is_local_source(source_name: Optional[str]) -> bool:
     return (source_name or "") in LOCAL_SOURCES
+
+
+def is_local_article(
+    source_name: Optional[str],
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+) -> bool:
+    """
+    Czy wpis liczy się jako „nasz" — dotyczący gminy Rybno i najbliższych okolic.
+
+    Dla większości źródeł wystarczy samo źródło. Dla feedów powiatowych musi
+    paść nazwa z gminy; listę sołectw i ich odmiany trzyma `alert_policy`
+    (bramka miejsca dla powiadomień) i jest to jedyna taka lista w projekcie.
+    """
+    if not is_local_source(source_name):
+        return False
+    if source_name in COUNTY_WIDE_SOURCES:
+        return bool(places_in(title, content))
+    return True
 
 
 # Nazwy techniczne z tabeli `sources` nie nadają się do pokazania mieszkańcowi
@@ -188,7 +216,12 @@ def is_pinned_alert(
     event_at: Optional[datetime] = None,
     event_until: Optional[datetime] = None,
 ) -> bool:
-    """Awaria na szczycie feedu tylko wtedy, gdy dotyczy najbliższych godzin."""
+    """
+    Awaria na szczycie tylko wtedy, gdy dotyczy najbliższych godzin.
+
+    Ten sam próg rozstrzyga o nagłówku briefingu — feed i briefing nie mogą
+    inaczej odpowiadać na pytanie „czy ta awaria jest sprawą teraz".
+    """
     if not category or "awari" not in category.lower():
         return False
     now = now or datetime.utcnow()
