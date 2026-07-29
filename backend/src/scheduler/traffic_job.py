@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from src.integrations.traffic_service import TrafficService
+from src.services.road_context import fetch_road_context, format_road_context
 from src.config import settings
 from src.database.schema import TrafficCache
 from src.utils.logger import setup_logger
@@ -34,12 +35,33 @@ async def run_traffic_job_async():
     service = TrafficService()
 
     try:
-        # 1. Fetch fresh data from Gemini (kosztowne API call)
+        # 1. Materiał źródłowy z własnego feedu — model ma pracować na naszych
+        #    zweryfikowanych wpisach z datami, a nie rekonstruować stan dróg
+        #    z przypadkowych wyników wyszukiwania.
+        async with async_session() as session:
+            road_items = await fetch_road_context(session)
+        logger.info(f"Materiał źródłowy o drogach: {len(road_items)} wpisów lokalnych")
+        for item in road_items[:5]:
+            logger.info(f"    [{item['date']}] {item['title'][:70]}")
+
+        # 2. Fetch fresh data from Gemini (kosztowne API call)
         logger.info("Fetching fresh traffic data from Gemini Grounding API...")
-        traffic_data = await service.get_traffic_data()
+        traffic_data = await service.get_traffic_data(
+            road_context=format_road_context(road_items)
+        )
 
         if not traffic_data or not traffic_data.roads:
             logger.warning("  ⚠️  No roads data returned - using fallback")
+            return
+
+        # Atrapa (typowe czasy przejazdu) nie jest danymi — nie nadpisuj nią cache'u.
+        # Stary, ale prawdziwy odczyt jest wart więcej niż świeży wpis "Brak danych",
+        # a ERROR w logu sprawia, że awaria Gemini nie przeleży znowu trzech tygodni.
+        if traffic_data.is_fallback:
+            logger.error(
+                "  ✗ Gemini nie zwrócił danych — zachowuję poprzedni wpis w cache. "
+                "Sprawdź limity API (429) lub dostępność modelu."
+            )
             return
 
         # 2. Save to database
