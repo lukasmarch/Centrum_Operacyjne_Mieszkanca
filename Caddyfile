@@ -8,15 +8,44 @@ rybnolive.pl {
         X-Content-Type-Options nosniff
         X-Frame-Options DENY
         Referrer-Policy strict-origin-when-cross-origin
-        Cache-Control "public, max-age=31536000, immutable"
     }
 
-    # HTML i SW nie cachować — SPA routing
-    @html {
-        path *.html /
-        path /sw.js /manifest.webmanifest
+    # Cache-Control celuje w konkretne ścieżki, a NIE globalnie. Dwie pułapki,
+    # obie wykryte 29.07.2026 w świeżym logu dostępu:
+    #  1) `Cache-Control` w bloku `header {}` bez matchera wygrywał z późniejszym
+    #     `header @html` — dyrektywa zadeklarowana wyżej owija tę niżej, więc na
+    #     WriteHeader nadpisywała ją. index.html i sw.js leciały z `immutable`;
+    #  2) nazwany matcher musi mieć JEDNĄ linię `path` — dwie linie łączą się
+    #     przez AND, a żadna ścieżka nie jest naraz `/` i `/sw.js`.
+    # Skutek obu razem: kto raz wszedł na stronę, dostawał ten sam bundle przez
+    # rok i żaden deploy do niego nie docierał — także poprawki kampanijne.
+    @immutable path /assets/*
+    header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+    # Klatki animacji hero i ikony: stałe nazwy plików, więc bez `immutable` —
+    # tydzień wystarcza, a podmiana assetu dojdzie do ludzi bez zmiany nazwy.
+    @statics path /videos/* /agents/* *.png *.jpg
+    header @statics Cache-Control "public, max-age=604800"
+
+    @nocache path / *.html /sw.js /registerSW.js /manifest.webmanifest
+    header @nocache Cache-Control "no-cache"
+
+    # Pomiar wejść. Do 29.07.2026 nie istniał ŻADEN zapis ruchu — ani tu, ani
+    # w uvicornie — więc pytanie „ile osób przyszło z kampanii" nie miało źródła
+    # odpowiedzi. Log daje: liczbę wejść, unikalne IP, `Referer` (odróżnia
+    # l.facebook.com od instagram.com) i parametry kampanijne (?alerty, utm_*).
+    #
+    # Świadomie zamiast GA4: zero ciasteczek, więc zero banera zgody, dane nie
+    # wychodzą z serwera. IP jest daną osobową — stąd krótka retencja (7 dni,
+    # tyle trwa ocena jednej fali kampanii). Raport: scripts/traffic_report.py
+    log {
+        output file /data/access.log {
+            roll_size 20MiB
+            roll_keep 4
+            roll_keep_for 168h
+        }
+        format json
     }
-    header @html Cache-Control "no-cache"
 }
 
 www.rybnolive.pl {
