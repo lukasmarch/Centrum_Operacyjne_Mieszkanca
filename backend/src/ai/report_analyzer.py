@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def _get_model():
     """Initialize Gemini model with API key."""
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-2.0-flash")
+    return genai.GenerativeModel(settings.GEMINI_MODEL)
 
 
 ANALYSIS_PROMPT = """Jesteś dyżurnym operatorem Centrum Powiadamiania o Zdarzeniach w gminie Rybno (powiat działdowski, woj. warmińsko-mazurskie).

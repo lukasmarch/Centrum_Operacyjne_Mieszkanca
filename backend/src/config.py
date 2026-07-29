@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     OPENWEATHER_API_KEY: str
     APIFY_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+    # Model Gemini dla ruchu drogowego i analizy zgłoszeń.
+    # 2026-07-29: gemini-2.0-flash ma na tym projekcie limit free tier = 0
+    # (429 RESOURCE_EXHAUSTED przy każdym przebiegu) → tymczasowo 2.5-flash.
+    # Po włączeniu płatności w Google wróć na "gemini-2.0-flash".
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     AIRLY_API_KEY: Optional[str] = None
     CEIDG_API_TOKEN: Optional[str] = None  # Token do API CEIDG v3
     REGON_API_KEY: Optional[str] = "b220c4e85a1b4e1da8b8"  # Klucz do API REGON (GUS)

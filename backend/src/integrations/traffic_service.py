@@ -29,6 +29,7 @@ class TrafficService:
     def __init__(self):
         from src.config import settings
         api_key = settings.GEMINI_API_KEY
+        self.model = settings.GEMINI_MODEL
         if not api_key:
             # Fallback to GOOGLE_API_KEY from settings or env if needed
             api_key = os.environ.get("GOOGLE_API_KEY") 
@@ -83,7 +84,7 @@ class TrafficService:
         try:
             print("Fetching fresh traffic data from Gemini...")
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=self.model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     tools=[types.Tool(google_search=types.GoogleSearch())],
