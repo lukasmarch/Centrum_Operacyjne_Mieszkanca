@@ -115,6 +115,14 @@ class TrafficService:
          ODRZUĆ wszystko, co dotyczy Rybna Wielkiego (gm. Kiszkowo, pow. gnieźnieński),
          Rybna k. Sochaczewa i innych. Sprawdź powiat, zanim użyjesz źródła.
 
+      4. KONKRETNY ODCINEK. Utrudnienie musi wskazywać nazwaną miejscowość, skrzyżowanie
+         lub numer drogi. Komunikaty o zasięgu wojewódzkim albo krajowym ("na drogach
+         województwa warmińsko-mazurskiego", "w całym kraju", ćwiczenia wojskowe,
+         ogólne apele o ostrożność, komunikaty pogodowe) NIE są utrudnieniem na trasie —
+         daj "Płynnie". Nie przypisuj jednego ogólnego komunikatu do wszystkich czterech
+         tras: jeśli coś dotyczy każdej z nich jednakowo, prawie zawsze znaczy to,
+         że nie dotyczy żadnej konkretnie.
+
       Jeśli którykolwiek warunek nie jest spełniony — STATUS: Płynnie, DELAY: 0 min.
       Nie zgaduj i nie wnioskuj "na wszelki wypadek": lepiej napisać, że jest płynnie,
       niż ostrzec mieszkańca przed utrudnieniem, którego nie ma.
@@ -216,6 +224,39 @@ class TrafficService:
         "olsztyn": "90 min",
     }
 
+    # Bramka miejsca dla utrudnień — ta sama zasada co w alertach push.
+    # Prośby w promkcie nie wystarczyły: model ogłosił "Utrudnienia" na WSZYSTKICH
+    # czterech trasach na podstawie komunikatu o ćwiczeniach wojskowych "na drogach
+    # województwa warmińsko-mazurskiego od 15 czerwca". Ostrzeżenie bez wskazania
+    # odcinka nie mówi mieszkańcowi nic, a psuje zaufanie do widgetu.
+    # RDZENIE nazw, nie pełne formy: „w Hartowcu" nie zawiera „hartowiec",
+    # a odmiana jest w tych komunikatach regułą („w Rybnie", „do Iławy",
+    # „między Truszczynami a Dębieniem"). Pisane bez „ł" (patrz `_flat`).
+    _ROUTE_PLACES: tuple[str, ...] = (
+        # trasy i cele
+        "rybn", "dzialdow", "lubaw", "ilaw", "olsztyn", "nidzic", "szczytn",
+        # miejscowości na trasach i w gminie
+        "hartow", "rumian", "koszelew", "tuczk", "truszczyn", "debien",
+        "zabin", "jezew", "dlutow", "fijew", "kostkow", "gralew", "grunwald",
+        "wikielec", "samplaw", "pratnic", "naguszew", "swiniarc",
+        # oznaczenia dróg
+        "538", "541", "1255", "1313", "dk15", "dk 15", "s7",
+    )
+
+    @staticmethod
+    def _flat(text: str) -> str:
+        """Do porównań: małe litery, „ł" na „l" (nie rozkłada się w NFKD)."""
+        import unicodedata
+        lowered = (text or "").lower().replace("ł", "l")
+        return "".join(
+            c for c in unicodedata.normalize("NFKD", lowered)
+            if not unicodedata.combining(c)
+        )
+
+    def _names_place_on_route(self, note: str) -> bool:
+        flat = self._flat(note)
+        return any(place in flat for place in self._ROUTE_PLACES)
+
     def _parse_response(self, text: str) -> List[RoadStatus]:
         roads = []
         import re
@@ -259,6 +300,18 @@ class TrafficService:
                 delay = int(''.join(filter(str.isdigit, delay_text)))
             except Exception:
                 delay = 0
+
+            # Utrudnienie musi wskazać KONKRETNE miejsce na trasie. Komunikat
+            # o zasięgu wojewódzkim ("na drogach województwa…") przechodził przez
+            # wszystkie prośby w prompcie i trafiał na wszystkie cztery trasy naraz.
+            if status != "Płynnie" and not self._names_place_on_route(note):
+                print(
+                    f"WARNING: odrzucam utrudnienie bez miejsca na trasie "
+                    f"({name}): {note[:120]}"
+                )
+                status = "Płynnie"
+                delay = 0
+                note = "Ruch płynny, brak potwierdzonych utrudnień."
 
             roads.append(RoadStatus(
                 id=str(i),
