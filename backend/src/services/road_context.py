@@ -18,7 +18,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.schema import Article, Source
-from src.services.feed_policy import is_local_article
+from src.services.alert_policy import places_in
+from src.services.feed_policy import is_local_source
+
+# Źródła o zasięgu szerszym niż gmina: samo „to Powiat/KPP/Energa" nie znaczy
+# „to nasze", więc wpis musi jeszcze nazwać miejscowość z gminy Rybno.
+# Listę sołectw trzyma `alert_policy.places_in` — jedna na projekt.
+WIDER_THAN_GMINA: frozenset[str] = frozenset({
+    "Powiat Działdowski (RSS)",
+    "KPP Działdowo (RSS)",
+    "Energa - wyłączenia bieżące (RSS)",
+    "Energa - wyłączenia planowane (RSS)",
+})
 
 # Wpis liczy się jako drogowy, gdy pada któreś z tych słów. Lista celowo wąska —
 # „inwestycja" czy „przetarg" wpuszczały do materiału plany bez wpływu na przejazd.
@@ -48,6 +59,19 @@ def _is_road_related(title: Optional[str], content: Optional[str]) -> bool:
     return any(term in haystack for term in ROAD_TERMS)
 
 
+def _is_local(
+    source_name: Optional[str],
+    title: Optional[str],
+    content: Optional[str],
+) -> bool:
+    """Czy wpis dotyczy gminy Rybno i okolic — ta sama zasada co w feedzie."""
+    if not is_local_source(source_name):
+        return False
+    if source_name in WIDER_THAN_GMINA:
+        return bool(places_in(title, content))
+    return True
+
+
 async def fetch_road_context(
     session: AsyncSession,
     days: int = DEFAULT_DAYS,
@@ -56,9 +80,9 @@ async def fetch_road_context(
     """
     Lokalne wpisy o drogach z ostatnich `days` dni, najnowsze pierwsze.
 
-    Lokalność rozstrzyga `feed_policy.is_local_article` — ta sama bramka co
-    w feedzie i briefingu, więc powiatowy komunikat bez nazwy z gminy Rybno
-    nie trafi tu jako „nasz".
+    Lokalność rozstrzyga `_is_local` — ta sama zasada co w feedzie: źródło musi
+    być lokalne, a przy feedach o zasięgu powiatowym musi jeszcze paść nazwa
+    miejscowości z gminy Rybno.
     """
     since = datetime.utcnow() - timedelta(days=days)
 
@@ -75,7 +99,7 @@ async def fetch_road_context(
     for article, source_name in result.all():
         if not _is_road_related(article.title, article.content):
             continue
-        if not is_local_article(source_name, article.title, article.content):
+        if not _is_local(source_name, article.title, article.content):
             continue
 
         text = (article.content or article.summary or "").strip()
