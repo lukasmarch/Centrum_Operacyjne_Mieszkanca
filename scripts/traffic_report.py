@@ -94,8 +94,20 @@ def classify_source(referer: str) -> str:
     return netloc or "nieznane"
 
 
+def header(headers: dict, name: str) -> str:
+    """Pierwsza wartość nagłówka z logu Caddy.
+
+    Caddy zapisuje nagłówki jako listy, ale przy odpowiedziach bez treści
+    (304, przekierowania, HEAD) potrafi zapisać `"Content-Type": []` — pusta
+    lista, nie brak klucza. Domyślna wartość z `.get()` wtedy nie zadziała,
+    bo klucz istnieje, i indeksowanie [0] wywala skrypt.
+    """
+    values = (headers or {}).get(name) or [""]
+    return values[0] or ""
+
+
 def is_page_view(entry: dict) -> bool:
-    ctype = entry.get("resp_headers", {}).get("Content-Type", [""])[0]
+    ctype = header(entry.get("resp_headers", {}), "Content-Type")
     return entry.get("status") == 200 and ctype.startswith("text/html")
 
 
@@ -137,7 +149,7 @@ def main() -> None:
         if req.get("host") != "rybnolive.pl":
             continue
 
-        ua = (req.get("headers", {}).get("User-Agent") or [""])[0].lower()
+        ua = header(req.get("headers", {}), "User-Agent").lower()
         if any(m in ua for m in LINK_PREVIEW_MARKERS):
             previews += 1
             continue
