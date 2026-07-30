@@ -10,12 +10,30 @@
  * naprawdę stoi awaria. Obietnica jest wąska (prąd, woda, pożar, wypadek
  * w gminie Rybno) i dokładnie tyle wysyła `alert_push_job` — subskrypcja idzie
  * z kategorią „alerty", więc zapis tutaj NIE zapisuje na dzienne podsumowanie.
+ *
+ * 28.07.2026 doszedł drugi punkt wejścia: `campaignOnly`. Reels kampanijny kończy
+ * się obietnicą „Włącz powiadomienia. Za darmo, bez zakładania konta", a widz
+ * lądował na Dashboardzie, gdzie tego włącznika NIE BYŁO — jedyny stały siedzi
+ * w Profil → Preferencje, czyli za rejestracją. Linki kampanijne prowadzą więc
+ * na `rybnolive.pl/?alerty`, a Dashboard pokazuje ten baner właśnie dla nich.
+ * Kontekst jest zachowany: taki widz przyszedł z materiału o awarii prądu.
  */
 import React, { useState } from 'react';
 import { BellRing, X } from 'lucide-react';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 
 const DISMISS_KEY = 'rl_push_prompt_dismissed_at';
+
+// Znacznik w adresie z linków kampanijnych (post, komentarz, opis Reelsa)
+const CAMPAIGN_PARAM = 'alerty';
+
+function cameFromCampaign(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).has(CAMPAIGN_PARAM);
+  } catch {
+    return false;
+  }
+}
 
 // Po zamknięciu nie wracamy przez miesiąc. Baner przy każdej awarii byłby
 // dokładnie tym rodzajem natręctwa, przed którym alerty mają chronić.
@@ -32,13 +50,19 @@ function wasDismissed(): boolean {
   }
 }
 
-const AlertPushPrompt: React.FC = () => {
+type Props = {
+  /** Pokaż wyłącznie wtedy, gdy wejście pochodzi z linku kampanijnego (`?alerty`). */
+  campaignOnly?: boolean;
+};
+
+const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false }) => {
   const { status, isSubscribed, isSupported, subscribe } = usePushNotifications();
   const [dismissed, setDismissed] = useState(wasDismissed);
   const [busy, setBusy] = useState(false);
   const [justEnabled, setJustEnabled] = useState(false);
 
   const hide =
+    (campaignOnly && !cameFromCampaign()) ||
     dismissed ||
     !isSupported ||
     isSubscribed ||

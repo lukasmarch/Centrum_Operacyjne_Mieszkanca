@@ -17,6 +17,7 @@ import { getHoliday, getNameDays } from '../src/utils/calendarUtils';
 import BentoGrid from './BentoGrid';
 import BentoTile from './BentoTile';
 import HeroSection from './hero/HeroSection';
+import AlertPushPrompt from './AlertPushPrompt';
 import AIBriefingTile from './AIBriefingTile';
 import WeatherTile from './WeatherTile';
 import EventsTile from './EventsTile';
@@ -93,6 +94,11 @@ const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQueryS
           <HeroSection onNavigate={onNavigate} onSubmit={onQuerySubmit} />
         </div>
       </div>
+
+      {/* Wejścia z kampanii (`?alerty`) dostają tu włącznik powiadomień, który
+          obiecuje im Reels. Bez tego jedyny stały włącznik siedzi w Profilu,
+          czyli za rejestracją — a materiał mówi „bez zakładania konta". */}
+      <AlertPushPrompt campaignOnly />
 
       {/* bentogrid.txt: BentoGrid z dark tiles */}
       <BentoGrid>
