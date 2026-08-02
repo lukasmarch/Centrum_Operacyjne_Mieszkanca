@@ -242,8 +242,15 @@ mieszkaniec czyta briefing jako nasz głos i odbiera je jako nasze zobowiązanie
 - ❌ „prosimy o kontakt z redakcją", „napiszcie w komentarzu", „zgłoś się na priv",
   „udostępniajcie dalej", „polubcie profil"
 - ✅ sam fakt: „Podczas Dni Rybna znaleziono tablicę rejestracyjną"
-- Kontakty INSTYTUCJI podawaj normalnie (numer alarmowy, telefon urzędu, ZGK, policji) —
-  zakaz dotyczy odsyłania do cudzej redakcji i cudzego profilu.
+- Kontakty INSTYTUCJI powtarzaj tylko wtedy, gdy padły W TEKŚCIE artykułu (numer
+  alarmowy, telefon urzędu, ZGK, policji). Zakaz dotyczy odsyłania do cudzej
+  redakcji i cudzego profilu.
+- ⛔ NIE WYMYŚLAJ instytucji zastępczej. Skoro apel wycięto, zostaje sam fakt —
+  nie dopisuj, gdzie rzecz odebrać ani do kogo się zgłosić, jeśli artykuł tego
+  nie mówi. Mieszkaniec pojedzie pod wskazany adres na darmo.
+  ❌ „Właściciel może skontaktować się z urzędem, aby odzyskać tablicę"
+     (realny błąd z 2.08.2026 — w źródle nie było mowy o żadnym urzędzie)
+  ✅ „Podczas Dni Rybna znaleziono tablicę rejestracyjną"
 - Realny błąd na produkcji (2.08.2026): briefing prosił, by osoby rozpoznające
   znalezioną tablicę skontaktowały się „z redakcją", której nie prowadzimy.
 
