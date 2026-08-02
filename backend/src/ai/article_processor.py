@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
+from src.services import weather_alert
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 from src.config import settings
@@ -118,6 +119,23 @@ class ArticleProcessor:
             )
             article.is_promotional = category_data.is_promotional
             article.processed = True
+
+            # Ostrzeżenie meteo obowiązuje do godziny wpisanej w jego treść
+            # i nigdzie indziej. Bez `event_until` feed rankował je jak zwykłą
+            # wiadomość, a briefing czytał nazajutrz jako aktualne (2.08.2026).
+            # Termin liczymy tylko dla wpisów bez własnego (Energa ma swój
+            # z `services/energa.py`, ustawiony już przy scrapowaniu).
+            if article.event_until is None and weather_alert.is_weather_alert(
+                article.title, text_content
+            ):
+                start, end = weather_alert.validity_or_default(
+                    article.title, text_content, article.published_at
+                )
+                article.event_at = article.event_at or start
+                article.event_until = end
+                self.logger.info(
+                    f"Weather alert {article.id}: ważne do {end} (UTC)"
+                )
 
             usage = result.usage()
             log_api_cost(

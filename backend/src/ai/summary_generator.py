@@ -13,13 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.models import DailySummary as DailySummaryModel
 from src.ai.prompts import DAILY_SUMMARY_PROMPT
-from src.database.schema import Article, Event, AirQuality, DailySummary, Source
+from src.database.schema import Article, Event, AirQuality, DailySummary, Source, Weather
+from src.services import weather_alert
 from src.services.feed_policy import (
     collapse_duplicates,
     dedup_text,
     is_local_article,
     is_pinned_alert,
     publishable_conditions,
+    strip_cta_tail,
+    strip_foreign_cta,
 )
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
@@ -31,9 +34,35 @@ logger = setup_logger("SummaryGenerator")
 # o godzinach, więc konwersja musi być jawna
 LOCAL_TZ = ZoneInfo("Europe/Warsaw")
 
+# Lokalizacja, której pogodę briefing opisuje. Ta sama, którą widget bierze
+# z `/api/weather` — briefing i widget nie mogą mówić o innym miejscu.
+WEATHER_LOCATION = "Rybno"
+
+# Ile slotów prognozy (co 3 h) pokazujemy modelowi. Briefing mówi o dzisiaj,
+# a nie o pięciu dniach — nadmiar kusi do zapowiadania pogody na przyszły tydzień.
+FORECAST_SLOTS = 5
+
 
 def _local(stamp: datetime) -> datetime:
     return stamp.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ)
+
+
+def _article_title(article) -> str:
+    """
+    Tytuł, który widzi model: nasz `display_title`, nie nagłówek źródła.
+
+    Kategoryzacja pisze `display_title` właśnie po to — depesza bez emoji,
+    wykrzykników i cudzych sformułowań (`prompts.CATEGORIZATION_PROMPT`, pkt 7).
+    Briefing sięgał obok, po surowy `title` z Facebooka, więc 2.08.2026 otworzył
+    się nagłówkiem „🔎 Znaleziono tablicę rejestracyjną podczas Dni Rybna!"
+    przepisanym z posta co do znaku razem z lupą i wykrzyknikiem.
+    """
+    return strip_cta_tail(article.display_title or article.title or "")
+
+
+def _article_body(article) -> str:
+    """Streszczenie wpisu bez cudzych apeli o kontakt."""
+    return strip_foreign_cta(article.summary or "")
 
 
 def _day_word(day_offset: int) -> Optional[str]:
@@ -154,6 +183,25 @@ class SummaryGenerator:
             self.logger.warning(f"No articles found for {date_start.date()}")
             return None
 
+        # Ostrzeżenie meteo po terminie ważności nie jest ostrzeżeniem. Post
+        # z 1.08 („dziś, w godzinach 15:00–01:00") wisiał w briefingu 2.08 o 11:30
+        # jako obowiązujący alert burzowy, a prognoza obok dawała zero opadów.
+        before_expiry = len(articles)
+        articles = [
+            article for article in articles
+            if not weather_alert.expired(
+                article.title,
+                article.content,
+                article.published_at,
+                getattr(article, "event_until", None),
+                now,
+            )
+        ]
+        if len(articles) < before_expiry:
+            self.logger.info(
+                f"Expired weather alerts dropped: {before_expiry} → {len(articles)} articles"
+            )
+
         # Ten sam materiał z dwóch źródeł idzie do AI raz — inaczej wraca
         # w briefingu jako dwie osobne „wiadomości"
         before_collapse = len(articles)
@@ -207,6 +255,23 @@ class SummaryGenerator:
         )
         air_quality = air_quality_result.scalar_one_or_none()
 
+        # 4b. Pogoda z tego samego rekordu, który zasila widget na stronie.
+        # Airly mierzy pyły — temperatura jest u niego danymi pobocznymi i bywa
+        # pusta: 2.08.2026 briefing napisał mieszkańcom „temperatura i wilgotność
+        # nie były dostępne", podczas gdy widget obok pokazywał 18°C.
+        weather_result = await session.execute(
+            select(Weather)
+            .where(Weather.location == WEATHER_LOCATION)
+            .where(Weather.is_current == True)  # noqa: E712
+            .order_by(Weather.fetched_at.desc())
+            .limit(1)
+        )
+        weather = weather_result.scalar_one_or_none()
+        if weather is None:
+            self.logger.warning(
+                f"No current weather for {WEATHER_LOCATION} — briefing bez sekcji pogodowej"
+            )
+
         # 5. Przygotuj dane wejściowe dla AI
         previous_headline_id = await self._previous_headline_id(session, date_start)
         top_article = self._select_top_article(
@@ -231,6 +296,7 @@ class SummaryGenerator:
             top_article=top_article,
             now=now,
             extended=extended,
+            weather=weather,
         )
 
         try:
@@ -537,6 +603,61 @@ class SummaryGenerator:
             return "[LOKALNY]"
         return "[REGIONALNY]"
 
+    @staticmethod
+    def _weather_lines(weather: Weather, now: datetime) -> list[str]:
+        """
+        Sekcja pogodowa: stan teraz + prognoza na najbliższe godziny.
+
+        Bierze się z rekordu `weather` — tego samego, który `/api/weather` podaje
+        widgetowi. Do 2.08.2026 briefing nie miał żadnej prognozy i nie potrafił
+        rozpoznać, że wczorajsze ostrzeżenie przed burzami nie ma pokrycia
+        w dzisiejszym dniu: model widział alert i tylko alert.
+        """
+        measured = _local(weather.fetched_at) if weather.fetched_at else None
+        lines = [
+            "\n" + "=" * 80,
+            "POGODA W RYBNIE — TO SAMO ŹRÓDŁO, CO WIDGET NA STRONIE"
+            + (f" (pomiar {measured:%H:%M})" if measured else ""),
+            "=" * 80,
+            "",
+            f"Teraz: {weather.temperature:.0f}°C (odczuwalna {weather.feels_like:.0f}°C), "
+            f"{weather.description}, wiatr {weather.wind_speed:.0f} m/s",
+        ]
+
+        slots = ((weather.forecast or {}).get("hourly") or [])[:FORECAST_SLOTS]
+        if slots:
+            lines.append("Prognoza (co 3 h; „opady” = prawdopodobieństwo opadów):")
+            for slot in slots:
+                stamp = slot.get("dt")
+                when = (
+                    datetime.fromtimestamp(stamp, ZoneInfo("UTC")).astimezone(LOCAL_TZ)
+                    if stamp else None
+                )
+                temp = slot.get("temp")
+                pop = slot.get("pop")
+                rain = slot.get("rain_3h")
+                parts = [
+                    f"  {when:%H:%M}" if when else "  ??:??",
+                    f"{temp:.0f}°C" if temp is not None else "—",
+                    str(slot.get("description") or ""),
+                ]
+                if pop is not None:
+                    parts.append(f"opady {round(pop * 100)}%")
+                if rain:
+                    parts.append(f"{rain} mm")
+                lines.append("  ".join(p for p in parts if p))
+
+        lines += [
+            "",
+            "⚠️ TA SEKCJA ROZSTRZYGA O POGODZIE. Artykuł zapowiadający burzę, ulewę",
+            "   czy alert pogodowy opisuje stan z chwili SWOJEJ publikacji. Jeśli",
+            "   prognoza powyżej nie potwierdza zagrożenia (znikoma szansa opadów) —",
+            "   NIE ostrzegaj przed nim i nie powtarzaj alertu jako obowiązującego.",
+            "   Liczb z tej sekcji NIE przepisuj do `highlights` (obok stoi widget",
+            "   z pomiarem na żywo) — opisz pogodę słowami.",
+        ]
+        return lines
+
     def _prepare_input_for_ai(
         self,
         date: datetime,
@@ -546,6 +667,7 @@ class SummaryGenerator:
         top_article=None,
         now: Optional[datetime] = None,
         extended: bool = False,
+        weather: Optional[Weather] = None,
     ) -> str:
         """Przygotuj sformatowany tekst dla AI"""
         now = now or datetime.utcnow()
@@ -564,11 +686,12 @@ class SummaryGenerator:
             lines += [
                 "=" * 80,
                 f"⚡ WYMAGANY ARTYKUŁ NAGŁÓWKA [ID:{top_article.id}]:",
-                f"   Tytuł: {top_article.title}",
+                f"   Tytuł: {_article_title(top_article)}",
                 f"   Kategoria: {top_article.category} | Źródło: [{locality}]",
             ]
-            if top_article.summary:
-                lines.append(f"   Treść: {top_article.summary}")
+            body = _article_body(top_article)
+            if body:
+                lines.append(f"   Treść: {body}")
             lines += [
                 f"   ZASADA: Headline MUSI być o tym artykule. cited_article_ids[0] MUSI = {top_article.id}.",
                 "=" * 80,
@@ -613,9 +736,10 @@ class SummaryGenerator:
             for i, article in enumerate(sorted_arts[:10], 1):  # max 10 per kategoria
                 label = self._get_locality_label(article)
                 when = _time_label(article, now)
-                lines.append(f"{i}. {label} {when} [ID:{article.id}] {article.title}")
-                if article.summary:
-                    lines.append(f"   → {article.summary}")
+                lines.append(f"{i}. {label} {when} [ID:{article.id}] {_article_title(article)}")
+                body = _article_body(article)
+                if body:
+                    lines.append(f"   → {body}")
                 # Lokalizację pokazuj tylko dla artykułów LOKALNYCH - dla regionalnych
                 # może być halucynowana przez AI kategoryzacji
                 if article.location_mentioned and self._is_local(article):
@@ -637,16 +761,20 @@ class SummaryGenerator:
                     lines.append(f"  Miejsce: {event.location}")
                 lines.append("")
 
-        # Dodaj dane air quality (czujnik w Rybnie)
+        # Pogoda — ten sam rekord, który zasila widget na stronie
+        if weather:
+            lines += self._weather_lines(weather, now)
+
+        # Dodaj dane air quality (czujnik w Rybnie).
+        # Wyłącznie powietrze: temperatura, wilgotność i ciśnienie stoją wyżej,
+        # w sekcji pogodowej. Podane dwa razy z dwóch źródeł dawały dwie różne
+        # wartości w jednym briefingu — a czujnik Airly potrafi ich nie mieć wcale.
         if air_quality:
             lines.append("\n" + "=" * 80)
-            lines.append("JAKOŚĆ POWIETRZA I WARUNKI (czujnik w Rybnie):")
+            lines.append("JAKOŚĆ POWIETRZA (czujnik Airly w Rybnie):")
             lines.append("=" * 80 + "\n")
             lines.append(f"Lokalizacja: {air_quality.location}")
-            lines.append(f"Temperatura: {air_quality.temperature}°C")
-            lines.append(f"Wilgotność: {air_quality.humidity}%")
-            lines.append(f"Ciśnienie: {air_quality.pressure} hPa")
-            lines.append(f"\nJakość powietrza: {air_quality.caqi_level} (CAQI: {air_quality.caqi})")
+            lines.append(f"Jakość powietrza: {air_quality.caqi_level} (CAQI: {air_quality.caqi})")
             lines.append(f"Pyły zawieszone:")
             lines.append(f"  - PM2.5: {air_quality.pm25} µg/m³")
             lines.append(f"  - PM10: {air_quality.pm10} µg/m³")

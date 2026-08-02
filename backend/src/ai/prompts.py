@@ -60,6 +60,11 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    - ZERO emoji, ZERO wykrzykników, ZERO CAPS LOCKA, zero clickbaitu
    - NIE kopiuj sformułowań ze źródłowego tytułu — przepisz treść własnymi słowami
    - przykład: zamiast "🚨🚨 Uwaga, kierowcy! 🚨 Na drodze..." → "Wypadek na drodze Truszczyny–Dębień, kierowca oddalił się z miejsca"
+   - ZERO wezwań do kontaktu z autorem posta ("kontakt z redakcją", "napiszcie w komentarzu",
+     "zgłoś się na priv", "udostępniajcie"). Tytuł niesie FAKT, nie cudzy apel — my tej
+     redakcji nie prowadzimy i nie odbieramy tych zgłoszeń.
+     ❌ "Znaleziono tablicę rejestracyjną w Rybnie, pilny kontakt z redakcją"
+     ✅ "Znaleziono tablicę rejestracyjną podczas Dni Rybna"
 8. Ustaw is_filler=true, jeśli wpis NIE niesie informacji, po którą mieszkaniec przyszedłby na portal:
    ✅ is_filler=TRUE:
    - post zaczynający się od powitania z datą: "Dzień dobry! Dziś 26 lipca...", "Dobry wieczór", "Miłego dnia"
@@ -218,6 +223,30 @@ w TREŚCI artykułu odnoszą się do dnia, w którym artykuł powstał.
   o 17:00", podczas gdy koncert był poprzedniego dnia, a w tym samym zestawie leżała
   relacja z podziękowaniami.
 
+**POGODA — ROZSTRZYGA NASZA PROGNOZA, NIE ARTYKUŁ:**
+W materiale stoi sekcja „POGODA W RYBNIE — TO SAMO ŹRÓDŁO, CO WIDGET NA STRONIE":
+stan teraz i prognoza na najbliższe godziny. To jedyne źródło prawdy o pogodzie.
+- Artykuł zapowiadający burzę, ulewę, upał czy alert IMGW opisuje stan z chwili SWOJEJ
+  publikacji. Zanim go powtórzysz, sprawdź prognozę: jeśli nie potwierdza zagrożenia,
+  NIE ostrzegaj przed nim i nie pisz, że ostrzeżenie obowiązuje.
+- O alercie, który minął, pisz w czasie przeszłym albo pomiń go całkowicie.
+- Realny błąd na produkcji (2.08.2026): briefing ostrzegał przed burzami II stopnia
+  na podstawie wczorajszego posta („dziś, w godzinach 15:00–01:00"), podczas gdy alert
+  wygasł w nocy, a widget obok pokazywał zerową szansę opadów.
+- Gdy sekcji pogodowej nie ma w materiale — nie pisz o pogodzie nic. Nie zgaduj
+  i nie opieraj się na artykułach.
+
+**CUDZE APELE ZOSTAJĄ U ŹRÓDŁA:**
+Posty źródłowe kończą się prośbą skierowaną do ICH odbiorców. Nie przepisuj ich —
+mieszkaniec czyta briefing jako nasz głos i odbiera je jako nasze zobowiązanie.
+- ❌ „prosimy o kontakt z redakcją", „napiszcie w komentarzu", „zgłoś się na priv",
+  „udostępniajcie dalej", „polubcie profil"
+- ✅ sam fakt: „Podczas Dni Rybna znaleziono tablicę rejestracyjną"
+- Kontakty INSTYTUCJI podawaj normalnie (numer alarmowy, telefon urzędu, ZGK, policji) —
+  zakaz dotyczy odsyłania do cudzej redakcji i cudzego profilu.
+- Realny błąd na produkcji (2.08.2026): briefing prosił, by osoby rozpoznające
+  znalezioną tablicę skontaktowały się „z redakcją", której nie prowadzimy.
+
 **ZAKAZ nagłówka z danych czujnika powietrza:**
 Dane z czujnika Airly (temperatura, CAQI, PM2.5/PM10) NIE są artykułem — nie mogą być nagłówkiem ani cited_article_ids[0]. Umieszczaj je wyłącznie w `highlights` (jedno zdanie) i w `air_quality_summary`. Wyjątek: CAQI > 100 (VERY_HIGH) — możesz dodać ostrzeżenie do nagłówka jako DODATEK do artykułu nagłówka, nie jako samodzielny headline.
 
@@ -230,7 +259,10 @@ to podważa zaufanie do wszystkich danych na stronie.
   ✅ „powietrze czyste", „jakość powietrza dobra", „ciepło i słonecznie", „chłodno"
   ❌ „CAQI 20.76", „27°C", „PM2.5 na poziomie 11 µg/m³"
 - Konkretne liczby umieszczaj TYLKO w `air_quality_summary`, zawsze z godziną pomiaru
-  (np. „Pomiar z 7:00: CAQI 21, temperatura 18°C")
+  (np. „Pomiar z 7:00: CAQI 21, PM2.5 i PM10 poniżej norm UE")
+- `air_quality_summary` dotyczy WYŁĄCZNIE powietrza (CAQI, pyły). Temperatury, wiatru
+  ani opadów tam nie opisuj — pogoda ma własną sekcję w materiale i miejsce
+  w `highlights`. Nigdy nie pisz, że danych nie było: brak sekcji = milczysz o niej.
 - Wyjątek: przy CAQI > 100 (VERY_HIGH) możesz podać liczbę także w `highlights` —
   ostrzeżenie o zagrożeniu jest ważniejsze niż spójność wyświetlania
 
@@ -252,7 +284,7 @@ to podważa zaufanie do wszystkich danych na stronie.
 
 4. **Nadchodzące wydarzenia**: Lista wydarzeń z datami (max 5 najbliższych)
 
-5. **Jakość powietrza i warunki**: Podsumowanie danych z czujnika (temperatura, wilgotność, ciśnienie, jakość powietrza CAQI, pyły PM2.5/PM10) + ewentualne alerty o złej jakości powietrza
+5. **Jakość powietrza** (`air_quality_summary`): Podsumowanie danych z czujnika Airly — CAQI, pyły PM2.5/PM10, godzina pomiaru + ewentualne ostrzeżenie przy złej jakości. Bez pogody: temperatura, wiatr i opady idą do `highlights`, opisane jakościowo.
 
 **KRYTYCZNA ZASADA PRIORYTETYZACJI:**
 **ZAWSZE priorytetyzuj wiadomości w kolejności:**
@@ -277,7 +309,8 @@ to podważa zaufanie do wszystkich danych na stronie.
 **WAŻNE dla Highlights (akapit opisowy):**
 - Format: **AKAPIT** (płynny tekst), NIE lista punktowana!
 - Użyj **pogrubienia** (markdown **tekst**) dla kluczowych informacji (daty, temperatury, nazwy wydarzeń)
-- ZAWSZE uwzględnij pogodę/jakość powietrza (temperatura, CAQI, ewentualne alerty)
+- ZAWSZE uwzględnij pogodę i jakość powietrza — jakościowo, bez liczb; alert pogodowy
+  tylko wtedy, gdy potwierdza go sekcja prognozy
 - ZAWSZE uwzględnij najbliższe wydarzenie (data + miejsce)
 - NIE generuj z samych wydarzeń kulturalnych chyba że są BARDZO znaczące
 - Jeśli nie ma pilnych wiadomości, pokaż PRAKTYCZNE (praca, zdrowie, transport)

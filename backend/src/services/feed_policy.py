@@ -166,6 +166,72 @@ def publishable_conditions(article_model):
     ]
 
 
+# --- cudze wezwania do kontaktu ---------------------------------------------
+
+# Post źródłowy kończy się zwykle prośbą skierowaną do JEGO odbiorców: „napiszcie
+# w komentarzu", „kontakt z redakcją". Przepisane do briefingu czyta się jak nasze
+# — 2.08.2026 briefing prosił, by osoby rozpoznające znalezioną tablicę
+# rejestracyjną skontaktowały się „z redakcją", której nie prowadzimy.
+# Atrybucja zostaje (link do oryginału w feedzie); przejmujemy fakt, nie apel.
+_CTA_PATTERNS = (
+    r"kontakt\w*\s+z\s+redakcj",
+    r"skontaktuj\w*\s+si\w*\s+z\s+redakcj",
+    r"redakcj\w*\s+(prosi|czeka|pro[sś]i)",
+    r"napisz\w*\s+(do\s+nas|w\s+komentarz|w\s+wiadomo[sś]ci|na\s+priv)",
+    r"wiadomo[sś]ci?\s+prywatn",
+    r"\bpw\b|\bpriv\b|messenger",
+    r"w\s+komentarzu\s+poni[zż]ej|link\s+w\s+komentarz",
+    r"(polub|obserwuj|[sś]led[zź])\w*\s+(nasz|profil|stron|fanpage)",
+    r"udost[eę]pni\w*",
+    r"zapraszamy\s+na\s+(nasz|profil|fanpage)",
+    # Dopisek naszego scrapera pod treścią z profili FB — nie jest zdaniem
+    # briefingu i model nie ma go przepisywać
+    r"pe[lł]na\s+tre[sś][cć]\s+u\s+[zź]r[oó]d[lł]a",
+)
+_CTA_RE = re.compile("|".join(_CTA_PATTERNS), re.IGNORECASE)
+
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
+
+
+def strip_foreign_cta(text: Optional[str]) -> str:
+    """
+    Treść bez zdań, które wzywają do kontaktu z cudzą redakcją albo profilem.
+
+    Wycinamy całe zdanie, bo apel rzadko da się uratować w połowie. Gdy po
+    wycięciu nic nie zostaje, oddajemy oryginał — lepszy cudzy apel niż pustka
+    w materiale dla modelu.
+    """
+    if not text:
+        return ""
+    kept = [part for part in _SENTENCE_SPLIT_RE.split(text) if part.strip() and not _CTA_RE.search(part)]
+    return " ".join(kept).strip() or text.strip()
+
+
+def strip_cta_tail(title: Optional[str]) -> str:
+    """
+    Tytuł bez doklejonego apelu: „Znaleziono tablicę w Rybnie, pilny kontakt
+    z redakcją" → „Znaleziono tablicę w Rybnie".
+
+    Apel wchodzi też do `display_title` (kategoryzacja przepisuje wymowę posta),
+    więc samo sięgnięcie po display_title zamiast tytułu źródłowego nie wystarcza.
+    Ucinamy wyłącznie KOŃCÓWKĘ — człon w środku zdania zostawiamy nietknięty,
+    żeby nie okaleczyć informacji.
+    """
+    if not title:
+        return ""
+    trimmed = title.strip()
+    # Ucinamy po ostatnim separatorze, dopóki ogon jest apelem. Oryginalnej
+    # interpunkcji nie odtwarzamy — zostaje dokładnie ten kawałek, który był.
+    while True:
+        separators = list(re.finditer(r"\s*[,;–—]\s+|\s+-\s+", trimmed))
+        if not separators:
+            return trimmed
+        last = separators[-1]
+        if not _CTA_RE.search(trimmed[last.end():]):
+            return trimmed
+        trimmed = trimmed[:last.start()].strip()
+
+
 def _reference_time(
     published_at: Optional[datetime],
     scraped_at: Optional[datetime],
