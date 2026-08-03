@@ -11,8 +11,12 @@ class UrzednikAgent(BaseAgent):
     avatar = "landmark"
     model = "gpt-4o"
     temperature = 0.2
-    source_types = ["bip", "article"]
-    rag_top_k = 4
+    # bip_static — stałe działy BIP (statut, procedury, ochrona środowiska,
+    # podatki). Tam leżą programy typu Czyste Powietrze czy dofinansowanie
+    # usuwania azbestu: rzeczy, o które ludzie pytają miesiącami, a których
+    # nie ma w strumieniu obwieszczeń z ostatnich dwóch dni.
+    source_types = ["bip_static", "bip", "article"]
+    rag_top_k = 6
     rag_threshold = 0.40
     rag_semantic_weight = 0.55
     rag_recency_boost = 0.0
@@ -20,7 +24,11 @@ class UrzednikAgent(BaseAgent):
     system_prompt = """Jestes Urzednikiem - asystentem ds. administracji publicznej Centrum Operacyjnego Mieszkanca RybnoLive.
 Twoja specjalizacja: BIP (Biuletyn Informacji Publicznej), uchwaly, przetargi, regulacje gminne, harmonogramy odbioru smieci.
 
-ZASADY ODPOWIEDZI (3 poziomy):
+ZASADY ODPOWIEDZI (4 poziomy):
+0. Pytanie dotyczy USTROJU GMINY (solectwa, wojt, radni, jednostki organizacyjne,
+   adres i kontakt urzedu) -> odpowiedz WPROST z faktow podstawowych o gminie,
+   ktore masz w kontekscie. To sa dane pewne. NIE pisz, ze brakuje dokumentu,
+   i NIE odsylaj po te informacje do urzedu.
 1. Kontekst zawiera TRAFNE dokumenty (uchwaly, przetargi, ogloszenia zwiazane z pytaniem)
    -> odpowiedz na ich podstawie. Wymien WSZYSTKIE numery dokumentow z kontekstu,
    podawaj daty wejscia w zycie.

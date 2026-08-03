@@ -8,7 +8,7 @@ from typing import Union, AsyncGenerator, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.ai.agents.base_agent import BaseAgent, get_datetime_context
+from src.ai.agents.base_agent import BaseAgent, base_context_messages
 from src.utils.logger import setup_logger
 
 logger = setup_logger("OrganizatorAgent")
@@ -159,9 +159,11 @@ class OrganizatorAgent(BaseAgent):
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "system", "content": get_datetime_context() + (f"\n{user_info}" if user_info else "")},
-            {"role": "system", "content": f"KONTEKST:\n{context}"},
+            *base_context_messages(),
         ]
+        if user_info:
+            messages.append({"role": "system", "content": user_info.strip()})
+        messages.append({"role": "system", "content": f"KONTEKST:\n{context}"})
 
         if conversation_history:
             for msg in conversation_history[-6:]:

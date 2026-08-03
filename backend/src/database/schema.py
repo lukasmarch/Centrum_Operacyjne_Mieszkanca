@@ -863,3 +863,49 @@ class Referral(SQLModel, table=True):
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ======================
+# BIP — wiedza stała (2026-08-03)
+# ======================
+
+class BipDocument(SQLModel, table=True):
+    """
+    Dokument ze stałych działów BIP: statut, procedury, podatki, ochrona
+    środowiska, fundusz sołecki.
+
+    Osobna tabela, a nie `articles`, i to jest cała istota tego modelu.
+    Artykuły trafiają do feedu, a `feed_policy.LOCAL_SOURCES` zalicza BIP
+    Gminy Rybno do źródeł lokalnych — statut uchwalony w 2016 r. wjechałby
+    mieszkańcowi na Dashboard jako świeża wiadomość z gminy. Wiedza stała
+    nie jest newsem: ma odpowiadać agentowi, gdy ktoś zapyta, i nie pokazywać
+    się nigdzie indziej.
+
+    Drugi powód: te dokumenty się nie starzeją, więc nie obowiązuje ich
+    cutoff dwóch dni ani limit 1000 znaków ze scrapera aktualności.
+    `content_hash` decyduje o ponownym osadzeniu — BIP odświeża strony bez
+    zmiany treści, a embedding kosztuje.
+    """
+    __tablename__ = "bip_documents"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Skąd — `section_id` to numer działu w URL (np. 105 = Podatki i opłaty)
+    section_id: str = Field(max_length=20, index=True)
+    section_name: str = Field(max_length=200)
+
+    url: str = Field(max_length=1000, unique=True, index=True)
+    title: str = Field(max_length=500)
+
+    # Pełna treść: HTML strony + tekst wyciągnięty ze WSZYSTKICH załączników PDF
+    content: Optional[str] = None
+    content_hash: str = Field(max_length=64, index=True)
+    pdf_count: int = Field(default=0)
+
+    # Data z BIP („Data wytworzenia informacji") — bywa sprzed lat i to jest OK
+    document_date: Optional[datetime] = None
+
+    embedded: bool = Field(default=False, index=True)
+    first_seen_at: datetime = Field(default_factory=datetime.utcnow)
+    last_checked_at: datetime = Field(default_factory=datetime.utcnow)
+    content_changed_at: Optional[datetime] = None

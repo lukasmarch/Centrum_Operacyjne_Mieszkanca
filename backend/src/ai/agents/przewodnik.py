@@ -6,7 +6,7 @@ from typing import Union, AsyncGenerator, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.ai.agents.base_agent import BaseAgent, get_datetime_context
+from src.ai.agents.base_agent import BaseAgent, base_context_messages
 from src.utils.logger import setup_logger
 
 logger = setup_logger("PrzewodnikAgent")
@@ -119,7 +119,7 @@ WYNIKI NA ZYWO (Premium):
 
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {"role": "system", "content": get_datetime_context()},
+            *base_context_messages(),
             {"role": "system", "content": f"KONTEKST:\n{context}"},
         ]
 

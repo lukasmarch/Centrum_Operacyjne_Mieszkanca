@@ -95,6 +95,44 @@ class SemanticChunker:
         return chunks
 
     @staticmethod
+    def chunk_bip_static(
+        title: str,
+        content: Optional[str],
+        section_name: str,
+    ) -> list[dict]:
+        """
+        Chunk dokumentu ze stałych działów BIP (statut, podatki, programy).
+
+        Nagłówek niesie dział, a nie samo `[BIP - dokument]` jak w chunkach
+        aktualności: „Podatek rolny" bez kontekstu może być czymkolwiek,
+        a „[BIP › Podatki i opłaty] Podatek rolny" mówi modelowi, w jakim
+        rejestrze patrzy. Nagłówek powtarza się w KAŻDYM kawałku — inaczej
+        drugi i dalsze fragmenty regulaminu trafiają do modelu bez informacji,
+        czego dotyczą.
+        """
+        header = f"[BIP › {section_name}] {title}".strip()
+
+        if not content:
+            return [{
+                "text": header,
+                "metadata": {"chunk_type": "title_only", "section_name": section_name},
+            }]
+
+        parts = SemanticChunker._split_text(content, max_chars=1800, overlap_chars=200)
+        return [
+            {
+                "text": f"{header}\n\n{part}",
+                "metadata": {
+                    "chunk_type": "bip_static",
+                    "chunk_part": i + 1,
+                    "chunk_total": len(parts),
+                    "section_name": section_name,
+                },
+            }
+            for i, part in enumerate(parts)
+        ]
+
+    @staticmethod
     def chunk_event(
         title: str,
         description: Optional[str],

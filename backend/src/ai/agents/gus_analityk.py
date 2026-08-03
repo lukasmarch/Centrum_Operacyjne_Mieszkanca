@@ -18,6 +18,10 @@ GUS_CATEGORIES = [
     "transport", "bezpieczenstwo", "zdrowie", "turystyka"
 ]
 
+# Pytanie spoza statystyki. Osobna wartość, a nie None, żeby dało się ją zwrócić
+# z klasyfikatora i porównać jawnie — patrz `respond`.
+NO_CATEGORY = "brak"
+
 CATEGORY_CLASSIFY_PROMPT = """Sklasyfikuj pytanie użytkownika do jednej kategorii danych GUS.
 
 Kategorie i ich zakres:
@@ -32,7 +36,12 @@ Kategorie i ich zakres:
 - zdrowie: przychodnie, apteki, porady lekarskie
 - turystyka: noclegi, turyści, baza turystyczna
 
-Odpowiedz TYLKO nazwą kategorii (np. "bezpieczenstwo"). Jeśli pytanie dotyczy kilku — wybierz główną. Jeśli żadna nie pasuje — "demografia"."""
+- brak: pytanie NIE dotyczy statystyk liczbowych GUS. Np. "ile gmina ma sołectw",
+  "kto jest wójtem", "gdzie jest urząd", "jak załatwić dowód", "co nowego w gminie".
+  Liczba w pytaniu nie czyni go statystycznym — GUS opisuje zjawiska mierzone
+  w czasie (ludność, bezrobocie, budżet), a nie ustrój i organizację gminy.
+
+Odpowiedz TYLKO nazwą kategorii (np. "bezpieczenstwo"). Jeśli pytanie dotyczy kilku — wybierz główną. Jeśli żadna nie pasuje — "brak"."""
 
 
 class GUSAnalitykAgent(BaseAgent):
@@ -53,7 +62,13 @@ ZASADY:
 - ZAWSZE podawaj konkretne liczby i lata
 - Porownuj z powiatem i srednia krajowa jesli dostepne
 - Wyciagaj wnioski: "To oznacza, ze Rybno..."
-- Jesli nie masz danych - powiedz wprost i zaproponuj sprawdzenie innej kategorii
+- Jesli nie masz danych - powiedz wprost, czego nie wiesz, i wskaz agenta, ktory
+  sie tym zajmuje (Urzednik, Redaktor, Przewodnik, Organizator, Straznik).
+  NIE odsylaj mieszkanca do urzedu jako pierwszej odpowiedzi i NIE podstawiaj
+  statystyk, o ktore nie pytal, w miejsce brakujacej odpowiedzi
+- Zakres GUS to zjawiska mierzone w czasie. Ustroj i organizacja gminy
+  (sołectwa, wladze, jednostki, adresy) to NIE statystyka - odpowiadaj na to
+  z faktow podstawowych o gminie, ktore masz w kontekscie
 - Formatuj dane w tabelach lub punktach dla czytelnosci
 - Uzywaj markdown: **pogrubienie**, # naglowki, - listy
 - Odpowiadaj po polsku"""
@@ -74,19 +89,35 @@ ZASADY:
         user=None
     ) -> Union[dict, AsyncGenerator]:
         """Generate response using GUS DB data — no RAG, no embed_text call"""
-        from src.ai.agents.base_agent import get_datetime_context
+        from src.ai.agents.base_agent import base_context_messages
         # 1. Classify query to GUS category
         category = await self._classify_gus_query(user_message)
         logger.info(f"GUS query classified as: {category}")
 
-        # 2. Fetch GUS data
-        rows = await self._fetch_gus_rows(session, category)
-        context = self._format_gus_context(rows, category)
+        # 2. Fetch GUS data. Kategoria „brak" = pytanie spoza statystyki
+        # („ile gmina ma sołectw"). Dawniej klasyfikator w takim wypadku
+        # zwracał „demografia", więc do odpowiedzi doklejał się wykres ludności
+        # niemający nic wspólnego z pytaniem — 3.08.2026 dokładnie tak wyszło.
+        # Pusta lista wierszy zeruje też wykresy w `_build_chart_data`.
+        if category == NO_CATEGORY:
+            rows = []
+            context = (
+                "[DANE GUS] Pytanie nie dotyczy statystyk GUS — nie pobrano żadnych danych.\n"
+                "Odpowiedz na podstawie faktów podstawowych o gminie, jeśli tam jest odpowiedź. "
+                "Jeśli jej tam nie ma, powiedz krótko, czego nie wiesz, i wskaż agenta, "
+                "który się tym zajmuje: Urzędnik (dokumenty urzędowe, procedury, BIP), "
+                "Redaktor (bieżące wiadomości), Przewodnik (wydarzenia, pogoda), "
+                "Organizator (odpady, kino, przychodnia), Strażnik (awarie). "
+                "NIE odsyłaj do urzędu jako pierwszej odpowiedzi i NIE proponuj statystyk zastępczych."
+            )
+        else:
+            rows = await self._fetch_gus_rows(session, category)
+            context = self._format_gus_context(rows, category)
         charts = self._build_chart_data(rows)
 
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {"role": "system", "content": get_datetime_context()},
+            *base_context_messages(),
             {"role": "system", "content": context}
         ]
 
@@ -128,14 +159,17 @@ ZASADY:
                 max_tokens=20
             )
             category = response.choices[0].message.content.strip().lower()
-            if category in GUS_CATEGORIES:
+            if category in GUS_CATEGORIES or category == NO_CATEGORY:
                 return category
             # Try partial match
             for cat in GUS_CATEGORIES:
                 if cat in category:
                     return cat
-            return "demografia"
+            return NO_CATEGORY
         except Exception as e:
+            # Awaria klasyfikatora to nie to samo co pytanie spoza statystyki:
+            # router skierował rozmowę tutaj, więc najpewniej chodzi o dane.
+            # Zostaje dotychczasowe zachowanie zamiast pustej odpowiedzi.
             logger.error(f"Category classification failed: {e}")
             return "demografia"
 

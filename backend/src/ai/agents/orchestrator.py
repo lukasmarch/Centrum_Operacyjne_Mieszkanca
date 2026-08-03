@@ -23,14 +23,21 @@ Dostepni agenci i ich INTENCJE:
   "co sie wydarzylo?", "jakie firmy szukaja pracownikow?", "aktualnosci z gminy"
   UWAGA: oferty pracy, ogloszenia o zatrudnienie, rekrutacja w firmach -> redaktor (nie gus_analityk!)
 
-- urzednik: szuka DOKUMENTOW URZEDOWYCH lub FORMALNYCH PROCEDUR
+- urzednik: szuka DOKUMENTOW URZEDOWYCH, FORMALNYCH PROCEDUR lub USTROJU GMINY
   Przykladowe pytania: "jaka jest uchwala w sprawie...", "gdzie zlozym wniosek o...", "przetarg nr...",
-  "kiedy wchodzi w zycie regulamin...", "co mowi BIP o..."
+  "kiedy wchodzi w zycie regulamin...", "co mowi BIP o...", "program Czyste Powietrze",
+  "dofinansowanie na usuniecie eternitu", "jak zlozyc deklaracje smieciowa"
+  TU TEZ trafiaja pytania o to, JAK GMINA JEST ZBUDOWANA I KTO NIA KIERUJE:
+  "ile gmina ma solectw", "jakie sa solectwa", "kto jest wojtem", "ilu jest radnych",
+  "gdzie jest urzad gminy", "jakie sa jednostki organizacyjne", "jaki jest statut gminy"
 
 - gus_analityk: chce STATYSTYK HISTORYCZNYCH I DANYCH LICZBOWYCH z GUS
   Przykladowe pytania: "ile wynosi bezrobocie w powiecie?", "jaki jest PKB gminy?",
   "ile ludzi pracuje na 1000 mieszkancow?", "jak zmienila sie demografia?", "dane o finansach gminy"
   UWAGA: pytania o konkretne oferty pracy lub firmy szukajace pracownikow -> redaktor, NIE tutaj!
+  UWAGA: samo slowo "ile" NIE oznacza statystyki. GUS opisuje zjawiska MIERZONE W CZASIE
+  (ludnosc, bezrobocie, budzet, liczba firm). Pytania o ustroj i organizacje gminy
+  ("ile solectw", "ilu radnych", "ile szkol prowadzi gmina") -> urzednik, NIE tutaj!
 
 - przewodnik: pyta o MIEJSCA, WYDARZENIA lub POGODE
   Przykladowe pytania: "co robic w weekend?", "gdzie zjesc?", "jaka bedzie pogoda?",

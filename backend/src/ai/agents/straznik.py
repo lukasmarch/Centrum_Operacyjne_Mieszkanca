@@ -51,7 +51,7 @@ ZASADY:
         user=None
     ) -> Union[dict, AsyncGenerator]:
         """Generate response from direct DB queries — no RAG, no embed_text call"""
-        from src.ai.agents.base_agent import get_datetime_context
+        from src.ai.agents.base_agent import base_context_messages
         reports = await self._fetch_recent_reports(session)
         awarie = await self._fetch_awaria_articles(session)
         bip_docs = await self._fetch_recent_bip(session)
@@ -60,7 +60,7 @@ ZASADY:
 
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {"role": "system", "content": get_datetime_context()},
+            *base_context_messages(),
             {"role": "system", "content": f"KONTEKST:\n{context}"}
         ]
 

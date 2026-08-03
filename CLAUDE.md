@@ -76,6 +76,7 @@ Co 4h → Air Quality (Airly)
 13:00–13:45 → Popołudniowy przebieg (scraping → AI → summary → embedding)
 8:00  → Cinema Repertoire
 Niedz 3:00 → CEIDG Sync
+Niedz 4:00 → Wiedza stała z BIP (statut, procedury, podatki, programy)
 Sob 10:00 → Newsletter Weekly
 Pn-Pt 7:15 → Newsletter Daily (Premium)
 1.01/04/07/10 → GUS Statistics
@@ -115,6 +116,33 @@ do WSZYSTKICH subskrybentów (kategoria `alerty` — plan Dla Każdego, nie Prem
 - Prompt: nagłówek awarii MUSI nazwać miejscowość — „AWARIA: wyłączenie w okolicy" nie mówi
   mieszkańcowi, czy chodzi o jego dom
 - Test: `cd backend && python -m scripts.test_summary_headline [--db]`
+
+## Wiedza agentów o gminie (2026-08-03)
+**Dwie warstwy, bo to dwa różne rodzaje wiedzy.** Pytanie „ile gmina ma sołectw"
+dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykres ludności.
+- **Karta gminy** (`services/gmina_facts.py`) — fakty fundamentalne (20 sołectw, wójt,
+  15 radnych, jednostki, adres urzędu) wstrzykiwane **bezwarunkowo do KAŻDEGO agenta**
+  przez `base_agent.base_context_messages()`. NIE przez RAG: odpowiedź na takie pytanie
+  nie może zależeć od progu podobieństwa. Limit 2 kB pilnuje `scripts/test_gmina_facts.py`
+  — rozdęta karta konkuruje o uwagę modelu z materiałem źródłowym.
+  ⚠️ `alert_policy.GMINA_RYBNO_PLACES` (22 nazwy) to MIEJSCOWOŚCI, nie sołectwa (20) —
+  nie podstawiać jednej listy pod drugą
+- **`bip_documents` + `source_type="bip_static"`** — stałe działy BIP (statut, procedury,
+  podatki, ochrona środowiska/azbest, gospodarka odpadami, fundusz sołecki).
+  Osobna tabela, NIE `articles`: BIP jest w `feed_policy.LOCAL_SOURCES`, więc statut
+  z 2016 r. wjechałby na Dashboard jako świeża wiadomość
+- `scrapers/bip_knowledge.py` — bez cutoff dat, bez limitu 1000 zn., **wszystkie**
+  załączniki PDF (scraper aktualności bierze `pdf_links[0]` i gubi resztę — konkrety
+  programu dotacyjnego siedzą we wniosku i regulaminie, nie w ogłoszeniu).
+  Zakres to jawna lista `DEFAULT_SECTIONS`, nie pełzanie po drzewie
+- `content_hash` decyduje o ponownym osadzeniu — BIP odświeża strony bez zmiany treści
+- Pierwsze napełnienie: `python -m scripts.migrations.add_bip_documents`, potem
+  `python -m scripts.run_bip_knowledge` (`--dry` = podgląd bez kosztów).
+  Cały korpus ~600 tys. znaków ≈ $0,003
+- Routing: `gus_analityk` = WYŁĄCZNIE szeregi czasowe BDL; ustrój gminy → `urzednik`.
+  Klasyfikator kategorii GUS zwraca `NO_CATEGORY` zamiast domyślnej „demografii" —
+  to ona doklejała wykres ludności do niepowiązanych odpowiedzi
+- Testy: `python -m scripts.test_gmina_facts`, `python -m scripts.test_bip_knowledge [--live]`
 
 ## Struktura Backend
 

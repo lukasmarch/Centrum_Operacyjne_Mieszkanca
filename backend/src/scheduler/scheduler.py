@@ -21,6 +21,7 @@ from src.scheduler.traffic_job import run_traffic_job
 from src.scheduler.newsletter_job import run_weekly_newsletter, run_daily_newsletter
 from src.scheduler.air_quality_job import run_air_quality_job
 from src.scheduler.ceidg_job import run_ceidg_job
+from src.scheduler.bip_knowledge_job import run_bip_knowledge_job
 from src.scheduler.embedding_job import run_embedding_job
 from src.scheduler.places_job import run_places_job
 from src.scheduler.health_job import run_health_job
@@ -316,6 +317,17 @@ def start_scheduler():
         trigger=CronTrigger(day_of_week='sun', hour=3, minute=0),
         id='ceidg_sync',
         name='Sync CEIDG businesses',
+        replace_existing=True
+    )
+
+    # Wiedza stała z BIP — niedziela 4:00 (statut, procedury, podatki, programy).
+    # Tygodniowo wystarczy: te dokumenty zmieniają się kilka razy w roku,
+    # a `content_hash` i tak wycina ponowne osadzanie niezmienionej treści.
+    scheduler.add_job(
+        func=run_bip_knowledge_job,
+        trigger=CronTrigger(day_of_week='sun', hour=4, minute=0),
+        id='bip_knowledge',
+        name='Wiedza stała z BIP (statut, procedury, podatki)',
         replace_existing=True
     )
 

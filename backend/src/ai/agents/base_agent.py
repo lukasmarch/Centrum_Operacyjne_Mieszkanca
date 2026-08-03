@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.embeddings import embedding_service
 from src.config import settings
+from src.services.gmina_facts import gmina_facts
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BaseAgent")
@@ -36,6 +37,24 @@ def get_datetime_context() -> str:
         f"AKTUALNA DATA I CZAS: {day_name}, {now.day} {month_name} {now.year}, "
         f"godz. {now.strftime('%H:%M')} | Pora roku: {season}"
     )
+
+
+def base_context_messages() -> list[dict]:
+    """Wiadomości `system`, które dostaje KAŻDY agent, zanim zobaczy KONTEKST.
+
+    Pięciu agentów składa `messages` samodzielnie (GUS, Strażnik, Przewodnik,
+    Organizator mają własne `respond()`), więc karta gminy dopisana ręcznie
+    w jednym z nich prędzej czy później ominęłaby pozostałe. Jedno źródło
+    zamiast pięciu kopii: nowy agent, który użyje tego helpera, dostaje
+    komplet automatycznie.
+
+    Kolejność jest znacząca — fakty stałe idą PRZED blokiem KONTEKST, żeby
+    świeższy materiał źródłowy mógł je nadpisać (patrz `gmina_facts`).
+    """
+    return [
+        {"role": "system", "content": get_datetime_context()},
+        {"role": "system", "content": gmina_facts()},
+    ]
 
 
 class BaseAgent:
@@ -144,7 +163,7 @@ class BaseAgent:
         # 3. Build messages
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {"role": "system", "content": get_datetime_context()},
+            *base_context_messages(),
             {"role": "system", "content": f"KONTEKST:\n{context}\n\nNIE pisz [Zrodlo: ...] ani [Źródło: ...] w treści odpowiedzi — źródła są podawane automatycznie przez system."}
         ]
 
