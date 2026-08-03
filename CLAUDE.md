@@ -142,7 +142,15 @@ dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykr
 - Routing: `gus_analityk` = WYŁĄCZNIE szeregi czasowe BDL; ustrój gminy → `urzednik`.
   Klasyfikator kategorii GUS zwraca `NO_CATEGORY` zamiast domyślnej „demografii" —
   to ona doklejała wykres ludności do niepowiązanych odpowiedzi
+- **Synonimy** (`services/search_synonyms.py`) — mowa potoczna → język urzędowy, dopisywane
+  do zapytania PRZED retrievalem (`base_agent`). Pomiar: „azbest" trafiał w dokument BIP
+  z podobieństwem 0,674, „eternit" nie trafiał wcale. Termin jest dopisywany, nie
+  podmieniany (oryginał pracuje w gałęzi BM25). Słownik ma zostać krótki
 - Testy: `python -m scripts.test_gmina_facts`, `python -m scripts.test_bip_knowledge [--live]`
+- ⚠️ **BIP /112/ milczy od 16.07.2026** — to NIE awaria scrapera (sprawdzone: parsuje
+  10 pozycji, najwyższe ID 3713 = to w bazie). Gmina publikuje na FB i gminarybno.pl,
+  sam BIP nie wydał obwieszczenia. Uboczne: scraper próbuje paginacji `?start=N`,
+  a BIP używa `/112/2/` — czyta więc tylko pierwszą stronę (bez znaczenia przy cutoff 2 dni)
 
 ## Struktura Backend
 
