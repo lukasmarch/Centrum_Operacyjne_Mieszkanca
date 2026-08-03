@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.embeddings import embedding_service
 from src.config import settings
 from src.services.gmina_facts import gmina_facts
+from src.services.search_synonyms import expand_query
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BaseAgent")
@@ -98,6 +99,12 @@ class BaseAgent:
         search_query = user_message
         if conversation_history:
             search_query = await self._rewrite_query(user_message, conversation_history)
+
+        # 0b. Mieszkaniec mówi „eternit", BIP pisze „azbest" — embedding tych
+        # dwóch nie łączy (0,674 dla „azbest", zero trafień dla „eternit").
+        # Zapytanie musi zostać poprawione TU, przed retrievalem: model dostaje
+        # już tylko to, co wyszukiwarka znalazła.
+        search_query = expand_query(search_query)
 
         # 1. Retrieve candidates (szerzej niż top_k — reranker zawęzi)
         candidates = await embedding_service.hybrid_search(

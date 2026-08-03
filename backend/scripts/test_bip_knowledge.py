@@ -119,6 +119,28 @@ empty = chunker.chunk_bip_static("Statut", None, "Statut Gminy")
 check(len(empty) == 1, "dokument bez treści daje jeden chunk tytułowy")
 
 
+print("\n== Synonimy w zapytaniu ==")
+# Pomiar na produkcji 3.08.2026: „azbest" trafiał w dokument BIP z podobieństwem
+# 0,674, „eternit" nie trafiał w niego wcale. Retrieval dzieje się przed modelem,
+# więc zapytanie trzeba poprawić w kodzie.
+from src.services.search_synonyms import expand_query  # noqa: E402
+
+expanded = expand_query("czy moge dostac dofinansowanie na usuniecie eternitu z dachu")
+check("azbest" in expanded, "eternit dociąga termin 'azbest'")
+check("eternitu" in expanded, "oryginalne słowo zostaje (pracuje w BM25)")
+check("odpady komunalne" in expand_query("kiedy wywoz smieci"), "śmieci → odpady komunalne")
+check("wody" in expand_query("czy woda jest brudna"), "kolejność słów nie ma znaczenia")
+check(
+    expand_query("ile wynosi bezrobocie") == "ile wynosi bezrobocie",
+    "zapytanie bez trafienia zostaje nietknięte",
+)
+check(expand_query("") == "" and expand_query(None) == "", "puste wejście nie wywala")
+check(
+    expand_query("azbest") == "azbest",
+    "termin urzędowy nie dubluje sam siebie",
+)
+
+
 async def live() -> None:
     print("\n== Pobranie na żywo ==")
     live_scraper = BipKnowledgeScraper({
