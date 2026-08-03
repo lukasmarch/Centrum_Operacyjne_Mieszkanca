@@ -63,6 +63,8 @@ MIME_TO_EXT = {
 SLUG_RE = re.compile(r"[^a-z0-9-]+")
 SUBDIR_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
 
+CAST_SUBDIR = "cast"  # arkusze postaci — referencje wyglądu dla kie.ai
+
 
 class MediaFromUrl(BaseModel):
     source_url: str = Field(..., description="Publiczny https URL grafiki (np. wynik kie.ai)")
@@ -190,6 +192,35 @@ def store_image_bytes(content: bytes, slug: str, ext: str = ".jpg", subdir: Opti
     return {"url": _public_url(relative), "path": f"/uploads/social/{relative}", "bytes": len(content)}
 
 
+def cast_reference_url(cast_id: str) -> Optional[str]:
+    """
+    Publiczny URL arkusza postaci — to jego kie.ai dostaje jako referencję wyglądu.
+
+    Arkusze żyją w repo (backend/assets/social/cast/), bo są częścią marki i mają
+    jechać z każdym deployem. Kopiujemy je do uploads/social/cast/, bo tylko ten
+    katalog jest wystawiony przez StaticFiles — kie.ai musi pobrać plik po HTTPS,
+    więc ścieżka na dysku kontenera mu nic nie daje.
+
+    Nazwa pliku jest stała (bez uuid): arkusz to jeden byt, który się podmienia,
+    a nie kolejna grafika w magazynie.
+
+    Zwraca None, gdy arkusza brak — grafika powstanie wtedy z samego opisu w prompcie.
+    Świadomie NIE jest to błąd: post bez idealnej ciągłości twarzy jest lepszy niż
+    brak posta, a ostrzeżenie w logu wystarczy, żeby to wyłapać.
+    """
+    source = social_content.cast_reference_path(cast_id)
+    if not source.exists():
+        logger.warning(f"[social] Brak arkusza postaci {source} — grafika bez referencji")
+        return None
+
+    target = _target_dir(CAST_SUBDIR) / source.name
+    if not target.exists() or target.stat().st_size != source.stat().st_size:
+        target.write_bytes(source.read_bytes())
+        logger.info(f"[social] Opublikowano arkusz postaci {CAST_SUBDIR}/{source.name}")
+
+    return _public_url(f"{CAST_SUBDIR}/{source.name}")
+
+
 async def _latest_summary() -> dict:
     """Najnowsze dzienne podsumowanie — to samo źródło co GET /api/summary/daily."""
     async with async_session() as session:
@@ -252,8 +283,11 @@ async def get_proposal(
         return proposal
 
     proposal = await social_content.build_photo_post(summary)
+    reference = cast_reference_url(proposal["cast"])
     try:
-        temporary_url = await social_content.generate_image(proposal["prompt"])
+        temporary_url = await social_content.generate_image(
+            proposal["prompt"], references=[reference] if reference else None
+        )
     except RuntimeError as exc:
         logger.error(f"[social] kie.ai: {exc}")
         raise HTTPException(status_code=502, detail=f"Nie udało się wygenerować grafiki: {exc}")

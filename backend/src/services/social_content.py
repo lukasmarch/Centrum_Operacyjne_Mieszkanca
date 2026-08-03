@@ -16,6 +16,7 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -73,17 +74,124 @@ def build_text_post(summary: dict) -> dict:
 # social_card.compose_photo_card, naszym fontem i naszymi kolorami. Wcześniej tekst
 # wypalał model — stąd pocięte wyrazy („SPADK NIKÓW MIESZKAŃCÓW”), gubione ogonki
 # i inny krój w każdym poście. Powtarzalność marki zaczyna się od tego podziału.
+#
+# Styl (2026-08-03): naklejka komiksowa zamiast płaskiej ilustracji. Poprzedni blok
+# („flat cartoon, rounded shapes, rural Masurian setting”) w połączeniu z paletą
+# ograniczoną do granatu i błękitu dawał obrazki bez wyrazu — w feedzie FB, gdzie
+# post ma pół sekundy na zatrzymanie kciuka, przezroczyste. Teraz: postać wycięta
+# grubym białym konturem, za nią energiczne pociągnięcia pędzla, akcenty w żółci,
+# magencie i fiolecie. Granat #05080f i błękit #3a81f6 zostają, więc W2 dalej czyta
+# się jako ta sama seria co codzienna karta dnia z W1.
 BRAND_STYLE = (
-    "Flat cartoon illustration for a Polish local-news brand: rounded shapes, "
-    "bold clean outlines, simple cel shading, warm and human, no photorealism, no 3D render. "
-    "Rural Masurian setting (fields, lake, small village houses, church tower). "
-    "Strict brand palette: deep navy background (#05080f), electric blue (#3a81f6) "
-    "and light blue glow (#91c5ff) as dominant accents, warm amber only as a small "
-    "light source inside the scene. Cinematic rim light, subtle grain. "
+    "Bold western cartoon sticker illustration (comic/graffiti poster energy, NOT anime, "
+    "not photorealistic, not 3D render): thick clean black lineart, flat cel shading with "
+    "one crisp highlight, expressive slightly caricatured face, confident hand-drawn feel. "
+    "The people are cut out from the background by a THICK WHITE STICKER OUTLINE. "
+    "Background: near-black (#05080f) covered with energetic dry-brush paint strokes — "
+    "electric blue (#3a81f6) as the dominant stroke, plus a flat warm-yellow disc, "
+    "magenta dots and violet zig-zag accents scattered around the figure. "
+    "Vibrant saturated colors, high contrast, poster-like composition. "
+    # „Polish village” bez tego doprecyzowania model czytał jako skansen: chałupy
+    # z bali i strzechy. Mieszkaniec Rybna ma się w kadrze rozpoznać, a nie poczuć,
+    # że się z niego nabijamy — ta sama zasada co przy bohaterach filmów kampanii.
+    "Setting is a MODERN Polish village in Masuria: plastered and brick houses with "
+    "tidy gardens, contemporary cars, ordinary present-day clothes. "
+    "NEVER log cabins, thatched roofs, folk costumes or rustic-poverty clichés. "
     "Keep the lower third of the frame calm and uncluttered — a headline goes there. "
     "ABSOLUTELY NO text, letters, numbers, signage, captions, logos or watermarks. "
+    # Osobno o ubraniach: przy samym „no logos” model i tak wyhaftował Bartkowi
+    # logo Carhartt na kieszeni — a to cudzy znak towarowy na materiale, który
+    # publikujemy na fanpage'u.
+    "All clothing is plain and unbranded — no brand marks, badges or prints on garments. "
     "No glowing orb, no globe, no giant hand."
 )
+
+# ── Obsada: trzy stałe twarze ────────────────────────────────────────────────
+#
+# Do tej pory każda grafika wymyślała ludzi od zera, więc seria nie istniała — dwa
+# posty obok siebie wyglądały jak z dwóch różnych marek. Trzy powracające postacie
+# robią z fanpage'a ciąg dalszy: mieszkaniec rozpoznaje Olę, zanim przeczyta nagłówek.
+#
+# `look` idzie do modelu graficznego dosłownie i MUSI zostać niezmieniony — to on,
+# razem z arkuszem referencyjnym (assets/social/cast/), trzyma twarz w ryzach.
+# `kiedy` czyta gpt-4o przy wyborze postaci do zdarzenia dnia.
+CAST_ASSET_DIR = Path(__file__).parent.parent.parent / "assets" / "social" / "cast"
+
+CAST: dict[str, dict] = {
+    "kuba": {
+        "name": "Kuba",
+        "look": (
+            "KUBA, a 26-year-old white man with warm auburn hair styled up in a short quiff "
+            "with one shaved temple, round black glasses, a small black ear stud, thick "
+            "expressive eyebrows, a slight knowing smirk, wearing an open orange-and-brown "
+            "plaid flannel shirt over a mint-green t-shirt"
+        ),
+        "kiedy": "sprawdza, dopytuje, siedzi w telefonie — urząd, dane, informacje, ciekawostki, technologia",
+    },
+    "ola": {
+        "name": "Ola",
+        "look": (
+            "OLA, a 24-year-old white woman with dark-blonde hair in a high ponytail with a "
+            "blunt fringe, freckles across her nose, small gold hoop earrings, wide bright "
+            "eyes, wearing a sunny-yellow cropped windbreaker over a white t-shirt"
+        ),
+        "kiedy": "jest w środku wydarzeń — festyny, wydarzenia, weekend, sport, dobre wiadomości, ludzie",
+    },
+    "bartek": {
+        "name": "Bartek",
+        "look": (
+            "BARTEK, a 30-year-old white man with a short dark beard, a charcoal knitted "
+            "beanie, calm heavy-lidded eyes, broad shoulders, wearing a navy hoodie under "
+            "an unzipped violet work jacket"
+        ),
+        "kiedy": "ogarnia sprawy praktyczne — awarie, prąd, woda, drogi, odpady, pogoda, ostrzeżenia",
+    },
+}
+
+DEFAULT_CAST = "ola"
+
+
+def cast_member(cast_id: Optional[str]) -> tuple[str, dict]:
+    """Postać z obsady po id — z twardym fallbackiem, bo id podaje model."""
+    key = (cast_id or "").strip().lower()
+    if key not in CAST:
+        if key:
+            logger.warning(f"[social] Nieznana postać „{key}” — biorę {DEFAULT_CAST}")
+        key = DEFAULT_CAST
+    return key, CAST[key]
+
+
+def cast_reference_path(cast_id: str) -> Path:
+    """
+    Plik arkusza postaci w repo — jedno miejsce, w którym żyje ta ścieżka.
+
+    Generator (scripts/build_social_cast.py) i endpoint publikujący arkusz muszą
+    zgadzać się co do nazwy i rozszerzenia; rozjazd oznacza cichy brak referencji,
+    bo brakujący arkusz z założenia nie przerywa generowania posta.
+    """
+    return CAST_ASSET_DIR / f"{cast_id}.jpg"
+
+
+def cast_sheet_prompt(cast_id: str) -> str:
+    """
+    Prompt arkusza referencyjnego (scripts/build_social_cast.py).
+
+    Arkusz powstaje z TEGO SAMEGO bloku stylu co grafiki dnia — inaczej referencja
+    ciągnęłaby model w stronę estetyki, której potem nie odtwarzamy.
+    """
+    _, member = cast_member(cast_id)
+    return (
+        f"Character reference sheet of one single character: {member['look']}. "
+        "Two views of the SAME person side by side on one image: a large waist-up "
+        "three-quarter view on the left, and a smaller head-and-shoulders close-up on the "
+        "right. Neutral friendly expression, arms relaxed, full head visible with margin. "
+        # Arkusz to referencja CZŁOWIEKA, nie kadru. Przy tle ze scenerią model brał
+        # z niego również otoczenie i każdy post dnia dostawał te same budynki.
+        "The two figures float on a COMPLETELY EMPTY dark background with only paint "
+        "strokes and accents around them — no buildings, no houses, no street, no "
+        "landscape, no props, not even in the corners. "
+        f"{BRAND_STYLE}"
+    )
 
 CLAIM_SYSTEM_PROMPT = """Jesteś dyrektorem kreatywnym lokalnego serwisu informacyjnego RybnoLive (gmina Rybno, powiat działdowski).
 Na podstawie podsumowania dnia przygotuj materiał do grafiki na Facebooka.
@@ -91,9 +199,16 @@ Na podstawie podsumowania dnia przygotuj materiał do grafiki na Facebooka.
 Zwróć WYŁĄCZNIE JSON:
 {
   "claim": "hasło na grafikę: 2-4 PEŁNE wyrazy, DRUKOWANYMI literami, bez kropki na końcu",
-  "scene": "scena po ANGIELSKU dla modelu graficznego: KTO i CO robi, 1-2 zdania, bez tekstu na obrazku",
+  "cast": "kuba | ola | bartek — kto z obsady pasuje do tego zdarzenia",
+  "scene": "scena po ANGIELSKU dla modelu graficznego: CO ta osoba robi, 1-2 zdania, bez tekstu na obrazku",
   "caption": "treść posta na Facebooka po polsku: 2-3 zdania, konkretnie o tym co się stało, bez hashtagów i bez linku"
 }
+
+OBSADA — trzy stałe postacie serii, w każdym poście występuje DOKŁADNIE JEDNA:
+- "kuba" — sprawdza, dopytuje, siedzi w telefonie: urząd, dane, informacje, ciekawostki, technologia
+- "ola" — jest w środku wydarzeń: festyny, wydarzenia, weekend, sport, dobre wiadomości, ludzie
+- "bartek" — ogarnia sprawy praktyczne: awarie, prąd, woda, drogi, odpady, pogoda, ostrzeżenia
+Wyglądu postaci NIE opisuj — dopisujemy go sami. W "scene" pisz o niej „he” / „she”.
 
 ZASADY DLA claim — to nagłówek nakładany na grafikę:
 - musi być poprawną polską frazą, zrozumiałą bez kontekstu
@@ -104,17 +219,19 @@ ZASADY DLA claim — to nagłówek nakładany na grafikę:
   "SPADEK LICZBY MIESZKAŃCÓW GMINY RYBNO W ROKU 2026" (za długie)
 
 ZASADY DLA scene — grafika ma POKAZAĆ SYTUACJĘ, nie jej symbol:
-- ZAWSZE są na niej ludzie i ZAWSZE coś robią; scena bez postaci jest błędem
+- bohaterem jest wybrana postać z obsady, pokazana od pasa w górę lub w połowie figury,
+  blisko widza; drugi plan (sąsiedzi, sprzęt, budynki) tylko jako tło sytuacji
+- postać ZAWSZE coś robi i reaguje twarzą; sama pozująca sylwetka jest błędem
 - czynność musi wynikać wprost ze zdarzenia i oddawać jego realia:
-  • awaria, utrudnienie, ostrzeżenie → widać SKUTEK dla mieszkańców
-    (wyłączony prąd: rodzina w ciemnej kuchni przy świecach i latarce w telefonie;
-     awaria wody: sąsiedzi z kanistrami przy beczkowozie;
-     objazd: kierowcy zawracający przed zamkniętą drogą)
-  • wydarzenie, sukces, dobra wiadomość → mieszkańcy biorą w nim CZYNNY udział
-    (festyn: ludzie tańczą przy scenie, dzieci z watą cukrową;
-     inwestycja: robotnicy i mieszkańcy oglądający nowy chodnik)
+  • awaria, utrudnienie, ostrzeżenie → widać SKUTEK i reakcję
+    (wyłączony prąd: świeci sobie latarką w telefonie w ciemnej kuchni;
+     awaria wody: niesie kanister od beczkowozu;
+     objazd: zawraca przed zamkniętą drogą, ręka na kierownicy)
+  • wydarzenie, sukces, dobra wiadomość → bierze w nim CZYNNY udział
+    (festyn: klaszcze w tłumie przy scenie, w dłoni wata cukrowa;
+     inwestycja: ogląda nowy chodnik, kciuk w górę)
 - konkret zamiast metafory: NIE "a symbol of a power outage", tylko
-  "a family sitting around a candle in a dark kitchen, one child holding a phone torch"
+  "she lights a dark kitchen with her phone torch, one eyebrow raised"
 - nastrój zgodny ze zdarzeniem — przy awarii spokojna powaga, nie panika ani nie zabawa
 - bez tekstu, napisów, tablic i szyldów w kadrze
 - dolna część kadru spokojna (tam wchodzi nagłówek)
@@ -161,13 +278,24 @@ async def build_photo_post(summary: dict) -> dict:
     data = json.loads(response.choices[0].message.content)
 
     claim = (data.get("claim") or headline[:40]).strip().upper()
-    scene = (data.get("scene") or "A quiet Masurian village at golden hour").strip()
+    scene = (data.get("scene") or "she looks over a quiet Masurian village at golden hour").strip()
     caption = (data.get("caption") or highlights[:300]).strip()
+    cast_id, member = cast_member(data.get("cast"))
 
     # Model dostaje wyłącznie scenę i styl — żadnego tekstu do narysowania. Claim
     # nakładamy potem sami (social_card.compose_photo_card), więc polskie znaki
     # i krój są pewne, a nie zależne od tego, co model zrozumie z liter.
-    prompt = f"Vertical 9:16 composition. {scene} {BRAND_STYLE}"
+    #
+    # Opis postaci idzie PRZED sceną i jest powtórzony w zdaniu o referencji: samo
+    # dołączenie arkusza nie wystarcza, model traktuje go wtedy jak luźną inspirację
+    # i po kilku postach Kuba gubi okulary.
+    prompt = (
+        f"Vertical 9:16 composition. {member['look']} — {scene} "
+        # Bez wyliczanki „glasses”: przy niej model dorysowywał okulary także Bartkowi,
+        # który ich nie nosi — lista cech działa jak podpowiedź, nie jak filtr.
+        "Keep this character's face, hair and outfit EXACTLY as in the reference image, "
+        f"and add nothing they do not already wear. {BRAND_STYLE}"
+    )
 
     # Claim NIE wchodzi do treści posta — jest już wypalony na grafice, a powtórzenie
     # wyglądałoby jak błąd. (Nie używamy tu capitalize(): psuje nazwy własne — „w rybnie”.)
@@ -177,6 +305,7 @@ async def build_photo_post(summary: dict) -> dict:
         "kind": "photo",
         "message": message,
         "claim": claim,
+        "cast": cast_id,
         "prompt": prompt,
         "date": content.get("date") or summary.get("date"),
     }
@@ -189,14 +318,25 @@ async def build_photo_post(summary: dict) -> dict:
 KIE_BASE = "https://api.kie.ai/api/v1/jobs"
 KIE_POLL_INTERVAL = 5.0
 KIE_TIMEOUT_SECONDS = 180
+MAX_REFERENCE_IMAGES = 8  # limit nano-banana-pro dla image_input
 
 
-async def generate_image(prompt: str, aspect_ratio: str = "9:16", resolution: str = "2K") -> str:
+async def generate_image(
+    prompt: str,
+    aspect_ratio: str = "9:16",
+    resolution: str = "2K",
+    references: Optional[list[str]] = None,
+) -> str:
     """
     Wygeneruj grafikę w kie.ai i zwróć jej (tymczasowy!) URL.
 
     Zwracany link żyje ~24h — dlatego wywołujący MUSI go od razu zapisać u nas
     (patrz store_image_from_url w endpoints/social.py).
+
+    `references` to publiczne URL-e arkuszy postaci — tak trzymamy jedną twarz przez
+    całą serię. Pole nazywa się `image_input` (do 8 obrazów); `image_urls` z części
+    poradników dotyczy innych modeli kie.ai i tutaj zostałoby po cichu zignorowane,
+    czyli referencja przestałaby działać bez jednego błędu w logu.
     """
     if not settings.KIE_API_KEY:
         raise RuntimeError("Brak KIE_API_KEY — generowanie grafik wyłączone")
@@ -206,6 +346,7 @@ async def generate_image(prompt: str, aspect_ratio: str = "9:16", resolution: st
         "model": settings.KIE_MODEL,
         "input": {
             "prompt": prompt,
+            "image_input": (references or [])[:MAX_REFERENCE_IMAGES],
             "aspect_ratio": aspect_ratio,
             "resolution": resolution,
             "output_format": "png",

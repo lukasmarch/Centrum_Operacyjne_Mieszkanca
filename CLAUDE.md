@@ -214,6 +214,15 @@ POST /api/social/media                      # grafika z URL → uploads/social/
 **Backend robi treść, n8n tylko akceptuje i publikuje.**
 - `services/social_content.py` — treść postów, prompt graficzny, klient kie.ai (`nano-banana-pro`), `CAMPAIGN_PLAN`
 - `services/social_card.py` — **karta dnia**: grafika 1200×630 składana lokalnie (Pillow) z `headline`; 0 zł, ~0,1 s; font `backend/assets/fonts/Outfit.ttf` + kadr `backend/assets/social/orb.jpg` (`COPY assets/` w Dockerfile)
+- **Obsada grafik W2 (2026-08-03)**: trzy powracające postacie — **Kuba** (urząd, dane, ciekawostki),
+  **Ola** (wydarzenia, weekend, ludzie), **Bartek** (awarie, drogi, odpady, pogoda). Postać do zdarzenia
+  wybiera gpt-4o (`cast` w JSON-ie), wygląd trzyma arkusz referencyjny `backend/assets/social/cast/<id>.jpg`
+  podawany kie.ai w polu **`image_input`** (NIE `image_urls` — to inny model i zostałoby zignorowane bez błędu).
+  Endpoint kopiuje arkusz do `uploads/social/cast/`, bo tylko ten katalog jest publiczny.
+  Styl: naklejka komiksowa, gruby biały kontur, pociągnięcia pędzla; granat #05080f i błękit #3a81f6
+  marki + żółć/magenta/fiolet. Prompt pilnuje **nowoczesnej** wsi (bez chałup z bali) i ubrań bez cudzych logo.
+  Arkusze: `python -m scripts.build_social_cast [--only ola] [--force]`;
+  podgląd posta bez publikacji: `python -m scripts.test_social_photo [--db] [--reference URL]`
 - **Oba rodzaje postów idą jako `/photos`** (nie `/feed`) — zdjęcie zamiast karty linku; `rybnolive.pl` zostaje w treści
 - OG w `frontend/index.html`: domena `rybnolive.pl` + `og-image.jpg` 1200×630 (było `rybno.pl/icon-512.png` → pusty kwadrat pod postami)
 - Grafiki: **jedno miejsce** `uploads/social/` → `api.rybnolive.pl/uploads/social/…` (wolumen `uploads`).
