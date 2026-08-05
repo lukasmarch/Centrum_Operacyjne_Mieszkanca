@@ -238,6 +238,7 @@ async def get_articles(
         bucket = pinned if is_pinned_alert(
             article.category, article.published_at, article.scraped_at, now,
             article.event_at, article.event_until,
+            article.title, article.content,
         ) else regular
         bucket.append((article, source_name))
 

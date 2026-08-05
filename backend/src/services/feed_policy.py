@@ -16,10 +16,12 @@ Cztery mechanizmy:
 """
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, time
 from typing import Callable, Iterable, Optional, TypeVar
 
 from src.services.alert_policy import places_in
+from src.services.weather_alert import expired as weather_alert_expired
+from src.services.weather_alert import is_weather_alert
 
 # Rozpad połowiczny świeżości: po 18 h wpis waży połowę tego, co świeży
 FRESHNESS_HALFLIFE_H = 18.0
@@ -232,13 +234,45 @@ def strip_cta_tail(title: Optional[str]) -> str:
         trimmed = trimmed[:last.start()].strip()
 
 
+def _dateless_to_midday(
+    timestamp: Optional[datetime],
+    now: Optional[datetime] = None,
+) -> Optional[datetime]:
+    """
+    Data bez godziny znaczy „tego dnia", a nie „o północy".
+
+    `gminarybno.pl`, BIP i „Moje Działdowo" podają przy wpisie samą datę, więc
+    scraper zapisuje północ (pomiar 05.08.2026: 8/8 wpisów gminy, 1/1 BIP,
+    4/4 Moje Działdowo — wszystkie inne źródła mają realne godziny). Przy
+    półokresie świeżości 18 h każdy wpis urzędu wchodził do rankingu obciążony
+    kilkunastogodzinnym wiekiem, którego nie miał: ostrzeżenie meteorologiczne
+    gminy z 05.08 przegrało w feedzie z „Powiat sierpecki. Samorządowcy
+    rozmawiali o współpracy" z Radia 7 i wypadło poza pięć pozycji Dashboardu.
+
+    Południe zamiast północy to najuczciwsze przybliżenie: błąd ±6 h zamiast
+    stałego postarzania o 12–22 h. Nie sięgamy po `scraped_at`, bo ten jest
+    nadpisywany przy każdym ponownym pobraniu (`scrapers/base.py`) — wpis
+    odmładzałby się w kółko i wisiał na górze feedu tygodniami.
+    """
+    if timestamp is None or timestamp.time() != time(0, 0):
+        return timestamp
+    midday = timestamp.replace(hour=12)
+    now = now or datetime.utcnow()
+    # Nie wolno wskazać przyszłości: nad ranem południe jeszcze nie nastało,
+    # a wpis „z dzisiaj" ma być świeży, nie zapowiedziany.
+    return min(midday, now) if midday > now else midday
+
+
 def _reference_time(
     published_at: Optional[datetime],
     scraped_at: Optional[datetime],
     event_at: Optional[datetime] = None,
+    now: Optional[datetime] = None,
 ) -> Optional[datetime]:
     """Moment, względem którego liczymy wagę wpisu."""
-    return event_at or published_at or scraped_at
+    if event_at:
+        return event_at
+    return _dateless_to_midday(published_at, now) or scraped_at
 
 
 def article_score(
@@ -257,7 +291,7 @@ def article_score(
     wyłączeniu jest świeżą informacją, a nie starą.
     """
     now = now or datetime.utcnow()
-    timestamp = _reference_time(published_at, scraped_at, event_at)
+    timestamp = _reference_time(published_at, scraped_at, event_at, now)
     if timestamp is None:
         return 0.0
 
@@ -281,16 +315,30 @@ def is_pinned_alert(
     now: Optional[datetime] = None,
     event_at: Optional[datetime] = None,
     event_until: Optional[datetime] = None,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
 ) -> bool:
     """
-    Awaria na szczycie tylko wtedy, gdy dotyczy najbliższych godzin.
+    Na szczycie stoi to, co dotyczy najbliższych godzin: awaria i obowiązujące
+    ostrzeżenie meteorologiczne.
 
     Ten sam próg rozstrzyga o nagłówku briefingu — feed i briefing nie mogą
-    inaczej odpowiadać na pytanie „czy ta awaria jest sprawą teraz".
+    inaczej odpowiadać na pytanie „czy to jest sprawa teraz".
     """
+    now = now or datetime.utcnow()
+
+    # Burza, upał i wichura są sprawą najbliższych godzin dokładnie tak samo jak
+    # wyłączenie prądu, ale kategoria z AI nazywa je „Pogodą" albo „Wiadomościami",
+    # więc warunek na „awari" ich nie obejmował. Rozstrzyga treść, nie etykieta —
+    # tym bardziej że kategoria powstaje dopiero o 6:15 i 13:15, a ostrzeżenie
+    # trafia do feedu od razu. `weather_alert` zna ważność wpisu (godziny z
+    # komunikatu IMGW, w ostateczności DEFAULT_VALIDITY_H), więc alert schodzi
+    # z góry sam, gdy przestaje obowiązywać.
+    if is_weather_alert(title, content):
+        return not weather_alert_expired(title, content, published_at, event_until, now)
+
     if not category or "awari" not in category.lower():
         return False
-    now = now or datetime.utcnow()
 
     if event_at:
         if event_until and now > event_until:
