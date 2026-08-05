@@ -12,9 +12,11 @@ interface DataCacheContextType {
     getWeather: (location: string) => WeatherData | null;
     setWeather: (location: string, data: WeatherData) => void;
 
-    // Daily Summary
-    getSummary: () => DailySummary | null;
-    setSummary: (data: DailySummary) => void;
+    // Daily Summary — razem z czasem wygenerowania, bo briefing jest odświeżany
+    // po południu (13:30) i kafel pokazuje, którą wersję widzisz. Trzymanie tego
+    // poza cache sprawiało, że po trafieniu w cache znacznik znikał.
+    getSummary: () => { data: DailySummary; generatedAt: Date | null } | null;
+    setSummary: (data: DailySummary, generatedAt: Date | null) => void;
 
     // Cinema
     getCinema: (location: CinemaLocation) => CinemaRepertoire | null;
@@ -30,7 +32,7 @@ const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
 export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [weatherCache, setWeatherCache] = useState<Map<string, CacheEntry<WeatherData>>>(new Map());
-    const [summaryCache, setSummaryCache] = useState<CacheEntry<DailySummary> | null>(null);
+    const [summaryCache, setSummaryCache] = useState<CacheEntry<{ data: DailySummary; generatedAt: Date | null }> | null>(null);
     const [cinemaCache, setCinemaCache] = useState<Map<CinemaLocation, CacheEntry<CinemaRepertoire>>>(new Map());
 
     // Helper to check if cache is valid
@@ -59,16 +61,16 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         });
     };
 
-    const getSummary = (): DailySummary | null => {
+    const getSummary = () => {
         if (isCacheValid(summaryCache)) {
             return summaryCache!.data;
         }
         return null;
     };
 
-    const setSummary = (data: DailySummary) => {
+    const setSummary = (data: DailySummary, generatedAt: Date | null) => {
         setSummaryCache({
-            data,
+            data: { data, generatedAt },
             timestamp: Date.now(),
             expiresIn: CACHE_DURATION
         });

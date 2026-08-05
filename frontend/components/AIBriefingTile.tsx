@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Sparkles, ExternalLink } from 'lucide-react';
+import { ArrowRight, Sparkles, ExternalLink, RefreshCw } from 'lucide-react';
 import { useDailySummary } from '../src/hooks/useDailySummary';
 import { AppSection } from '../types';
 
@@ -20,15 +20,24 @@ function renderMarkdown(text: string): React.ReactNode {
 const AIBriefingTile: React.FC<AIBriefingTileProps> = ({ onNavigate }) => {
   const { summary, loading, lastUpdated } = useDailySummary();
 
-  const formatTimeAgo = (date: Date | null) => {
-    if (!date) return '';
-    const mins = Math.floor((Date.now() - date.getTime()) / 60000);
-    if (mins < 1) return 'przed chwilą';
-    if (mins < 60) return `${mins} min temu`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h temu`;
-    return 'wczoraj';
+  /**
+   * Godzina zegarowa, nie „5h temu". Briefing powstaje o 7:00 i jest odświeżany
+   * o 13:30 — dopiero konkretna godzina mówi, którą z tych wersji masz przed sobą.
+   * Odległość w czasie tego nie rozstrzyga, a dla wchodzącego po południu „6h temu"
+   * brzmi jak treść poranna, choć materiał jest z południa.
+   */
+  const formatUpdate = (date: Date | null) => {
+    if (!date) return null;
+    const time = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    const today = new Date();
+    const sameDay =
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+    return sameDay ? time : `wczoraj ${time}`;
   };
+
+  const updateLabel = formatUpdate(lastUpdated);
 
   return (
     <div className="h-full flex flex-col p-6 relative overflow-hidden">
@@ -48,9 +57,13 @@ const AIBriefingTile: React.FC<AIBriefingTileProps> = ({ onNavigate }) => {
             <span className="text-xs font-extrabold text-blue-400 uppercase tracking-wider">AI Daily Briefing</span>
             <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
           </div>
-          {lastUpdated && (
-            <span className="text-[10px] text-neutral-500 font-mono">
-              {formatTimeAgo(lastUpdated)}
+          {updateLabel && (
+            <span
+              className="flex items-center gap-1 text-[10px] text-neutral-500 font-mono shrink-0"
+              title={`Briefing zaktualizowany o ${updateLabel}. Powstaje o 7:00 i jest odświeżany po południu, gdy urząd i ZGK opublikują nowe informacje.`}
+            >
+              <RefreshCw size={9} className="text-neutral-600" />
+              {updateLabel}
             </span>
           )}
         </div>

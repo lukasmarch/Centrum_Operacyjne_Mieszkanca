@@ -13,6 +13,19 @@ interface DailySummaryApiResponse {
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 
+/**
+ * `generated_at` przychodzi z backendu jako naiwny UTC (`datetime.utcnow()`
+ * w `DailySummary`), czyli napis BEZ oznaczenia strefy. `new Date("2026-08-05T11:30:23")`
+ * czyta taki napis jako czas LOKALNY, więc briefing odświeżony o 13:30 wyglądał
+ * na wygenerowany o 11:30 — dwie godziny starszy, niż jest naprawdę.
+ */
+function parseUtc(raw: string): Date | null {
+    if (!raw) return null;
+    const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw);
+    const parsed = new Date(hasZone ? raw : `${raw}Z`);
+    return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function useDailySummary() {
     const { getSummary, setSummary } = useDataCache();
     const [summary, setSummaryState] = useState<DailySummary | null>(null);
@@ -25,7 +38,8 @@ export function useDailySummary() {
             // Check cache first
             const cachedSummary = getSummary();
             if (cachedSummary) {
-                setSummaryState(cachedSummary);
+                setSummaryState(cachedSummary.data);
+                setLastUpdated(cachedSummary.generatedAt);
                 setLoading(false);
                 setError(null);
                 return;
@@ -42,9 +56,10 @@ export function useDailySummary() {
                 const data: DailySummaryApiResponse = await response.json();
 
                 // The content field contains the actual summary structure
+                const generatedAt = parseUtc(data.generated_at);
                 setSummaryState(data.content);
-                setSummary(data.content); // Store in cache
-                setLastUpdated(new Date(data.generated_at));
+                setSummary(data.content, generatedAt); // Store in cache
+                setLastUpdated(generatedAt);
                 setError(null);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Błąd pobierania podsumowania');
