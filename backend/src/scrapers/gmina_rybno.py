@@ -113,7 +113,7 @@ class GminaRybnoScraper(BaseScraper):
                 try:
                     self.logger.info(f"Fetching details for: {full_url}")
                     detail_html = await self.fetch(full_url)
-                    article_data.update(self._parse_detail(detail_html))
+                    article_data.update(self._parse_detail(detail_html, title))
                     # Data pochodzi z listingu — nie nadpisujemy
                     article_data['published_at'] = published_at
                 except Exception as e:
@@ -128,10 +128,21 @@ class GminaRybnoScraper(BaseScraper):
         self.logger.info(f"Znaleziono {len(articles)} artykułów na gminarybno.pl")
         return articles
 
-    def _parse_detail(self, html: str) -> Dict:
-        """Pobiera content i główny obrazek ze strony detalu."""
+    def _parse_detail(self, html: str, listing_title: str = '') -> Dict:
+        """Pobiera content, pełny tytuł i główny obrazek ze strony detalu."""
         soup = BeautifulSoup(html, 'html.parser')
         data = {}
+
+        # Listing podaje tytuł ucięty do stałej długości („Ostrzeżenie
+        # meteorologiczne -…”), więc na kafelku widać wielokropek zamiast tego,
+        # o co chodzi. Pełna wersja siedzi w `og:title` strony szczegółowej
+        # (`<title>` i `<h1>` są bezużyteczne — oba brzmią „GminaRybno.pl”).
+        og_title = soup.find('meta', attrs={'property': 'og:title'})
+        full_title = (og_title.get('content') or '').strip() if og_title else ''
+        # Tylko gdy naprawdę jest pełniejszy. Na stronach bez własnego `og:title`
+        # trafia tam nazwa serwisu — podmiana dałaby feed samych „GminaRybno.pl”.
+        if len(full_title) > len(listing_title):
+            data['title'] = full_title
 
         content_div = soup.find('div', id='main') or soup.find('div', class_='entry-content')
         if content_div:
