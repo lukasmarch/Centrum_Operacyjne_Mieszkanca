@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 
 from src.config import settings
 from src.database.schema import Source
@@ -56,16 +56,22 @@ def filter_recent_articles(articles: list, days: int = 2) -> list:
     return filtered
 
 
-async def update_articles_job(source_filter: str = None, source_prefix: str = None, exclude_types: list = None):
+async def update_articles_job(
+    source_filter: str = None,
+    source_prefix: str = None,
+    exclude_types: list = None,
+    include_names: list = None,
+):
     """Job to scrape and update articles from all active sources.
 
     Args:
         source_filter: If provided, only scrape the source with this name.
         source_prefix: If provided, only scrape sources whose name starts with it.
         exclude_types: Pomiń źródła tych typów. Południowy przebieg pomija
-            `social_media`, bo Facebook chodzi przez płatne Apify, a profile FB
-            i tak publikują rano — dokładając przebieg dla darmowych RSS/HTML
-            (urząd, BIP, ZGK, Powiat, Energa) nie ruszamy rachunku.
+            `social_media`, bo Facebook chodzi przez płatne Apify.
+        include_names: Źródła wpuszczone MIMO `exclude_types`, po nazwie. Służy
+            do wyjęcia pojedynczych profili FB spod blokady typu — patrz
+            `run_midday_article_job`, gdzie decyduje o tym rachunek, a nie rodzaj.
     """
     logger.info("=" * 60)
     logger.info("Starting article update job...")
@@ -83,7 +89,10 @@ async def update_articles_job(source_filter: str = None, source_prefix: str = No
         # Fetch active sources (optionally filtered by name)
         query = select(Source).where(Source.status == "active")
         if exclude_types:
-            query = query.where(Source.type.notin_(exclude_types))
+            blocked = Source.type.notin_(exclude_types)
+            if include_names:
+                blocked = or_(blocked, Source.name.in_(include_names))
+            query = query.where(blocked)
         if source_filter:
             query = query.where(Source.name == source_filter)
         elif source_prefix:
@@ -104,6 +113,14 @@ async def update_articles_job(source_filter: str = None, source_prefix: str = No
         ]
 
         logger.info(f"Found {len(sources)} active sources to scrape")
+
+        # Nazwa źródła to napis wpisany ręcznie — literówka albo zmiana nazwy w bazie
+        # cicho wypisałaby profil z przebiegu i nikt by tego nie zauważył, bo job
+        # kończy się sukcesem. Zamiast tego mówi wprost, czego nie znalazł.
+        if include_names:
+            missing = set(include_names) - {s["name"] for s in sources}
+            if missing:
+                logger.warning(f"include_names bez pokrycia w bazie: {sorted(missing)}")
 
         for source in sources:
             total_sources += 1
@@ -197,14 +214,34 @@ def run_article_job():
     asyncio.run(update_articles_job())
 
 
+# Profile FB wpuszczone do przebiegu południowego mimo płatnego Apify. Wybrane
+# rachunkiem, nie rodzajem: actor rozlicza się WYŁĄCZNIE za pobrany post
+# (`PAID_ACTORS_PER_EVENT`, ~$0,007/szt.), więc koszt drugiego przebiegu jest
+# wprost proporcjonalny do wolumenu profilu. Te dwa dają ~0,8 posta dziennie
+# (≈ $0,3/mies.), podczas gdy „Facebook - Syla" to 8,6 posta dziennie — jej
+# drugi przebieg wypchnąłby rachunek poza darmowy limit $5/mies.
+MIDDAY_SOCIAL_SOURCES = [
+    "Facebook - Rybno",                      # profil gminy — ogłoszenia urzędowe
+    "Facebook - ZakladGospodarkiKomunalnej",  # odpady, woda
+]
+
+
 def run_midday_article_job():
-    """Południowy przebieg — tylko źródła darmowe (RSS/HTML).
+    """Południowy przebieg — źródła darmowe + dwa profile FB gminy.
 
     Poranny scraping o 6:00 zastaje urząd, BIP, ZGK i Powiat jeszcze przed
     publikacją, więc briefing z 7:00 powstawał wyłącznie z materiału wczorajszego.
-    Facebook pomijamy: chodzi przez płatne Apify, a profile publikują rano.
+
+    Facebook był tu pomijany w całości z uzasadnieniem „profile publikują rano".
+    Pomiar z 05.08.2026 to obalił: **83% postów FB powstaje po 8:00**, a średnie
+    opóźnienie profilu gminy między publikacją a pojawieniem się na stronie
+    wynosiło **35 godzin** (ZGK: 27 h). Ogłoszenie urzędu z południa czekało
+    do następnego poranka — w serwisie, który nazywa się „na żywo".
     """
-    asyncio.run(update_articles_job(exclude_types=["social_media"]))
+    asyncio.run(update_articles_job(
+        exclude_types=["social_media"],
+        include_names=MIDDAY_SOCIAL_SOURCES,
+    ))
 
 
 def run_energa_job():
