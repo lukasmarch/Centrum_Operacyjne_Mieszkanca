@@ -20,6 +20,8 @@ const DEFAULT_SUGGESTIONS = [
   'Co mówi BIP o przetargach?',
 ];
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
 const BG = '#05080f';
 const TOTAL_FRAMES  = 121;
 const SCALE_BOOST   = 1.08;
@@ -46,8 +48,16 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate, onSubmit }) => {
   const currentFrameRef = useRef(0);
 
   // ── suggestions ──────────────────────────────────────────────────────────
+  // Adres MUSI iść przez API_URL. Do 05.08.2026 stało tu relatywne
+  // `/api/chat/suggestions` — jedyne takie miejsce w aplikacji (ChatInterface
+  // i PromptBar robiły to poprawnie). Na produkcji rybnolive.pl NIE proxuje
+  // /api, więc Caddy odpowiadał SPA fallbackiem: index.html ze statusem 200.
+  // `r.json()` wywalał się na HTML-u, `catch` to zjadał i hero pokazywało
+  // statyczne DEFAULT_SUGGESTIONS. Uboczny koszt był większy niż sama wpadka:
+  // 45 takich żądań w tygodniu log Caddy zapisał jako `text/html` 200, czyli
+  // jako WEJŚCIA — raport ruchu zawyżał o 48% (138 zamiast 93).
   useEffect(() => {
-    fetch('/api/chat/suggestions')
+    fetch(`${API_URL}/chat/suggestions`)
       .then(r => r.json())
       .then(d => { if (d.suggestions?.length) setSuggestions(d.suggestions); })
       .catch(() => {});

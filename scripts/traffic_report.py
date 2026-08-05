@@ -53,6 +53,30 @@ BOT_MARKERS = (
 )
 LINK_PREVIEW_MARKERS = ("facebookexternalhit", "facebookcatalog", "whatsapp", "twitterbot")
 
+# Ścieżki, o które pyta wyłącznie skaner podatności. Rybnolive nie ma WordPressa
+# ani PHP, więc żądanie `/wp-login.php` czy `/.env` nie może paść przypadkiem —
+# a skanery podszywają się pod zwykłego Chrome'a, więc `BOT_MARKERS` ich nie widzi.
+# Rozpoznajemy je po tym, CZEGO szukały, nie po tym, jak się przedstawiły; jedno
+# takie żądanie dyskwalifikuje IP w całości, razem z jego wejściami na stronę główną.
+PROBE_PATHS = (
+    "wp-login",
+    "wp-admin",
+    "wp-content",
+    "wp-includes",
+    "xmlrpc",
+    "/.env",
+    "/.git",
+    "/.aws",
+    "phpmyadmin",
+    "/vendor/",
+    "/config",
+    "/index.php",
+    ".php",
+    "/admin",
+    "/shell",
+    "/cgi-bin",
+)
+
 
 def fetch_log(host: str) -> list[str]:
     """Czyta log z wolumenu Caddy przez SSH. Kontener nie ma pythona, więc
@@ -107,8 +131,38 @@ def header(headers: dict, name: str) -> str:
 
 
 def is_page_view(entry: dict) -> bool:
+    """Czy to wejście człowieka na stronę.
+
+    Sam `text/html` + 200 nie wystarcza, bo Caddy ma `try_files {path} /index.html`:
+    KAŻDA nieznana ścieżka dostaje index.html ze statusem 200 i typem text/html.
+    Nieudane wywołanie API wygląda więc identycznie jak wyświetlenie strony —
+    05.08.2026 tak właśnie 45 żądań o `/api/chat/suggestions` (relatywny fetch
+    w HeroSection, host bez proxy na /api) zawyżyło tydzień o 48%: 138 zamiast 93.
+
+    Ścieżka `/api/*` na `rybnolive.pl` NIGDY nie jest stroną — API stoi pod
+    api.rybnolive.pl. Fallback pod tym adresem to zawsze błąd po stronie kodu,
+    nie odwiedziny, i nie może wchodzić do statystyki.
+    """
     ctype = header(entry.get("resp_headers", {}), "Content-Type")
-    return entry.get("status") == 200 and ctype.startswith("text/html")
+    if entry.get("status") != 200 or not ctype.startswith("text/html"):
+        return False
+    path = urlparse(entry.get("request", {}).get("uri", "")).path
+    return not path.startswith("/api/")
+
+
+def is_machine(ua: str) -> bool:
+    """Czy to maszyna, a nie przeglądarka.
+
+    Sam brak `User-Agenta` wystarczy za dowód: każda przeglądarka go wysyła.
+    Bez tej reguły raport z 02.08 pokazał 1391 „wejść”, z czego 1101 zrobiło
+    16 adresów z chmury Azure, każdy po ~100 dziennie, wszystkie z pustym UA —
+    dopasowanie wzorca z `BOT_MARKERS` nie miało czego szukać w pustym napisie.
+    """
+    ua = ua.strip()
+    if not ua:
+        return True
+    low = ua.lower()
+    return any(m in low for m in BOT_MARKERS) or "anthropic" in low
 
 
 def main() -> None:
@@ -128,9 +182,11 @@ def main() -> None:
         days=args.days - 1
     )
 
-    views: list[dict] = []
-    previews = 0
-    bots = 0
+    # Pierwszy przebieg wyłącznie po to, by poznać skanery podatności. Muszą być
+    # znane ZANIM policzymy wejścia, bo skaner najpierw pobiera stronę główną
+    # (to wygląda jak wejście człowieka), a dopiero potem pyta o `/wp-login.php`.
+    entries: list[tuple[datetime, dict]] = []
+    probing_ips: set[str] = set()
 
     for line in lines:
         line = line.strip()
@@ -141,19 +197,30 @@ def main() -> None:
         except json.JSONDecodeError:
             continue
 
-        when = datetime.fromtimestamp(entry.get("ts", 0))
-        if when < since:
-            continue
-
         req = entry.get("request", {})
         if req.get("host") != "rybnolive.pl":
             continue
 
-        ua = header(req.get("headers", {}), "User-Agent").lower()
-        if any(m in ua for m in LINK_PREVIEW_MARKERS):
+        path = urlparse(req.get("uri", "")).path.lower()
+        if any(p in path for p in PROBE_PATHS):
+            probing_ips.add(req.get("client_ip") or req.get("remote_ip", ""))
+
+        entries.append((datetime.fromtimestamp(entry.get("ts", 0)), entry))
+
+    views: list[dict] = []
+    previews = 0
+    bots = 0
+
+    for when, entry in entries:
+        if when < since:
+            continue
+
+        req = entry.get("request", {})
+        ua = header(req.get("headers", {}), "User-Agent")
+        if any(m in ua.lower() for m in LINK_PREVIEW_MARKERS):
             previews += 1
             continue
-        if any(m in ua for m in BOT_MARKERS):
+        if is_machine(ua) or (req.get("client_ip") or req.get("remote_ip", "")) in probing_ips:
             bots += 1
             continue
         if not is_page_view(entry):
@@ -194,7 +261,7 @@ def main() -> None:
     if previews:
         print(f"  Podglądy linku FB:  {previews:>4}   (nie odwiedzający — bot pobierający og:image)")
     if bots:
-        print(f"  Roboty pominięte:   {bots:>4}")
+        print(f"  Roboty pominięte:   {bots:>4}   (w tym {len(probing_ips)} IP szukających dziur)")
 
     print("\n  Skąd przyszli")
     for src, n in Counter(v["source"] for v in views).most_common():
