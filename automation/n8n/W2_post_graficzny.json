@@ -7,13 +7,13 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "0 17 * * 2"
+              "expression": "0 17 * * 2,4"
             }
           ]
         }
       },
-      "id": "7656056d-dc4a-49e2-831b-870721c4f104",
-      "name": "Wtorki 17:00",
+      "id": "dd53c5c7-d29a-492f-802c-42fc9bc8c65c",
+      "name": "Wtorki i czwartki 17:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -27,7 +27,7 @@
         "path": "rybnolive-post-grafika-__KAMPANIA_SECRET__",
         "options": {}
       },
-      "id": "352f2aa8-360a-4cb5-998b-7ebce6552e58",
+      "id": "1f5030da-0ce3-4237-b4af-5ce061790272",
       "name": "Uruchom / ponów",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -35,7 +35,7 @@
         -220,
         180
       ],
-      "webhookId": "367d1ef8-4be4-44bc-8bcb-820cdc83f334"
+      "webhookId": "b8f9eb9b-e3d7-4f03-99b8-b8fb6fecd633"
     },
     {
       "parameters": {
@@ -46,7 +46,7 @@
           "timeout": 200000
         }
       },
-      "id": "ab6be796-03c2-419f-8861-f820a2a6e7a5",
+      "id": "0dcf8a62-bfeb-439c-a94d-87b33a325715",
       "name": "Propozycja + grafika",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -94,7 +94,7 @@
           ]
         }
       },
-      "id": "e164b315-51ae-42ee-957f-3967551b7b36",
+      "id": "afa99a25-7e15-4693-9115-4a44ea9e9fd2",
       "name": "Do akceptacji (TG)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -115,7 +115,7 @@
         "httpMethod": "GET",
         "options": {}
       },
-      "id": "a01d69b2-4d6d-4525-8f6c-da1193e1babc",
+      "id": "215d534d-f8d0-40d8-aaa8-aa83ad03de70",
       "name": "Czekaj na akceptację",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -123,7 +123,7 @@
         440,
         80
       ],
-      "webhookId": "146d9136-e24f-4d2b-9fb9-f19dabd508a0"
+      "webhookId": "5f225e07-87d3-4b1e-b539-5cbd64b66949"
     },
     {
       "parameters": {
@@ -146,7 +146,7 @@
           }
         }
       },
-      "id": "dbb49ba4-678a-4f9e-a776-56714b4e3d35",
+      "id": "cf2024a9-35e0-4f86-9833-ac29f28013ee",
       "name": "Publikuj grafikę na FB",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
@@ -170,7 +170,7 @@
           "appendAttribution": false
         }
       },
-      "id": "92654e82-909a-4405-b8e9-c86f25e7668c",
+      "id": "8920b441-c178-4f10-aa9c-b5eb8dcf0cb5",
       "name": "Potwierdzenie",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
