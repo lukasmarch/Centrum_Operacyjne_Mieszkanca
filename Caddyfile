@@ -65,4 +65,38 @@ api.rybnolive.pl {
         X-Frame-Options DENY
         Referrer-Policy strict-origin-when-cross-origin
     }
+
+    # Log API — osobny plik, bo dopiero on pokazuje, co się dzieje PO wejściu.
+    # Log strony (wyżej) widzi jeden GET i nic więcej: aplikacja to SPA, więc
+    # przejście do Aktualności, otwarcie czatu czy przewinięcie feedu nie
+    # generuje żadnego żądania do rybnolive.pl. 05.08.2026 skończyło się to
+    # wnioskiem wyssanym z palca („ludzie wchodzą i nic nie robią”), którego
+    # nie dało się ani potwierdzić, ani obalić — bo host api.rybnolive.pl nie
+    # miał ANI JEDNEGO wpisu w logu. Teraz lejek jest mierzalny.
+    #
+    # Osobny plik, nie wspólny z access.log: jedno wejście to kilkanaście
+    # wywołań API, więc przy wspólnej rotacji ruch API wypchnąłby historię
+    # wejść na długo przed upływem 7 dni.
+    #
+    # Filtr `query` wycina tokeny z adresu. Log jest już zbiorem danych
+    # osobowych (IP), ale token wypisu z newslettera działa jak klucz do konta
+    # — kto ma plik, mógłby wypisać cudzy adres. Zdejmujemy go na wejściu,
+    # zamiast liczyć na to, że nikt nie zajrzy. Nagłówki Authorization
+    # i Cookie Caddy redaguje sam.
+    log {
+        output file /data/api-access.log {
+            roll_size 20MiB
+            roll_keep 4
+            roll_keep_for 168h
+        }
+        format filter {
+            wrap json
+            fields {
+                request>uri query {
+                    delete token
+                    delete access_token
+                }
+            }
+        }
+    }
 }
