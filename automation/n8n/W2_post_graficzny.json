@@ -12,7 +12,7 @@
           ]
         }
       },
-      "id": "dd53c5c7-d29a-492f-802c-42fc9bc8c65c",
+      "id": "3620f32e-db71-4a99-9b7d-65b33f81507a",
       "name": "Wtorki i czwartki 17:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -27,7 +27,7 @@
         "path": "rybnolive-post-grafika-__KAMPANIA_SECRET__",
         "options": {}
       },
-      "id": "1f5030da-0ce3-4237-b4af-5ce061790272",
+      "id": "772cff57-f444-4e81-9608-de9718f4cc9c",
       "name": "Uruchom / ponów",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -35,7 +35,7 @@
         -220,
         180
       ],
-      "webhookId": "b8f9eb9b-e3d7-4f03-99b8-b8fb6fecd633"
+      "webhookId": "2d15e254-2958-4ff7-9af9-f34b6179dd83"
     },
     {
       "parameters": {
@@ -46,7 +46,7 @@
           "timeout": 200000
         }
       },
-      "id": "0dcf8a62-bfeb-439c-a94d-87b33a325715",
+      "id": "a9bc1f17-0a50-405a-8008-a2d760e97e56",
       "name": "Propozycja + grafika",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -94,7 +94,7 @@
           ]
         }
       },
-      "id": "afa99a25-7e15-4693-9115-4a44ea9e9fd2",
+      "id": "734ac41d-a343-41dd-9884-1a9d53fe7c23",
       "name": "Do akceptacji (TG)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -115,7 +115,7 @@
         "httpMethod": "GET",
         "options": {}
       },
-      "id": "215d534d-f8d0-40d8-aaa8-aa83ad03de70",
+      "id": "b0bee003-3ad0-4b4a-8575-88a16b945d85",
       "name": "Czekaj na akceptację",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -123,7 +123,7 @@
         440,
         80
       ],
-      "webhookId": "5f225e07-87d3-4b1e-b539-5cbd64b66949"
+      "webhookId": "ebc6ce42-d0d0-48fd-beb5-d026e85b63cf"
     },
     {
       "parameters": {
@@ -146,7 +146,7 @@
           }
         }
       },
-      "id": "cf2024a9-35e0-4f86-9833-ac29f28013ee",
+      "id": "2be99bbb-0e81-48d3-b422-3b8c6f462664",
       "name": "Publikuj grafikę na FB",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
@@ -170,7 +170,7 @@
           "appendAttribution": false
         }
       },
-      "id": "8920b441-c178-4f10-aa9c-b5eb8dcf0cb5",
+      "id": "f301235a-d46f-419a-80c5-797df1a8746f",
       "name": "Potwierdzenie",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
@@ -187,7 +187,7 @@
     }
   ],
   "connections": {
-    "Wtorki 17:00": {
+    "Wtorki i czwartki 17:00": {
       "main": [
         [
           {

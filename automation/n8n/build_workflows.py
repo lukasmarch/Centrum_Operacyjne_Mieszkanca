@@ -230,7 +230,7 @@ def build_photo_workflow():
         tg_confirm("Potwierdzenie", "✅ Post z grafiką opublikowany na fanpage'u RybnoLive.", [880, 80]),
     ]
     c = wire(
-        ("Wtorki 17:00", "Propozycja + grafika"),
+        ("Wtorki i czwartki 17:00", "Propozycja + grafika"),
         ("Uruchom / ponów", "Propozycja + grafika"),
         ("Propozycja + grafika", "Do akceptacji (TG)"),
         ("Do akceptacji (TG)", "Czekaj na akceptację"),
