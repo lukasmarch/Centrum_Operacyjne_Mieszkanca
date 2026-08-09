@@ -167,12 +167,24 @@ class BaseAgent:
 
         context = "\n\n".join(context_parts) if context_parts else "Brak kontekstu."
 
+        # 2b. Materiał, którego wyszukiwarka z definicji nie znajdzie. Pytanie
+        # „co nowego" nie ma słów, które cokolwiek wyróżniają — najbliższymi
+        # sąsiadami wektora są wpisy zawierające „nowe" i „gmina", więc Redaktor
+        # dostawał inwestycje w Stawigudzie sprzed pół roku i odpowiadał
+        # „nie mam aktualnych artykułów" przy pełnej bazie. Agent, który tego
+        # potrzebuje, dopisuje własny blok; reszta nie płaci nic.
+        extra = await self.extra_context(
+            session, user_message, {d["source_id"] for d in context_docs}
+        )
+
         # 3. Build messages
         messages = [
             {"role": "system", "content": self.system_prompt},
             *base_context_messages(),
             {"role": "system", "content": f"KONTEKST:\n{context}\n\nNIE pisz [Zrodlo: ...] ani [Źródło: ...] w treści odpowiedzi — źródła są podawane automatycznie przez system."}
         ]
+        if extra:
+            messages.append({"role": "system", "content": extra})
 
         if conversation_history:
             for msg in conversation_history[-10:]:
@@ -198,6 +210,20 @@ class BaseAgent:
             "model": self.model,
             "agent_name": self.name
         }
+
+    async def extra_context(
+        self,
+        session: AsyncSession,
+        user_message: str,
+        retrieved_ids: set,
+    ) -> Optional[str]:
+        """
+        Dodatkowy blok `system` poza RAG-iem — pusty, dopóki agent go nie nadpisze.
+
+        `retrieved_ids` to ID wpisów, które już weszły przez retrieval; agent ma
+        ich NIE powtarzać, żeby ten sam artykuł nie zajmował miejsca dwa razy.
+        """
+        return None
 
     async def _rewrite_query(self, user_message: str, conversation_history: list[dict]) -> str:
         """Przepisuje pytanie kontynuacyjne na samodzielne zapytanie do wyszukiwarki."""

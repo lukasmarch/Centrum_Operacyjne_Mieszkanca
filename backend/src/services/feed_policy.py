@@ -18,6 +18,7 @@ import re
 import unicodedata
 from datetime import datetime, time
 from typing import Callable, Iterable, Optional, TypeVar
+from zoneinfo import ZoneInfo
 
 from src.services.alert_policy import places_in
 from src.services.weather_alert import expired as weather_alert_expired
@@ -273,6 +274,61 @@ def _reference_time(
     if event_at:
         return event_at
     return _dateless_to_midday(published_at, now) or scraped_at
+
+
+# --- znacznik czasu w materiale dla modelu -----------------------------------
+
+LOCAL_TZ = ZoneInfo("Europe/Warsaw")
+_DAY_WORDS = {-1: "wczoraj", 0: "dziś", 1: "jutro", 2: "pojutrze"}
+
+
+def _local(value: datetime) -> datetime:
+    """Naiwny UTC z bazy → czas lokalny, którym mówi mieszkaniec."""
+    return value.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ)
+
+
+def time_label(
+    published_at: Optional[datetime],
+    event_at: Optional[datetime] = None,
+    event_until: Optional[datetime] = None,
+    now: Optional[datetime] = None,
+    published_prefix: str = "",
+) -> str:
+    """
+    Kiedy to jest — w postaci, w jakiej podajemy modelowi.
+
+    Bez tego model nie odróżniał wpisu sprzed godziny od wpisu sprzed doby,
+    a wyłączenie prądu ogłoszone dziesięć dni temu czytał jako starą wiadomość
+    (7.08.2026: „nie ma żadnych zgłoszeń" czterdzieści minut przed wyłączeniem).
+    Dla zdarzenia z terminem liczy się TERMIN, dla wiadomości — publikacja.
+
+    ⚠️ `summary_generator._time_label` robi to samo w nawiasach kwadratowych.
+    Scalenie wymaga przebiegu `scripts.test_summary_headline` — briefing jest
+    wrażliwy na brzmienie znaczników, więc nie robimy tego przy okazji.
+    """
+    now = now or datetime.utcnow()
+    today = _local(now).date()
+
+    if event_at:
+        start = _local(event_at)
+        span = f"{start:%H:%M}"
+        if event_until:
+            span += f"–{_local(event_until):%H:%M}"
+        word = _DAY_WORDS.get((start.date() - today).days)
+        when = f"{word} {span}" if word else f"{start:%d.%m.%Y} {span}"
+        if event_until and event_at <= now <= event_until:
+            return f"ZDARZENIE {when} — TRWA TERAZ"
+        if (event_until or event_at) < now:
+            return f"ZDARZENIE {when} — już się zakończyło"
+        return f"ZDARZENIE {when}"
+
+    if not published_at:
+        return "bez daty"
+
+    stamp = _local(published_at)
+    word = _DAY_WORDS.get((stamp.date() - today).days)
+    when = f"{word} {stamp:%H:%M}" if word else f"{stamp:%d.%m.%Y}"
+    return f"{published_prefix}{when}"
 
 
 def article_score(

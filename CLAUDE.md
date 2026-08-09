@@ -117,6 +117,71 @@ do WSZYSTKICH subskrybentów (kategoria `alerty` — plan Dla Każdego, nie Prem
   mieszkańcowi, czy chodzi o jego dom
 - Test: `cd backend && python -m scripts.test_summary_headline [--db]`
 
+## Strażnik: zdarzenie z terminem ≠ świeże ogłoszenie (2026-08-09)
+**7.08 o 8:21 mieszkaniec pyta „czy dziś nie będzie prądu", Strażnik: „nie ma żadnych
+zgłoszeń". Wyłączenie startowało o 9:00.** Wpis (art. 5060) był w bazie z `event_at`,
+kategorią Awaria i osadzony w RAG — do kontekstu nie wszedł, bo zapytanie agenta
+filtrowało po DACIE OGŁOSZENIA (`published_at >= now() - 7 dni`), a Energa ogłosiła
+wyłączenie 28.07, dziesięć dni wcześniej. Feed i briefing dostały na to `event_at`
+w lipcu (`_fetch_articles` w `summary_generator`), agent został z oknem publikacji.
+- `straznik._fetch_alert_articles` ma teraz DWA okna: awaria bez terminu → 7 dni
+  wstecz po publikacji; zdarzenie z `event_at` → od 6 h po zakończeniu do 72 h w przód,
+  **bez względu na wiek ogłoszenia**. Kolejność: najbliżej zdarzenia, nie najświeżej
+- Kontekst pokazuje TERMIN („ZDARZENIE dziś 09:00–14:00 — TRWA TERAZ"), datę ogłoszenia
+  tylko w nawiasie, oraz zasięg (`gmina Rybno` / `poza gminą` przez `is_local_article`)
+- Prompt: mając w kontekście zdarzenie zapowiedziane, agent NIE MOŻE odpowiedzieć
+  „brak awarii" bez jego wymienienia — na pytanie ogólne gubił je nawet z poprawnym kontekstem
+- ⚠️ Strażnik **nie używa RAG** (`source_types = []`) — obecność wpisu w `document_embeddings`
+  nic tu nie gwarantuje. To zapytanie SQL jest jedynym źródłem jego wiedzy o awariach
+
+## Redaktor: świeżość to nie zadanie dla wyszukiwarki (2026-08-09)
+**„Co nowego w gminie?" → „nie mam aktualnych artykułów" przy 16 wpisach z 3 dni.**
+RAG był świeży (każdy wpis z ostatnich 36 h ma chunki, ostatni zapis 13:45) — zawiódł
+retrieval: pytanie ogólne nie ma słów wyróżniających, więc sąsiadami wektora były chunki
+ze słowami „nowe" i „gmina" (Działdowo 2.08, Płośnica 25.02, Lubowidz 19.03, Stawiguda 31.03).
+`rag_recency_boost=0.25` tego nie przebija. Model **poprawnie** nie podał tego jako nowin.
+- `BaseAgent.extra_context(session, msg, retrieved_ids)` — hak na materiał, którego
+  wyszukiwarka z definicji nie znajdzie. Domyślnie `None`, więc reszta agentów nie płaci nic
+- `RedaktorAgent.extra_context` → blok **ŚWIEŻY FEED** (48 h, 8 wpisów, `feed_policy`:
+  publishable + `article_score` + `collapse_duplicates`), z etykietą `[gmina Rybno]`/`[okolice]`
+  i znacznikiem czasu; wpisy już wzięte przez RAG są pomijane (`retrieved_ids`)
+- ⚠️ Blok to ~1,5 kB, czyli tyle co cały kontekst RAG → **bramka**: wchodzi tylko przy pytaniu
+  ogólnym (`_GENERIC_QUESTION`) albo gdy retrieval dał < 3 trafienia. Przy „kiedy gra Delfin"
+  nie wchodzi wcale — ten sam argument, przez który karta gminy ma limit 2 kB
+- `feed_policy.time_label()` — jedno miejsce na znacznik „dziś 09:00–14:00 — TRWA TERAZ",
+  używa go Strażnik i Redaktor. ⚠️ `summary_generator._time_label` to nadal osobna kopia;
+  scalenie wymaga przebiegu `test_summary_headline`
+
+## Kto czyta RAG (stan 2026-08-09)
+| Agent | Wiedza | Uwagi |
+|---|---|---|
+| Redaktor | RAG `["article"]` + blok świeżego feedu | top_k 8, próg 0.35, recency 0.25 |
+| Urzędnik | RAG `["bip_static","bip","article"]` | top_k 6, próg 0.40 |
+| Strażnik / Organizator / Przewodnik / GUS | **własny SQL, zero RAG** | osadzenie wpisu nic tu nie gwarantuje |
+
+Przebieg: scraping 6:00/13:00 → AI 6:15/13:15 (`processed`) → embedding 6:50/13:45 →
+`document_embeddings`. Zapytanie: przepisanie pytania → synonimy → hybrid_search (wektor+BM25,
+próg, recency) → rerank gpt-4o-mini → KONTEKST + karta gminy. Opóźnienie publikacja→RAG:
+max ~7 h rano, ~45 min po południu (wieczorne posty FB czekają do rana).
+⚠️ **1095 chunków `event` nie czyta żaden agent** — Przewodnik bierze wydarzenia SQL-em.
+
+## Walidator odpowiedzi agentów (2026-08-09)
+`backend/scripts/test_agent_answers.py` — 11 pytań mieszkańca sprawdzanych **kontra stan bazy**.
+Oczekiwania liczy wyrocznia (własne zapytanie SQL, niezależne od kodu agenta), nie sztywna
+lista odpowiedzi: „czy dziś nie będzie prądu" jest poprawne albo błędne wyłącznie względem
+tego, co w bazie stoi na dziś.
+- Dwa etapy: **KONTEKST** (czy fakt dotarł do materiału agenta — błąd zapytania/retrievalu)
+  i **ODPOWIEDŹ** (czy model go powiedział — błąd promptu). Bez tego każdy czerwony wynik
+  to śledztwo od zera
+- `replay-07-08` odtwarza chwilę awarii (`_fetch_alert_articles(now=...)`) — jedyny przypadek
+  z datą na sztywno, bo dotyczy zdarzenia, które już było
+- Użycie: `python -m scripts.test_agent_answers [--dry] [--no-route] [--only id1,id2] [--list]`.
+  `--dry` = same wyrocznie i kontekst, bez kosztów modelu. Kod wyjścia 1 przy błędzie
+- Stan 9.08.2026 po naprawach Strażnika i Redaktora: **11/11 zielonych** na danych produkcyjnych
+- Uruchamianie na prodzie z MacBooka: `ssh -f -N -L 55432:<IP kontenera db>:5432 root@91.99.142.30`,
+  potem `DATABASE_URL=…@localhost:55432/centrum_operacyjne`. Lokalna baza jest z kwietnia
+  i nie ma nawet kolumny `event_at`
+
 ## Wiedza agentów o gminie (2026-08-03)
 **Dwie warstwy, bo to dwa różne rodzaje wiedzy.** Pytanie „ile gmina ma sołectw"
 dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykres ludności.
