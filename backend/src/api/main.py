@@ -123,6 +123,11 @@ app.include_router(voice_router)  # /api/voice/transcribe
 
 app.include_router(social_router)  # /api/social/* — propozycje postów dla n8n
 
+# Sesje Rady Gminy — skróty obrad. Publiczne widzą wyłącznie skróty zatwierdzone
+# przez człowieka; `/review/{token}` to strona akceptacji otwierana z maila.
+from src.api.endpoints.council import router as council_router
+app.include_router(council_router)  # /api/council/*
+
 @app.on_event("startup")
 async def startup_event():
     """Start scheduler and register AI agents on app startup"""

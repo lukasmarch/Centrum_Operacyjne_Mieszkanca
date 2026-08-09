@@ -33,6 +33,25 @@ class NewsletterStatus(str, Enum):
     BOUNCED = "bounced"
 
 
+class CouncilSessionStatus(str, Enum):
+    """
+    Droga skrótu sesji Rady od wykrycia nagrania do strony.
+
+    `PENDING` jest stanem docelowym joba, nie stanem przejściowym: skrót obrad
+    czeka na człowieka i sam z siebie nigdzie nie pojedzie. Powód siedzi
+    w `ai/council_summary.py` — cytat da się sprawdzić twardo (jest w transkrypcie
+    albo go nie ma), ale `description` już nie: sędzia-LLM na tym samym materiale
+    raz łapie dopisany cel działki, raz go przepuszcza. Zdania podejrzane są więc
+    tylko oznaczane, a decyzję podejmuje człowiek.
+    """
+    NEW = "new"                # wykryte nagranie, jeszcze nieprzepisane
+    PROCESSING = "processing"  # trwa transkrypcja albo skrót
+    PENDING = "pending"        # skrót gotowy, czeka na akceptację człowieka
+    PUBLISHED = "published"    # zaakceptowany, widoczny publicznie
+    REJECTED = "rejected"      # odrzucony przez człowieka, nie wraca
+    ERROR = "error"            # przebieg padł; wraca do kolejki do `MAX_ATTEMPTS`
+
+
 # ======================
 # User System Tables (Sprint 1)
 # ======================
@@ -909,3 +928,83 @@ class BipDocument(SQLModel, table=True):
     first_seen_at: datetime = Field(default_factory=datetime.utcnow)
     last_checked_at: datetime = Field(default_factory=datetime.utcnow)
     content_changed_at: Optional[datetime] = None
+
+
+# ======================
+# Sesje Rady Gminy — transkrypcja obrad (2026-08-09)
+# ======================
+
+class CouncilSession(SQLModel, table=True):
+    """
+    Jedna sesja Rady Gminy: nagranie, transkrypt, skrót i decyzja człowieka.
+
+    Osobna tabela, a nie `articles` — z tego samego powodu co `bip_documents`,
+    tylko odwrotnie ustawionego. BIP nie może wjechać do feedu, bo jest stary.
+    Skrót sesji nie może wjechać do feedu, bo **nie jest jeszcze zatwierdzony**:
+    powstaje automatycznie i do czasu akceptacji nie istnieje dla nikogo poza
+    adminem. Dopiero `status = published` czyni z niego treść.
+
+    **Transkrypt zostaje w bazie na stałe** i to nie jest zapasowa kopia.
+    Weryfikacja cytatu (`Transcript.locate`) wymaga segmentów ze znacznikami
+    czasu, więc bez nich nie da się później ani sprawdzić, czy zdanie przypisane
+    radnemu naprawdę padło, ani osadzić obrad w RAG. Przepisanie nagrania od
+    nowa kosztuje $0,52 — trzymanie ~70 kB JSON-a nie kosztuje nic.
+
+    Tożsamość niesie `external_id` = `page_id` z galerii gminy, nie URL:
+    slug podstrony zmienia się przy korekcie literówki w tytule, numer nie.
+    """
+    __tablename__ = "council_sessions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # --- skąd (galeria gminy → YouTube) ---
+    external_id: str = Field(max_length=32, unique=True, index=True)
+    title: str = Field(max_length=500)
+    session_number: Optional[str] = Field(default=None, max_length=20)  # rzymski, z tytułu
+    session_date: Optional[datetime] = Field(default=None, index=True)
+    page_url: str = Field(max_length=1000)
+    youtube_id: Optional[str] = Field(default=None, max_length=20)
+
+    # --- materiał źródłowy ---
+    duration_s: float = Field(default=0.0)
+    transcript_chars: int = Field(default=0)
+    transcript_json: Optional[str] = None  # {"segments": [{start, end, text}], ...}
+
+    # --- skrót (CouncilSummaryModel po weryfikacji, JSON) ---
+    summary_json: Optional[str] = None
+
+    # --- raport jakości; po tym admin decyduje, czy w ogóle warto czytać ---
+    quotes_total: int = Field(default=0)
+    quotes_verified: int = Field(default=0)
+    quotes_dropped: int = Field(default=0)
+    timestamps_fixed: int = Field(default=0)
+    # Druga bramka: zdania opisów konfrontowane z fragmentem nagrania.
+    # `claims_flagged_text` trzyma usunięte zdania — admin musi zobaczyć, CO
+    # model zmyślił, a nie tylko ile razy; sam licznik niczego nie uczy.
+    claims_total: int = Field(default=0)
+    claims_flagged: int = Field(default=0)
+    claims_flagged_text: Optional[str] = None
+    # Obie bramki przeszły bez zastrzeżeń. Nadal NIE znaczy „opublikuj bez
+    # czytania" — sędzia opisów przepuszcza zdania niejednoznaczne z rozmysłem
+    # (fałszywy alarm uczy ignorować ostrzeżenia), a wybór tematów do skrótu
+    # nie jest weryfikowany przez nic.
+    quotes_clean: bool = Field(default=False)
+
+    # --- decyzja człowieka ---
+    status: str = Field(default=CouncilSessionStatus.NEW.value, max_length=20, index=True)
+    # Losowy token z maila do admina. Osobno od JWT, żeby akceptacja działała
+    # z telefonu bez logowania — ten sam wzorzec co wypis z newslettera.
+    review_token: Optional[str] = Field(default=None, max_length=64, unique=True, index=True)
+    review_note: Optional[str] = Field(default=None, max_length=1000)
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[int] = Field(default=None, foreign_key="users.id")
+    published_at: Optional[datetime] = None
+
+    # --- przebieg ---
+    attempts: int = Field(default=0)
+    last_error: Optional[str] = Field(default=None, max_length=1000)
+    cost_usd: float = Field(default=0.0)
+    embedded: bool = Field(default=False, index=True)  # transkrypt w RAG (kolejny etap)
+
+    first_seen_at: datetime = Field(default_factory=datetime.utcnow)
+    processed_at: Optional[datetime] = None

@@ -22,6 +22,7 @@ from src.scheduler.newsletter_job import run_weekly_newsletter, run_daily_newsle
 from src.scheduler.air_quality_job import run_air_quality_job
 from src.scheduler.ceidg_job import run_ceidg_job
 from src.scheduler.bip_knowledge_job import run_bip_knowledge_job
+from src.scheduler.council_job import run_council_job
 from src.scheduler.embedding_job import run_embedding_job
 from src.scheduler.places_job import run_places_job
 from src.scheduler.health_job import run_health_job
@@ -328,6 +329,19 @@ def start_scheduler():
         trigger=CronTrigger(day_of_week='sun', hour=4, minute=0),
         id='bip_knowledge',
         name='Wiedza stała z BIP (statut, procedury, podatki)',
+        replace_existing=True
+    )
+
+    # Sesje Rady Gminy — codziennie 4:30, przed porannym przebiegiem scrapingu.
+    # Sesja zdarza się ~raz w miesiącu, więc job zwykle nic nie znajdzie i to jest
+    # stan normalny. Godzina jest martwa celowo: transkrypcja trzygodzinnego
+    # nagrania zajmuje kilka minut i nie ma konkurować o CPU z pipeline'em 6:00.
+    # Skrót kończy w stanie `pending` — publikuje człowiek, patrz council_job.
+    scheduler.add_job(
+        func=run_council_job,
+        trigger=CronTrigger(hour=4, minute=30),
+        id='council_sessions',
+        name='Skróty sesji Rady Gminy (do akceptacji)',
         replace_existing=True
     )
 

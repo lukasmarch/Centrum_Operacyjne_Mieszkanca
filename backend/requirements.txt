@@ -43,3 +43,9 @@ google-genai>=1.47.0
 
 # Karta dnia na Facebooka — grafika składana lokalnie (services/social_card.py)
 pillow>=10.0.0
+
+# Sesje Rady Gminy — pobieranie audio z YouTube (services/council_transcript.py).
+# Wymaga też ffmpeg w systemie: patrz apt-get w Dockerfile.
+# YouTube zmienia zasady kilka razy w roku — przy błędzie 403 zacznij od podbicia
+# tej wersji, dopiero potem grzeb w `_YTDLP_ARGS`.
+yt-dlp>=2025.10.14

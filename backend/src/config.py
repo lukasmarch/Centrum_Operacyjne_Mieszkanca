@@ -85,6 +85,13 @@ class Settings(BaseSettings):
     ADMIN_ALERT_EMAIL: Optional[str] = None        # None = alerty wyłączone (dev)
     ADMIN_ALERT_RATE_LIMIT_HOURS: int = 1          # max 1 email/job/godzinę
 
+    # Telegram — kanał akceptacji skrótów sesji Rady (scheduler/council_job.py).
+    # Ten sam bot i ten sam czat, przez który n8n podaje do akceptacji posty na FB;
+    # tu jednak dzwoni backend bezpośrednio, bo publikacja dzieje się u nas,
+    # a nie na Facebooku — n8n nie miałby czego pośredniczyć.
+    TELEGRAM_BOT_TOKEN: Optional[str] = None       # None = powiadomienia tylko mailem
+    TELEGRAM_CHAT_ID: Optional[str] = None
+
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
