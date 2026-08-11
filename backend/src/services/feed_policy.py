@@ -438,6 +438,26 @@ def _tokens(text: str) -> frozenset[str]:
     return frozenset(w for w in words if len(w) > 2 and w not in _STOPWORDS)
 
 
+def topic_signature(text: Optional[str]) -> frozenset[str]:
+    """
+    Temat wpisu w postaci porównywalnej — ten sam zbiór słów, którym feed scala
+    duplikaty. Pusty zbiór znaczy „nie da się rozstrzygnąć" i nie jest podobny
+    do niczego.
+
+    Energa publikuje każde odświeżenie wyłączenia jako osobny wiersz, więc
+    porównanie po ID nie widzi, że to wciąż ta sama zapowiedź: 7, 10 i 11.08.2026
+    briefing otworzył się tym samym wyłączeniem pod trzema różnymi ID.
+    """
+    return _tokens(text or "")
+
+
+def same_topic(a: frozenset[str], b: frozenset[str]) -> bool:
+    """Czy dwie sygnatury opisują ten sam materiał (próg wspólny z deduplikacją)."""
+    if not a or not b:
+        return False
+    return _similarity(a, b) >= SIMILARITY_THRESHOLD
+
+
 def _similarity(a: frozenset[str], b: frozenset[str]) -> float:
     if not a or not b:
         return 0.0

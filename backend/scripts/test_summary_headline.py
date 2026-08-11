@@ -26,7 +26,7 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 from src.ai.summary_generator import SummaryGenerator
-from src.services.feed_policy import is_local_article
+from src.services.feed_policy import is_local_article, topic_signature
 
 NOW = datetime(2026, 7, 29, 12, 0)
 
@@ -62,72 +62,75 @@ def article(
     )
 
 
-# (opis, materiał, nagłówek poprzedniego briefingu, ID, które ma wygrać)
-CASES: List[Tuple[str, List[SimpleNamespace], Optional[int], int]] = [
+# (opis, materiał, tytuły nagłówków ostatnich briefingów, ID, które ma wygrać)
+#
+# Pamięć jest po TEMACIE, nie po ID — kolejne odświeżenie tego samego
+# wyłączenia Energi dostaje nowy wiersz i nowe ID.
+CASES: List[Tuple[str, List[SimpleNamespace], List[str], int]] = [
     (
         "awaria dziś (za 4 h) bije lokalną kulturę",
         [article(1, "Awaria", "Wyłączenie planowane w Rybnie", ENERGA, 20, 4, 9),
          article(2, "Kultura", "Koncert w świetlicy", published_h=2)],
-        None, 1,
+        [], 1,
     ),
     (
         "awaria za dziewięć dni przegrywa z dzisiejszym transportem",
         [article(1, "Awaria", "Wyłączenie w Rybnie 7 sierpnia", ENERGA, 26, 216, 221),
          article(2, "Transport", "Zamknięcie drogi Tuczki – Koszelewy", published_h=3)],
-        None, 2,
+        [], 2,
     ),
     (
         "awaria za dziewięć dni wygrywa, gdy nie ma nic innego",
         [article(1, "Awaria", "Wyłączenie w Rybnie 7 sierpnia", ENERGA, 26, 216, 221)],
-        None, 1,
+        [], 1,
     ),
     (
         "zakończone wyłączenie nie jest nagłówkiem",
         [article(1, "Awaria", "Wyłączenie planowane w Rybnie", ENERGA, 30, -8, -2),
          article(2, "Sport", "Turniej w Rumianie", published_h=5)],
-        None, 2,
+        [], 2,
     ),
     (
         "wyłączenie trwające od dwóch godzin wygrywa",
         [article(1, "Awaria", "Wyłączenie planowane w Rybnie", ENERGA, 30, -2, 3),
          article(2, "Transport", "Zamknięcie drogi", published_h=1)],
-        None, 1,
+        [], 1,
     ),
     (
         "pożar bez terminu, sprzed dwóch godzin, wygrywa",
         [article(1, "Awaria", "Pożar stodoły w Naguszewie", published_h=2),
          article(2, "Zdrowie", "Dyżur apteki", published_h=1)],
-        None, 1,
+        [], 1,
     ),
     (
         "wyłączenie w Płośnicy (feed powiatowy) przegrywa z lokalnym sportem",
         [article(1, "Awaria", "Wyłączenie - Region Mława - Płośnica gmina wiejska", ENERGA, 20, 4, 9),
          article(2, "Sport", "Turniej w Rumianie", published_h=6)],
-        None, 2,
+        [], 2,
     ),
     (
         "wczorajszy nagłówek ustępuje innemu lokalnemu kandydatowi",
         [article(1, "Transport", "Zamknięcie drogi Tuczki – Koszelewy", published_h=1),
          article(2, "Urząd", "Nabór wniosków w gminie", published_h=6)],
-        1, 2,
+        ["Zamknięcie drogi Tuczki – Koszelewy"], 2,
     ),
     (
         "wczorajszy nagłówek wraca, gdy alternatywą jest tylko regionalny",
         [article(1, "Transport", "Zamknięcie drogi Tuczki – Koszelewy", published_h=1),
          article(2, "Urząd", "Sesja rady w Olsztynie", OLSZTYN, published_h=2)],
-        1, 1,
+        ["Zamknięcie drogi Tuczki – Koszelewy"], 1,
     ),
     (
         "trwająca awaria zostaje nagłówkiem, choć była nim wczoraj",
         [article(1, "Awaria", "Brak wody w Rybnie", ENERGA, 26, -20, 6),
          article(2, "Transport", "Zamknięcie drogi", published_h=1)],
-        1, 1,
+        ["Brak wody w Rybnie"], 1,
     ),
     (
         "bez wpisów lokalnych wygrywa regionalny o wyższym priorytecie",
         [article(1, "Kultura", "Festyn w Mławie", OLSZTYN, published_h=2),
          article(2, "Zdrowie", "Nowy oddział szpitala", OLSZTYN, published_h=8)],
-        None, 2,
+        [], 2,
     ),
     # Radio 7 i KPP obsługują cały powiat — od 11.08.2026 są w COUNTY_WIDE_SOURCES,
     # więc o lokalności wpisu rozstrzyga treść, nie nazwa źródła (audyt: 20 z 29
@@ -137,21 +140,38 @@ CASES: List[Tuple[str, List[SimpleNamespace], Optional[int], int]] = [
         [article(1, "Urząd", "Powiat żuromiński pozyskał 40 tys. zł dla seniorów",
                  RADIO7, published_h=1),
          article(2, "Kultura", "Festyn w Rumianie", published_h=8)],
-        None, 2,
+        [], 2,
     ),
     (
         "wiadomość Radia 7 o gminie Rybno zostaje lokalna i wygrywa",
         [article(1, "Urząd", "Nowy chodnik w Rybnie oddany do użytku",
                  RADIO7, published_h=1),
          article(2, "Kultura", "Festyn w Mławie", OLSZTYN, published_h=2)],
-        None, 1,
+        [], 1,
     ),
     (
         "komunikat KPP bez nazwy miejscowości przegrywa z lokalnym",
         [article(1, "Transport", "Zasady korzystania z hulajnóg elektrycznych",
                  KPP, published_h=1),
          article(2, "Urząd", "Nabór wniosków w gminie Rybno", published_h=9)],
-        None, 2,
+        [], 2,
+    ),
+    # Energa odświeża zapowiedź co kilka godzin i każde odświeżenie to nowy wiersz.
+    # Pamięć po ID tego nie widziała — to samo wyłączenie otwierało briefing
+    # 7, 10 i 11.08.2026 (audyt: 43% nagłówków tygodnia to awarie)
+    (
+        "odświeżona zapowiedź wyłączenia (nowe ID, ten sam temat) nie wraca na nagłówek",
+        [article(1, "Awaria", "Wyłączenie planowane - Region Mława - Rybno gmina wiejska",
+                 ENERGA, 26, 120, 126),
+         article(2, "Kultura", "Festyn w Rumianie", published_h=6)],
+        ["Wyłączenie planowane - Region Mława - Rybno gmina wiejska - ul. Sportowa"], 2,
+    ),
+    (
+        "temat sprzed trzech dni też blokuje, nie tylko wczorajszy",
+        [article(1, "Urząd", "Nabór wniosków na fundusz sołecki w Rybnie", published_h=1),
+         article(2, "Sport", "Turniej w Rumianie", published_h=10)],
+        ["Koncert w świetlicy",
+         "Nabór wniosków na fundusz sołecki w Rybnie"], 2,
     ),
 ]
 
@@ -189,11 +209,12 @@ def run_cases() -> int:
     print("=" * 78)
 
     failures = 0
-    for label, articles, previous_headline_id, expected in CASES:
+    for label, articles, previous_headlines, expected in CASES:
         generator = _generator({a.source_id: a.source_name for a in articles})
         _mark_local(generator, articles)
+        recent_topics = [topic_signature(title) for title in previous_headlines]
         chosen = generator._select_top_article(
-            _by_category(articles), NOW, previous_headline_id
+            _by_category(articles), NOW, recent_topics
         )
         got = chosen.id if chosen else None
         ok = got == expected
@@ -230,7 +251,7 @@ async def run_db():
             articles = await generator._fetch_articles(
                 session, date_start - timedelta(days=1), now
             )
-        previous_headline_id = await generator._previous_headline_id(session, date_start)
+        recent_topics = await generator._recent_headline_topics(session, date_start)
 
     if not articles:
         print("Brak materiału — briefing nie powstałby.")
@@ -240,14 +261,14 @@ async def run_db():
 
     grouped = _by_category(articles)
     print(f"Materiał: {len(articles)} wpisów w {len(grouped)} kategoriach")
-    print(f"Nagłówek poprzedniego briefingu: "
-          f"{f'ID:{previous_headline_id}' if previous_headline_id else '—'}\n")
+    print(f"Tematy nagłówków z ostatnich {generator.HEADLINE_MEMORY_DAYS} dni: "
+          f"{len(recent_topics)}\n")
 
     ranking = sorted(
         (
             (
                 0 if generator._is_local(a) else 1,
-                1 if a.id == previous_headline_id else 0,
+                1 if generator._repeats_recent_headline(a, recent_topics) else 0,
                 generator._headline_priority(category, a, now),
                 generator._time_distance_h(a, now),
                 category,
@@ -263,7 +284,7 @@ async def run_db():
         print(f"  {'lok' if not locality else 'reg':>7} {repeat:>9} {priority:>9} "
               f"{distance:>7.1f}h  {category:<12} ID:{item.id} {(item.title or '')[:44]}")
 
-    top = generator._select_top_article(grouped, now, previous_headline_id)
+    top = generator._select_top_article(grouped, now, recent_topics)
     print(f"\n→ NAGŁÓWEK: [ID:{top.id}] "
           f"[{'LOKALNY' if generator._is_local(top) else 'REGIONALNY'}] "
           f"kat={top.category}\n  {(top.title or '')[:100]}")

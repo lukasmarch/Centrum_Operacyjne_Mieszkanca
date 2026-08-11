@@ -21,8 +21,10 @@ from src.services.feed_policy import (
     is_local_article,
     is_pinned_alert,
     publishable_conditions,
+    same_topic,
     strip_cta_tail,
     strip_foreign_cta,
+    topic_signature,
 )
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
@@ -273,9 +275,9 @@ class SummaryGenerator:
             )
 
         # 5. Przygotuj dane wejściowe dla AI
-        previous_headline_id = await self._previous_headline_id(session, date_start)
+        recent_topics = await self._recent_headline_topics(session, date_start)
         top_article = self._select_top_article(
-            articles_by_category, now, previous_headline_id
+            articles_by_category, now, recent_topics
         )
         if top_article:
             locality = "LOKALNY" if self._is_local(top_article) else "REGIONALNY"
@@ -283,10 +285,9 @@ class SummaryGenerator:
                 f"Top article (deterministic): [ID:{top_article.id}] [{locality}] "
                 f"cat={top_article.category} '{top_article.title[:60]}'"
             )
-            if top_article.id == previous_headline_id:
+            if self._repeats_recent_headline(top_article, recent_topics):
                 self.logger.info(
-                    f"Headline repeats previous briefing [ID:{previous_headline_id}] "
-                    "— brak innego kandydata"
+                    "Headline repeats a recent briefing topic — brak innego kandydata"
                 )
         input_data = self._prepare_input_for_ai(
             date_start,
@@ -433,27 +434,51 @@ class SummaryGenerator:
         )
         return list(result.scalars().all())
 
-    async def _previous_headline_id(
+    # Ile poranków wstecz pamięta nagłówek. Trzy, bo zapowiedź wyłączenia potrafi
+    # wracać z przerwą: to samo wyłączenie otworzyło briefing 7, 10 i 11.08.2026.
+    HEADLINE_MEMORY_DAYS = 3
+
+    async def _recent_headline_topics(
         self,
         session: AsyncSession,
         date_start: datetime,
-    ) -> Optional[int]:
+        days: Optional[int] = None,
+    ) -> list:
         """
-        Artykuł, który był nagłówkiem poprzedniego briefingu — albo None.
+        Tematy, którymi otwierały się ostatnie briefingi — jako sygnatury słów.
+
+        Pamiętamy TEMAT, nie identyfikator. Energa zapisuje każde odświeżenie
+        wyłączenia jako osobny wiersz, więc porównanie po ID nie widziało, że to
+        wciąż ta sama zapowiedź: mieszkaniec dostał ten sam nagłówek 7, 10 i 11.08.2026
+        pod trzema różnymi ID, a audyt policzył awarie jako 43% nagłówków tygodnia.
 
         Okno materiału sięga wczoraj (fallback przy chudym dniu), więc bez tej
-        pamięci ten sam wpis potrafi otworzyć briefing dwa poranki z rzędu:
-        wyłączenie prądu ogłoszone 28.07.2026 wróciło jako nagłówek 29.07.
+        pamięci ten sam wpis potrafi otworzyć briefing dwa poranki z rzędu.
         """
+        days = self.HEADLINE_MEMORY_DAYS if days is None else days
         result = await session.execute(
             select(DailySummary)
             .where(DailySummary.date < date_start)
+            .where(DailySummary.date >= date_start - timedelta(days=days))
             .order_by(DailySummary.date.desc())
-            .limit(1)
         )
-        previous = result.scalar_one_or_none()
-        cited = (previous.content or {}).get("cited_articles") if previous else None
-        return cited[0].get("id") if cited else None
+        topics = []
+        for previous in result.scalars().all():
+            cited = (previous.content or {}).get("cited_articles")
+            if not cited:
+                continue
+            signature = topic_signature(cited[0].get("title"))
+            if signature:
+                topics.append(signature)
+        return topics
+
+    @staticmethod
+    def _repeats_recent_headline(article, recent_topics) -> bool:
+        """Czy wpis mówi o tym samym, co któryś z ostatnich nagłówków."""
+        if not recent_topics:
+            return False
+        signature = topic_signature(article.title)
+        return any(same_topic(signature, seen) for seen in recent_topics)
 
     def _is_local(self, article) -> bool:
         return article.id in self._local_article_ids
@@ -523,15 +548,19 @@ class SummaryGenerator:
         self,
         articles_by_category: dict,
         now: datetime,
-        previous_headline_id: Optional[int] = None,
+        recent_topics: Optional[list] = None,
     ):
         """Deterministycznie wybierz artykuł do nagłówka.
 
         Kolejność rozstrzygania:
         1. lokalny przed regionalnym — regionalny wygrywa tylko przy braku lokalnych,
-        2. nagłówek poprzedniego briefingu na końcu swojej grupy,
+        2. temat ostatnich briefingów na końcu swojej grupy,
         3. ważność kategorii (`_headline_priority`),
         4. bliskość w czasie.
+
+        Punkt 2 porównuje TEMAT (`same_topic`), nie identyfikator: kolejne
+        odświeżenie tego samego wyłączenia prądu ma nowe ID i wracało jako
+        nagłówek mimo pamięci (7, 10 i 11.08.2026).
 
         Punkt 2 nie wyklucza artykułu — przepuszcza przed nim każdego innego
         kandydata o tej samej lokalności. Gdy dzień jest chudy i alternatywy nie
@@ -547,8 +576,8 @@ class SummaryGenerator:
             for article in arts:
                 priority = self._headline_priority(category, article, now)
                 repeats = (
-                    article.id == previous_headline_id
-                    and priority != self.CATEGORY_PRIORITY["Awaria"]
+                    priority != self.CATEGORY_PRIORITY["Awaria"]
+                    and self._repeats_recent_headline(article, recent_topics)
                 )
                 key = (
                     0 if self._is_local(article) else 1,
