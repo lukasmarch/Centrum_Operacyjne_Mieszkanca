@@ -4,6 +4,11 @@ sqlmodel==0.0.14
 pydantic>=2.10.0
 pydantic-settings>=2.0.0
 pydantic-ai>=0.0.14
+# pydantic-ai 0.4.x importuje prywatne opentelemetry._events, usunięte w api 1.44.0
+# (backend nie wstawał po rebuildzie 2026-08-11); para api/semconv musi być spójna,
+# a semconv >=0.60b1 wymaga mistralai ciągnięty przez pydantic-ai
+opentelemetry-api==1.39.1
+opentelemetry-semantic-conventions==0.60b1
 asyncpg==0.29.0
 aiohttp>=3.9.0
 httpx>=0.27.2
