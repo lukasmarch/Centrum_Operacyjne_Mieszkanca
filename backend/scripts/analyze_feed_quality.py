@@ -28,6 +28,16 @@ Użycie:
 
 `--no-llm` = same warstwy 1 i 2, bez kosztów modelu.
 Skrypt jest wyłącznie do czytania bazy — nie zapisuje niczego.
+
+⚠️ CZEGO TĄ BAZĄ NIE ZMIERZYSZ: opóźnienia publikacja → pobranie.
+`scrapers/base.py` nadpisuje `scraped_at` przy KAŻDYM ponownym pobraniu, a wpis
+wisi w feedzie źródła około dwóch dni i jest w tym czasie pobierany kilka razy.
+`scraped_at - published_at` mierzy więc wiek wpisu w chwili, gdy wypadł z feedu
+źródła — nie czas reakcji scrapera. Stąd 11.08.2026 mediany 35–45 h z sufitem
+na 48 h dla WSZYSTKICH źródeł naraz i fałszywy alarm o „luce w pobraniach
+Radia 7": w tym samym czasie feed radia serwował dziesięć świeżych pozycji,
+a baza miała 121 wpisów z trzydziestu dni z najnowszym tego samego poranka.
+Cisza źródła sprawdza się porównaniem z jego feedem NA ŻYWO, nie tą kolumną.
 """
 from __future__ import annotations
 
