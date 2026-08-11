@@ -278,10 +278,29 @@ def _reference_time(
     event_at: Optional[datetime] = None,
     now: Optional[datetime] = None,
 ) -> Optional[datetime]:
-    """Moment, względem którego liczymy wagę wpisu."""
-    if event_at:
+    """
+    Moment, względem którego liczymy wagę wpisu — ten BLIŻSZY teraz.
+
+    Zapowiedź żyje dwa razy: w dniu ogłoszenia jest świeżą wiadomością, potem
+    gaśnie, a przed samym terminem wraca. Branie zawsze terminu chowało ogłoszenie
+    w chwili, gdy było najbardziej aktualne — festyn zapowiedziany dziś na koniec
+    miesiąca spadałby na dno feedu tego samego poranka, w którym gmina go ogłosiła
+    (przy `LOOKAHEAD_HALFLIFE_H` = 48 h dwadzieścia dni w przód to mnożnik 0,0007).
+
+    Ta sama zasada, którą briefing stosuje przy wyborze nagłówka
+    (`summary_generator._time_distance_h`): liczy się odległość, nie kierunek.
+    """
+    published = _dateless_to_midday(published_at, now) or scraped_at
+    if not event_at:
+        return published
+    if not published:
         return event_at
-    return _dateless_to_midday(published_at, now) or scraped_at
+
+    now = now or datetime.utcnow()
+    return min(
+        (event_at, published),
+        key=lambda stamp: abs((now - stamp).total_seconds()),
+    )
 
 
 # --- znacznik czasu w materiale dla modelu -----------------------------------

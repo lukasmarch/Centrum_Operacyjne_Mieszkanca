@@ -94,6 +94,24 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    ⚠️ TEST: czy ten wpis jest cudzą reklamą, za której publikację normalnie się płaci?
      Jeśli tak — is_promotional=true.
 
+10. Ustaw event_start, jeśli wpis ZAPOWIADA zdarzenie z konkretną datą:
+   ✅ WYPEŁNIJ (format ISO "RRRR-MM-DDTGG:MM", czas lokalny):
+   - festyn, dożynki, koncert, turniej, rajd — "27 sierpnia o 15:00" → "2026-08-27T15:00"
+   - zebranie wiejskie, sesja rady, dyżur radnego, konsultacje
+   - zapowiedziane zamknięcie drogi, objazd, zbiórka odpadów wielkogabarytowych
+   - termin składania wniosków / zapisów, jeśli wpis podaje datę graniczną
+   - daty względne przelicz wobec "Data publikacji" podanej w treści zapytania
+     ("w najbliższą sobotę", "jutro o 18:00")
+   - gdy podano samą datę bez godziny → "RRRR-MM-DDT00:00"
+   ❌ event_start=null:
+   - relacja z tego, co JUŻ SIĘ ODBYŁO ("odbył się", "wczoraj zagrali", podsumowanie)
+   - wiadomość bez terminu (wypadek, komunikat, wynik meczu, oferta pracy bez daty)
+   - sama data publikacji, godziny otwarcia urzędu, cykliczne "w każdy wtorek"
+   ⚠️ event_end wypełnij TYLKO, gdy godzina zakończenia jest wprost w tekście
+     ("10:00-14:00" → event_end "RRRR-MM-DDT14:00"). Inaczej null.
+   ⚠️ NIE ZGADUJ. Jeśli daty nie ma w tekście wprost — null. Zmyślony termin jest
+     gorszy niż jego brak: wpis wraca wtedy na górę feedu w losowym dniu.
+
 **Zasady:**
 - Jeśli artykuł pasuje do wielu kategorii, wybierz tę GŁÓWNĄ
 - **AWARIA WODY/PRĄDU/GAZU/WYPADEK → zawsze Awaria, NIGDY Transport!**

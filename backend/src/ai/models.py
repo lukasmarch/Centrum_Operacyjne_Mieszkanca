@@ -65,6 +65,23 @@ class ArticleCategory(BaseModel):
             "i wszystkiego, co jest informacją, a nie ofertą sprzedaży."
         )
     )
+    event_start: Optional[str] = Field(
+        default=None,
+        description=(
+            "Termin ZAPOWIADANEGO zdarzenia w formacie ISO 'YYYY-MM-DDTHH:MM' (czas lokalny). "
+            "Wypełnij TYLKO, gdy wpis zapowiada coś, co dopiero nastąpi, i podaje datę: "
+            "festyn, zebranie wiejskie, dyżur, zbiórka, zapisy z terminem, zamknięcie drogi. "
+            "Gdy godziny nie podano, wpisz 'YYYY-MM-DDT00:00'. "
+            "null dla relacji z tego, co już było, i dla wiadomości bez terminu."
+        )
+    )
+    event_end: Optional[str] = Field(
+        default=None,
+        description=(
+            "Koniec zapowiadanego zdarzenia w tym samym formacie — TYLKO gdy godzina "
+            "zakończenia jest wprost w tekście. Inaczej null."
+        )
+    )
 
 
 class ExtractedEvent(BaseModel):

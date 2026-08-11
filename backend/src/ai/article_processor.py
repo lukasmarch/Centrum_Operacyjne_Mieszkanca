@@ -5,6 +5,8 @@ Używa Pydantic AI do automatycznej kategoryzacji artykułów do 8 modułów tem
 ekstrakcji tagów, lokalizacji i generowania podsumowań.
 """
 import re
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from pydantic_ai import Agent
 from sqlmodel import select
@@ -14,6 +16,7 @@ from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
 from src.services import weather_alert
+from src.services.feed_policy import LOCAL_TZ
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 from src.config import settings
@@ -28,6 +31,12 @@ _GREETING_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 # Słowa, których obecność wyklucza uznanie wpisu za zapychacz — nawet po powitaniu
+# Dzień tygodnia w wejściu dla modelu — „w najbliższą sobotę" bez niego
+# jest nieprzeliczalne
+_WEEKDAYS = (
+    "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela",
+)
+
 _URGENT_WORDS = (
     'awari', 'brak wody', 'brak prądu', 'wypadek', 'pożar', 'utrudnien',
     'ostrzeżen', 'alert', 'zamknięt', 'ewakuac', 'zagrożen',
@@ -40,6 +49,45 @@ def _looks_like_filler(title: str, content: str) -> bool:
         return False
     haystack = f"{title}\n{content}".lower()
     return not any(word in haystack for word in _URGENT_WORDS)
+
+
+# Zapowiedź dalej niż pół roku w przód to prawie zawsze pomyłka modelu (zwykle
+# rok publikacji doklejony do dnia zdarzenia). Wsteczne terminy odrzucamy poza
+# marginesem doby: post o wczorajszym festynie to relacja, nie zapowiedź.
+MAX_EVENT_LOOKAHEAD_DAYS = 180
+MAX_EVENT_BACKDATE_DAYS = 1
+
+
+def _parse_event_time(
+    value: Optional[str],
+    published_at: Optional[datetime],
+) -> Optional[datetime]:
+    """
+    Termin podany przez model → naiwny UTC, albo None.
+
+    Model dostaje i zwraca czas lokalny (tak mówi wpis), baza trzyma naiwny UTC.
+    Bezpieczniki liczymy względem daty publikacji, nie „teraz": kategoryzacja
+    chodzi też po zaległościach, a wpis sprzed tygodnia ma prawo zapowiadać
+    zdarzenie sprzed pięciu dni.
+    """
+    if not value:
+        return None
+
+    try:
+        local = datetime.fromisoformat(value.strip())
+    except (ValueError, AttributeError):
+        return None
+
+    if local.tzinfo is None:
+        local = local.replace(tzinfo=LOCAL_TZ)
+    stamp = local.astimezone(timezone.utc).replace(tzinfo=None)
+
+    reference = published_at or datetime.utcnow()
+    if stamp > reference + timedelta(days=MAX_EVENT_LOOKAHEAD_DAYS):
+        return None
+    if stamp < reference - timedelta(days=MAX_EVENT_BACKDATE_DAYS):
+        return None
+    return stamp
 
 
 class ArticleProcessor:
@@ -87,7 +135,15 @@ class ArticleProcessor:
             self.logger.warning(f"Article {article.id} has no content or summary - skipping")
             return None
 
-        content = f"Title: {article.title}\n\n{text_content}"
+        # Data publikacji w treści zapytania — bez niej model nie przeliczy
+        # „w najbliższą sobotę" ani „jutro o 18:00" na konkretny termin
+        stamp = article.published_at or article.scraped_at
+        published_line = (
+            f"Data publikacji: {stamp.replace(tzinfo=timezone.utc).astimezone(LOCAL_TZ):%Y-%m-%d %H:%M} "
+            f"({_WEEKDAYS[stamp.weekday()]})\n"
+            if stamp else ""
+        )
+        content = f"{published_line}Title: {article.title}\n\n{text_content}"
 
         try:
             # Wywołaj AI agent z retry logic
@@ -136,6 +192,27 @@ class ArticleProcessor:
                 self.logger.info(
                     f"Weather alert {article.id}: ważne do {end} (UTC)"
                 )
+
+            # Zapowiedź z terminem rankuje się terminem, nie datą ogłoszenia
+            # (`feed_policy._reference_time`). Do 11.08.2026 `event_at` ustawiała
+            # wyłącznie Energa przy scrapowaniu i alerty meteo wyżej — 11 wpisów
+            # na 264 z miesiąca. Festyn zapowiedziany na sobotę wypadał z feedu
+            # w czwartek, bo liczył się wiek ogłoszenia.
+            # Energa i meteo mają pierwszeństwo: ich termin pochodzi z komunikatu,
+            # nie z odczytu modelu.
+            if article.event_at is None and article.event_until is None:
+                start = _parse_event_time(
+                    category_data.event_start, article.published_at
+                )
+                if start:
+                    article.event_at = start
+                    article.event_until = _parse_event_time(
+                        category_data.event_end, article.published_at
+                    )
+                    self.logger.info(
+                        f"Event {article.id}: termin {start} (UTC) "
+                        f"[{category_data.primary_category}]"
+                    )
 
             usage = result.usage()
             log_api_cost(
