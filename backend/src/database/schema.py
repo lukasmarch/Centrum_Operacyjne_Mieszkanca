@@ -192,6 +192,12 @@ class Article(SQLModel, table=True):
     # przyszły tydzień wypadała z feedu, zanim zdarzenie nastąpiło.
     event_at: Optional[datetime] = None
     event_until: Optional[datetime] = None
+    # Ocena treści z kategoryzacji (lokalność + użyteczność, 0–6). NULL = nieocenione
+    # i daje mnożnik neutralny w `feed_policy.article_score`. Bez tego czynnika
+    # ranking widział wyłącznie wagę źródła i świeżość, więc wygrywał kanał
+    # publikujący najczęściej — pomiar 11.08.2026: pierwsza piątka Dashboardu
+    # gorsza od średniej materiału w trzech wymiarach na cztery.
+    content_score: Optional[int] = None
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
     category: Optional[str] = Field(default=None, max_length=100)
     tags: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAY(String)))

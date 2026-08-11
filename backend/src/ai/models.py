@@ -65,6 +65,27 @@ class ArticleCategory(BaseModel):
             "i wszystkiego, co jest informacją, a nie ofertą sprzedaży."
         )
     )
+    locality: int = Field(
+        default=0, ge=0, le=3,
+        description=(
+            "Na ile wpis dotyczy gminy Rybno i jej mieszkańców. "
+            "3 = dzieje się w gminie Rybno lub bezpośrednio jej dotyczy; "
+            "2 = sąsiednia gmina powiatu działdowskiego, mieszkaniec Rybna to odczuje "
+            "(Działdowo, Lidzbark, Płośnica, Iłowo); "
+            "1 = powiat lub region bez związku z gminą; "
+            "0 = poza powiatem (Żuromin, Mława, Olsztyn) albo temat ogólnopolski."
+        )
+    )
+    usefulness: int = Field(
+        default=0, ge=0, le=3,
+        description=(
+            "Czy mieszkaniec może z tym wpisem coś zrobić. "
+            "3 = wymaga działania lub decyzji (termin, awaria, nabór, zmiana godzin); "
+            "2 = konkret przydatny (co, gdzie, kiedy — wydarzenie, inwestycja, oferta pracy); "
+            "1 = warto wiedzieć, ale nic z tego nie wynika (relacja, wynik, ciekawostka); "
+            "0 = nic nie wnosi."
+        )
+    )
     event_start: Optional[str] = Field(
         default=None,
         description=(

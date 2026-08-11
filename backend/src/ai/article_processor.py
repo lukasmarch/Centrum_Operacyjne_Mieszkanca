@@ -174,6 +174,10 @@ class ArticleProcessor:
                 article.title, text_content
             )
             article.is_promotional = category_data.is_promotional
+            # Trzeci czynnik rankingu obok wagi źródła i świeżości — patrz
+            # `feed_policy.content_factor`. Liczony RAZ, tutaj, bo ranking feedu
+            # chodzi przy każdym żądaniu i nie może pytać modelu.
+            article.content_score = category_data.locality + category_data.usefulness
             article.processed = True
 
             # Ostrzeżenie meteo obowiązuje do godziny wpisanej w jego treść

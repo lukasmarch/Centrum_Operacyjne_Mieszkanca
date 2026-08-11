@@ -173,6 +173,7 @@ STYL: obiektywny, dziennikarski, rzeczowy. Max 3-4 akapity. Odpowiadaj po polsku
                 now,
                 row[0].event_at,
                 row[0].event_until,
+                row[0].content_score,
             ),
             reverse=True,
         )

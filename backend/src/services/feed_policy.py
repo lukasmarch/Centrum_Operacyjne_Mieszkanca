@@ -358,6 +358,25 @@ def time_label(
     return f"{published_prefix}{when}"
 
 
+# Ocena treści (`articles.content_score`, 0–6 = lokalność + użyteczność) przełożona
+# na mnożnik. Zakres 0,7–1,3 dobrany celowo umiarkowanie: przy półokresie świeżości
+# 18 h odpowiada przesunięciu o ~±9 h, więc przestawia kolejność w obrębie doby,
+# ale nie wskrzesza wpisu sprzed tygodnia. Wpis nieoceniony (NULL — wszystko sprzed
+# 11.08.2026 i wszystko przed przebiegiem kategoryzacji) dostaje 1,0 i zachowuje
+# dotychczasową pozycję.
+CONTENT_FACTOR_BASE = 0.7
+CONTENT_FACTOR_STEP = 0.1
+MAX_CONTENT_SCORE = 6
+
+
+def content_factor(content_score: Optional[int]) -> float:
+    """Mnożnik jakości treści; brak oceny = 1,0 (neutralnie)."""
+    if content_score is None:
+        return 1.0
+    score = max(0, min(MAX_CONTENT_SCORE, content_score))
+    return CONTENT_FACTOR_BASE + CONTENT_FACTOR_STEP * score
+
+
 def article_score(
     published_at: Optional[datetime],
     scraped_at: Optional[datetime],
@@ -365,13 +384,20 @@ def article_score(
     now: Optional[datetime] = None,
     event_at: Optional[datetime] = None,
     event_until: Optional[datetime] = None,
+    content_score: Optional[int] = None,
 ) -> float:
     """
-    Waga źródła × odległość w czasie od momentu, który dla mieszkańca się liczy.
+    Waga źródła × świeżość × ocena treści.
 
-    Dla zwykłej wiadomości to data publikacji. Dla zdarzenia z terminem
-    (wyłączenie prądu) — sam termin: ogłoszenie sprzed trzech tygodni o jutrzejszym
-    wyłączeniu jest świeżą informacją, a nie starą.
+    Świeżość liczy się od momentu, który dla mieszkańca się liczy: dla zwykłej
+    wiadomości to publikacja, dla zapowiedzi — to z dwóch (publikacja, termin),
+    co bliżej teraz.
+
+    Trzeci czynnik dołożony 11.08.2026 po audycie tygodnia. Bez niego ranking
+    widział tylko to, JAK CZĘSTO źródło publikuje, i pierwsza piątka Dashboardu
+    wychodziła gorsza od średniej materiału w lokalności, konkrecie i przyciąganiu.
+    Ocenę liczy raz kategoryzacja (`ai/article_processor`), bo ranking chodzi przy
+    każdym żądaniu feedu i nie może pytać modelu.
     """
     now = now or datetime.utcnow()
     timestamp = _reference_time(published_at, scraped_at, event_at, now)
@@ -388,7 +414,7 @@ def article_score(
     if event_until and now > event_until:
         freshness *= 0.25
 
-    return source_weight(source_name) * freshness
+    return source_weight(source_name) * freshness * content_factor(content_score)
 
 
 def is_pinned_alert(

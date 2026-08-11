@@ -228,7 +228,7 @@ async def get_articles(
     rows.sort(
         key=lambda row: article_score(
             row[0].published_at, row[0].scraped_at, row[1], now,
-            row[0].event_at, row[0].event_until,
+            row[0].event_at, row[0].event_until, row[0].content_score,
         ),
         reverse=True,
     )
@@ -256,7 +256,7 @@ async def get_articles(
         regular + overflow,
         key=lambda row: article_score(
             row[0].published_at, row[0].scraped_at, row[1], now,
-            row[0].event_at, row[0].event_until,
+            row[0].event_at, row[0].event_until, row[0].content_score,
         ),
         reverse=True,
     )

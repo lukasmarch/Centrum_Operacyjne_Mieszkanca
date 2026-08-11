@@ -88,6 +88,7 @@ class Art:
     scraped_at: Optional[datetime]
     event_at: Optional[datetime]
     event_until: Optional[datetime]
+    content_score: Optional[int]
     is_filler: bool
     is_promotional: bool
     processed: bool
@@ -129,7 +130,8 @@ def fetch(conn, days: int) -> list[Art]:
         """
         SELECT a.id, a.source_id, s.name, a.title, a.display_title, a.content,
                a.summary, a.url, a.category, a.published_at, a.scraped_at,
-               a.event_at, a.event_until, a.is_filler, a.is_promotional, a.processed
+               a.event_at, a.event_until, a.content_score,
+               a.is_filler, a.is_promotional, a.processed
         FROM articles a JOIN sources s ON s.id = a.source_id
         WHERE a.published_at >= now() - make_interval(days => %s)
            OR a.scraped_at   >= now() - make_interval(days => %s)
@@ -213,7 +215,8 @@ def simulate_feed(articles: list[Art], now: datetime, limit: int = 50) -> list[A
 
     def score(a: Art) -> float:
         return article_score(
-            a.published_at, a.scraped_at, a.source_name, now, a.event_at, a.event_until
+            a.published_at, a.scraped_at, a.source_name, now, a.event_at, a.event_until,
+            a.content_score,
         )
 
     rows.sort(key=score, reverse=True)

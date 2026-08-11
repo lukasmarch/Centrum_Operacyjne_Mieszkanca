@@ -94,7 +94,26 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    ⚠️ TEST: czy ten wpis jest cudzą reklamą, za której publikację normalnie się płaci?
      Jeśli tak — is_promotional=true.
 
-10. Ustaw event_start, jeśli wpis ZAPOWIADA zdarzenie z konkretną datą:
+10. Oceń wpis dwiema liczbami 0-3 — decydują o kolejności w feedzie:
+   **locality** — na ile to sprawa gminy Rybno:
+   3 = dzieje się w gminie Rybno (Rybno, Żabiny, Rumian, Koszelewy, Tuczki, Naguszewo,
+       Gronowo, Hartowiec, Truszczyny, Dębień, Grabacz, Wery, Jeglia, Kopaniarze…)
+       albo wprost jej dotyczy (decyzja urzędu, ZGK, szkoła w gminie)
+   2 = sąsiednia gmina powiatu działdowskiego (Działdowo, Lidzbark, Płośnica, Iłowo,
+       Rybno-okolice) — mieszkaniec Rybna to odczuje: droga, szpital, urząd powiatowy
+   1 = powiat lub województwo bez związku z gminą
+   0 = poza powiatem (Żuromin, Mława, Olsztyn, Sierpc) albo temat ogólnopolski
+   **usefulness** — czy mieszkaniec może z tym coś zrobić:
+   3 = wymaga działania lub uwagi (awaria, termin składania wniosku, nabór, zmiana
+       godzin urzędu, objazd, zapisy)
+   2 = konkret z odpowiedzią na co/gdzie/kiedy (wydarzenie z datą, inwestycja, oferta
+       pracy, nowa firma, harmonogram)
+   1 = warto wiedzieć, ale nic z tego nie wynika (relacja z imprezy, wynik meczu,
+       sukces ucznia, ciekawostka)
+   0 = nie wnosi nic
+   ⚠️ Oceniaj to, co JEST w tekście. Wpis bez nazwy miejscowości ma locality najwyżej 1,
+     nawet jeśli źródło jest lokalne — nie zgaduj, że „to pewnie u nas".
+11. Ustaw event_start, jeśli wpis ZAPOWIADA zdarzenie z konkretną datą:
    ✅ WYPEŁNIJ (format ISO "RRRR-MM-DDTGG:MM", czas lokalny):
    - festyn, dożynki, koncert, turniej, rajd — "27 sierpnia o 15:00" → "2026-08-27T15:00"
    - zebranie wiejskie, sesja rady, dyżur radnego, konsultacje
