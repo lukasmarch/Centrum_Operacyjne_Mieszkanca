@@ -33,6 +33,8 @@ NOW = datetime(2026, 7, 29, 12, 0)
 ENERGA = "Energa - wyłączenia planowane (RSS)"
 RYBNO = "Facebook - Rybno"
 OLSZTYN = "Radio Olsztyn (RSS)"
+RADIO7 = "Radio 7 Działdowo (RSS)"
+KPP = "KPP Działdowo (RSS)"
 
 
 def article(
@@ -125,6 +127,30 @@ CASES: List[Tuple[str, List[SimpleNamespace], Optional[int], int]] = [
         "bez wpisów lokalnych wygrywa regionalny o wyższym priorytecie",
         [article(1, "Kultura", "Festyn w Mławie", OLSZTYN, published_h=2),
          article(2, "Zdrowie", "Nowy oddział szpitala", OLSZTYN, published_h=8)],
+        None, 2,
+    ),
+    # Radio 7 i KPP obsługują cały powiat — od 11.08.2026 są w COUNTY_WIDE_SOURCES,
+    # więc o lokalności wpisu rozstrzyga treść, nie nazwa źródła (audyt: 20 z 29
+    # wpisów Radia 7 nie dotyczyło gminy, a briefing otwierał się nimi)
+    (
+        "wiadomość Radia 7 o Żurominie przegrywa z lokalnym wydarzeniem",
+        [article(1, "Urząd", "Powiat żuromiński pozyskał 40 tys. zł dla seniorów",
+                 RADIO7, published_h=1),
+         article(2, "Kultura", "Festyn w Rumianie", published_h=8)],
+        None, 2,
+    ),
+    (
+        "wiadomość Radia 7 o gminie Rybno zostaje lokalna i wygrywa",
+        [article(1, "Urząd", "Nowy chodnik w Rybnie oddany do użytku",
+                 RADIO7, published_h=1),
+         article(2, "Kultura", "Festyn w Mławie", OLSZTYN, published_h=2)],
+        None, 1,
+    ),
+    (
+        "komunikat KPP bez nazwy miejscowości przegrywa z lokalnym",
+        [article(1, "Transport", "Zasady korzystania z hulajnóg elektrycznych",
+                 KPP, published_h=1),
+         article(2, "Urząd", "Nabór wniosków w gminie Rybno", published_h=9)],
         None, 2,
     ),
 ]

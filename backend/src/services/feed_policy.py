@@ -73,14 +73,22 @@ SOURCE_WEIGHTS: dict[str, float] = {
     "Facebook - Panorama Regionu": 0.85,
 }
 
-# Feedy wojewódzkie zawężone filtrem słów kluczowych do powiatu — o lokalności
-# pojedynczego wpisu rozstrzyga jego treść, nie nazwa źródła. Feed Energi obejmuje
-# Region Mława (Płośnica, Iłowo, Lidzbark…), więc samo „to Energa" nie znaczy
-# „to nasze": 29.07.2026 briefing zapowiedział mieszkańcom Rybna wyłączenie prądu
+# Źródła o zasięgu szerszym niż gmina — o lokalności pojedynczego wpisu
+# rozstrzyga jego treść, nie nazwa źródła. Feed Energi obejmuje Region Mława
+# (Płośnica, Iłowo, Lidzbark…), więc samo „to Energa" nie znaczy „to nasze":
+# 29.07.2026 briefing zapowiedział mieszkańcom Rybna wyłączenie prądu
 # w Płośnicy jako lokalną awarię.
+#
+# KPP i Radio 7 dopisane po audycie z 11.08.2026: obsługują cały powiat i kawałek
+# sąsiednich, a kod liczył każdy ich wpis jako lokalny po samej nazwie źródła.
+# Pomiar tygodnia: 20 z 29 wpisów Radia 7 i 6 z 22 wpisów KPP nie dotyczyło gminy
+# (Żuromin, Mława, Lidzbark) — stąd rozjazd między lokalnością raportowaną (77%)
+# a realną (~26%). Nagłówek briefingu otwierał się nimi jak wiadomością z Rybna.
 COUNTY_WIDE_SOURCES: frozenset[str] = frozenset({
     "Energa - wyłączenia bieżące (RSS)",
     "Energa - wyłączenia planowane (RSS)",
+    "KPP Działdowo (RSS)",
+    "Radio 7 Działdowo (RSS)",
 })
 
 # Źródła dotyczące bezpośrednio gminy Rybno i powiatu działdowskiego.
