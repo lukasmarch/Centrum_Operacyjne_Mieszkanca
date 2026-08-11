@@ -136,11 +136,25 @@ class Art:
 def fetch(conn, days: int) -> list[Art]:
     """Wszystko z okna, łącznie z odrzutami — udział odrzutów jest wynikiem."""
     cur = conn.cursor()
+
+    # Ten skrypt jest testem regresji dla zmian w polityce feedu, więc musi dać
+    # się uruchomić PRZED migracją, która dokłada kolumnę — inaczej nie ma z czym
+    # porównać wyniku po zmianie. Brak kolumny czytamy jako „nic nie ocenione",
+    # czyli dokładnie to, co `feed_policy.content_factor` robi z NULL-em.
+    cur.execute("""
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'articles' AND column_name = 'content_score'
+    """)
+    has_content_score = cur.fetchone() is not None
+    content_score_col = "a.content_score" if has_content_score else "NULL::smallint"
+    if not has_content_score:
+        print("  (baza bez kolumny content_score — ranking liczony bez oceny treści)")
+
     cur.execute(
-        """
+        f"""
         SELECT a.id, a.source_id, s.name, a.title, a.display_title, a.content,
                a.summary, a.url, a.category, a.published_at, a.scraped_at,
-               a.event_at, a.event_until, a.content_score,
+               a.event_at, a.event_until, {content_score_col},
                a.is_filler, a.is_promotional, a.processed
         FROM articles a JOIN sources s ON s.id = a.source_id
         WHERE a.published_at >= now() - make_interval(days => %s)
