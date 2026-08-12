@@ -269,11 +269,13 @@ async def get_articles(
     )
 
     # Map results to ArticleOutput with source_name
+    pinned_ids = {article.id for article, _ in pinned}
     articles = []
     for article, source_name in ordered[:limit]:
         article_dict = article.model_dump()
         article_dict['source_name'] = source_name
         article_dict['source_label'] = source_label(source_name)
+        article_dict['is_pinned'] = article.id in pinned_ids
         articles.append(ArticleOutput(**article_dict))
 
     return articles

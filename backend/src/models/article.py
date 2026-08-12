@@ -29,6 +29,9 @@ class ArticleOutput(BaseModel):
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     scraped_at: datetime
+    # Awaria będąca sprawą najbliższych godzin (feed_policy.is_pinned_alert) —
+    # frontend nie ma jak tego policzyć sam, bo progi czasu żyją w backendzie
+    is_pinned: bool = False
 
     class Config:
         from_attributes = True
