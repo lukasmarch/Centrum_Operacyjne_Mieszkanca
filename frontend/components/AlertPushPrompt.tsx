@@ -13,10 +13,16 @@
  *
  * 28.07.2026 doszedł drugi punkt wejścia: `campaignOnly`. Reels kampanijny kończy
  * się obietnicą „Włącz powiadomienia. Za darmo, bez zakładania konta", a widz
- * lądował na Dashboardzie, gdzie tego włącznika NIE BYŁO — jedyny stały siedzi
+ * lądował na widoku, gdzie tego włącznika NIE BYŁO — jedyny stały siedzi
  * w Profil → Preferencje, czyli za rejestracją. Linki kampanijne prowadzą więc
- * na `rybnolive.pl/?alerty`, a Dashboard pokazuje ten baner właśnie dla nich.
- * Kontekst jest zachowany: taki widz przyszedł z materiału o awarii prądu.
+ * na `rybnolive.pl/?alerty`.
+ *
+ * 11.08.2026: ten baner wisiał na bento-Dashboardzie, który wypadł z routingu
+ * razem z przebudową strony głównej — czyli `?alerty` prowadziło znów donikąd.
+ * Stoi teraz na `SimpleHomePage`, i to BEZ `campaignOnly`: awaria „na teraz"
+ * zdarza się kilka razy w miesiącu, a przez resztę dni jedyna prośba o zgodę
+ * na push nie pokazywała się w ogóle. W dniu z awarią prosi o nią głośniej
+ * `AlertOfTheDay`, więc na stronie zawsze jest dokładnie jedno takie wezwanie.
  */
 import React, { useState } from 'react';
 import { BellRing, X } from 'lucide-react';
@@ -53,9 +59,16 @@ function wasDismissed(): boolean {
 type Props = {
   /** Pokaż wyłącznie wtedy, gdy wejście pochodzi z linku kampanijnego (`?alerty`). */
   campaignOnly?: boolean;
+  /**
+   * `alert` — obok trwającej awarii w feedzie (czerwień jest wtedy prawdziwa).
+   * `calm` — na stronie głównej w dzień bez awarii. Ta sama obietnica, ale bez
+   * czerwonej ramki: baner alarmowy w spokojny dzień czyta się jak ostrzeżenie
+   * i podnosi puls, zanim mieszkaniec dojdzie do słowa „następnej".
+   */
+  tone?: 'alert' | 'calm';
 };
 
-const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false }) => {
+const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert' }) => {
   const { status, isSubscribed, isSupported, subscribe } = usePushNotifications();
   const [dismissed, setDismissed] = useState(wasDismissed);
   const [busy, setBusy] = useState(false);
@@ -98,10 +111,18 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false }) => {
     if (ok) setJustEnabled(true);
   };
 
+  const calm = tone === 'calm';
+
   return (
-    <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-red-950/40 to-white/[0.02] border border-red-500/20">
+    <div
+      className={`relative flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border ${
+        calm
+          ? 'bg-[#0d1117] border-white/10'
+          : 'bg-gradient-to-r from-red-950/40 to-white/[0.02] border-red-500/20'
+      }`}
+    >
       <div className="flex items-start gap-3 flex-1 pr-6">
-        <BellRing size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+        <BellRing size={18} className={`flex-shrink-0 mt-0.5 ${calm ? 'text-blue-400' : 'text-red-400'}`} />
         <div>
           <p className="text-sm font-bold text-neutral-100">
             O następnej awarii dowiedz się bez wchodzenia na stronę
@@ -116,7 +137,9 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false }) => {
       <button
         onClick={enable}
         disabled={busy}
-        className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-500 text-white transition-colors disabled:opacity-50"
+        className={`flex-shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors disabled:opacity-50 ${
+          calm ? 'bg-blue-600 hover:bg-blue-500' : 'bg-red-600 hover:bg-red-500'
+        }`}
       >
         {busy ? 'Włączam…' : 'Włącz alerty'}
       </button>

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /zamowienie
+Disallow: /profil
+
+Sitemap: https://rybnolive.pl/sitemap.xml

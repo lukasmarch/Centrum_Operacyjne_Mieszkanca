@@ -7,7 +7,6 @@ import { Camera } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
 import { usePushNotifications } from '../hooks/usePushNotifications';
-import { DASHBOARD_LAYOUTS, DashboardLayoutId, TileId, getUserDashboardLayout } from '../config/dashboardLayouts';
 import PricingCards from '../../components/PricingCards';
 import { getAccessToken } from '../services/authApi';
 
@@ -144,11 +143,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
 
   const [localError, setLocalError] = useState('');
 
-  // Dashboard layout state
-  const [selectedLayout, setSelectedLayout] = useState<DashboardLayoutId>(
-    getUserDashboardLayout(user?.preferences ?? null)
-  );
-  const [layoutSaving, setLayoutSaving] = useState(false);
 
   // Fetch referral data when tab is active
   useEffect(() => {
@@ -185,21 +179,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
     setTimeout(() => setSuccessMessage(''), 3000);
-  };
-
-  const handleLayoutSelect = async (layoutId: DashboardLayoutId) => {
-    const previousLayout = selectedLayout;
-    setSelectedLayout(layoutId);
-    setLayoutSaving(true);
-    clearError();
-    try {
-      await updateProfile({ preferences: { dashboard_layout: layoutId } });
-      showSuccess('Układ dashboardu zapisany');
-    } catch {
-      setSelectedLayout(previousLayout); // revert on error
-    } finally {
-      setLayoutSaving(false);
-    }
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -782,106 +761,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
           {/* Preferences Tab */}
           {activeTab === 'preferences' && (
             <div className="space-y-6">
-              {/* Dashboard Layout Presets */}
-              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-                <h2 className="text-xl font-bold mb-2">Układ dashboardu</h2>
-                <p className="text-sm text-neutral-500 mb-6">
-                  Wybierz układ kafelków na stronie głównej
-                </p>
-
-                {isPremium ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {(Object.values(DASHBOARD_LAYOUTS) as typeof DASHBOARD_LAYOUTS[DashboardLayoutId][]).map((layout) => {
-                      const TILE_COLORS: Record<TileId, string> = {
-                        ai_briefing: 'bg-blue-400',
-                        weather:     'bg-sky-400',
-                        traffic:     'bg-orange-400',
-                        events:      'bg-violet-400',
-                        airly:       'bg-emerald-400',
-                        gmina:       'bg-rose-400',
-                        news:        'bg-gray-400',
-                      };
-
-                      const MiniGridPreview = () => (
-                        <div className="grid grid-cols-4 gap-0.5 h-12 mb-3">
-                          {layout.tiles.map((tile) => (
-                            <div
-                              key={tile.id}
-                              title={tile.id}
-                              style={{
-                                gridColumn: `span ${Math.min(tile.colSpan, 4)}`,
-                                gridRow: tile.rowSpan ? `span ${tile.rowSpan}` : undefined,
-                              }}
-                              className={`rounded-sm ${TILE_COLORS[tile.id]} opacity-80`}
-                            />
-                          ))}
-                        </div>
-                      );
-
-                      const isActive = selectedLayout === layout.id;
-
-                      return (
-                        <button
-                          key={layout.id}
-                          onClick={() => handleLayoutSelect(layout.id)}
-                          disabled={layoutSaving}
-                          className={`text-left p-4 rounded-xl border-2 transition-all disabled:opacity-60 ${
-                            isActive
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-800/50 hover:border-gray-700 bg-gray-950'
-                          }`}
-                        >
-                          <MiniGridPreview />
-                          <p className="font-semibold text-sm text-neutral-200">{layout.name}</p>
-                          <p className="text-xs text-neutral-500 mt-0.5">{layout.description}</p>
-                          {isActive && (
-                            <p className="text-xs text-blue-600 font-semibold mt-1">
-                              {layoutSaving ? 'Zapisywanie...' : 'Aktywny'}
-                            </p>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <div className="grid grid-cols-2 gap-4 opacity-40 pointer-events-none select-none">
-                      {(Object.values(DASHBOARD_LAYOUTS) as typeof DASHBOARD_LAYOUTS[DashboardLayoutId][]).map((layout) => (
-                        <div
-                          key={layout.id}
-                          className="p-4 rounded-xl border-2 border-gray-800/50 bg-gray-950"
-                        >
-                          <div className="grid grid-cols-4 gap-0.5 h-12 mb-3">
-                            {layout.tiles.map((tile) => (
-                              <div
-                                key={tile.id}
-                                style={{ gridColumn: `span ${Math.min(tile.colSpan, 4)}` }}
-                                className="rounded-sm bg-gray-300"
-                              />
-                            ))}
-                          </div>
-                          <p className="font-semibold text-sm text-neutral-200">{layout.name}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                      <div className="text-center bg-gray-950/90 px-6 py-4 rounded-2xl shadow-sm border border-gray-800/50">
-                        <p className="text-neutral-300 font-semibold mb-1">Funkcja Premium</p>
-                        <p className="text-neutral-500 text-sm mb-3">
-                          Wybierz układ dashboardu z planem Premium
-                        </p>
-                        <button
-                          onClick={() => onNavigate('premium')}
-                          className="px-5 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors"
-                        >
-                          Ulepsz do Premium
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Newsletter */}
               <NewsletterPrefs isPremium={isPremium} apiBase={API_BASE_URL} />
 

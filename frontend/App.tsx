@@ -1,9 +1,16 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import Dashboard from './components/Dashboard';
+// Uwaga: components/Dashboard.tsx (bento-panel) NIE jest już nigdzie routowany.
+// Zostaje w repo jako magazyn kafli, których nie ma jeszcze gdzie indziej
+// (ruch drogowy, kino, apteka dyżurna, monitoring) — do przeniesienia na
+// strony szczegółowe, potem plik można skasować.
 import NewsFeed from './components/NewsFeed';
 import EventsFeed from './components/EventsFeed';
 import { AppSection, TabId } from './types';
+import { applySeo } from './src/seo';
+import SimpleHomePage from './src/pages/SimpleHomePage';
+import WastePage from './src/pages/WastePage';
+import BusPage from './src/pages/BusPage';
 import { DataCacheProvider } from './src/context/DataCacheContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginPage from './src/pages/LoginPage';
@@ -45,6 +52,8 @@ const SECTION_TO_TAB: Record<AppSection, TabId> = {
     news: 'miasto',
     events: 'miasto',
     weather: 'miasto',
+    waste: 'miasto',
+    bus: 'miasto',
     reports: 'zgloszenia',
     stats: 'dane',
     business: 'dane',
@@ -78,6 +87,17 @@ export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
     checkout: '/zamowienie',
     // Newsletter linkuje do zgłoszeń — bez własnej ścieżki mail lądował na dashboardzie
     reports: '/zgloszenia',
+    // Sekcje treściowe z własnym adresem — warunek indeksowania w Google:
+    // bez ścieżki nie ma czego wpisać do sitemapy ani do canonical.
+    // Lustro tej listy trzyma backend/src/api/endpoints/seo.py (sitemap.xml).
+    news: '/wiadomosci',
+    events: '/wydarzenia',
+    weather: '/pogoda',
+    waste: '/harmonogram-odpadow',
+    bus: '/autobus',
+    stats: '/statystyki',
+    business: '/firmy',
+    assistant: '/asystent',
 };
 
 const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PATH)
@@ -85,6 +105,18 @@ const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PA
 
 const sectionFromPath = (): AppSection =>
     PATH_TO_SECTION[window.location.pathname.replace(/\/+$/, '')] ?? 'dashboard';
+
+/**
+ * Nieznany adres pokazuje stronę główną, więc musi też mieć jej adres — inaczej
+ * stary link (np. do wycofanego `/panel`) zostaje w pasku i w indeksie Google
+ * jako osobna strona z tą samą treścią. Wyjątek: powrót z Przelewy24, którego
+ * ścieżkę czyta PaymentReturnBanner.
+ */
+const normalizeUnknownPath = () => {
+    const path = window.location.pathname.replace(/\/+$/, '');
+    if (!path || path === '/payment/success' || PATH_TO_SECTION[path]) return;
+    window.history.replaceState({}, '', `/${window.location.search}`);
+};
 
 // Wybrany plan żyje w adresie (/zamowienie?plan=premium&okres=yearly), żeby zamówienie
 // przetrwało odświeżenie strony i drogę przez rejestrację konta
@@ -98,7 +130,10 @@ const checkoutFromUrl = (): CheckoutSelection | null => {
 };
 
 const AppContent: React.FC = () => {
-    const [activeSection, setActiveSection] = useState<AppSection>(sectionFromPath);
+    const [activeSection, setActiveSection] = useState<AppSection>(() => {
+        normalizeUnknownPath();
+        return sectionFromPath();
+    });
     const [activeTab, setActiveTab] = useState<TabId>(() => SECTION_TO_TAB[sectionFromPath()]);
     const [initialQuery, setInitialQuery] = useState<string>('');
     const { user, isAuthenticated, isLoading, logout } = useAuth();
@@ -171,6 +206,11 @@ const AppContent: React.FC = () => {
         syncUrl(TAB_DEFAULT_SECTION[tab]);
     }, [syncUrl]);
 
+    // Meta per sekcja (title/description/canonical) — patrz frontend/src/seo.ts
+    useEffect(() => {
+        applySeo(activeSection, SECTION_TO_PATH[activeSection]);
+    }, [activeSection]);
+
     // Przycisk wstecz/dalej w przeglądarce
     useEffect(() => {
         const handlePopState = () => {
@@ -223,7 +263,11 @@ const AppContent: React.FC = () => {
 
         switch (activeSection) {
             case 'dashboard':
-                return <Dashboard onNavigate={handleNavigate} onQuerySubmit={setInitialQuery} />;
+                return <SimpleHomePage onNavigate={handleNavigate} onQuerySubmit={setInitialQuery} />;
+            case 'waste':
+                return <WastePage onNavigate={handleNavigate} />;
+            case 'bus':
+                return <BusPage onNavigate={handleNavigate} />;
             case 'assistant':
                 return <AssistantPage initialQuery={initialQuery} onNavigate={handleNavigate} />;
             case 'news':
@@ -345,8 +389,11 @@ const AppContent: React.FC = () => {
         );
     }
 
+    // `overflow-x-clip`, nie `-hidden`: `hidden` robi z korzenia kontener
+    // przewijania, więc przyklejony TopBar przyklejał się do JEGO góry i uciekał
+    // razem ze stroną. `clip` obcina tak samo, ale kontenera nie tworzy
     return (
-        <div className="min-h-screen text-white selection:bg-blue-500/30 overflow-x-hidden" style={{ background: '#05080f' }}>
+        <div className="min-h-screen text-white selection:bg-blue-500/30 overflow-x-clip" style={{ background: '#05080f' }}>
             {/* Global BeamsBackground — fixed full-page, shared with hero */}
             <BeamsBackground intensity="medium" className="fixed inset-0 pointer-events-none" />
             {/* Extra depth: dark radial overlay at centre-bottom */}

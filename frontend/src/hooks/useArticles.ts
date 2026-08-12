@@ -17,6 +17,9 @@ interface ArticleApiResponse {
   category: string | null;
   tags: string[] | null;
   scraped_at: string;
+  event_at: string | null;
+  event_until: string | null;
+  is_pinned: boolean;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -84,7 +87,11 @@ export function useArticles(options: UseArticlesOptions = {}) {
           timestamp: formatTimestamp(item.published_at || item.scraped_at),
           rawTimestamp: item.published_at || item.scraped_at,
           url: item.url,
-          imageUrl: item.image_url || undefined
+          imageUrl: item.image_url || undefined,
+          // Alert „na teraz" wg feed_policy.is_pinned_alert — liczony w backendzie
+          isPinnedAlert: item.is_pinned || false,
+          eventAt: item.event_at || undefined,
+          eventUntil: item.event_until || undefined,
         }));
 
         setArticles(mappedArticles);

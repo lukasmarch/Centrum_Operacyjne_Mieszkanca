@@ -13,6 +13,11 @@ export interface Article {
   rawTimestamp: string;
   url: string;
   imageUrl?: string;
+  /** Awaria będąca sprawą najbliższych godzin (backend: feed_policy.is_pinned_alert) */
+  isPinnedAlert?: boolean;
+  /** Termin zdarzenia (np. wyłączenie prądu) — naiwny UTC z backendu */
+  eventAt?: string;
+  eventUntil?: string;
 }
 
 export interface WeatherData {
@@ -255,7 +260,7 @@ export interface ReportMapItem {
   created_at: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies';
 
 export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'zgloszenia';
 
