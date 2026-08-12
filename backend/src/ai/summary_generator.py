@@ -4,10 +4,12 @@ Summary Generator - Generowanie dziennych podsumowań przez AI
 Agreguje artykuły z ostatnich 24h, wydarzenia i pogodę,
 a następnie generuje przyjazne podsumowanie dla mieszkańców.
 """
+import re
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ModelRetry, RunContext
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -99,6 +101,72 @@ def _time_label(article, now: datetime) -> str:
     return f"[{word} {published:%H:%M}]" if word else f"[{published:%d.%m} {published:%H:%M}]"
 
 
+# --- walidacja odpowiedzi briefingu ------------------------------------------
+# Dwie reguły z promptu, które model łamał mimo przykładów, egzekwowane kodem:
+# 12.08.2026 highlights dostały „temperaturą sięgającą 23°C" wbrew zakazowi
+# liczb pomiarowych (obok stoi widget na żywo i po godzinie wartości się
+# rozjeżdżają). Tu ModelRetry zamiast cichej poprawki — przeredagowanie zdania
+# to zadanie modelu, wycięcie liczby kodem zostawiłoby kalekie zdanie.
+
+# Liczba z jednostką pomiarową. Daty i godziny („19 sierpnia", „9:00") są
+# dozwolone — wzorce wymagają kontekstu jednostki, nie łapią gołych liczb.
+_MEASUREMENT_RE = re.compile(
+    r"\d+(?:[.,]\d+)?\s*(?:°|stopni\b|µg|ug/m)"
+    r"|caqi\D{0,3}\d"
+    r"|pm\s?(?:2[.,]?5|10)\D{0,10}\d",
+    re.IGNORECASE,
+)
+
+
+@dataclass
+class SummaryRun:
+    """Kontekst jednego przebiegu: co briefing MUSI i co WOLNO mu cytować."""
+    required_headline_id: Optional[int] = None
+    known_article_ids: frozenset = field(default_factory=frozenset)
+
+
+async def validate_summary(
+    ctx: RunContext[SummaryRun], output: DailySummaryModel
+) -> DailySummaryModel:
+    # Cytowania spoza podanego materiału odpadają po cichu — link na kaflu
+    # briefingu prowadziłby donikąd
+    if ctx.deps.known_article_ids:
+        cited = [
+            i for i in output.cited_article_ids
+            if i in ctx.deps.known_article_ids
+        ]
+        if cited != output.cited_article_ids:
+            logger.info(
+                "Walidator: usunięte cytowania spoza materiału: "
+                f"{set(output.cited_article_ids) - set(cited)}"
+            )
+            output.cited_article_ids = cited
+
+    # „WYMAGANY ARTYKUŁ NAGŁÓWKA" to dotąd była prośba w prompcie; kod wybiera
+    # artykuł deterministycznie (lokalność → nie-powtórka → kategoria →
+    # bliskość), więc nagłówek z innego artykułu to błąd wykonania, nie wybór
+    required = ctx.deps.required_headline_id
+    if required and (
+        not output.cited_article_ids or output.cited_article_ids[0] != required
+    ):
+        raise ModelRetry(
+            f"Nagłówek MUSI bazować na artykule [ID:{required}] wskazanym jako "
+            f"WYMAGANY ARTYKUŁ NAGŁÓWKA, a jego ID musi być PIERWSZE w "
+            f"cited_article_ids. Napisz headline o tym artykule."
+        )
+
+    match = _MEASUREMENT_RE.search(output.highlights)
+    if match:
+        raise ModelRetry(
+            f"W highlights stoi liczba pomiarowa („{match.group(0)}”) — "
+            f"zakazana, bo obok jest widget z pomiarem na żywo. Opisz warunki "
+            f"jakościowo (np. „ciepło i słonecznie”), liczby zostaw w "
+            f"air_quality_summary."
+        )
+
+    return output
+
+
 class SummaryGenerator:
     """Serwis do generowania dziennych podsumowań"""
 
@@ -112,9 +180,11 @@ class SummaryGenerator:
         self.agent = Agent(
             'openai:gpt-4o',
             output_type=DailySummaryModel,
+            deps_type=SummaryRun,
             system_prompt=DAILY_SUMMARY_PROMPT,
             output_retries=3
         )
+        self.agent.output_validator(validate_summary)
         self.logger = logger
 
     async def generate_daily_summary(
@@ -303,9 +373,13 @@ class SummaryGenerator:
         try:
             # 6. Wywołaj AI agent dwukrotnie, wybierz lepszy wynik
             all_articles_map = {a.id: a for a in articles}
+            run_deps = SummaryRun(
+                required_headline_id=top_article.id if top_article else None,
+                known_article_ids=frozenset(all_articles_map),
+            )
             self.logger.info(f"Calling AI to generate summary (articles: {len(articles)}, events: {len(events)})")
-            result_a = await self.agent.run(input_data)
-            result_b = await self.agent.run(input_data)
+            result_a = await self.agent.run(input_data, deps=run_deps)
+            result_b = await self.agent.run(input_data, deps=run_deps)
 
             for res in (result_a, result_b):
                 usage = res.usage()
