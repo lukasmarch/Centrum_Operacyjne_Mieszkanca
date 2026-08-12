@@ -260,7 +260,7 @@ export interface ReportMapItem {
   created_at: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'cinema' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies';
 
 export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'zgloszenia';
 

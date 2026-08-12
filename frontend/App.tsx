@@ -11,6 +11,7 @@ import { applySeo } from './src/seo';
 import SimpleHomePage from './src/pages/SimpleHomePage';
 import WastePage from './src/pages/WastePage';
 import BusPage from './src/pages/BusPage';
+import CinemaPage from './src/pages/CinemaPage';
 import { DataCacheProvider } from './src/context/DataCacheContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginPage from './src/pages/LoginPage';
@@ -36,10 +37,18 @@ const PrivacyPage      = lazy(() => import('./src/pages/PrivacyPage'));
 const CookiePolicyPage = lazy(() => import('./src/pages/CookiePolicyPage'));
 const CheckoutPage     = lazy(() => import('./src/pages/CheckoutPage'));
 
+// Podmenu zakładki „Info". Odpady, autobus i kino dopisane razem z przebudową:
+// bez nich strony powstałe 11–12.08 były osiągalne WYŁĄCZNIE z kafla na stronie
+// głównej, więc ktoś, kto wszedł na `/wiadomosci` prosto z Google, nie miał jak
+// do nich trafić. Pasek przewija się w poziomie, więc sześć pozycji mieści się
+// na telefonie bez łamania wiersza.
 const MIASTO_ITEMS = [
     { id: 'news', label: 'Wiadomości' },
     { id: 'events', label: 'Wydarzenia' },
     { id: 'weather', label: 'Pogoda' },
+    { id: 'waste', label: 'Odpady' },
+    { id: 'bus', label: 'Autobus' },
+    { id: 'cinema', label: 'Kino' },
 ];
 
 // Zakładka "Firmy": katalog wizytówek jako front, Statystyki GUS dostępne
@@ -54,6 +63,7 @@ const SECTION_TO_TAB: Record<AppSection, TabId> = {
     weather: 'miasto',
     waste: 'miasto',
     bus: 'miasto',
+    cinema: 'miasto',
     reports: 'zgloszenia',
     stats: 'dane',
     business: 'dane',
@@ -95,6 +105,7 @@ export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
     weather: '/pogoda',
     waste: '/harmonogram-odpadow',
     bus: '/autobus',
+    cinema: '/kino',
     stats: '/statystyki',
     business: '/firmy',
     assistant: '/asystent',
@@ -268,6 +279,8 @@ const AppContent: React.FC = () => {
                 return <WastePage onNavigate={handleNavigate} />;
             case 'bus':
                 return <BusPage onNavigate={handleNavigate} />;
+            case 'cinema':
+                return <CinemaPage />;
             case 'assistant':
                 return <AssistantPage initialQuery={initialQuery} onNavigate={handleNavigate} />;
             case 'news':

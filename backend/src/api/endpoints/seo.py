@@ -30,7 +30,7 @@ BASE_URL = "https://rybnolive.pl"
 #
 # ⚠️ Lista jest krótka CELOWO i odpowiada frontowi, który stoi na produkcji.
 # Adresy `/wiadomosci`, `/wydarzenia`, `/pogoda`, `/statystyki`, `/firmy`,
-# `/asystent`, `/harmonogram-odpadow` i `/autobus` istnieją dopiero w przebudowie
+# `/asystent`, `/harmonogram-odpadow`, `/autobus` i `/kino` istnieją dopiero w przebudowie
 # strony głównej (commit c9d18cf), która czeka na akceptację i NIE jest wdrożona.
 # Dopisanie ich tutaj wcześniej robi dokładnie to, przed czym ostrzega nagłówek
 # tego pliku: crawler dostaje SPA-fallback z cudzym tytułem i uczy się, że

@@ -11,6 +11,10 @@
     "title": "Autobus Rybno – Działdowo: rozkład jazdy na żywo | RybnoLive",
     "description": "Rozkład jazdy autobusu Rybno – Działdowo z przystankami, mapą i pozycją kursu na żywo. Sprawdź, czy autobus już jedzie i o której jest następny."
   },
+  "/kino": {
+    "title": "Kino Działdowo — repertuar i godziny seansów | RybnoLive",
+    "description": "Aktualny repertuar Kina Działdowo: co grają dziś i w najbliższych dniach, godziny seansów i plakaty. Najbliższe kino dla mieszkańców gminy Rybno."
+  },
   "/wiadomosci": {
     "title": "Wiadomości z Gminy Rybno — aktualności i alerty | RybnoLive",
     "description": "Najnowsze wiadomości z Gminy Rybno i powiatu działdowskiego: awarie prądu i wody, komunikaty urzędu, ostrzeżenia pogodowe. Aktualizowane kilka razy dziennie."

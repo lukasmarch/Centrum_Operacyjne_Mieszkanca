@@ -12,10 +12,12 @@ import AlertOfTheDay from '../../components/simple/AlertOfTheDay';
 import AlertPushPrompt from '../../components/AlertPushPrompt';
 import TodayCard from '../../components/simple/TodayCard';
 import WeatherTodayCard from '../../components/simple/WeatherTodayCard';
-import WeekendCard from '../../components/simple/WeekendCard';
+import KadrCard from '../../components/simple/KadrCard';
 import NewsMini from '../../components/simple/NewsMini';
 import NoticeBoard from '../../components/simple/NoticeBoard';
 import NewsletterCta from '../../components/simple/NewsletterCta';
+import CinemaCard from '../../components/simple/CinemaCard';
+import RoadStatusStrip from '../../components/simple/RoadStatusStrip';
 import AskBar from '../../components/simple/AskBar';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
@@ -183,9 +185,14 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
         return 'Dziś już nie kursuje';
     }, [bus, busStops]);
 
-    // Karta weekendowa: najbliższy piątek–niedziela (dziś, jeśli weekend trwa)
-    const weekendSubtitle = useMemo(() => {
-        if (!events?.length) return 'Kino, koncerty i atrakcje w okolicy';
+    /**
+     * Weekend: najbliższy piątek–niedziela (dziś, jeśli weekend trwa).
+     * `null` znaczy „nic nie ma" i tak też brzmi na karcie — wcześniej pustka
+     * dostawała zdanie „Kino, koncerty i atrakcje w okolicy", które wyglądało
+     * jak zapowiedź, a było wypełniaczem
+     */
+    const weekendSubtitle = useMemo<string | null>(() => {
+        if (!events?.length) return null;
         const now = new Date();
         const friday = new Date(now);
         friday.setHours(0, 0, 0, 0);
@@ -197,7 +204,7 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
             const d = new Date(e.date);
             return d >= friday && d < monday;
         });
-        if (!weekendEvents.length) return 'Kino, koncerty i atrakcje w okolicy';
+        if (!weekendEvents.length) return null;
         const first = weekendEvents[0].title;
         return weekendEvents.length > 1
             ? `${first} i jeszcze ${weekendEvents.length - 1} więcej`
@@ -263,12 +270,32 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
                         onClick={() => onNavigate('bus')}
                     />
                 </div>
+
+                {/* Stan dróg jako stopka sekcji, nie piąta karta: to jedno zdanie
+                    przez większość dni w roku, więc nie zasługuje na własne pole
+                    w siatce — ale gdy coś się dzieje, ma być widoczne od razu */}
+                <div className="mt-3">
+                    <RoadStatusStrip />
+                </div>
             </section>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_1fr] lg:gap-5">
-                <WeekendCard subtitle={weekendSubtitle} onClick={() => onNavigate('events')} />
+                <KadrCard
+                    weekendSubtitle={weekendSubtitle ?? ''}
+                    hasWeekendEvents={weekendSubtitle !== null}
+                    onOpenEvents={() => onNavigate('events')}
+                />
                 <NewsMini articles={newsArticles} onShowAll={() => onNavigate('news')} />
             </div>
+
+            {/* Wypoczynek — na razie samo kino. Kafel sam się chowa, gdy nie ma
+                seansu przed nami, więc sekcja nie zostaje z pustym miejscem */}
+            <section aria-label="Wypoczynek">
+                <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
+                    Wypoczynek
+                </h2>
+                <CinemaCard onClick={() => onNavigate('cinema')} />
+            </section>
 
             {/*
               Prośba o adres e-mail dopiero POD treścią: mieszkaniec zdążył
