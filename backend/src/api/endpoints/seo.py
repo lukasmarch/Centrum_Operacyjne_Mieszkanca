@@ -27,25 +27,26 @@ BASE_URL = "https://rybnolive.pl"
 
 # Ścieżki muszą być lustrem SECTION_TO_PATH z frontend/App.tsx — rozjazd
 # oznacza wpisy prowadzące na dashboard z ogólnym tytułem.
+#
+# ⚠️ Lista jest krótka CELOWO i odpowiada frontowi, który stoi na produkcji.
+# Adresy `/wiadomosci`, `/wydarzenia`, `/pogoda`, `/statystyki`, `/firmy`,
+# `/asystent`, `/harmonogram-odpadow` i `/autobus` istnieją dopiero w przebudowie
+# strony głównej (commit c9d18cf), która czeka na akceptację i NIE jest wdrożona.
+# Dopisanie ich tutaj wcześniej robi dokładnie to, przed czym ostrzega nagłówek
+# tego pliku: crawler dostaje SPA-fallback z cudzym tytułem i uczy się, że
+# sitemapa kłamie. Przy wdrażaniu przebudowy przywrócić je RAZEM z frontem.
 STATIC_PAGES = [
-    {"loc": "/",            "priority": "1.0", "changefreq": "hourly"},
-    {"loc": "/wiadomosci",  "priority": "0.9", "changefreq": "hourly"},
-    {"loc": "/wydarzenia",  "priority": "0.8", "changefreq": "daily"},
-    {"loc": "/pogoda",      "priority": "0.6", "changefreq": "hourly"},
-    # Dwie strony evergreen — odpowiadają na najczęstsze pytania w gminie
-    # i na frazy bez konkurencji („harmonogram wywozu odpadów Rybno")
-    {"loc": "/harmonogram-odpadow", "priority": "0.9", "changefreq": "monthly"},
-    {"loc": "/autobus",     "priority": "0.8", "changefreq": "monthly"},
-    {"loc": "/statystyki",  "priority": "0.6", "changefreq": "monthly"},
-    {"loc": "/firmy",       "priority": "0.6", "changefreq": "weekly"},
-    {"loc": "/asystent",    "priority": "0.7", "changefreq": "monthly"},
-    {"loc": "/cennik",      "priority": "0.5", "changefreq": "monthly"},
-    {"loc": "/zgloszenia",  "priority": "0.5", "changefreq": "weekly"},
+    {"loc": "/",                      "priority": "1.0", "changefreq": "hourly"},
+    {"loc": "/cennik",                "priority": "0.5", "changefreq": "monthly"},
+    {"loc": "/zgloszenia",            "priority": "0.5", "changefreq": "weekly"},
+    {"loc": "/regulamin",             "priority": "0.3", "changefreq": "yearly"},
+    {"loc": "/polityka-prywatnosci",  "priority": "0.3", "changefreq": "yearly"},
+    {"loc": "/polityka-cookies",      "priority": "0.3", "changefreq": "yearly"},
 ]
 
 # Strony aktualizowane wraz z treścią serwisu — dostają lastmod z najnowszego
 # artykułu, żeby crawler widział, że jest po co wracać.
-CONTENT_PATHS = {"/", "/wiadomosci", "/wydarzenia"}
+CONTENT_PATHS = {"/", "/wiadomosci", "/wydarzenia"}  # /wiadomosci, /wydarzenia — po wdrożeniu przebudowy
 
 
 @router.get("/sitemap.xml", response_class=Response)
