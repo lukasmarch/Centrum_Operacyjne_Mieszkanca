@@ -1,7 +1,34 @@
 rybnolive.pl {
     root * /srv/frontend
     file_server
-    try_files {path} /index.html
+
+    # Sitemapę generuje backend (lista tras + lastmod z bazy). Zwykłe
+    # `try_files {path} /index.html` przepisałoby /sitemap.xml na SPA-fallback
+    # ZANIM reverse_proxy zdąży dopasować ścieżkę (kolejność dyrektyw: rewrite
+    # przed proxy) — stąd rewrite z jawnym wyjątkiem zamiast try_files.
+    #
+    # `{path}/index.html` PRZED ogólnym fallbackiem: `npm run build` zapisuje dla
+    # każdej trasy osobny HTML z własnym title/description/canonical
+    # (scripts/prerender-meta.mjs). Bez tej linii robot bez JS dostaje na /cennik
+    # nagłówek strony głównej, bo aplikacja ustawia meta dopiero po starcie.
+    @spa_fallback {
+        not path /sitemap.xml
+        not file {
+            try_files {path} {path}/index.html
+        }
+    }
+    rewrite @spa_fallback /index.html
+
+    @prerendered {
+        not path /sitemap.xml
+        file {
+            try_files {path}/index.html
+        }
+    }
+    rewrite @prerendered {path}/index.html
+
+    reverse_proxy /sitemap.xml backend:8000
+
     encode gzip
 
     header {
@@ -27,7 +54,16 @@ rybnolive.pl {
     @statics path /videos/* /agents/* *.png *.jpg
     header @statics Cache-Control "public, max-age=604800"
 
-    @nocache path / *.html /sw.js /registerSW.js /manifest.webmanifest
+    # Reguła odwrócona: „wszystko, co NIE jest statycznym zasobem, ma się nie
+    # cache'ować". Wcześniej była to lista ścieżek (`/ *.html …`) i przy dodaniu
+    # prerenderowanych podstron przestała wystarczać: matcher widzi adres SPRZED
+    # przepisania, więc `/cennik` nie pasuje ani do `/`, ani do `*.html`
+    # i wychodził BEZ nagłówka — a wtedy przeglądarka cache'uje heurystycznie
+    # i powracający dostaje HTML wskazujący nieistniejący już bundle.
+    @nocache {
+        not path /assets/* /videos/* /agents/*
+        not path *.png *.jpg *.jpeg *.svg *.webp *.ico *.woff2
+    }
     header @nocache Cache-Control "no-cache"
 
     # Pomiar wejść. Do 29.07.2026 nie istniał ŻADEN zapis ruchu — ani tu, ani
