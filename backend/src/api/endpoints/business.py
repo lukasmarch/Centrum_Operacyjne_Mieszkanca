@@ -633,6 +633,18 @@ async def claim_business(
             select(BusinessProfile).where(BusinessProfile.business_id == business_id)
         )
         profile = existing.scalar_one_or_none()
+        if profile and profile.claim_status == "rejected":
+            # Wiersze "rejected" sprzed poprawki z 12.08.2026 blokowały firmę
+            # bezterminowo. Sprzątamy je przy pierwszej próbie przejęcia, żeby
+            # naprawa działała także na danych, które już są w bazie —
+            # bez ręcznego SQL-a na produkcji
+            logger.info(
+                f"Claim: usuwam zalegający odrzucony profil {profile.id} "
+                f"dla firmy {business_id}"
+            )
+            await session.delete(profile)
+            await session.flush()
+            profile = None
         if profile:
             if profile.user_id == user.id:
                 raise HTTPException(status_code=409, detail="Już zgłosiłeś przejęcie tej wizytówki")
@@ -700,13 +712,33 @@ async def moderate_claim(
         if not profile:
             raise HTTPException(status_code=404, detail="Zgłoszenie nie zostało znalezione")
 
-        profile.claim_status = "verified" if action == "approve" else "rejected"
-        profile.verified_at = datetime.utcnow() if action == "approve" else None
+        if action == "reject":
+            # Odrzucenie KASUJE wiersz, nie oznacza go statusem.
+            #
+            # Dlaczego: `claim_business` blokuje przejęcie, gdy dla firmy istnieje
+            # JAKIKOLWIEK profil. Zostawiony wiersz "rejected" blokował więc firmę
+            # na zawsze — prawdziwy właściciel dostawał „Ta wizytówka została już
+            # przejęta" i nie miał jak tego obejść. Wykryte 12.08.2026 przy
+            # sprzątaniu po teście przejęcia.
+            #
+            # Uboczna korzyść: dane kontaktowe odrzuconego zgłaszającego nie
+            # zostają w bazie bezterminowo. Ślad audytowy niesie log poniżej.
+            business_id = profile.business_id
+            await session.delete(profile)
+            await session.commit()
+            logger.info(
+                f"Claim {claim_id} reject by admin {user.email} — profil skasowany, "
+                f"firma {business_id} wraca do puli"
+            )
+            return {"status": "ok", "claim_status": "rejected", "profile_deleted": True}
+
+        profile.claim_status = "verified"
+        profile.verified_at = datetime.utcnow()
         profile.updated_at = datetime.utcnow()
         session.add(profile)
         await session.commit()
 
-        logger.info(f"Claim {claim_id} {action} by admin {user.email}")
+        logger.info(f"Claim {claim_id} approve by admin {user.email}")
         return {"status": "ok", "claim_status": profile.claim_status}
 
 

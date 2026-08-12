@@ -19,6 +19,7 @@ from sqlmodel import select
 
 from src.database.schema import (
     User, Subscription, NewsletterSubscriber, Report, PushSubscription,
+    BusinessProfile, BusinessAnnouncement,
 )
 from src.database.vectors import Conversation, ChatMessage, APICostLog
 from src.utils.logger import setup_logger
@@ -190,7 +191,31 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
         delete(NewsletterSubscriber).where(NewsletterSubscriber.email == user_email)
     )
 
-    # 5. Anonimizacja rekordu users (FK z subscriptions/referrals pozostaje spójne)
+    # 5. Wizytówki firm — kasowane RAZEM z kontem.
+    #
+    # Podstawą prawną publikacji telefonu, adresu e-mail i godzin otwarcia jest
+    # ZGODA właściciela wyrażona przy przejęciu wizytówki. Konto znika, więc znika
+    # zgoda — a bez niej kontakt nie może zostać w katalogu. Do 12.08.2026 nie
+    # kasowaliśmy tych wierszy wcale: wizytówka zostawała „przejęta" przez konto,
+    # które już nie istniało, z danymi kontaktowymi wystawionymi publicznie,
+    # a firma była zablokowana przed ponownym przejęciem przez kogokolwiek.
+    #
+    # Ogłoszenia idą pierwsze, bo wskazują na tę samą firmę i po skasowaniu
+    # profilu zostałyby w tablicy jako reklama bez właściciela.
+    business_ids = (await session.execute(
+        select(BusinessProfile.business_id).where(BusinessProfile.user_id == user.id)
+    )).scalars().all()
+    if business_ids:
+        await session.execute(
+            delete(BusinessAnnouncement).where(
+                BusinessAnnouncement.business_id.in_(business_ids)
+            )
+        )
+        await session.execute(
+            delete(BusinessProfile).where(BusinessProfile.user_id == user.id)
+        )
+
+    # 6. Anonimizacja rekordu users (FK z subscriptions/referrals pozostaje spójne)
     user.email = f"usuniete-{user.id}@anonimizacja.rybnolive.pl"
     user.full_name = "Konto usunięte"
     user.password_hash = "!deleted!" + secrets.token_hex(24)
@@ -205,7 +230,7 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
 
     await session.commit()
     logger.info(f"DSAR delete: user {user.id} anonymized, artifacts purged "
-                f"({len(conv_ids)} conversations)")
+                f"({len(conv_ids)} conversations, {len(business_ids)} wizytówek)")
 
 
 def _iso(dt) -> Optional[str]:
