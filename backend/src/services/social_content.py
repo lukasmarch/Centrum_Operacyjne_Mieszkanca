@@ -453,7 +453,12 @@ CAMPAIGN_PLAN: list[dict] = [
     {
         "at": "2026-08-07 17:00", "kind": "post", "title": "Post — Organizator (odpady)",
         "image": "karuzela_5_organizator.png",
-        "message": "Kiedy wywóz w Twojej miejscowości? 🗓️\nOrganizator zna harmonogram dla wszystkich 24 sołectw gminy Rybno — na pamięć.\nZapytaj na rybnolive.pl\n\nrybnolive.pl — Twoja gmina. Na żywo.\n#Rybno #GminaRybno #RybnoLive",
+        # ⚠️ Było „wszystkich 24 sołectw” i to nieprawda w obie strony: sołectw jest
+        # 20 (gmina_facts.SOLECTWA), miejscowości 22 (alert_policy.GMINA_RYBNO_PLACES),
+        # a 24 to liczba POZYCJI w waste_schedule — bo Rybno ma dwa rejony wywozu
+        # (R1, R2) i osobno stoją domki letniskowe. W gminie, gdzie każdy zna swoje
+        # sołectwo, taka liczba kosztuje wiarygodność całego serwisu.
+        "message": "Kiedy wywóz w Twojej miejscowości? 🗓️\nOrganizator zna harmonogram całej gminy Rybno — na pamięć.\nZapytaj na rybnolive.pl\n\nrybnolive.pl — Twoja gmina. Na żywo.\n#Rybno #GminaRybno #RybnoLive",
     },
     {
         "at": "2026-08-10 10:00", "kind": "reminder", "title": "📊 KPI-check kampanii",
