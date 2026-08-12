@@ -851,18 +851,35 @@ async def set_business_premium(
 
 
 @router.post("/{business_id}/view")
-async def track_business_view(business_id: int):
-    """Licznik wyświetleń wizytówki — argument sprzedażowy planu Firma lokalna."""
+async def track_business_view(
+    business_id: int,
+    kind: str = Query("impression", regex="^(impression|contact)$"),
+):
+    """
+    Licznik wizytówki — DWIE różne miary.
+
+    `impression` — karta pojawiła się na ekranie (katalog, sekcja Reklama).
+    `contact`    — ktoś kliknął telefon, www albo e-mail.
+
+    Domyślnie `impression`, i to jest celowe: gdyby domyślną wartością był
+    `contact`, każdy nieuaktualniony klient podbijałby liczbę, którą sprzedajemy.
+    Zawyżona statystyka kosztuje więcej niż jej brak — do 12.08.2026 katalog
+    liczył pokazy jako „wyświetlenia wizytówki" i jedno wejście na zakładkę
+    Firmy podbijało wynik wszystkim firmom naraz.
+    """
     async with async_session() as session:
         result = await session.execute(
             select(BusinessProfile).where(BusinessProfile.business_id == business_id)
         )
         profile = result.scalar_one_or_none()
         if profile:
-            profile.views_count += 1
+            if kind == "contact":
+                profile.views_count += 1
+            else:
+                profile.impressions_count += 1
             session.add(profile)
             await session.commit()
-        return {"status": "ok"}
+        return {"status": "ok", "kind": kind}
 
 
 @router.get("/announcements/active", response_model=List[ActiveAnnouncement])

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Search, X, Info, Store, BarChart3, Phone, Globe, Clock, Star, BadgeCheck, Pencil, Megaphone, Tag } from 'lucide-react';
 import {
     fetchCatalog, claimBusiness, fetchMyClaims, updateBusinessProfile, uploadBusinessLogo,
-    trackBusinessView, fetchPendingClaims, moderateClaim,
+    trackBusinessImpression, trackBusinessContact, fetchPendingClaims, moderateClaim,
     fetchActiveAnnouncements, fetchMyAnnouncements, createAnnouncement, deactivateAnnouncement,
     getAssetUrl, isOwnerBusiness,
     CatalogCard, MyClaim, PendingClaim, ActiveAnnouncement, BusinessAnnouncement, AnnouncementType,
@@ -148,7 +148,7 @@ const CatalogBusinessCard: React.FC<{
     const premium = card.profile.is_premium && !isOwnerBusiness(card.nazwa);
 
     useEffect(() => {
-        trackBusinessView(card.id);
+        trackBusinessImpression(card.id);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [card.id]);
 
@@ -216,6 +216,11 @@ const CatalogBusinessCard: React.FC<{
                 {card.profile.telefon && (
                     <a
                         href={`tel:${card.profile.telefon.replace(/\s/g, '')}`}
+                        // Kliknięcie w kontakt to JEDYNA liczba, którą wolno pokazać
+                        // firmie jako „ktoś się Tobą zainteresował". Renderowanie
+                        // karty (wyżej, `trackBusinessImpression`) mówi tylko tyle,
+                        // że ktoś przeszedł obok wystawy
+                        onClick={() => trackBusinessContact(card.id)}
                         className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
                             premium
                                 ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-500 hover:to-orange-500'
@@ -229,6 +234,7 @@ const CatalogBusinessCard: React.FC<{
                     <a
                         href={card.profile.www.startsWith('http') ? card.profile.www : `https://${card.profile.www}`}
                         target="_blank" rel="noopener noreferrer"
+                        onClick={() => trackBusinessContact(card.id)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-white/[0.06] text-neutral-300 border border-white/10 hover:bg-white/[0.1] transition-all"
                     >
                         <Globe size={12} /> WWW

@@ -363,13 +363,21 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # Miesięczny raport dla firm z wizytówkami — 1. dnia miesiąca 8:30
-    # (statystyki wyświetleń + ogłoszeń; obiecany w planie Firma lokalna)
+    # Tygodniowy raport dla firm z wizytówkami — poniedziałek 8:30
+    #
+    # Było raz na miesiąc. Raport docierał wtedy, gdy właściciel firmy dawno
+    # zapomniał, co w tym czasie robił, a przyrost z 30 dni nie mówi, która
+    # okazja zadziałała. Poniedziałek rano: właściciel planuje tydzień i ma
+    # świeżo w pamięci poprzedni.
+    #
+    # ⚠️ Identyfikator zmieniony, więc APScheduler doda nowe zadanie zamiast
+    # nadpisać stare. Po wdrożeniu skasować `business_monthly_report` z tabeli
+    # zadań, inaczej 1. dnia miesiąca wyjdzie drugi raport z tym samym oknem.
     scheduler.add_job(
         func=run_business_reports,
-        trigger=CronTrigger(day=1, hour=8, minute=30),
-        id='business_monthly_report',
-        name='Send monthly business reports',
+        trigger=CronTrigger(day_of_week='mon', hour=8, minute=30),
+        id='business_weekly_report',
+        name='Send weekly business reports',
         replace_existing=True
     )
 

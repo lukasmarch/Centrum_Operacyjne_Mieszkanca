@@ -486,10 +486,21 @@ class BusinessProfile(SQLModel, table=True):
     is_premium: bool = Field(default=False, index=True)
     premium_until: Optional[datetime] = None
 
-    # Statystyki (argument sprzedażowy)
+    # Statystyki (argument sprzedażowy) — DWIE różne miary, patrz migracja
+    # `add_business_impressions` (12.08.2026). Do tej daty `views_count` liczył
+    # w istocie pokazy karty: katalog wywoływał licznik przy renderowaniu, więc
+    # jedno wejście na zakładkę Firmy podbijało wynik wszystkim wizytówkom naraz.
+    #
+    # `impressions_count` — karta pojawiła się na ekranie (zasięg)
+    # `views_count`       — ktoś kliknął telefon, www albo e-mail (zainteresowanie)
+    #
+    # Sprzedawać wolno tylko to drugie. Pierwsze mówi, ile razy ktoś PRZESZEDŁ
+    # obok wystawy; dopiero kliknięcie znaczy, że się zatrzymał.
+    impressions_count: int = Field(default=0)
+    impressions_last_report: int = Field(default=0)
     views_count: int = Field(default=0)
-    # Snapshot licznika z ostatniego raportu miesięcznego — pozwala liczyć
-    # przyrost wyświetleń "w tym miesiącu" bez tabeli historii
+    # Snapshot licznika z ostatniego raportu — pozwala liczyć przyrost
+    # "od ostatniego maila" bez tabeli historii
     views_last_report: int = Field(default=0)
 
     created_at: datetime = Field(default_factory=datetime.utcnow)

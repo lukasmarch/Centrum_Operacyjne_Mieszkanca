@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Store, Phone, Clock, Sparkles, ArrowRight, Tag } from 'lucide-react';
 import {
-  fetchCatalog, fetchActiveAnnouncements, trackBusinessView, getAssetUrl, promotableCards,
+  fetchCatalog, fetchActiveAnnouncements, trackBusinessImpression, getAssetUrl, promotableCards,
   CatalogCard, ActiveAnnouncement,
 } from '../src/services/businessApi';
 import { AppSection } from '../types';
@@ -97,7 +97,7 @@ const PromotedBusinessesTile: React.FC<{ onNavigate?: (section: AppSection) => v
               {okazje.map(o => (
                 <button
                   key={o.id}
-                  onClick={() => { trackBusinessView(o.business_id); goToBusinesses(); }}
+                  onClick={() => { trackBusinessImpression(o.business_id); goToBusinesses(); }}
                   className="w-full text-left bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2.5 hover:bg-amber-500/15 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -125,7 +125,7 @@ const PromotedBusinessesTile: React.FC<{ onNavigate?: (section: AppSection) => v
               {premium.map(card => (
                 <button
                   key={card.id}
-                  onClick={() => { trackBusinessView(card.id); goToBusinesses(); }}
+                  onClick={() => { trackBusinessImpression(card.id); goToBusinesses(); }}
                   className="w-full text-left bg-gray-900/40 border border-white/5 rounded-xl px-3 py-2.5 hover:border-amber-500/30 transition-colors"
                 >
                   <div className="flex items-center gap-2.5">

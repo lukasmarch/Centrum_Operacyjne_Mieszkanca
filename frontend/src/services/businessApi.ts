@@ -226,9 +226,26 @@ export async function deactivateAnnouncement(announcementId: number): Promise<vo
     if (!res.ok) throw new Error(`Błąd wycofania: ${res.status}`);
 }
 
-/** Licznik wyświetleń wizytówki (fire-and-forget) */
-export function trackBusinessView(businessId: number): void {
-    fetch(`${API_BASE}/business/${businessId}/view`, { method: 'POST' }).catch(() => {});
+/**
+ * Licznik wizytówki (fire-and-forget). DWIE różne miary — nie mieszać:
+ *
+ * `impression` — karta pojawiła się na ekranie. Mówi tylko tyle, ile „ktoś
+ *   przeszedł obok wystawy": jedno wejście do katalogu to pokaz dla KAŻDEJ
+ *   widocznej firmy.
+ * `contact` — ktoś kliknął telefon, www albo e-mail. Dopiero to znaczy,
+ *   że się zatrzymał, i tylko tę liczbę wolno sprzedawać firmie.
+ *
+ * Do 12.08.2026 istniała jedna funkcja wołana przy renderowaniu karty, a jej
+ * wynik szedł do klienta jako „wyświetlenia wizytówki".
+ */
+export function trackBusinessImpression(businessId: number): void {
+    fetch(`${API_BASE}/business/${businessId}/view?kind=impression`, { method: 'POST' })
+        .catch(() => {});
+}
+
+export function trackBusinessContact(businessId: number): void {
+    fetch(`${API_BASE}/business/${businessId}/view?kind=contact`, { method: 'POST' })
+        .catch(() => {});
 }
 
 // ── Admin ──

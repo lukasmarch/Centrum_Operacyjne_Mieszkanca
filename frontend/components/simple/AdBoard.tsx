@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Store, Phone, Clock, Tag, ArrowRight, ExternalLink } from 'lucide-react';
 import {
-    fetchCatalog, fetchActiveAnnouncements, trackBusinessView, getAssetUrl, promotableCards,
+    fetchCatalog, fetchActiveAnnouncements, trackBusinessImpression, getAssetUrl, promotableCards,
     CatalogCard, ActiveAnnouncement,
 } from '../../src/services/businessApi';
 import { useAuth } from '../../src/context/AuthContext';
@@ -137,7 +137,7 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
                     {firms.map(firm => (
                         <button
                             key={firm.id}
-                            onClick={() => { trackBusinessView(firm.id); onOpenBusinesses(); }}
+                            onClick={() => { trackBusinessImpression(firm.id); onOpenBusinesses(); }}
                             className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-4 text-left transition-colors hover:border-amber-500/35"
                         >
                             {firm.profile.logo_url ? (
