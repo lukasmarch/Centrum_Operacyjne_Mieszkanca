@@ -15,6 +15,7 @@ import WeatherTodayCard from '../../components/simple/WeatherTodayCard';
 import KadrCard from '../../components/simple/KadrCard';
 import NewsMini from '../../components/simple/NewsMini';
 import AdBoard from '../../components/simple/AdBoard';
+import ReportsMini from '../../components/simple/ReportsMini';
 import NewsletterCta from '../../components/simple/NewsletterCta';
 import CinemaCard from '../../components/simple/CinemaCard';
 import RoadStatusStrip from '../../components/simple/RoadStatusStrip';
@@ -305,9 +306,14 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
             <NewsletterCta town={town} onOpenPrivacy={() => onNavigate('privacy')} />
 
             {/*
-              Reklama stoi PONIŻEJ treści i newslettera, i jest nazwana po imieniu.
-              Szyna druga — „Ogłoszenia drobne" mieszkańców i komunikaty sołtysów —
-              powstaje w etapie 1 i nigdy nie mieszają się z tą sekcją
+              Zgłoszenia 24 PRZED reklamą: to jedyne miejsce, w którym mieszkaniec
+              coś od siebie wnosi, więc stoi wyżej niż to, za co ktoś zapłacił
+            */}
+            <ReportsMini onOpenReports={() => onNavigate('reports')} />
+
+            {/*
+              Reklama stoi PONIŻEJ treści i jest nazwana po imieniu. Komunikaty
+              sołtysów dostaną osobną sekcję i nigdy nie zmieszają się z tą
             */}
             <AdBoard onOpenBusinesses={() => onNavigate('business')} />
 

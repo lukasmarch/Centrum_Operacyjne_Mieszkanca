@@ -29,12 +29,42 @@ interface AdBoardProps {
  * się dla tego planu. Odznaka „Polecane w Rybnie" w katalogu firm zostaje,
  * bo katalog to miejsce, do którego wchodzi się z własnej woli.
  */
+/**
+ * Najwyżej dwa kafle z każdego rodzaju. Sekcja ma zapraszać, nie zajmować
+ * ekranu — strona główna należy do treści gminnej, reklama jest gościem.
+ */
+const MAX_PER_KIND = 2;
+
+/**
+ * Rotacja wyróżnień: który dzień roku, taka wycinka listy.
+ *
+ * Problem, który to rozwiązuje: dziesięciu klientów płaci po 49 zł za to samo
+ * „wyróżnienie", a miejsca są dwa. Bez rotacji dwie firmy dostają wszystko,
+ * a osiem płaci za nic — i pierwsza, która to zauważy, ma rację, rezygnując.
+ * Przy rotacji dziennej każdy dostaje równy udział dni, a obietnica sprzedażowa
+ * daje się napisać uczciwie: *stale* na górze katalogu, *rotacyjnie* na stronie
+ * głównej.
+ *
+ * Dzień, nie losowanie: ta sama firma ma stać przez całą dobę, żeby dało się
+ * powiedzieć „byłeś widoczny we wtorek". Losowanie przy każdym wejściu jest
+ * niemierzalne i wygląda na usterkę, gdy odświeżysz stronę.
+ */
+function rotateByDay<T>(items: T[], take: number): T[] {
+    if (items.length <= take) return items;
+    const dayOfYear = Math.floor(
+        (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86_400_000,
+    );
+    const start = (dayOfYear * take) % items.length;
+    return Array.from({ length: take }, (_, i) => items[(start + i) % items.length]);
+}
+
 const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
     const { user } = useAuth();
     const hidesAds = user?.tier === 'premium';
 
     const [firms, setFirms] = useState<CatalogCard[]>([]);
     const [ads, setAds] = useState<ActiveAnnouncement[]>([]);
+    const [firmsTotal, setFirmsTotal] = useState(0);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -43,11 +73,17 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
             return;
         }
         let cancelled = false;
-        Promise.allSettled([fetchCatalog(), fetchActiveAnnouncements(4)])
+        Promise.allSettled([fetchCatalog(), fetchActiveAnnouncements(8)])
             .then(([catalog, announcements]) => {
                 if (cancelled) return;
-                if (catalog.status === 'fulfilled') setFirms(promotableCards(catalog.value).slice(0, 3));
-                if (announcements.status === 'fulfilled') setAds(announcements.value.slice(0, 2));
+                if (catalog.status === 'fulfilled') {
+                    const promotable = promotableCards(catalog.value);
+                    setFirmsTotal(promotable.length);
+                    setFirms(rotateByDay(promotable, MAX_PER_KIND));
+                }
+                if (announcements.status === 'fulfilled') {
+                    setAds(rotateByDay(announcements.value, MAX_PER_KIND));
+                }
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
@@ -56,6 +92,7 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
     if (hidesAds || loading) return null;
 
     const isEmpty = !firms.length && !ads.length;
+    const hidden = Math.max(0, firmsTotal - firms.length);
 
     return (
         <section aria-label="Reklama">
@@ -165,7 +202,9 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
                     onClick={onOpenBusinesses}
                     className="mt-3 flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-amber-400 transition-colors hover:text-amber-300"
                 >
-                    Wszystkie firmy z gminy
+                    {/* Liczba mówi wprost, że rotacja istnieje — firma, która dziś
+                        nie stoi na stronie głównej, widzi, że nie zniknęła */}
+                    {hidden > 0 ? `Wszystkie wyróżnione firmy (${firmsTotal})` : 'Wszystkie firmy z gminy'}
                     <ExternalLink size={14} aria-hidden />
                 </button>
             )}
