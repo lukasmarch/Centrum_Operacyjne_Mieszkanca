@@ -5,10 +5,11 @@ Używa Pydantic AI do automatycznej kategoryzacji artykułów do 8 modułów tem
 ekstrakcji tagów, lokalizacji i generowania podsumowań.
 """
 import re
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,7 @@ from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
 from src.services import weather_alert
+from src.services.alert_policy import _flat, places_in
 from src.services.feed_policy import LOCAL_TZ
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
@@ -56,6 +58,147 @@ def _looks_like_filler(title: str, content: str) -> bool:
 # marginesem doby: post o wczorajszym festynie to relacja, nie zapowiedź.
 MAX_EVENT_LOOKAHEAD_DAYS = 180
 MAX_EVENT_BACKDATE_DAYS = 1
+
+# --- próg krótkiej treści ----------------------------------------------------
+# 04.08.2026: 40-znakowy post „RyBaśka - Restauracja Rybna 👌🏼🐟" dostał od modelu
+# nagłówek „Nowa restauracja RyBaśka otwarta w Rybnie" i summary o „promowaniu
+# regionalnych smaków" — wszystko poza nazwą zmyślone, bo `summary` i
+# `display_title` są w schemacie obowiązkowe, a przy tak krótkim wejściu jedynym
+# materiałem na „własne słowa" jest wiedza ogólna modelu. Poniżej progu NIE
+# wołamy modelu wcale: tytuł zostaje po odjęciu emoji, summary zostaje surowe
+# (scraper RSS) albo puste, kategoria NULL. Wyjątek: słowa pilne — 45-znakowe
+# „jutro brak wody na ul. Leśnej" to pełnoprawna informacja i idzie do modelu.
+MIN_CONTENT_CHARS = 120
+
+# Doklejka naszego scrapera FB — nie jest treścią wpisu i nie liczy się do progu
+_SOURCE_SUFFIX_RE = re.compile(
+    r"\s*Pełna treść u źródła:.*$", re.DOTALL | re.IGNORECASE
+)
+
+# Strzałki, symbole, dingbaty, emoji właściwe + modyfikatory (ZWJ, wariant FE0F)
+_EMOJI_RE = re.compile(
+    "[\u200d\u2190-\u2bff\ufe0f\U0001F000-\U0001FAFF]+"
+)
+
+
+def _informative_text(text: str) -> str:
+    return _SOURCE_SUFFIX_RE.sub("", text or "").strip()
+
+
+def _clean_title(title: str) -> str:
+    """Surowy tytuł w wersji do pokazania: bez emoji, wykrzykników i śmieci."""
+    cleaned = _EMOJI_RE.sub("", title or "")
+    cleaned = cleaned.replace("!", "").strip()
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip(" -–—|,.")[:120]
+
+
+def _is_low_content(title: str, text: str) -> bool:
+    """Za mało treści na uczciwą parafrazę — i nic pilnego, co by ją wymuszało."""
+    core = _informative_text(text)
+    if len(core) >= MIN_CONTENT_CHARS:
+        return False
+    haystack = f"{title or ''}\n{core}".lower()
+    return not any(word in haystack for word in _URGENT_WORDS)
+
+
+# --- grounding odpowiedzi modelu w tekście źródłowym -------------------------
+# Reguły w rodzaju „NIE ZGADUJ" stoją w prompcie i bywają ignorowane (12.08:
+# post o Nocy Perseidów bez żadnej daty dostał event_start; „Restauracja Rybna"
+# 4.08 dostała lokalizację Rybno). Walidator pydantic-ai sprawdza odpowiedź
+# KONTRA tekst źródłowy i po cichu przycina, co nie ma pokrycia — bez
+# ModelRetry, więc bez dodatkowych wywołań.
+
+@dataclass
+class SourceText:
+    """Tekst, którym model dysponował — bez naszej linii „Data publikacji"."""
+    title: str
+    body: str
+
+    @property
+    def flat(self) -> str:
+        return _flat(f"{self.title} {self.body}")
+
+
+# Ślad daty w tekście: dzień miesiąca jako liczba albo słowo względne.
+# Sama nazwa miesiąca („pod koniec sierpnia") nie wystarcza na konkretny termin.
+_RELATIVE_DATE_RE = re.compile(
+    r"\b(dzis|dzisiaj|jutro|pojutrze|weekend|"
+    r"poniedzialek|poniedzialk\w*|wtorek|wtork\w*|srod\w*|czwartek|czwartk\w*|"
+    r"piatek|piatk\w*|sobot\w*|niedziel\w*)\b"
+)
+
+
+def _event_date_grounded(value: Optional[str], source: SourceText) -> bool:
+    """Czy data podana przez model ma jakikolwiek ślad w tekście źródłowym."""
+    if not value:
+        return False
+    try:
+        local = datetime.fromisoformat(value.strip())
+    except (ValueError, AttributeError):
+        return False
+    if re.search(rf"\b0?{local.day}\b", source.flat):
+        return True
+    return bool(_RELATIVE_DATE_RE.search(source.flat))
+
+
+def _mentioned_in_text(name: str, flat_text: str) -> bool:
+    """Nazwa miejscowości pada w tekście — po rdzeniach, odporna na odmianę."""
+    words = [w for w in re.split(r"[^0-9a-z]+", _flat(name)) if w]
+    if not words:
+        return False
+    for word in words:
+        stem = word.rstrip("aeiouy")
+        if len(stem) < 4:
+            stem = word
+        if stem not in flat_text:
+            return False
+    return True
+
+
+async def ground_categorization(
+    ctx: RunContext[SourceText], output: ArticleCategory
+) -> ArticleCategory:
+    """
+    Deterministyczne przycięcie odpowiedzi do tego, co JEST w tekście.
+    Ciche poprawki zamiast ModelRetry: korekta jest jednoznaczna, a retry
+    kosztowałby drugie wywołanie przy każdym potknięciu stylu.
+    """
+    source = ctx.deps
+
+    # 1. Lokalizacja musi paść w tekście — koniec z dedukcją z nazw firm
+    grounded_locations = [
+        loc for loc in output.locations_mentioned
+        if _mentioned_in_text(loc, source.flat)
+    ]
+    if len(grounded_locations) != len(output.locations_mentioned):
+        dropped = set(output.locations_mentioned) - set(grounded_locations)
+        logger.info(f"Grounding: usunięte lokalizacje spoza tekstu: {dropped}")
+        output.locations_mentioned = grounded_locations
+
+    # 2. locality=3 wymaga nazwy z gminy Rybno wprost w tekście (ta sama lista
+    #    miejscowości co bramka alertów) — „to pewnie u nas" nie jest dowodem
+    if output.locality >= 3 and not places_in(source.title, source.body):
+        logger.info("Grounding: locality 3→2, w tekście nie pada nazwa z gminy")
+        output.locality = 2
+
+    # 3. Styl depeszy egzekwowany kodem, nie prośbą w prompcie
+    cleaned = _clean_title(output.display_title)
+    if cleaned and cleaned != output.display_title:
+        output.display_title = cleaned
+
+    # 4. Termin zdarzenia musi mieć ślad w tekście (liczba dnia albo „jutro",
+    #    „w sobotę"). 12.08.2026: Noc Perseidów bez żadnej daty w poście dostała
+    #    event_start — model trafił z wiedzy ogólnej, ale to był czysty traf.
+    if output.event_start and not _event_date_grounded(output.event_start, source):
+        logger.info(
+            f"Grounding: event_start {output.event_start} bez śladu daty "
+            f"w tekście — odrzucony"
+        )
+        output.event_start = None
+        output.event_end = None
+
+    return output
 
 
 def _parse_event_time(
@@ -104,8 +247,11 @@ class ArticleProcessor:
         self.agent = Agent(
             'openai:gpt-4o-mini',
             output_type=ArticleCategory,
+            deps_type=SourceText,
             system_prompt=CATEGORIZATION_PROMPT
         )
+        # Grounding kontra tekst źródłowy — patrz komentarz nad SourceText
+        self.agent.output_validator(ground_categorization)
         self.logger = logger
 
     async def process_article(
@@ -135,6 +281,25 @@ class ArticleProcessor:
             self.logger.warning(f"Article {article.id} has no content or summary - skipping")
             return None
 
+        # Za krótki na uczciwą parafrazę → bez modelu. Obowiązkowe `summary`
+        # i `display_title` przy 40 znakach wejścia zamieniają kategoryzację
+        # w konfabulację (RyBaśka, 4.08.2026). Summary zostaje, jakie jest
+        # (surowe ze scrapera albo None) — to jedyna wersja, która nie kłamie.
+        if _is_low_content(article.title, text_content):
+            article.display_title = _clean_title(article.title) or None
+            article.is_filler = article.is_filler or _looks_like_filler(
+                article.title, text_content
+            )
+            article.processed = True
+            session.add(article)
+            await session.commit()
+            await session.refresh(article)
+            self.logger.info(
+                f"✓ Article {article.id}: poniżej progu {MIN_CONTENT_CHARS} zn. "
+                f"— bez kategoryzacji, tytuł źródłowy bez emoji"
+            )
+            return article
+
         # Data publikacji w treści zapytania — bez niej model nie przeliczy
         # „w najbliższą sobotę" ani „jutro o 18:00" na konkretny termin
         stamp = article.published_at or article.scraped_at
@@ -149,10 +314,11 @@ class ArticleProcessor:
             # Wywołaj AI agent z retry logic
             self.logger.info(f"Processing article {article.id}: {article.title[:50]}...")
 
+            source_text = SourceText(title=article.title or "", body=text_content)
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    result = await self.agent.run(content)
+                    result = await self.agent.run(content, deps=source_text)
                     category_data = result.output
                     break
                 except Exception as e:

@@ -511,18 +511,66 @@ def _similarity(a: frozenset[str], b: frozenset[str]) -> float:
 
 def dedup_text(article) -> str:
     """
-    Materiał wpisu w postaci, w jakiej porównujemy go z innymi. Termin zdarzenia
-    wchodzi do sygnatury osobno — dwa wyłączenia w Rybnie mają identyczny tytuł
-    („Wyłączenie planowane - Region Mława - Rybno gmina wiejska") i różnią się
-    wyłącznie datą i listą ulic.
+    Materiał wpisu w postaci, w jakiej porównujemy go z innymi.
+
+    Po kategoryzacji porównujemy sam `display_title`: depeszowy nagłówek modelu
+    streszcza temat, a summary rozprasza sygnaturę (każde źródło streszcza inny
+    aspekt tego samego komunikatu). 12.08.2026 nabór na azbest w czterech
+    redakcjach (BIP, strona gminy, dwa profile FB) zajął trzy pierwsze miejsca
+    feedu — podobieństwo pełnych tekstów nie przekraczało 0,52 przy progu 0,72.
+    Wpisy sprzed kategoryzacji (okno 6:00–6:15) porównujemy po staremu.
+
+    Termin zdarzenia wchodzi jako zwarty token `ev…` — dwa wyłączenia w Rybnie
+    mają identyczny tytuł i różnią się wyłącznie datą; poprzedni format
+    `%Y-%m-%d %H:%M` rozpadał się w `_tokens` na dwuznaki i ginął w filtrze
+    długości, więc daty realnie nie było w sygnaturze.
     """
-    body = (article.content or article.summary or "")[:300]
-    base = f"{article.title or ''} {body}"
+    display = getattr(article, "display_title", None)
+    if display:
+        base = display
+    else:
+        body = (article.content or article.summary or "")[:300]
+        base = f"{article.title or ''} {body}"
     event_at = getattr(article, "event_at", None)
-    return f"{event_at:%Y-%m-%d %H:%M} {base}" if event_at else base
+    return f"ev{event_at:%Y%m%d%H%M} {base}" if event_at else base
 
 
 D = TypeVar("D")
+
+
+# Powyżej tego zawierania rdzeni słów tytułu uznajemy dwa wpisy za ten sam
+# komunikat w różnych redakcjach. Zawieranie (|∩|/min), nie Jaccard: krótszy
+# tytuł ma się mieścić w dłuższym, nadmiarowe słowa dłuższego nie rozwadniają
+# wyniku. Zmierzony margines (12.08.2026): te same komunikaty 0,86–1,0;
+# różne komunikaty urzędowe tego samego dnia (azbest vs stypendia) ≤ 0,5.
+STEM_CONTAINMENT_THRESHOLD = 0.85
+
+# Minimalna liczba rdzeni do testu zawierania — trzysłowne tytuły trafiają
+# w wysokie zawieranie przypadkiem
+_STEM_MIN_TOKENS = 5
+
+_EVENT_TOKEN_RE = re.compile(r"^ev\d{12}$")
+
+
+def _stem_tokens(tokens: frozenset[str]) -> frozenset[str]:
+    """
+    Rdzenie słów — zgrubne ścięcie polskiej fleksji, przez którą „Rybno" i
+    „w Rybnie" albo „usuwanie" i „usuwaniu" były różnymi tokenami i ten sam
+    komunikat w dwóch redakcjach nie przekraczał progu podobieństwa.
+    """
+    stems = set()
+    for word in tokens:
+        if _EVENT_TOKEN_RE.match(word):
+            continue  # termin porównujemy osobno, nie jako słowo
+        stem = word.rstrip("aeiouy")[:6]
+        stems.add(stem if len(stem) >= 3 else word)
+    return frozenset(stems)
+
+
+def _containment(a: frozenset[str], b: frozenset[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / min(len(a), len(b))
 
 
 def collapse_duplicates(items: Iterable[D], text_of: Callable[[D], str]) -> list[D]:
@@ -534,18 +582,41 @@ def collapse_duplicates(items: Iterable[D], text_of: Callable[[D], str]) -> list
     razy obok siebie (kanał „planowane" i „bieżące" Energi), oba jako awaria.
     Deduplikacja po `external_id` łapie tylko wpisy o wspólnym identyfikatorze —
     to jest siatka bezpieczeństwa na przedruki między źródłami.
+
+    Dwa testy podobieństwa: Jaccard pełnych tokenów (przedruki niemal dosłowne)
+    oraz zawieranie rdzeni słów (ten sam komunikat w różnych redakcjach —
+    12.08.2026 nabór na azbest z BIP, strony gminy i FB zajął trzy pierwsze
+    miejsca feedu naraz). Blokada nadrzędna: wpisy z RÓŻNYMI terminami zdarzeń
+    nie są duplikatami nigdy — dwa wyłączenia Energi w tej samej wsi mają
+    identyczne tytuły i różnią się wyłącznie datą.
     """
     kept: list[D] = []
-    signatures: list[frozenset[str]] = []
+    seen: list[tuple[frozenset[str], frozenset[str], frozenset[str]]] = []
 
     for item in items:
-        signature = _tokens(text_of(item))
-        if signature and any(
-            _similarity(signature, seen) >= SIMILARITY_THRESHOLD for seen in signatures
-        ):
+        tokens = _tokens(text_of(item))
+        events = frozenset(t for t in tokens if _EVENT_TOKEN_RE.match(t))
+        stems = _stem_tokens(tokens)
+
+        duplicate = False
+        if tokens:
+            for seen_tokens, seen_stems, seen_events in seen:
+                if events and seen_events and events.isdisjoint(seen_events):
+                    continue  # różne terminy = różne zdarzenia
+                if _similarity(tokens, seen_tokens) >= SIMILARITY_THRESHOLD:
+                    duplicate = True
+                    break
+                if (
+                    len(stems) >= _STEM_MIN_TOKENS
+                    and len(seen_stems) >= _STEM_MIN_TOKENS
+                    and _containment(stems, seen_stems) >= STEM_CONTAINMENT_THRESHOLD
+                ):
+                    duplicate = True
+                    break
+        if duplicate:
             continue
         kept.append(item)
-        signatures.append(signature)
+        seen.append((tokens, stems, events))
 
     return kept
 
