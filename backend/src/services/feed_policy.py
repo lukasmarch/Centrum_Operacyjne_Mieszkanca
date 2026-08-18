@@ -106,6 +106,12 @@ LOCAL_SOURCES: frozenset[str] = COUNTY_WIDE_SOURCES | {
     "Moje Działdowo",
     "Powiat Działdowski (RSS)",
     "KPP Działdowo (RSS)",
+    # Organizator imprezy w gminie. Źródło trzymane jako `disabled` — nic z niego
+    # nie scrapujemy, służy wyłącznie za atrybucję dla komunikatów wpisywanych
+    # ręcznie. Powód: 18.08.2026 jedyna informacja o zmianie organizacji ruchu
+    # na 23.08 (wahadło na powiatowej 1255 N, 9:20–17:00) wisiała na fanpage'u
+    # organizatora i nigdzie indziej — ani gmina, ani BIP jej nie wydały.
+    "Łaciate Mazury MTB",
 }
 
 # Źródła, których nazw NIE eksponujemy w interfejsie.

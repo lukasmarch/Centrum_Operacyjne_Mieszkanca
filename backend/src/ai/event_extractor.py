@@ -19,6 +19,43 @@ from src.config import settings
 logger = setup_logger("EventExtractor")
 
 
+# Bramka wyboru artykułów do ekstrakcji. Do 18.08.2026 była to biała lista
+# ["Kultura", "Edukacja", "Urząd"] — i przez to kalendarz nie zobaczył ANI JEDNEGO
+# wydarzenia sportowego (0 na 1132 wpisów). Prompt kategoryzacji słusznie wysyła
+# „zawody, turnieje, biegi" do kategorii Sport, więc zapowiedź zawodów MTB
+# w Rybnie 23.08.2026 wypadła tu, mimo że wisiała w bazie z trzech źródeł od 14.08.
+# Odwracamy logikę: wykluczamy to, co wydarzeniem NIE JEST, zamiast zgadywać z góry,
+# które kategorie mieszkaniec wpisuje sobie do kalendarza.
+SKIP_CATEGORIES = frozenset({
+    # Awaria ma własną ścieżkę: alert_policy + push co 15 min. Jej „termin" to czas
+    # trwania usterki, nie impreza — 17 wyłączeń Energi na dwa tygodnie zalałoby
+    # kalendarz i wypchnęło z niego dożynki.
+    "Awaria",
+    # Obwieszczenia o działkach i planach — termin składania uwag żyje w feedzie,
+    # ale nikt nie idzie na to w niedzielę.
+    "Nieruchomości",
+})
+
+
+def is_event_candidate(article: Article) -> bool:
+    """
+    Czy warto zapytać model, czy ten artykuł zapowiada wydarzenie.
+
+    Bramka jest tania i ma być czytana bez uruchamiania modelu — dlatego
+    osobna funkcja, a nie warunek wpleciony w zapytanie SQL.
+    """
+    # Zapychacze i cudza reklama nigdy nie były odsiewane, a szły do gpt-4o
+    # jak wszystko inne: w kategorii Biznes 20 z 23 wpisów z dwóch tygodni to
+    # była powtarzana reklama ubezpieczeń.
+    if article.is_filler or article.is_promotional:
+        return False
+
+    if article.category in SKIP_CATEGORIES:
+        return False
+
+    return True
+
+
 class EventExtractor:
     """Serwis do ekstrakcji wydarzeń z artykułów"""
 
@@ -133,10 +170,10 @@ URL: {article.url}
         """
         Wyekstrahuj wydarzenia z ostatnich X godzin
 
-        Sprawdza tylko artykuły z kategorii mogących zawierać wydarzenia:
-        - Kultura
-        - Edukacja
-        - Urząd
+        O tym, które artykuły trafiają do modelu, decyduje `is_event_candidate`:
+        odrzucamy zapychacze, reklamy i kategorie, które wydarzeniem nie są
+        (patrz SKIP_CATEGORIES). Reszta idzie do modelu — również Sport
+        i Rekreacja, których stara biała lista nie przepuszczała wcale.
 
         Args:
             session: Async database session
@@ -154,17 +191,21 @@ URL: {article.url}
             .where(
                 Article.processed == True,
                 Article.scraped_at >= cutoff,
-                Article.category.in_(["Kultura", "Edukacja", "Urząd"])
+                Article.category.is_not(None),
             )
             .order_by(Article.scraped_at.desc())
         )
-        articles = result.scalars().all()
+        candidates = result.scalars().all()
+        articles = [a for a in candidates if is_event_candidate(a)]
 
         if not articles:
             self.logger.info("No articles to extract events from")
             return 0
 
-        self.logger.info(f"Checking {len(articles)} articles for events...")
+        self.logger.info(
+            f"Checking {len(articles)} articles for events "
+            f"({len(candidates) - len(articles)} odrzuconych przez bramkę)..."
+        )
 
         # Ekstrahuj wydarzenia
         event_count = 0
