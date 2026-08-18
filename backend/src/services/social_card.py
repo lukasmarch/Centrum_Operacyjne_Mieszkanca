@@ -92,17 +92,48 @@ def _label_for(headline: str, day: date) -> str:
     return f"{DNI[day.weekday()]} · {day.day} {MIESIACE[day.month - 1].upper()}"
 
 
+# Miejsca, w których wolno złamać JEDEN wyraz, gdy sam nie mieści się w kolumnie.
+# „TUCZKI–KOSZELEWY" to dla `str.split()` jeden token, więc bez tego wyjeżdżał za kadr
+# przy każdym rozmiarze fontu — a nazwa z półpauzą to w tej gminie norma, nie wyjątek.
+_BREAKABLE = re.compile(r"(?<=[–\-/])")
+
+
+def _split_long_word(word: str, font: ImageFont.FreeTypeFont, max_width: int) -> List[str]:
+    """Rozbij wyraz na kawałki po półpauzie/łączniku. Znak łamania zostaje na końcu wiersza."""
+    if font.getlength(word) <= max_width:
+        return [word]
+    parts = [p for p in _BREAKABLE.split(word) if p]
+    if len(parts) < 2:
+        return [word]                        # nie ma gdzie złamać — zostaje na zwężenie fontu
+    chunks: List[str] = []
+    current = ""
+    for part in parts:
+        candidate = current + part
+        if not current or font.getlength(candidate) <= max_width:
+            current = candidate
+        else:
+            chunks.append(current)
+            current = part
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def _wrap_to_width(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> List[str]:
     """Zawiń tekst tak, by żaden wiersz nie przekroczył max_width w pikselach."""
     lines: List[str] = []
     current = ""
     for word in text.split():
-        candidate = f"{current} {word}".strip()
-        if not current or font.getlength(candidate) <= max_width:
-            current = candidate
-        else:
-            lines.append(current)
-            current = word
+        for piece in _split_long_word(word, font, max_width):
+            candidate = f"{current} {piece}".strip()
+            if not current or font.getlength(candidate) <= max_width:
+                current = candidate
+            else:
+                lines.append(current)
+                current = piece
+            if piece is not word and current and font.getlength(current) >= max_width * 0.98:
+                lines.append(current)        # kawałek z łącznikiem domyka wiersz
+                current = ""
     if current:
         lines.append(current)
     return lines
@@ -117,7 +148,7 @@ def _fit_headline(
     for size in sizes:
         font = _font(size, "ExtraBold")
         lines = _wrap_to_width(headline, font, max_width)
-        if len(lines) <= max_lines:
+        if len(lines) <= max_lines and all(font.getlength(l) <= max_width for l in lines):
             return font, lines, size
     # Nagłówek dłuższy niż jakikolwiek układ — przycinamy, wielokropek sygnalizuje ucięcie
     size = sizes[-1]
@@ -205,40 +236,34 @@ def _cover(image: Image.Image, width: int, height: int) -> Image.Image:
     return resized.crop((left, top, left + width, top + height))
 
 
-def compose_photo_card(illustration: bytes, claim: str, day: Optional[date] = None) -> bytes:
+def _draw_photo_layers(
+    base: Image.Image, claim: str, day: date, label: Optional[str] = None
+) -> Image.Image:
     """
-    Zwróć JPEG 1080×1920: ilustracja z kie.ai pod spodem, nasza typografia na wierzchu.
+    Nałóż na `base` (RGBA 1080×1920) gradient, pigułkę, nagłówek i stopkę marki.
 
-    Model rysuje wyłącznie scenę — ani jednej litery (patrz BRAND_STYLE). Nagłówek,
-    pigułkę i stopkę składamy tutaj, fontem Outfit i kolorami z DESIGN/BRAND.md.
-    Dzięki temu każdy post ma ten sam krój, te same kolory i poprawne ogonki,
-    niezależnie od tego, co model zrobiłby z polskim tekstem.
+    `base` z pełną alfą to post graficzny; `base` przezroczysty to nakładka na wideo.
+    Jedna funkcja dla obu, bo inaczej napis w rolce prędzej czy później rozjedzie się
+    z napisem w poście — a to ta sama seria i widz to widzi z miniatury.
     """
-    day = day or date.today()
-    claim = _strip_emoji(claim or "").upper() or "RYBNO NA ŻYWO"
-
-    img = _cover(Image.open(BytesIO(illustration)).convert("RGB"), PHOTO_WIDTH, PHOTO_HEIGHT)
-
-    # Przyciemnienie od dołu — bez niego biały nagłówek ginie na jasnych fragmentach
-    # ilustracji (niebo, poświata). Kolor gradientu to tło marki, więc dolna krawędź
-    # kadru zlewa się z resztą identyfikacji.
     overlay = Image.new("RGBA", (PHOTO_WIDTH, PHOTO_HEIGHT), BG + (0,))
     draw_overlay = ImageDraw.Draw(overlay)
     for y in range(GRADIENT_TOP, PHOTO_HEIGHT):
         progress = (y - GRADIENT_TOP) / (PHOTO_HEIGHT - GRADIENT_TOP)
         draw_overlay.line([(0, y), (PHOTO_WIDTH, y)], fill=BG + (int(245 * progress ** 1.6),))
-    img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+    img = Image.alpha_composite(base, overlay)
 
     draw = ImageDraw.Draw(img)
     draw.rectangle((0, 0, PHOTO_WIDTH, 8), fill=BLUE)
 
     # Pigułka: ta sama logika co na karcie dnia (awaria ma pierwszeństwo nad datą),
-    # żeby oba rodzaje postów czytało się jak jedną serię.
-    label = _label_for(claim, day)
+    # żeby oba rodzaje postów czytało się jak jedną serię. `label` nadpisuje ją, gdy
+    # materiał nie jest o dniu, a o etapie sprawy („ZAKOŃCZENIE PRAC").
+    pill = (label or _label_for(claim, day)).upper()
     label_font = _font(30, "ExtraBold")
-    label_width = draw.textlength(label, font=label_font)
+    label_width = draw.textlength(pill, font=label_font)
     draw.rounded_rectangle((PHOTO_MARGIN, 88, PHOTO_MARGIN + label_width + 64, 156), radius=34, fill=BLUE)
-    draw.text((PHOTO_MARGIN + 32 + label_width / 2, 122), label, font=label_font, fill=WHITE, anchor="mm")
+    draw.text((PHOTO_MARGIN + 32 + label_width / 2, 122), pill, font=label_font, fill=WHITE, anchor="mm")
 
     # Blok tekstu kotwiczony do DOŁU kadru: nagłówek rośnie w górę, więc stopka zostaje
     # w tym samym miejscu niezależnie od tego, czy claim ma jedną linię czy trzy.
@@ -255,7 +280,43 @@ def compose_photo_card(illustration: bytes, claim: str, day: Optional[date] = No
     draw.text((PHOTO_MARGIN, footer_top + 34), "rybnolive.pl", font=domain_font, fill=GLOW, anchor="la")
     draw.text((PHOTO_MARGIN, footer_top + 106), "Twoja gmina. Na żywo.",
               font=_font(34, "Medium"), fill=GREY, anchor="la")
+    return img
+
+
+def compose_photo_card(illustration: bytes, claim: str, day: Optional[date] = None,
+                       label: Optional[str] = None) -> bytes:
+    """
+    Zwróć JPEG 1080×1920: ilustracja z kie.ai pod spodem, nasza typografia na wierzchu.
+
+    Model rysuje wyłącznie scenę — ani jednej litery (patrz BRAND_STYLE). Nagłówek,
+    pigułkę i stopkę składamy tutaj, fontem Outfit i kolorami z DESIGN/BRAND.md.
+    Dzięki temu każdy post ma ten sam krój, te same kolory i poprawne ogonki,
+    niezależnie od tego, co model zrobiłby z polskim tekstem.
+    """
+    day = day or date.today()
+    claim = _strip_emoji(claim or "").upper() or "RYBNO NA ŻYWO"
+
+    base = _cover(Image.open(BytesIO(illustration)).convert("RGB"), PHOTO_WIDTH, PHOTO_HEIGHT)
+    img = _draw_photo_layers(base.convert("RGBA"), claim, day, label).convert("RGB")
 
     buffer = BytesIO()
     img.save(buffer, format="JPEG", quality=92, optimize=True)
+    return buffer.getvalue()
+
+
+def render_photo_overlay(claim: str, day: Optional[date] = None,
+                         label: Optional[str] = None) -> bytes:
+    """
+    Zwróć PNG 1080×1920 z alfą: sama warstwa marki, bez obrazu pod spodem.
+
+    Do nakładania ffmpegiem na WŁASNY materiał wideo. Napis wychodzi identyczny jak
+    na poście graficznym — ten sam font, te same współrzędne, ten sam gradient —
+    bo obie ścieżki przechodzą przez `_draw_photo_layers`.
+    """
+    day = day or date.today()
+    claim = _strip_emoji(claim or "").upper() or "RYBNO NA ŻYWO"
+
+    base = Image.new("RGBA", (PHOTO_WIDTH, PHOTO_HEIGHT), (0, 0, 0, 0))
+    buffer = BytesIO()
+    _draw_photo_layers(base, claim, day, label).save(buffer, format="PNG")
     return buffer.getvalue()
