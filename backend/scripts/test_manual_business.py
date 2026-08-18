@@ -115,6 +115,16 @@ async def main() -> int:
         check("ceidg_id ma prefiks 'manual-'", business.ceidg_id.startswith("manual-"))
         check("NIP pusty jest dozwolony", business.nip == "")
 
+        # Branża MUSI wylądować na wizytówce, nie tylko w notatce dla admina.
+        # Karta w katalogu liczy branżę z `pkd_main`, którego wpis ręczny nie ma —
+        # 18.08 firma z branżą „Produkcja" weszła do katalogu z pustym podpisem
+        profile_new = (await session.execute(
+            select(BusinessProfile).where(BusinessProfile.id == claim_id)
+        )).scalar_one()
+        check("branża trafia na wizytówkę jako opis",
+              profile_new.description == "usługi opiekuńcze",
+              f"opis to {profile_new.description!r}")
+
         # 1. Niewidoczna publicznie przed akceptacją
         visible = (await session.execute(
             apply_public_visibility(select(CEIDGBusiness.id))

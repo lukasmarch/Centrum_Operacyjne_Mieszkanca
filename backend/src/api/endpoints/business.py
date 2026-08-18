@@ -816,6 +816,13 @@ async def add_manual_business(
             user_id=user.id,
             claim_status="pending",
             claim_note=" · ".join(note_parts) or None,
+            # Branża wchodzi na wizytówkę jako opis, nie tylko do notatki admina.
+            # Karta w katalogu liczy branżę z `pkd_main` (`get_friendly_category`),
+            # a wpis ręczny nie ma kodu PKD i mieć nie będzie — bez tego to, co
+            # właściciel wpisał w „czym się zajmujecie", nie pojawiłoby się nigdzie
+            # publicznie. Wykryte 18.08 przy pierwszym przejściu ścieżki przez UI:
+            # firma z branżą „Produkcja" wchodziła do katalogu z pustym podpisem.
+            description=(request.branza.strip()[:600] if request.branza else None),
             telefon=request.telefon,
             email=request.email,
             www=request.www,

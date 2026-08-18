@@ -470,8 +470,10 @@ const ClaimModal: React.FC<{
                                             <input type="text" value={mNip} onChange={e => setMNip(e.target.value)}
                                                 placeholder="NIP (jeśli firma go ma)" inputMode="numeric"
                                                 className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                                            {/* Trafia na wizytówkę jako opis — wpis ręczny nie ma kodu PKD,
+                                                z którego katalog liczy branżę firmom z rejestru */}
                                             <input type="text" value={mBranza} onChange={e => setMBranza(e.target.value)}
-                                                placeholder="Czym się zajmujecie?"
+                                                placeholder="Czym się zajmujecie? (pokażemy na wizytówce)"
                                                 className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
                                         </div>
                                         <button onClick={() => { setManual(false); setStep(1); }} className="text-[11px] text-blue-400 hover:underline">
