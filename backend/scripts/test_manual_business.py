@@ -157,6 +157,28 @@ async def main() -> int:
         )).scalar_one()
         check("wizytówka ma status verified", profile.claim_status == "verified")
 
+    print("\n2b. Duplikat jest blokowany, nie ostrzegany")
+    # Ostrzeżenie w notatce dla admina wystarczyło, żeby przy jednym kliknięciu
+    # „Zatwierdź" w katalogu stanęły dwie identyczne karty (18.08). Blokada jest
+    # twarda i musi znosić różnice w wielkości liter oraz zwielokrotnione spacje.
+    try:
+        await add_manual_business(
+            ManualBusinessRequest(nazwa=TEST_NAZWA.upper().replace(" ", "  "),
+                                  miasto="Hartowiec"),
+            user=user,
+        )
+        check("ta sama nazwa w tej samej miejscowości odrzucona", False, "przeszło")
+    except Exception as exc:
+        code = getattr(exc, "status_code", None)
+        check("ta sama nazwa w tej samej miejscowości odrzucona", code == 409,
+              f"kod {code}, oczekiwano 409")
+
+    twin_elsewhere = await add_manual_business(
+        ManualBusinessRequest(nazwa=TEST_NAZWA, miasto="Rumian"), user=user
+    )
+    check("ta sama nazwa w INNEJ miejscowości przechodzi",
+          twin_elsewhere["status"] == "pending")
+
     print("\n3. Odrzucenie kasuje wiersz-widmo")
     async with async_session() as session:
         profile = (await session.execute(

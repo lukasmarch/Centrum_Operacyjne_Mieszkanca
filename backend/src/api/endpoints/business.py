@@ -772,11 +772,35 @@ async def add_manual_business(
                            f"przejmij jej wizytówkę zamiast dodawać nową",
                 )
 
+        # Ta sama nazwa w tej samej miejscowości = BLOKADA, nie ostrzeżenie.
+        # Do 18.08 zgłoszenie przechodziło z adnotacją dla admina; wystarczyło,
+        # że kliknął „Zatwierdź" nie czytając, i w katalogu stawały dwie
+        # identyczne karty. Ostrzeżenie, które można kliknąć na wylot, nie jest
+        # zabezpieczeniem.
+        #
+        # Porównanie po nazwie znormalizowanej (wielkość liter + zwielokrotnione
+        # spacje), bo „ZAKŁAD  Usługowy" i „Zakład Usługowy" to ta sama firma.
+        #
+        # Bliźniaki wykreślone z rejestru i te ze sprzeciwem RODO są pomijane:
+        # nie ma ich w katalogu, więc blokada byłaby dla zgłaszającego
+        # niezrozumiała, a przy `opted_out` wprost ujawniałaby, że taka firma
+        # w bazie jest.
+        norm_nazwa = " ".join(nazwa.split()).lower()
         twin = (await session.execute(
             select(CEIDGBusiness)
-            .where(func.lower(CEIDGBusiness.nazwa) == nazwa.lower())
+            .where(func.lower(func.regexp_replace(
+                CEIDGBusiness.nazwa, r"\s+", " ", "g")) == norm_nazwa)
             .where(CEIDGBusiness.miasto == miasto)
+            .where(CEIDGBusiness.opted_out == False)  # noqa: E712
+            .where(CEIDGBusiness.status != "WYKRESLONY")
         )).scalars().first()
+        if twin:
+            raise HTTPException(
+                status_code=409,
+                detail=f"„{twin.nazwa}” jest już w katalogu w miejscowości {miasto}. "
+                       f"Jeśli to Twoja firma — przejmij jej wizytówkę. Jeśli to inna "
+                       f"firma o tej samej nazwie, dopisz wyróżnik (np. imię właściciela).",
+            )
 
         business = CEIDGBusiness(
             # Prefiks 'manual-' czyni identyfikator rozpoznawalnym w logach
@@ -803,11 +827,6 @@ async def add_manual_business(
             note_parts.append(f"Branża: {request.branza.strip()}")
         if request.note:
             note_parts.append(request.note.strip())
-        if twin:
-            note_parts.append(
-                f"⚠️ W katalogu jest już firma o tej nazwie w tej miejscowości "
-                f"(id {twin.id}) — sprawdź, czy to nie duplikat"
-            )
         if not nip:
             note_parts.append("Zgłoszona bez NIP-u")
 
