@@ -122,6 +122,10 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    - daty względne przelicz wobec "Data publikacji" podanej w treści zapytania
      ("w najbliższą sobotę", "jutro o 18:00")
    - gdy podano samą datę bez godziny → "RRRR-MM-DDT00:00"
+   ⚠️ Decyduje TERMIN, nie styl tekstu. Zapowiedź napisana jak felieton albo
+     zapowiedź prasowa („23 sierpnia kolarze pojadą…", „to może być najszybszy
+     wyścig sezonu") też ma event_start. Czas przyszły + data = wypełniasz,
+     nawet jeśli wpis nie brzmi jak zaproszenie i nie podaje godziny.
    ❌ event_start=null:
    - relacja z tego, co JUŻ SIĘ ODBYŁO ("odbył się", "wczoraj zagrali", podsumowanie)
    - wiadomość bez terminu (wypadek, komunikat, wynik meczu, oferta pracy bez daty)
