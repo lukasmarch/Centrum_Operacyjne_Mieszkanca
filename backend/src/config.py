@@ -92,6 +92,14 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: Optional[str] = None       # None = powiadomienia tylko mailem
     TELEGRAM_CHAT_ID: Optional[str] = None
 
+    # ElevenLabs — lektor do rolek (`scripts/tts_elevenlabs.py`). Sam skrypt czyta
+    # klucz przez load_dotenv i backend go nie używa, ale pole MUSI tu być:
+    # Settings ma extra_forbidden, więc sama obecność ELEVENLABS_API_KEY
+    # w backend/.env wywracała każdy lokalny import src.config — łącznie
+    # z uvicornem i skryptami z scripts/. Ten sam mechanizm co przy mieszaniu
+    # backend/.env z frontend/.env.
+    ELEVENLABS_API_KEY: Optional[str] = None
+
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
