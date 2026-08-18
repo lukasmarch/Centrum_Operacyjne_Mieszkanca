@@ -83,6 +83,24 @@ export interface PendingClaim {
     telefon?: string | null;
     email?: string | null;
     created_at: string;
+    /** 'ceidg' — dane potwierdza rejestr, sprawdzamy tylko właściciela.
+     *  'manual' — firma dopisana ręcznie, trzeba potwierdzić też jej istnienie. */
+    source?: 'ceidg' | 'manual';
+}
+
+/** Firma spoza CEIDG — dopisywana przez właściciela (spółka, oddział, KGW) */
+export interface ManualBusinessInput {
+    nazwa: string;
+    miasto: string;
+    nip?: string;
+    ulica?: string;
+    budynek?: string;
+    kod_pocztowy?: string;
+    branza?: string;
+    telefon?: string;
+    email?: string;
+    www?: string;
+    note?: string;
 }
 
 /** Katalog wizytówek (strona główna zakładki) — premium na górze */
@@ -100,6 +118,32 @@ export async function claimBusiness(businessId: number, data: {
     note?: string;
 }): Promise<{ status: string; message: string }> {
     const res = await fetch(`${API_BASE}/business/${businessId}/claim`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Wystąpił błąd' }));
+        throw new Error(err.detail || `Błąd: ${res.status}`);
+    }
+    return res.json();
+}
+
+/** Miejscowości gminy Rybno — jedyna lista dopuszczalna przy wpisie ręcznym.
+ *  Pobierana z backendu, bo tam stoi oryginał (AVAILABLE_LOCATIONS w types.ts
+ *  to pozycje harmonogramu odpadów, nie miejscowości). */
+export async function fetchGminaLocalities(): Promise<string[]> {
+    const res = await fetch(`${API_BASE}/business/gmina-localities`);
+    if (!res.ok) return [];
+    return res.json();
+}
+
+/** Dodaj firmę, której nie ma w CEIDG (wymaga zalogowania).
+ *  Wpis jest niewidoczny publicznie, dopóki nie zatwierdzi go człowiek. */
+export async function addManualBusiness(
+    data: ManualBusinessInput,
+): Promise<{ status: string; claim_id: number; business_id: number; message: string }> {
+    const res = await fetch(`${API_BASE}/business/manual`, {
         method: 'POST',
         headers: authHeaders(true),
         body: JSON.stringify(data),

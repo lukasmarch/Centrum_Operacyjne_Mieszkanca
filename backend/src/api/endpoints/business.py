@@ -19,6 +19,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File
 from pydantic import BaseModel
 from sqlmodel import select, func, text
+from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.connection import async_session
@@ -28,6 +29,9 @@ from src.database.schema import (
 from src.auth.dependencies import get_optional_user, get_admin_user, get_current_active_user
 from src.utils.logger import setup_logger
 from src.integrations.regon_api import RegonService
+# Jedna lista miejscowości gminy na projekt — ta sama, po której alerty
+# rozstrzygają, czy awaria dotyczy naszych mieszkańców
+from src.services.alert_policy import GMINA_RYBNO_PLACES
 
 logger = setup_logger("BusinessAPI")
 
@@ -117,6 +121,26 @@ class ProfileUpdateRequest(BaseModel):
     logo_url: Optional[str] = None
 
 
+class ManualBusinessRequest(BaseModel):
+    """Firma dopisana przez właściciela — nie ma jej w CEIDG.
+
+    NIP jest opcjonalny świadomie: poza rejestrem działalności są też koła
+    gospodyń, stowarzyszenia i sołeckie inicjatywy, a katalog ma być spisem
+    tego, co w gminie realnie działa.
+    """
+    nazwa: str
+    miasto: str                       # miejscowość z gminy Rybno (lista zamknięta)
+    nip: Optional[str] = None
+    ulica: Optional[str] = None
+    budynek: Optional[str] = None
+    kod_pocztowy: Optional[str] = None
+    branza: Optional[str] = None      # opis własnymi słowami, nie kod PKD
+    telefon: Optional[str] = None
+    email: Optional[str] = None
+    www: Optional[str] = None
+    note: Optional[str] = None        # czym firma się zajmuje / jak zweryfikować
+
+
 class PendingClaim(BaseModel):
     claim_id: int
     business_id: int
@@ -128,6 +152,10 @@ class PendingClaim(BaseModel):
     telefon: Optional[str] = None
     email: Optional[str] = None
     created_at: datetime
+    # 'ceidg' = weryfikujemy TYLKO, czy zgłaszający jest właścicielem (dane firmy
+    # potwierdza rejestr). 'manual' = trzeba potwierdzić także, że firma istnieje
+    # i działa w gminie — rejestr nic tu nie mówi. Admin musi widzieć różnicę.
+    source: str = "ceidg"
 
 
 class AnnouncementCreate(BaseModel):
@@ -207,11 +235,27 @@ class CategoryItem(BaseModel):
 # ==================== Helpers ====================
 
 def apply_public_visibility(query):
-    """Filtry widoczności publicznej: bez sprzeciwów (RODO art. 21)
-    i bez firm wykreślonych z rejestru (retencja, art. 5)."""
+    """Filtry widoczności publicznej: bez sprzeciwów (RODO art. 21),
+    bez firm wykreślonych z rejestru (retencja, art. 5) i bez wpisów ręcznych,
+    których nikt jeszcze nie zatwierdził.
+
+    Ten trzeci warunek jest bramką, nie kosmetyką. Firmę z CEIDG potwierdza
+    rejestr — jest w katalogu, zanim ktokolwiek się nią zainteresuje. Firmę
+    dopisaną ręcznie potwierdza wyłącznie człowiek sprawdzający zgłoszenie,
+    więc do tego czasu nie może jej widzieć nikt poza kolejką admina. Inaczej
+    formularz „dodaj firmę" byłby otwartym wejściem do publicznego katalogu.
+    """
+    approved_manual = select(BusinessProfile.business_id).where(
+        BusinessProfile.claim_status == "verified"
+    )
     return query.where(
         CEIDGBusiness.opted_out == False  # noqa: E712
-    ).where(CEIDGBusiness.status != "WYKRESLONY")
+    ).where(CEIDGBusiness.status != "WYKRESLONY").where(
+        or_(
+            CEIDGBusiness.source != "manual",
+            CEIDGBusiness.id.in_(approved_manual),
+        )
+    )
 
 
 # ==================== Endpoints ====================
@@ -668,6 +712,130 @@ async def claim_business(
                 "message": "Zgłoszenie przyjęte — zweryfikujemy je w ciągu 2 dni roboczych."}
 
 
+@router.get("/gmina-localities", response_model=List[str])
+async def get_gmina_localities():
+    """Miejscowości gminy Rybno — lista, po której walidujemy wpisy ręczne.
+
+    Front pobiera ją stąd zamiast trzymać własną kopię. `AVAILABLE_LOCATIONS`
+    w types.ts NIE nadaje się do tego celu: to 24 pozycje harmonogramu odpadów
+    („Rybno R1", „Domki letniskowe"), a nie nazwy miejscowości.
+    """
+    return sorted(GMINA_RYBNO_PLACES)
+
+
+@router.post("/manual", status_code=201)
+async def add_manual_business(
+    request: ManualBusinessRequest,
+    user=Depends(get_current_active_user),
+):
+    """
+    Dodaj firmę, której nie ma w CEIDG — spółkę, oddział, koło gospodyń.
+
+    Tworzy wiersz-widmo w `ceidg_businesses` (`source='manual'`) razem
+    z wizytówką w tej samej transakcji i kieruje go do TEJ SAMEJ kolejki
+    akceptacji co przejęcia. Wpis jest niewidoczny publicznie, dopóki admin
+    go nie zatwierdzi — czyli dopóki człowiek nie potwierdzi, że firma istnieje.
+
+    Dlaczego wiersz-widmo, a nie osobna tabela: cała reszta kodu (katalog,
+    ogłoszenia, statystyki, premium, DSAR) trzyma się `business_id`. Osobna
+    tabela oznaczałaby drugą gałąź w każdym z tych miejsc.
+    """
+    nazwa = request.nazwa.strip()
+    if len(nazwa) < 3:
+        raise HTTPException(status_code=400, detail="Podaj pełną nazwę firmy")
+
+    miasto = request.miasto.strip()
+    if miasto not in GMINA_RYBNO_PLACES:
+        raise HTTPException(
+            status_code=400,
+            detail="Katalog obejmuje wyłącznie firmy z gminy Rybno — "
+                   "wybierz miejscowość z listy",
+        )
+
+    nip = (request.nip or "").replace("-", "").replace(" ", "").strip()
+    if nip and (not nip.isdigit() or len(nip) != 10):
+        raise HTTPException(status_code=400, detail="NIP ma 10 cyfr")
+
+    async with async_session() as session:
+        # Duplikat po NIP wykrywamy tylko wtedy, gdy NIP podano. Bez niego
+        # zostaje porównanie nazw w tej samej miejscowości — nie blokuje,
+        # bo „Zakład Usługowy Kowalski" bywa nazwą dwóch różnych firm, ale
+        # trafia do adnotacji dla admina
+        if nip:
+            existing = (await session.execute(
+                select(CEIDGBusiness).where(CEIDGBusiness.nip == nip)
+            )).scalars().first()
+            if existing:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"„{existing.nazwa}” jest już w katalogu — "
+                           f"przejmij jej wizytówkę zamiast dodawać nową",
+                )
+
+        twin = (await session.execute(
+            select(CEIDGBusiness)
+            .where(func.lower(CEIDGBusiness.nazwa) == nazwa.lower())
+            .where(CEIDGBusiness.miasto == miasto)
+        )).scalars().first()
+
+        business = CEIDGBusiness(
+            # Prefiks 'manual-' czyni identyfikator rozpoznawalnym w logach
+            # i w bazie bez zaglądania do kolumny source
+            ceidg_id=f"manual-{uuid.uuid4()}",
+            source="manual",
+            nazwa=nazwa,
+            nip=nip or "",
+            pkd_main=None,
+            status="AKTYWNY",
+            ulica=request.ulica,
+            budynek=request.budynek,
+            miasto=miasto,
+            kod_pocztowy=(request.kod_pocztowy or "13-220"),
+            gmina="Rybno",
+            powiat="działdowski",
+            wojewodztwo="warmińsko-mazurskie",
+        )
+        session.add(business)
+        await session.flush()  # potrzebne business.id do profilu
+
+        note_parts = []
+        if request.branza:
+            note_parts.append(f"Branża: {request.branza.strip()}")
+        if request.note:
+            note_parts.append(request.note.strip())
+        if twin:
+            note_parts.append(
+                f"⚠️ W katalogu jest już firma o tej nazwie w tej miejscowości "
+                f"(id {twin.id}) — sprawdź, czy to nie duplikat"
+            )
+        if not nip:
+            note_parts.append("Zgłoszona bez NIP-u")
+
+        profile = BusinessProfile(
+            business_id=business.id,
+            user_id=user.id,
+            claim_status="pending",
+            claim_note=" · ".join(note_parts) or None,
+            telefon=request.telefon,
+            email=request.email,
+            www=request.www,
+        )
+        session.add(profile)
+        await session.commit()
+        await session.refresh(profile)
+
+        logger.info(
+            f"Manual business: '{nazwa}' ({miasto}) by user={user.email} "
+            f"business={business.id} claim={profile.id}"
+        )
+        return {
+            "status": "pending",
+            "claim_id": profile.id,
+            "business_id": business.id,
+            "message": "Zgłoszenie przyjęte — sprawdzimy je w ciągu 2 dni roboczych.",
+        }
+
+
 @router.get("/claims/pending", response_model=List[PendingClaim])
 async def list_pending_claims(user=Depends(get_admin_user)):
     """Przejęcia wizytówek oczekujące na weryfikację (tylko admin)."""
@@ -692,6 +860,7 @@ async def list_pending_claims(user=Depends(get_admin_user)):
                 telefon=p.telefon,
                 email=p.email,
                 created_at=p.created_at,
+                source=b.source,
             )
             for p, b, email in result.all()
         ]
@@ -725,12 +894,28 @@ async def moderate_claim(
             # zostają w bazie bezterminowo. Ślad audytowy niesie log poniżej.
             business_id = profile.business_id
             await session.delete(profile)
+
+            # Wpis ręczny nie ma do czego wracać: firmę stworzyło to samo
+            # zgłoszenie, więc po odrzuceniu zostałby w bazie wiersz-widmo,
+            # którego nie widać nigdzie w interfejsie, a który niesie nazwę
+            # (często nazwisko) odrzuconego zgłaszającego. Kasujemy razem
+            # z profilem. Firma z CEIDG zostaje — ta istnieje niezależnie od nas.
+            business = (await session.execute(
+                select(CEIDGBusiness).where(CEIDGBusiness.id == business_id)
+            )).scalar_one_or_none()
+            ghost_deleted = False
+            if business and business.source == "manual":
+                await session.delete(business)
+                ghost_deleted = True
+
             await session.commit()
             logger.info(
                 f"Claim {claim_id} reject by admin {user.email} — profil skasowany, "
-                f"firma {business_id} wraca do puli"
+                + (f"wpis ręczny {business_id} usunięty z bazy"
+                   if ghost_deleted else f"firma {business_id} wraca do puli")
             )
-            return {"status": "ok", "claim_status": "rejected", "profile_deleted": True}
+            return {"status": "ok", "claim_status": "rejected",
+                    "profile_deleted": True, "business_deleted": ghost_deleted}
 
         profile.claim_status = "verified"
         profile.verified_at = datetime.utcnow()

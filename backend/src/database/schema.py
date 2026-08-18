@@ -438,6 +438,18 @@ class CEIDGBusiness(SQLModel, table=True):
     # Sprzeciw wobec przetwarzania (RODO art. 21): karta ukryta publicznie.
     # Flaga musi przetrwać każdą synchronizację CEIDG.
     opted_out: bool = Field(default=False, index=True)
+
+    # Skąd wziął się wiersz: 'ceidg' (rejestr) albo 'manual' (firma dopisana
+    # przez właściciela — spółka, oddział, działalność zarejestrowana pod innym
+    # adresem, koło gospodyń).
+    #
+    # ⚠️ To NIE jest kolumna informacyjna. `ceidg_job` oznacza statusem
+    # WYKRESLONY każdy wiersz, którego nie ma w odpowiedzi API, a wpis ręczny
+    # z definicji nie ma tam odpowiednika — bez tego znacznika zniknąłby
+    # z katalogu w pierwszą niedzielę po dodaniu. Sync musi też wykluczyć te
+    # wiersze z mianownika pokrycia, inaczej rosnąca liczba wpisów ręcznych
+    # zbija `coverage` poniżej progu i prawdziwe wykreślenia przestają działać.
+    source: str = Field(default="ceidg", max_length=20, index=True)
     
     # External link
     ceidg_link: Optional[str] = Field(default=None, max_length=500)

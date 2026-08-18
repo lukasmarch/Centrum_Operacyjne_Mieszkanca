@@ -6,7 +6,7 @@ import {
     fetchCatalog, claimBusiness, fetchMyClaims, updateBusinessProfile, uploadBusinessLogo,
     trackBusinessImpression, trackBusinessContact, fetchPendingClaims, moderateClaim,
     fetchActiveAnnouncements, fetchMyAnnouncements, createAnnouncement, deactivateAnnouncement,
-    getAssetUrl, isOwnerBusiness,
+    getAssetUrl, isOwnerBusiness, addManualBusiness, fetchGminaLocalities,
     CatalogCard, MyClaim, PendingClaim, ActiveAnnouncement, BusinessAnnouncement, AnnouncementType,
 } from '../services/businessApi';
 
@@ -283,6 +283,24 @@ const ClaimModal: React.FC<{
     const [error, setError] = useState<string | null>(null);
     const [done, setDone] = useState(false);
 
+    // Tryb ręczny — firma, której nie ma w CEIDG (spółka, oddział, KGW).
+    // Ta sama ścieżka, nie druga pozycja w menu: człowiek, który nie znalazł
+    // swojej firmy, jest już tutaj i szuka. Odesłanie go do formularza
+    // kontaktowego kończyło wizytę.
+    const [manual, setManual] = useState(false);
+    const [mNazwa, setMNazwa] = useState('');
+    const [mMiasto, setMMiasto] = useState('');
+    const [mNip, setMNip] = useState('');
+    const [mUlica, setMUlica] = useState('');
+    const [mBranza, setMBranza] = useState('');
+    const [localities, setLocalities] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (manual && localities.length === 0) {
+            fetchGminaLocalities().then(setLocalities).catch(() => setLocalities([]));
+        }
+    }, [manual, localities.length]);
+
     useEffect(() => {
         if (search.length < 2) { setResults([]); return; }
         const t = setTimeout(async () => {
@@ -298,16 +316,31 @@ const ClaimModal: React.FC<{
     }, [search]);
 
     const submit = async () => {
-        if (!selected || !consent) return;
+        if (!consent) return;
+        if (manual ? !(mNazwa.trim() && mMiasto) : !selected) return;
         setSubmitting(true);
         setError(null);
         try {
-            await claimBusiness(selected.id, {
-                telefon: telefon.trim() || undefined,
-                email: email.trim() || undefined,
-                www: www.trim() || undefined,
-                note: note.trim() || undefined,
-            });
+            if (manual) {
+                await addManualBusiness({
+                    nazwa: mNazwa.trim(),
+                    miasto: mMiasto,
+                    nip: mNip.trim() || undefined,
+                    ulica: mUlica.trim() || undefined,
+                    branza: mBranza.trim() || undefined,
+                    telefon: telefon.trim() || undefined,
+                    email: email.trim() || undefined,
+                    www: www.trim() || undefined,
+                    note: note.trim() || undefined,
+                });
+            } else {
+                await claimBusiness(selected!.id, {
+                    telefon: telefon.trim() || undefined,
+                    email: email.trim() || undefined,
+                    www: www.trim() || undefined,
+                    note: note.trim() || undefined,
+                });
+            }
             setDone(true);
             onClaimed();
         } catch (err: any) {
@@ -325,8 +358,18 @@ const ClaimModal: React.FC<{
                         <div className="text-5xl mb-4">🎉</div>
                         <h2 className="text-xl font-black text-neutral-100 mb-2">Zgłoszenie przyjęte!</h2>
                         <p className="text-neutral-400 text-sm leading-relaxed">
-                            Zweryfikujemy przejęcie wizytówki <strong className="text-neutral-200">{selected?.nazwa}</strong> w
-                            ciągu 2 dni roboczych. Po zatwierdzeniu uzupełnisz opis i godziny otwarcia.
+                            {manual ? (
+                                <>
+                                    Sprawdzimy wpis <strong className="text-neutral-200">{mNazwa}</strong> w ciągu
+                                    2 dni roboczych — firmy nie ma w rejestrze, więc potwierdzamy ją u źródła.
+                                    Do tego czasu jest widoczna tylko dla Ciebie.
+                                </>
+                            ) : (
+                                <>
+                                    Zweryfikujemy przejęcie wizytówki <strong className="text-neutral-200">{selected?.nazwa}</strong> w
+                                    ciągu 2 dni roboczych. Po zatwierdzeniu uzupełnisz opis i godziny otwarcia.
+                                </>
+                            )}
                         </p>
                         <button onClick={onClose} className="mt-6 px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 transition-colors">
                             Zamknij
@@ -335,11 +378,15 @@ const ClaimModal: React.FC<{
                 ) : (
                     <>
                         <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-xl font-black text-neutral-100">Przejmij wizytówkę</h2>
+                            <h2 className="text-xl font-black text-neutral-100">
+                                {manual ? 'Dodaj swoją firmę' : 'Przejmij wizytówkę'}
+                            </h2>
                             <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
                         </div>
                         <p className="text-xs text-neutral-500 mb-6">
-                            Krok {step} z 2 — {step === 1 ? 'znajdź swoją firmę w rejestrze' : 'dane kontaktowe do wizytówki'}
+                            Krok {step} z 2 — {step === 1
+                                ? 'znajdź swoją firmę w rejestrze'
+                                : manual ? 'dane firmy i kontakt' : 'dane kontaktowe do wizytówki'}
                         </p>
 
                         {!isAuthenticated ? (
@@ -382,18 +429,62 @@ const ClaimModal: React.FC<{
                                     ))}
                                     {search.length >= 2 && !searching && results.length === 0 && (
                                         <p className="text-xs text-neutral-500 text-center py-4">
-                                            Nie znaleziono firmy. Napisz do nas: biuro@lumargo.pl
+                                            Nie znaleziono firmy o tej nazwie.
                                         </p>
                                     )}
+                                </div>
+                                {/* Wyjście dla firm spoza CEIDG: spółek, oddziałów, kół gospodyń.
+                                    Rejestr obejmuje wyłącznie jednoosobowe działalności, więc
+                                    „nie ma jej w wyszukiwarce" nie znaczy „nie istnieje" */}
+                                <div className="pt-3 mt-1 border-t border-white/8">
+                                    <p className="text-[11px] text-neutral-500 leading-relaxed mb-2">
+                                        Nie ma tu Twojej firmy? Rejestr CEIDG nie obejmuje spółek,
+                                        oddziałów ani kół gospodyń — dopisz ją ręcznie, sprawdzimy zgłoszenie.
+                                    </p>
+                                    <button
+                                        onClick={() => { setManual(true); setSelected(null); setStep(2); }}
+                                        className="w-full py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-sm font-bold text-neutral-200 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all"
+                                    >
+                                        Dodaj firmę ręcznie
+                                    </button>
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
-                                    <p className="text-sm font-bold text-neutral-200">{selected?.nazwa}</p>
-                                    <p className="text-xs text-neutral-500">📍 {selected?.miasto} · NIP {selected?.nip}</p>
-                                    <button onClick={() => setStep(1)} className="text-[11px] text-blue-400 hover:underline mt-1">← zmień firmę</button>
-                                </div>
+                                {manual ? (
+                                    <div className="space-y-3">
+                                        <input type="text" value={mNazwa} onChange={e => setMNazwa(e.target.value)}
+                                            placeholder="Pełna nazwa firmy *" autoFocus
+                                            className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <select value={mMiasto} onChange={e => setMMiasto(e.target.value)}
+                                                className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none">
+                                                <option value="">Miejscowość *</option>
+                                                {localities.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                                            </select>
+                                            <input type="text" value={mUlica} onChange={e => setMUlica(e.target.value)}
+                                                placeholder="Ulica i numer"
+                                                className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="text" value={mNip} onChange={e => setMNip(e.target.value)}
+                                                placeholder="NIP (jeśli firma go ma)" inputMode="numeric"
+                                                className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                                            <input type="text" value={mBranza} onChange={e => setMBranza(e.target.value)}
+                                                placeholder="Czym się zajmujecie?"
+                                                className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                                        </div>
+                                        <button onClick={() => { setManual(false); setStep(1); }} className="text-[11px] text-blue-400 hover:underline">
+                                            ← wróć do wyszukiwarki
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+                                        <p className="text-sm font-bold text-neutral-200">{selected?.nazwa}</p>
+                                        <p className="text-xs text-neutral-500">📍 {selected?.miasto} · NIP {selected?.nip}</p>
+                                        <button onClick={() => setStep(1)} className="text-[11px] text-blue-400 hover:underline mt-1">← zmień firmę</button>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-3">
                                     <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Telefon firmowy"
                                         className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
@@ -403,22 +494,26 @@ const ClaimModal: React.FC<{
                                 <input type="text" value={www} onChange={e => setWww(e.target.value)} placeholder="Strona WWW (opcjonalnie)"
                                     className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
                                 <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
-                                    placeholder="Jak możemy potwierdzić, że to Twoja firma? (np. oddzwonimy na numer z szyldu/strony)"
+                                    placeholder={manual
+                                        ? 'Jak możemy potwierdzić, że firma działa? (np. adres szyldu, strona, profil na Facebooku)'
+                                        : 'Jak możemy potwierdzić, że to Twoja firma? (np. oddzwonimy na numer z szyldu/strony)'}
                                     className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500 resize-none" />
                                 <label className="flex items-start gap-2.5 cursor-pointer">
                                     <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 accent-blue-500 shrink-0" />
                                     <span className="text-[11px] text-neutral-400 leading-relaxed">
-                                        Oświadczam, że reprezentuję tę firmę, i wyrażam zgodę na publikację podanych
-                                        danych kontaktowych na wizytówce w katalogu firm RybnoLive. <span className="text-red-400">*</span>
+                                        {manual
+                                            ? 'Oświadczam, że reprezentuję tę firmę, podane dane są prawdziwe, a firma działa na terenie gminy Rybno. Wyrażam zgodę na publikację danych kontaktowych na wizytówce w katalogu firm RybnoLive.'
+                                            : 'Oświadczam, że reprezentuję tę firmę, i wyrażam zgodę na publikację podanych danych kontaktowych na wizytówce w katalogu firm RybnoLive.'}
+                                        {' '}<span className="text-red-400">*</span>
                                     </span>
                                 </label>
                                 {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠️ {error}</p>}
                                 <button
                                     onClick={submit}
-                                    disabled={submitting || !consent}
+                                    disabled={submitting || !consent || (manual && !(mNazwa.trim() && mMiasto))}
                                     className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 transition-all"
                                 >
-                                    {submitting ? 'Wysyłam…' : 'Przejmij wizytówkę (0 zł)'}
+                                    {submitting ? 'Wysyłam…' : manual ? 'Zgłoś firmę (0 zł)' : 'Przejmij wizytówkę (0 zł)'}
                                 </button>
                             </div>
                         )}
@@ -735,8 +830,26 @@ const ClaimsModerationModal: React.FC<{
                     <div className="space-y-4">
                         {claims.map(c => (
                             <div key={c.claim_id} className="p-4 bg-white/[0.03] border border-white/8 rounded-2xl">
-                                <p className="font-bold text-neutral-100 text-sm">{c.nazwa}</p>
-                                <p className="text-xs text-neutral-500 mt-0.5">📍 {c.miasto} · NIP {c.nip}</p>
+                                <div className="flex items-start gap-2">
+                                    <p className="font-bold text-neutral-100 text-sm flex-1">{c.nazwa}</p>
+                                    {c.source === 'manual' && (
+                                        <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-amber-400 text-[10px] font-bold">
+                                            spoza CEIDG
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-neutral-500 mt-0.5">
+                                    📍 {c.miasto}{c.nip ? ` · NIP ${c.nip}` : ' · bez NIP-u'}
+                                </p>
+                                {c.source === 'manual' && (
+                                    // Przy przejęciu dane firmy potwierdza rejestr i sprawdzamy
+                                    // tylko zgłaszającego. Tutaj rejestr nie mówi nic — odrzucenie
+                                    // kasuje wiersz firmy razem z wizytówką
+                                    <p className="text-[11px] text-amber-400/80 mt-1.5 leading-relaxed">
+                                        Wpis ręczny — potwierdź, że firma istnieje i działa w gminie.
+                                        Rejestr tego nie potwierdza.
+                                    </p>
+                                )}
                                 <p className="text-xs text-neutral-400 mt-1.5">
                                     👤 {c.user_email}
                                     {c.telefon && <> · 📞 {c.telefon}</>}

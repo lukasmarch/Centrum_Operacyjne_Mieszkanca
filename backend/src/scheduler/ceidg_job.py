@@ -89,7 +89,14 @@ async def fetch_ceidg_businesses():
             # job może chodzić co tydzień bez ryzyka rate limitu.
             logger.info("💾 Synchronizacja przyrostowa z bazą...")
 
-            result = await session.execute(select(CEIDGBusiness))
+            # Wpisy ręczne (source='manual') NIE biorą udziału w porównaniu
+            # z rejestrem — ani jako kandydaci do wykreślenia, ani w mianowniku
+            # pokrycia. To firmy spoza CEIDG (spółki, oddziały, koła gospodyń),
+            # więc ich nieobecność w odpowiedzi API jest stanem normalnym,
+            # a nie sygnałem, że zniknęły z rejestru.
+            result = await session.execute(
+                select(CEIDGBusiness).where(CEIDGBusiness.source == "ceidg")
+            )
             db_firms = {b.ceidg_id: b for b in result.scalars().all()}
 
             api_ids = set()

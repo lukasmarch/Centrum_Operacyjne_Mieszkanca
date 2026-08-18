@@ -19,7 +19,7 @@ from sqlmodel import select
 
 from src.database.schema import (
     User, Subscription, NewsletterSubscriber, Report, PushSubscription,
-    BusinessProfile, BusinessAnnouncement,
+    BusinessProfile, BusinessAnnouncement, CEIDGBusiness,
 )
 from src.database.vectors import Conversation, ChatMessage, APICostLog
 from src.utils.logger import setup_logger
@@ -213,6 +213,16 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
         )
         await session.execute(
             delete(BusinessProfile).where(BusinessProfile.user_id == user.id)
+        )
+        # Firmy dopisane ręcznie (source='manual') istnieją w bazie WYŁĄCZNIE
+        # dlatego, że ten użytkownik je zgłosił — nie ma ich w żadnym rejestrze.
+        # Po usunięciu konta zostałby wiersz z nazwą firmy, a ta u jednoosobowej
+        # działalności bywa wprost imieniem i nazwiskiem. Firm z CEIDG nie
+        # ruszamy: te istnieją niezależnie od nas i wracają do puli.
+        await session.execute(
+            delete(CEIDGBusiness)
+            .where(CEIDGBusiness.id.in_(business_ids))
+            .where(CEIDGBusiness.source == "manual")
         )
 
     # 6. Anonimizacja rekordu users (FK z subscriptions/referrals pozostaje spójne)
