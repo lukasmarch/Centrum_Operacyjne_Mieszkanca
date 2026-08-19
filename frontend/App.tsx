@@ -109,6 +109,10 @@ export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
     stats: '/statystyki',
     business: '/firmy',
     assistant: '/asystent',
+    // Profil ma adres nie po to, żeby go indeksować (sitemapa go nie zna —
+    // patrz backend/src/api/endpoints/seo.py), tylko żeby dało się w niego
+    // wysłać człowieka mailem: decyzja o wizytówce linkuje do /profil?zakladka=firma
+    profile: '/profil',
 };
 
 const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PATH)
@@ -133,6 +137,13 @@ const normalizeUnknownPath = () => {
 // przetrwało odświeżenie strony i drogę przez rejestrację konta
 type CheckoutSelection = { tier: string; frequency: Frequency };
 
+/** Zakładka profilu wskazana w adresie — `/profil?zakladka=firma` z maila
+ *  o decyzji w sprawie wizytówki. */
+const tabFromUrl = (): 'firma' | undefined =>
+    new URLSearchParams(window.location.search).get('zakladka') === 'firma'
+        ? 'firma'
+        : undefined;
+
 const checkoutFromUrl = (): CheckoutSelection | null => {
     const params = new URLSearchParams(window.location.search);
     const tier = params.get('plan');
@@ -149,7 +160,9 @@ const AppContent: React.FC = () => {
     const [initialQuery, setInitialQuery] = useState<string>('');
     const { user, isAuthenticated, isLoading, logout } = useAuth();
 
-    const [profileInitialTab, setProfileInitialTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | undefined>(undefined);
+    const [profileInitialTab, setProfileInitialTab] = useState<
+        'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma' | undefined
+    >(() => tabFromUrl());
     const [checkoutSelection, setCheckoutSelection] = useState<CheckoutSelection | null>(checkoutFromUrl);
 
     // Adres w pasku przeglądarki podąża za sekcją (tylko dla sekcji z SECTION_TO_PATH)

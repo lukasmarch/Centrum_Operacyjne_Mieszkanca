@@ -539,6 +539,43 @@ class BusinessAnnouncement(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
+class BusinessClaimLog(SQLModel, table=True):
+    """Ślad po decyzjach w sprawie przejęcia wizytówki — kto, o którą firmę
+    i z jakim skutkiem.
+
+    Dlaczego osobna tabela, skoro jest `business_profiles`. Odrzucenie KASUJE
+    profil (`moderate_claim`), i musi kasować: zostawiony wiersz „rejected"
+    blokowałby firmę przed przejęciem przez prawdziwego właściciela. Razem
+    z profilem znikał jednak jedyny ślad, że ktokolwiek próbował — nie było
+    jak odróżnić pierwszej próby od piątej ani powiedzieć zgłaszającemu,
+    że jego wniosek rozpatrzono odmownie.
+
+    Trzymamy MINIMUM: kto, która firma, jaka decyzja, kiedy. Bez telefonu,
+    e-maila i uzasadnienia — te znikają razem z profilem i nie mają tu wracać.
+    `business_name` jest wyjątkiem koniecznym: wpis ręczny bywa kasowany razem
+    z odrzuceniem, więc bez zapisanej nazwy nie da się pokazać człowiekowi,
+    CZEGO dotyczyła odmowa. Przy usunięciu konta (DSAR) kasujemy te wiersze
+    razem z resztą — prawo do usunięcia jest ważniejsze niż nasz audyt.
+
+    Brak kluczy obcych jest zamierzony: firma z `source='manual'` i konto
+    użytkownika bywają usuwane, a log ma je przeżyć do czasu DSAR.
+    """
+    __tablename__ = "business_claim_log"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(index=True)
+    user_id: int = Field(index=True)
+
+    # claimed / approved / rejected
+    action: str = Field(max_length=20, index=True)
+    # Nazwa firmy w chwili decyzji — patrz docstring
+    business_name: str = Field(max_length=300)
+    # Kto podjął decyzję (puste przy 'claimed')
+    admin_email: Optional[str] = Field(default=None, max_length=255)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 class CEIDGSyncStats(SQLModel, table=True):
     """Statystyki synchronizacji CEIDG"""
     __tablename__ = "ceidg_sync_stats"

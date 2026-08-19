@@ -3,14 +3,25 @@ import { AppSection, Business } from '../../types';
 import { useAuth } from '../context/AuthContext';
 import { Search, X, Info, Store, BarChart3, Phone, Globe, Clock, Star, BadgeCheck, Pencil, Megaphone, Tag } from 'lucide-react';
 import {
-    fetchCatalog, claimBusiness, fetchMyClaims, updateBusinessProfile, uploadBusinessLogo,
+    fetchCatalog, claimBusiness, fetchMyClaims,
     trackBusinessImpression, trackBusinessContact, fetchPendingClaims, moderateClaim,
-    fetchActiveAnnouncements, fetchMyAnnouncements, createAnnouncement, deactivateAnnouncement,
+    fetchActiveAnnouncements,
     getAssetUrl, isOwnerBusiness, addManualBusiness, fetchGminaLocalities,
-    CatalogCard, MyClaim, PendingClaim, ActiveAnnouncement, BusinessAnnouncement, AnnouncementType,
+    CatalogCard, MyClaim, PendingClaim, ActiveAnnouncement,
 } from '../services/businessApi';
+// Okna właściciela są wspólne z zakładką „Moja firma" w profilu
+import { EditProfileModal, AnnouncementsModal } from '../../components/BusinessOwnerModals';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+/** Odmiana rzeczownika przez liczbę — polski ma trzy formy, nie dwie.
+ *  Bez tego kolejka admina pokazywała „prowadzi 6 wizytówki". */
+const pluralPL = (n: number, one: string, few: string, many: string): string => {
+    if (n === 1) return one;
+    const last = n % 10;
+    const lastTwo = n % 100;
+    return last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14) ? few : many;
+};
 
 interface Locality {
     name: string;
@@ -526,269 +537,6 @@ const ClaimModal: React.FC<{
     );
 };
 
-// ==================== Modal: edycja wizytówki (właściciel) ====================
-
-const EditProfileModal: React.FC<{
-    claim: MyClaim;
-    card?: CatalogCard;
-    onClose: () => void;
-    onSaved: () => void;
-}> = ({ claim, card, onClose, onSaved }) => {
-    const [description, setDescription] = useState(card?.profile.description || '');
-    const [telefon, setTelefon] = useState(card?.profile.telefon || '');
-    const [email, setEmail] = useState(card?.profile.email || '');
-    const [www, setWww] = useState(card?.profile.www || '');
-    const [godziny, setGodziny] = useState(card?.profile.godziny || '');
-    const [logoUrl, setLogoUrl] = useState(card?.profile.logo_url || '');
-    const [uploadingLogo, setUploadingLogo] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const onLogoSelected = async (file: File | undefined) => {
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-            setError('Logo jest za duże. Maksymalny rozmiar: 2MB');
-            return;
-        }
-        setUploadingLogo(true);
-        setError(null);
-        try {
-            const url = await uploadBusinessLogo(claim.business_id, file);
-            setLogoUrl(url);
-            onSaved(); // upload zapisuje się od razu w bazie — odśwież katalog w tle
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setUploadingLogo(false);
-        }
-    };
-
-    const save = async () => {
-        setSaving(true);
-        setError(null);
-        try {
-            await updateBusinessProfile(claim.business_id, {
-                description: description,
-                telefon: telefon,
-                email: email,
-                www: www,
-                godziny: godziny,
-            });
-            onSaved();
-            onClose();
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-xl font-black text-neutral-100">Edytuj wizytówkę</h2>
-                    <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
-                </div>
-                <p className="text-xs text-neutral-500 mb-5">{claim.nazwa} · 👁 {claim.views_count} wyświetleń</p>
-
-                <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
-                            {logoUrl
-                                ? <img src={getAssetUrl(logoUrl)} alt="Logo" className="w-full h-full object-cover" />
-                                : <span className="text-neutral-500 text-2xl">🏪</span>}
-                        </div>
-                        <div className="flex-1">
-                            <label className="inline-block px-4 py-2 bg-white/[0.06] border border-white/10 rounded-xl text-xs font-bold text-neutral-300 hover:bg-white/[0.1] cursor-pointer transition-all">
-                                {uploadingLogo ? 'Wysyłam…' : logoUrl ? 'Zmień logo' : 'Dodaj logo'}
-                                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                                    disabled={uploadingLogo}
-                                    onChange={e => onLogoSelected(e.target.files?.[0])} />
-                            </label>
-                            <p className="text-[10px] text-neutral-500 mt-1.5">JPG, PNG lub WEBP, max 2MB</p>
-                        </div>
-                    </div>
-                    <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={600}
-                        placeholder="Opis firmy — czym się zajmujecie, co Was wyróżnia (max 600 znaków)"
-                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500 resize-none" />
-                    <div className="grid grid-cols-2 gap-3">
-                        <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Telefon"
-                            className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail"
-                            className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                    </div>
-                    <input type="text" value={www} onChange={e => setWww(e.target.value)} placeholder="Strona WWW"
-                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                    <input type="text" value={godziny} onChange={e => setGodziny(e.target.value)} placeholder="Godziny otwarcia, np. pn-pt 8-17, sb 8-13"
-                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                    {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠️ {error}</p>}
-                    <button onClick={save} disabled={saving}
-                        className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 transition-all">
-                        {saving ? 'Zapisuję…' : 'Zapisz wizytówkę'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ==================== Modal: ogłoszenia firmy (plan Firma lokalna) ====================
-
-const QUOTA_INFO: Record<AnnouncementType, { label: string; limit: number; hint: string }> = {
-    ogloszenie: { label: 'Ogłoszenie', limit: 2, hint: 'widoczne w feedzie aktualności i newsletterze' },
-    okazja: { label: 'Okazja „tu i teraz"', limit: 8, hint: 'krótka promocja (maks. 7 dni) — strona główna i wizytówka' },
-};
-
-const AnnouncementsModal: React.FC<{
-    claim: MyClaim;
-    onClose: () => void;
-    onChanged: () => void;
-}> = ({ claim, onClose, onChanged }) => {
-    const [items, setItems] = useState<BusinessAnnouncement[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [type, setType] = useState<AnnouncementType>('okazja');
-    const [title, setTitle] = useState('');
-    const [body, setBody] = useState('');
-    const [validUntil, setValidUntil] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const load = useCallback(() => {
-        fetchMyAnnouncements(claim.business_id).then(setItems).finally(() => setLoading(false));
-    }, [claim.business_id]);
-
-    useEffect(() => { load(); }, [load]);
-
-    const monthStart = new Date();
-    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-    const usedThisMonth = (t: AnnouncementType) =>
-        items.filter(i => i.type === t && new Date(i.created_at) >= monthStart).length;
-
-    const publish = async () => {
-        setSaving(true);
-        setError(null);
-        try {
-            await createAnnouncement(claim.business_id, {
-                type,
-                title: title.trim(),
-                body: body.trim(),
-                valid_until: type === 'okazja' && validUntil ? new Date(validUntil).toISOString() : undefined,
-            });
-            setTitle(''); setBody(''); setValidUntil('');
-            load();
-            onChanged();
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const withdraw = async (id: number) => {
-        try {
-            await deactivateAnnouncement(id);
-            setItems(prev => prev.map(i => i.id === id ? { ...i, is_active: false } : i));
-            onChanged();
-        } catch (err) {
-            console.error('Announcement withdraw failed:', err);
-        }
-    };
-
-    const now = new Date();
-    const isLive = (a: BusinessAnnouncement) =>
-        a.is_active && (!a.valid_until || new Date(a.valid_until) > now);
-
-    return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-xl font-black text-neutral-100">📣 Ogłoszenia firmy</h2>
-                    <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
-                </div>
-                <p className="text-xs text-neutral-500 mb-5">{claim.nazwa}</p>
-
-                {!claim.is_premium ? (
-                    <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center">
-                        <p className="text-sm font-bold text-amber-300 mb-1">Funkcja planu „Firma lokalna"</p>
-                        <p className="text-xs text-neutral-400 leading-relaxed">
-                            Ogłoszenia i okazje publikują firmy z planem Firma lokalna (49 zł/mc):
-                            2 ogłoszenia + 8 okazji miesięcznie, widoczne na stronie głównej,
-                            w feedzie i newsletterze. Napisz do nas: biuro@lumargo.pl
-                        </p>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {/* Formularz publikacji */}
-                        <div className="grid grid-cols-2 gap-2">
-                            {(Object.keys(QUOTA_INFO) as AnnouncementType[]).map(t => (
-                                <button key={t} onClick={() => setType(t)}
-                                    className={`p-3 rounded-xl border text-left transition-all ${
-                                        type === t ? 'bg-amber-500/15 border-amber-500/40' : 'bg-gray-900 border-gray-700/50 hover:border-gray-600'
-                                    }`}>
-                                    <p className={`text-xs font-bold ${type === t ? 'text-amber-300' : 'text-neutral-300'}`}>{QUOTA_INFO[t].label}</p>
-                                    <p className="text-[10px] text-neutral-500 mt-0.5">{QUOTA_INFO[t].hint}</p>
-                                    <p className="text-[10px] text-neutral-400 mt-1">
-                                        {usedThisMonth(t)}/{QUOTA_INFO[t].limit} w tym miesiącu
-                                    </p>
-                                </button>
-                            ))}
-                        </div>
-                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} maxLength={120}
-                            placeholder={type === 'okazja' ? 'Np. Truskawki 50% taniej do 16:00' : 'Tytuł ogłoszenia'}
-                            className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-amber-500 outline-none placeholder:text-neutral-500" />
-                        <textarea value={body} onChange={e => setBody(e.target.value)} rows={3} maxLength={500}
-                            placeholder="Treść (max 500 znaków)"
-                            className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-amber-500 outline-none placeholder:text-neutral-500 resize-none" />
-                        {type === 'okazja' && (
-                            <label className="block text-xs text-neutral-400">
-                                Ważna do (maks. 7 dni):
-                                <input type="datetime-local" value={validUntil} onChange={e => setValidUntil(e.target.value)}
-                                    className="mt-1 w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-amber-500 outline-none" />
-                            </label>
-                        )}
-                        {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠️ {error}</p>}
-                        <button onClick={publish} disabled={saving || !title.trim() || !body.trim()}
-                            className="w-full py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white font-black rounded-xl hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 transition-all">
-                            {saving ? 'Publikuję…' : 'Opublikuj'}
-                        </button>
-
-                        {/* Lista ogłoszeń */}
-                        {loading ? (
-                            <p className="text-neutral-500 text-xs text-center py-3">Ładowanie…</p>
-                        ) : items.length > 0 && (
-                            <div className="space-y-2 pt-2 border-t border-white/8">
-                                {items.map(a => (
-                                    <div key={a.id} className="p-3 bg-white/[0.03] border border-white/8 rounded-xl">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
-                                                    {a.type === 'okazja' ? <Tag size={10} className="text-amber-400" /> : <Megaphone size={10} className="text-blue-400" />}
-                                                    {a.title}
-                                                </p>
-                                                <p className="text-[11px] text-neutral-500 mt-0.5 line-clamp-2">{a.body}</p>
-                                                <p className="text-[10px] text-neutral-600 mt-1">
-                                                    {isLive(a) ? '🟢 aktywne' : '⚪ nieaktywne'}
-                                                    {a.valid_until && ` · do ${new Date(a.valid_until).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
-                                                </p>
-                                            </div>
-                                            {isLive(a) && (
-                                                <button onClick={() => withdraw(a.id)}
-                                                    className="text-[10px] text-red-400 hover:text-red-300 whitespace-nowrap flex-shrink-0">
-                                                    Wycofaj
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
 
 // ==================== Modal: weryfikacja przejęć (admin) ====================
 
@@ -857,6 +605,19 @@ const ClaimsModerationModal: React.FC<{
                                     {c.telefon && <> · 📞 {c.telefon}</>}
                                     {c.email && <> · ✉️ {c.email}</>}
                                 </p>
+                                {/* Historia zgłaszającego. Odrzucenie kasuje wiersz wizytówki,
+                                    więc bez `business_claim_log` każdy wniosek wyglądał jak
+                                    pierwszy — także trzeci z rzędu po dwóch odmowach. */}
+                                <p className="text-[11px] text-neutral-500 mt-1">
+                                    {c.user_registered_at && <>konto od {new Date(c.user_registered_at).toLocaleDateString('pl-PL')}</>}
+                                    {!!c.user_verified_profiles && <> · prowadzi {c.user_verified_profiles} {pluralPL(c.user_verified_profiles, 'wizytówkę', 'wizytówki', 'wizytówek')}</>}
+                                </p>
+                                {!!c.user_rejected_before && (
+                                    <p className="text-[11px] font-bold text-amber-400 mt-1">
+                                        ⚠️ Wcześniej odrzuciliśmy {c.user_rejected_before}{' '}
+                                        {pluralPL(c.user_rejected_before, 'wniosek', 'wnioski', 'wniosków')} tego konta
+                                    </p>
+                                )}
                                 {c.note && <p className="text-xs text-neutral-400 mt-1.5 italic">„{c.note}"</p>}
                                 <div className="flex gap-2 mt-3">
                                     <button
@@ -918,7 +679,10 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
     const myVerifiedByBusinessId = new Map(
         myClaims.filter(c => c.claim_status === 'verified').map(c => [c.business_id, c])
     );
-    const myPendingClaim = myClaims.find(c => c.claim_status === 'pending');
+    // `.filter`, nie `.find`: kto zgłosił dwie firmy, ma prawo widzieć status obu.
+    // Do 19.08 baner pokazywał wyłącznie pierwsze zgłoszenie, więc drugie
+    // wyglądało, jakby przepadło.
+    const myPendingClaims = myClaims.filter(c => c.claim_status === 'pending');
 
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [localities, setLocalities] = useState<Locality[]>([]);
@@ -1130,12 +894,19 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
             {view === 'katalog' && (
                 <>
                     {/* Status mojego przejęcia */}
-                    {myPendingClaim && (
-                        <div className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-4 text-sm text-neutral-300">
-                            ⏳ Twoje przejęcie wizytówki <strong>{myPendingClaim.nazwa}</strong> czeka
+                    {myPendingClaims.map(claim => (
+                        <div key={claim.business_id}
+                            className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-4 text-sm text-neutral-300">
+                            ⏳ Twoje zgłoszenie firmy <strong>{claim.nazwa}</strong> czeka
                             na weryfikację — zwykle do 2 dni roboczych.
+                            {onNavigate && (
+                                <button onClick={() => onNavigate('profile')}
+                                    className="ml-1 text-blue-300 hover:text-blue-200 underline underline-offset-2">
+                                    Status wszystkich Twoich firm
+                                </button>
+                            )}
                         </div>
-                    )}
+                    ))}
 
                     {catalogLoading ? (
                         <div className="text-center py-16 text-neutral-500">Ładowanie katalogu…</div>

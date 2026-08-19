@@ -19,7 +19,7 @@ from sqlmodel import select
 
 from src.database.schema import (
     User, Subscription, NewsletterSubscriber, Report, PushSubscription,
-    BusinessProfile, BusinessAnnouncement, CEIDGBusiness,
+    BusinessProfile, BusinessAnnouncement, CEIDGBusiness, BusinessClaimLog,
 )
 from src.database.vectors import Conversation, ChatMessage, APICostLog
 from src.utils.logger import setup_logger
@@ -224,6 +224,19 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
             .where(CEIDGBusiness.id.in_(business_ids))
             .where(CEIDGBusiness.source == "manual")
         )
+
+    # 5b. Historia zgłoszeń o wizytówki (`business_claim_log`) — kasowana zawsze,
+    # także gdy żaden profil dziś nie istnieje.
+    #
+    # Log powstał po to, żeby przeżyć skasowanie profilu przy odmowie: dzięki
+    # niemu wiemy, że ktoś już raz próbował przejąć cudzą firmę, i możemy mu
+    # powiedzieć, jak sprawa się skończyła. Prawo do usunięcia danych stoi
+    # jednak wyżej niż nasz audyt — a wiersz niesie nazwę firmy, która przy
+    # jednoosobowej działalności bywa wprost imieniem i nazwiskiem.
+    # Ślad, że decyzja zapadła, zostaje w logu aplikacji (bez treści).
+    await session.execute(
+        delete(BusinessClaimLog).where(BusinessClaimLog.user_id == user.id)
+    )
 
     # 6. Anonimizacja rekordu users (FK z subscriptions/referrals pozostaje spójne)
     user.email = f"usuniete-{user.id}@anonimizacja.rybnolive.pl"

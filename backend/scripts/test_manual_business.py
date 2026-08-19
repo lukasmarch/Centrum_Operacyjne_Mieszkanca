@@ -31,11 +31,11 @@ from sqlmodel import select  # noqa: E402
 
 from src.database.connection import async_session, engine  # noqa: E402
 from src.database.schema import (  # noqa: E402
-    CEIDGBusiness, BusinessProfile, User, SQLModel,
+    CEIDGBusiness, BusinessProfile, BusinessClaimLog, User, SQLModel,
 )
 from src.api.endpoints.business import (  # noqa: E402
-    ManualBusinessRequest, add_manual_business, moderate_claim,
-    apply_public_visibility,
+    ManualBusinessRequest, ClaimRequest, add_manual_business, claim_business,
+    moderate_claim, apply_public_visibility,
 )
 
 TEST_EMAIL = "test-manual-business@rybnolive.local"
@@ -58,7 +58,8 @@ async def ensure_tables() -> None:
     """Tworzy tylko tabele potrzebne temu testowi (baza deweloperska bywa pusta)."""
     tables = [
         SQLModel.metadata.tables[t]
-        for t in ("users", "business_profiles", "ceidg_businesses")
+        for t in ("users", "business_profiles", "ceidg_businesses",
+                  "business_claim_log")
         if t in SQLModel.metadata.tables
     ]
     async with engine.begin() as conn:
@@ -67,6 +68,14 @@ async def ensure_tables() -> None:
 
 async def cleanup(session) -> None:
     """Kasuje wszystko, co test mógł zostawić — także po przerwanym przebiegu."""
+    # Log zgłoszeń idzie pierwszy: nie ma klucza obcego do users (ma przeżyć
+    # skasowanie profilu przy odmowie), więc nic go nie usunie kaskadowo.
+    # Drugi warunek łapie ślady po przebiegu przerwanym PO skasowaniu konta —
+    # wtedy podzapytanie o e-mail nie zwraca już nic, a wiersze zostają
+    await session.execute(text(
+        "DELETE FROM business_claim_log WHERE user_id IN "
+        "(SELECT id FROM users WHERE email = :e) OR business_name = :n"
+    ), {"e": TEST_EMAIL, "n": TEST_NAZWA})
     await session.execute(text(
         "DELETE FROM business_profiles WHERE user_id IN "
         "(SELECT id FROM users WHERE email = :e)"
@@ -202,6 +211,58 @@ async def main() -> int:
             select(CEIDGBusiness.id).where(CEIDGBusiness.source == "ceidg").limit(1)
         )).scalars().all()
         check("firmy z rejestru nietknięte", len(firms_from_registry) == 1)
+
+    print("\n3b. Odmowa zostawia ślad i zamyka drogę na 30 dni")
+    async with async_session() as session:
+        actions = (await session.execute(
+            text("SELECT action FROM business_claim_log WHERE user_id = :u "
+                 "ORDER BY id"),
+            {"u": user.id},
+        )).scalars().all()
+        check("log zapisał zgłoszenie, akceptację i odmowę",
+              {"claimed", "approved", "rejected"} <= set(actions), str(actions))
+
+        # Firma z rejestru — wpis ręczny po odmowie już nie istnieje, a karencja
+        # ma sens tylko tam, gdzie jest do czego wracać
+        registry_id = (await session.execute(
+            select(CEIDGBusiness.id).where(CEIDGBusiness.source == "ceidg").limit(1)
+        )).scalars().first()
+        session.add(BusinessClaimLog(
+            business_id=registry_id,
+            user_id=user.id,
+            action="rejected",
+            business_name="Firma z rejestru",
+        ))
+        await session.commit()
+
+    try:
+        await claim_business(registry_id, ClaimRequest(), user=user)
+        check("karencja blokuje ponowny wniosek po odmowie", False, "przeszło")
+    except Exception as exc:
+        check("karencja blokuje ponowny wniosek po odmowie",
+              getattr(exc, "status_code", None) == 403,
+              f"kod {getattr(exc, 'status_code', None)}")
+
+    # Blokada dotyczy odrzuconego, NIE firmy — prawdziwy właściciel nie może
+    # płacić za cudzą próbę
+    async with async_session() as session:
+        other = User(email="test-manual-other@rybnolive.local", password_hash="!test!",
+                     full_name="Ktoś inny")
+        session.add(other)
+        await session.commit()
+        await session.refresh(other)
+    try:
+        again = await claim_business(registry_id, ClaimRequest(), user=other)
+        check("ktoś inny przechodzi mimo cudzej odmowy", again["status"] == "pending")
+    except Exception as exc:
+        check("ktoś inny przechodzi mimo cudzej odmowy", False, str(exc))
+    async with async_session() as session:
+        await session.execute(text(
+            "DELETE FROM business_claim_log WHERE user_id = :u"), {"u": other.id})
+        await session.execute(text(
+            "DELETE FROM business_profiles WHERE user_id = :u"), {"u": other.id})
+        await session.execute(text("DELETE FROM users WHERE id = :u"), {"u": other.id})
+        await session.commit()
 
     print("\n4. Bramki walidacji")
     for label, req, expect in [

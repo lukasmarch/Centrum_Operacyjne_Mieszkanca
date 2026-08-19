@@ -63,13 +63,31 @@ export function promotableCards(cards: CatalogCard[]): CatalogCard[] {
     return cards.filter(c => c.profile.is_premium && !isOwnerBusiness(c.nazwa));
 }
 
+/**
+ * Wizytówka widziana oczami właściciela (zakładka „Moja firma" w profilu).
+ *
+ * `claim_id` bywa puste: pozycje `rejected` nie mają już profilu w bazie
+ * (odrzucenie go kasuje) i pochodzą z `business_claim_log`.
+ */
 export interface MyClaim {
-    claim_id: number;
+    claim_id?: number | null;
     business_id: number;
     nazwa: string;
+    miasto?: string | null;
     claim_status: 'pending' | 'verified' | 'rejected';
+    source?: 'ceidg' | 'manual';
     is_premium: boolean;
     views_count: number;
+    impressions_count?: number;
+    /** Karta ukryta na wniosek firmy (RODO art. 21) — nie ma jej w katalogu */
+    is_hidden?: boolean;
+    created_at?: string | null;
+    verified_at?: string | null;
+    /** Data odmowy — tylko pozycje `rejected` */
+    decided_at?: string | null;
+    /** Treść karty — żeby formularz edycji startował z tym, co już wpisano.
+     *  Pusty formularz + zapis = wyczyszczenie wizytówki. */
+    profile?: BusinessProfilePublic | null;
 }
 
 export interface PendingClaim {
@@ -86,6 +104,12 @@ export interface PendingClaim {
     /** 'ceidg' — dane potwierdza rejestr, sprawdzamy tylko właściciela.
      *  'manual' — firma dopisana ręcznie, trzeba potwierdzić też jej istnienie. */
     source?: 'ceidg' | 'manual';
+
+    /** Kontekst o zgłaszającym — konto założone przed chwilą, które zgłasza
+     *  trzecią firmę po dwóch odmowach, to inna sprawa niż wracający właściciel. */
+    user_registered_at?: string | null;
+    user_verified_profiles?: number;
+    user_rejected_before?: number;
 }
 
 /** Firma spoza CEIDG — dopisywana przez właściciela (spółka, oddział, KGW) */

@@ -8,13 +8,14 @@ import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import PricingCards from '../../components/PricingCards';
+import MyBusinessPanel from '../../components/MyBusinessPanel';
 import { getAccessToken } from '../services/authApi';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 interface ProfilePageProps {
-  onNavigate: (section: 'dashboard' | 'premium' | 'terms' | 'privacy') => void;
-  initialTab?: 'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj';
+  onNavigate: (section: 'dashboard' | 'premium' | 'terms' | 'privacy' | 'business') => void;
+  initialTab?: 'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma';
 }
 
 const NewsletterPrefs: React.FC<{ isPremium: boolean; apiBase: string }> = ({ isPremium, apiBase }) => {
@@ -122,7 +123,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
   const { status: pushStatus, isSubscribed: pushSubscribed, isSupported: pushSupported, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const [pushLoading, setPushLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj'>(initialTab ?? 'profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma'>(initialTab ?? 'profile');
   const [referralData, setReferralData] = useState<{referral_code: string; referral_link: string; referrals_count: number; reward_per_referral: string} | null>(null);
   const [referralCopied, setReferralCopied] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -406,6 +407,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                 }`}
               >
                 Subskrypcja
+              </button>
+              <button
+                onClick={() => setActiveTab('firma')}
+                className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
+                  activeTab === 'firma'
+                    ? 'bg-blue-50 text-blue-600 font-semibold'
+                    : 'text-neutral-600 hover:bg-gray-950'
+                }`}
+              >
+                Moja firma
               </button>
               <button
                 onClick={() => setActiveTab('polecaj')}
@@ -843,6 +854,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                 </dl>
               </div>
             </div>
+          )}
+          {/* Moja firma — wizytówki przypisane do tego konta */}
+          {activeTab === 'firma' && (
+            <MyBusinessPanel
+              onGoToCatalog={() => onNavigate('business')}
+              onGoToPricing={() => onNavigate('premium')}
+            />
           )}
           {/* Polecaj Tab */}
           {activeTab === 'polecaj' && (

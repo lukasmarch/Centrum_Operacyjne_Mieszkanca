@@ -485,3 +485,68 @@ class EmailService:
             subject="Potwierdź subskrypcję newslettera - RybnoLive",
             html_content=html
         )
+
+    async def send_business_claim_decision(
+        self,
+        to_email: str,
+        business_name: str,
+        approved: bool,
+    ) -> Dict[str, Any]:
+        """Decyzja w sprawie przejęcia wizytówki — do zgłaszającego.
+
+        Wysyłamy TAKŻE odmowę, choć milczenie byłoby wygodniejsze. Zgłoszenie,
+        które znika bez słowa, wygląda dla człowieka jak awaria serwisu — wraca
+        więc i składa je ponownie, a my za każdym razem oceniamy je od zera.
+        Odmowa nie podaje powodu (bywa nim „nie potwierdziliśmy, że to Pana
+        firma"), za to zawsze wskazuje drogę odwoławczą: adres, pod którym
+        siedzi człowiek.
+        """
+        panel_url = app_link("/profil", campaign="wizytowka")
+
+        if approved:
+            subject = f"✅ Wizytówka „{business_name}” jest Twoja"
+            body = f"""
+            <h2>Wizytówka potwierdzona</h2>
+            <p>Potwierdziliśmy Twoje zgłoszenie firmy <strong>{business_name}</strong>.
+               Od teraz karta jest przypisana do Twojego konta.</p>
+            <p>W zakładce <strong>Moja firma</strong> w profilu uzupełnisz telefon,
+               godziny otwarcia i opis — to one decydują, czy mieszkaniec zadzwoni.</p>
+            <a href="{panel_url}" class="btn">Uzupełnij wizytówkę</a>
+            """
+        else:
+            subject = f"Zgłoszenie firmy „{business_name}” — decyzja"
+            body = f"""
+            <h2>Nie potwierdziliśmy zgłoszenia</h2>
+            <p>Twój wniosek o wizytówkę firmy <strong>{business_name}</strong>
+               nie został potwierdzony, więc karta wraca do puli.</p>
+            <p>Jeśli to Twoja firma, odpisz na tę wiadomość albo napisz na
+               <a href="mailto:biuro@lumargo.pl">biuro@lumargo.pl</a> — wystarczy
+               cokolwiek, co wiąże Cię z firmą (pieczątka, faktura, wpis w CEIDG).
+               Załatwimy to od ręki, bez czekania na kolejny wniosek.</p>
+            """
+
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: sans-serif; line-height: 1.6; color: #333; }}
+                .btn {{ display: inline-block; background: #1e3a5f; color: white; padding: 12px 30px;
+                        text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            {body}
+            <p style="font-size: 12px; color: #888; margin-top: 30px;">
+                RybnoLive — katalog firm gminy Rybno
+            </p>
+        </body>
+        </html>
+        """
+
+        return await self.send_email(
+            to_email=to_email,
+            subject=subject,
+            html_content=html,
+            reply_to="biuro@lumargo.pl",
+        )

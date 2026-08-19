@@ -15,7 +15,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query, Depends, UploadFile, File
 from pydantic import BaseModel
 from sqlmodel import select, func, text
@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.connection import async_session
 from src.database.schema import (
     CEIDGBusiness, CEIDGSyncStats, BusinessProfile, BusinessAnnouncement,
+    BusinessClaimLog,
 )
 from src.auth.dependencies import get_optional_user, get_admin_user, get_current_active_user
 from src.utils.logger import setup_logger
@@ -41,6 +42,13 @@ LOGO_UPLOAD_DIR = Path(__file__).parent.parent.parent.parent / "uploads" / "busi
 LOGO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 LOGO_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 LOGO_MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB — logo, nie zdjęcie reportażowe
+
+# Karencja po odmowie: tyle dni ten sam użytkownik nie może ponowić wniosku
+# o TĘ SAMĄ firmę. Odrzucenie kasuje profil, więc bez tej bramki nic nie stoi
+# na przeszkodzie, by wysłać zgłoszenie ponownie minutę później — i tak
+# w kółko. Firmy nie blokujemy: wniosek od KOGOŚ INNEGO przechodzi normalnie,
+# bo prawdziwy właściciel nie może płacić za cudzą próbę.
+CLAIM_COOLDOWN_DAYS = 30
 
 router = APIRouter(prefix="/api/business", tags=["business"])
 
@@ -156,6 +164,43 @@ class PendingClaim(BaseModel):
     # potwierdza rejestr). 'manual' = trzeba potwierdzić także, że firma istnieje
     # i działa w gminie — rejestr nic tu nie mówi. Admin musi widzieć różnicę.
     source: str = "ceidg"
+
+    # Kontekst o zgłaszającym. Samo „ktoś prosi o firmę X" nie wystarcza do
+    # decyzji: konto założone przed chwilą, które zgłasza trzecią firmę po dwóch
+    # wcześniejszych odmowach, to zupełnie inna sprawa niż właściciel wracający
+    # po roku. Liczby biorą się z `business_claim_log` i profili tego konta.
+    user_registered_at: Optional[datetime] = None
+    user_verified_profiles: int = 0   # ile wizytówek to konto już prowadzi
+    user_rejected_before: int = 0     # ile jego wniosków odrzuciliśmy wcześniej
+
+
+class MyClaimItem(BaseModel):
+    """Wizytówka widziana oczami właściciela — zakładka „Moja firma".
+
+    `claim_id` jest pusty dla pozycji odrzuconych: profil wtedy nie istnieje,
+    a wpis pochodzi z `business_claim_log`. Front rozpoznaje je po `claim_status`.
+    """
+    claim_id: Optional[int] = None
+    business_id: int
+    nazwa: str
+    miasto: Optional[str] = None
+    claim_status: str                 # pending / verified / rejected
+    source: str = "ceidg"
+    is_premium: bool = False
+    views_count: int = 0
+    impressions_count: int = 0
+    # Karta ukryta na wniosek firmy (RODO art. 21) — właściciel ma o tym wiedzieć,
+    # bo inaczej „moja wizytówka zniknęła z katalogu" wygląda jak awaria
+    is_hidden: bool = False
+    created_at: Optional[datetime] = None
+    verified_at: Optional[datetime] = None
+    decided_at: Optional[datetime] = None   # data odmowy (pozycje 'rejected')
+
+    # Treść karty — potrzebna, by formularz edycji wystartował z tym, co
+    # już jest wpisane. Bez tego okno otwierane spoza katalogu miało puste
+    # pola, a zapis kasował opis i kontakt (backend traktuje pusty string
+    # jako „wyczyść"). Dane własne właściciela, więc wraca komplet.
+    profile: Optional[ProfilePublic] = None
 
 
 class AnnouncementCreate(BaseModel):
@@ -632,26 +677,75 @@ async def get_catalog(limit: int = Query(60, ge=1, le=200)):
         return cards
 
 
-@router.get("/my-claims")
+@router.get("/my-claims", response_model=List[MyClaimItem])
 async def get_my_claims(user=Depends(get_current_active_user)):
-    """Przejęcia wizytówek zalogowanego użytkownika (status + business_id)."""
+    """Wizytówki zalogowanego użytkownika — materiał dla zakładki „Moja firma".
+
+    Zwraca TRZY rodzaje pozycji, nie jeden:
+    - `pending` i `verified` — z `business_profiles`,
+    - `rejected` — z `business_claim_log`, bo odrzucenie kasuje profil.
+
+    Bez tego trzeciego rodzaju człowiek, którego wniosek odrzucono, nie
+    dostawał żadnego sygnału: zgłoszenie po prostu znikało z interfejsu.
+    """
     async with async_session() as session:
         result = await session.execute(
-            select(BusinessProfile, CEIDGBusiness.nazwa)
+            select(BusinessProfile, CEIDGBusiness)
             .join(CEIDGBusiness, CEIDGBusiness.id == BusinessProfile.business_id)
             .where(BusinessProfile.user_id == user.id)
+            .order_by(BusinessProfile.created_at.desc())
         )
-        return [
-            {
-                "claim_id": p.id,
-                "business_id": p.business_id,
-                "nazwa": nazwa,
-                "claim_status": p.claim_status,
-                "is_premium": p.is_premium,
-                "views_count": p.views_count,
-            }
-            for p, nazwa in result.all()
-        ]
+        items = []
+        owned_ids = set()
+        for p, b in result.all():
+            owned_ids.add(p.business_id)
+            items.append(MyClaimItem(
+                claim_id=p.id,
+                business_id=p.business_id,
+                nazwa=b.nazwa,
+                miasto=b.miasto,
+                claim_status=p.claim_status,
+                source=b.source or "ceidg",
+                is_premium=p.is_premium,
+                views_count=p.views_count,
+                impressions_count=p.impressions_count,
+                is_hidden=b.opted_out,
+                created_at=p.created_at,
+                verified_at=p.verified_at,
+                profile=ProfilePublic(
+                    description=p.description,
+                    telefon=p.telefon,
+                    email=p.email,
+                    www=p.www,
+                    godziny=p.godziny,
+                    logo_url=p.logo_url,
+                    is_premium=p.is_premium,
+                ),
+            ))
+
+        # Odmowy. Bierzemy najnowszą decyzję na firmę i pomijamy te, na które
+        # użytkownik ma dziś profil — ktoś odrzucony w maju mógł ponowić wniosek
+        # po karencji i zostać zatwierdzony; pokazywanie mu wtedy starej odmowy
+        # obok działającej wizytówki byłoby myleniem go bez powodu.
+        rejected = await session.execute(
+            select(BusinessClaimLog)
+            .where(BusinessClaimLog.user_id == user.id)
+            .where(BusinessClaimLog.action == "rejected")
+            .order_by(BusinessClaimLog.created_at.desc())
+        )
+        seen = set()
+        for log in rejected.scalars().all():
+            if log.business_id in owned_ids or log.business_id in seen:
+                continue
+            seen.add(log.business_id)
+            items.append(MyClaimItem(
+                business_id=log.business_id,
+                nazwa=log.business_name,
+                claim_status="rejected",
+                decided_at=log.created_at,
+            ))
+
+        return items
 
 
 @router.post("/{business_id}/claim", status_code=201)
@@ -694,6 +788,35 @@ async def claim_business(
                 raise HTTPException(status_code=409, detail="Już zgłosiłeś przejęcie tej wizytówki")
             raise HTTPException(status_code=409, detail="Ta wizytówka została już przejęta")
 
+        # Karencja po odmowie. Odrzucenie kasuje profil, więc bez tego sprawdzenia
+        # ten sam człowiek może wysyłać ten sam wniosek bez końca, a admin ocenia
+        # go za każdym razem od nowa, nie wiedząc, że już raz odmówił.
+        cooldown_start = datetime.utcnow() - timedelta(days=CLAIM_COOLDOWN_DAYS)
+        recent_rejection = (await session.execute(
+            select(BusinessClaimLog)
+            .where(BusinessClaimLog.business_id == business_id)
+            .where(BusinessClaimLog.user_id == user.id)
+            .where(BusinessClaimLog.action == "rejected")
+            .where(BusinessClaimLog.created_at >= cooldown_start)
+            .order_by(BusinessClaimLog.created_at.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        if recent_rejection:
+            from src.newsletter.email_service import plural_pl
+            days_left = max(1, CLAIM_COOLDOWN_DAYS - (
+                datetime.utcnow() - recent_rejection.created_at
+            ).days)
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Twój wcześniejszy wniosek o tę firmę nie został potwierdzony. "
+                    f"Ponowne zgłoszenie będzie możliwe za {days_left} "
+                    f"{plural_pl(days_left, 'dzień', 'dni', 'dni')} — "
+                    "jeśli to Twoja firma, napisz na biuro@lumargo.pl, "
+                    "załatwimy to od ręki."
+                ),
+            )
+
         profile = BusinessProfile(
             business_id=business_id,
             user_id=user.id,
@@ -704,6 +827,12 @@ async def claim_business(
             www=request.www,
         )
         session.add(profile)
+        session.add(BusinessClaimLog(
+            business_id=business_id,
+            user_id=user.id,
+            action="claimed",
+            business_name=business.nazwa,
+        ))
         await session.commit()
         await session.refresh(profile)
 
@@ -847,6 +976,12 @@ async def add_manual_business(
             www=request.www,
         )
         session.add(profile)
+        session.add(BusinessClaimLog(
+            business_id=business.id,
+            user_id=user.id,
+            action="claimed",
+            business_name=nazwa,
+        ))
         await session.commit()
         await session.refresh(profile)
 
@@ -862,18 +997,66 @@ async def add_manual_business(
         }
 
 
+async def _send_claim_decision(to_email: str, business_name: str, approved: bool) -> None:
+    """Powiadomienie o decyzji — świadomie bez podnoszenia wyjątku.
+
+    Padnięty Resend nie może cofnąć decyzji admina, która jest już w bazie.
+    Nieudana wysyłka ląduje w logu i tyle: alternatywą byłoby 500 na endpoincie
+    moderacji przy zatwierdzeniu, które się powiodło.
+    """
+    try:
+        from src.newsletter.email_service import EmailService
+        result = await EmailService().send_business_claim_decision(
+            to_email=to_email, business_name=business_name, approved=approved,
+        )
+        if result.get("status") not in ("sent", "skipped"):
+            logger.error(f"Claim decision mail failed -> {to_email}: {result.get('error')}")
+    except Exception as e:
+        logger.error(f"Claim decision mail crashed -> {to_email}: {e}")
+
+
 @router.get("/claims/pending", response_model=List[PendingClaim])
 async def list_pending_claims(user=Depends(get_admin_user)):
-    """Przejęcia wizytówek oczekujące na weryfikację (tylko admin)."""
+    """Przejęcia wizytówek oczekujące na weryfikację (tylko admin).
+
+    Każda pozycja niesie też kontekst o zgłaszającym — od kiedy ma konto,
+    ile wizytówek już prowadzi i ile jego wniosków odrzuciliśmy wcześniej.
+    Bez tego każdy wniosek wygląda jak pierwszy, a odrzucenie nie zostawia
+    śladu w `business_profiles` (kasuje wiersz), więc historia jest niewidoczna.
+    """
     from src.database.schema import User
     async with async_session() as session:
         result = await session.execute(
-            select(BusinessProfile, CEIDGBusiness, User.email)
+            select(BusinessProfile, CEIDGBusiness, User)
             .join(CEIDGBusiness, CEIDGBusiness.id == BusinessProfile.business_id)
             .join(User, User.id == BusinessProfile.user_id)
             .where(BusinessProfile.claim_status == "pending")
             .order_by(BusinessProfile.created_at.asc())
         )
+        rows = result.all()
+        user_ids = {u.id for _, _, u in rows}
+
+        # Dwa zapytania zbiorcze zamiast dwóch na wiersz — kolejka bywa pusta
+        # przez tydzień, ale po kampanii potrafi mieć kilkadziesiąt pozycji
+        rejected_counts: Dict[int, int] = {}
+        verified_counts: Dict[int, int] = {}
+        if user_ids:
+            rej = await session.execute(
+                select(BusinessClaimLog.user_id, func.count())
+                .where(BusinessClaimLog.user_id.in_(user_ids))
+                .where(BusinessClaimLog.action == "rejected")
+                .group_by(BusinessClaimLog.user_id)
+            )
+            rejected_counts = {uid: cnt for uid, cnt in rej.all()}
+
+            ver = await session.execute(
+                select(BusinessProfile.user_id, func.count())
+                .where(BusinessProfile.user_id.in_(user_ids))
+                .where(BusinessProfile.claim_status == "verified")
+                .group_by(BusinessProfile.user_id)
+            )
+            verified_counts = {uid: cnt for uid, cnt in ver.all()}
+
         return [
             PendingClaim(
                 claim_id=p.id,
@@ -881,14 +1064,17 @@ async def list_pending_claims(user=Depends(get_admin_user)):
                 nazwa=b.nazwa,
                 miasto=b.miasto,
                 nip=b.nip,
-                user_email=email,
+                user_email=u.email,
                 note=p.claim_note,
                 telefon=p.telefon,
                 email=p.email,
                 created_at=p.created_at,
                 source=b.source,
+                user_registered_at=u.created_at,
+                user_verified_profiles=verified_counts.get(u.id, 0),
+                user_rejected_before=rejected_counts.get(u.id, 0),
             )
-            for p, b, email in result.all()
+            for p, b, u in rows
         ]
 
 
@@ -898,7 +1084,14 @@ async def moderate_claim(
     action: str = Query(..., regex="^(approve|reject)$"),
     user=Depends(get_admin_user),
 ):
-    """Zatwierdź lub odrzuć przejęcie wizytówki (tylko admin)."""
+    """Zatwierdź lub odrzuć przejęcie wizytówki (tylko admin).
+
+    Obie decyzje zostawiają wpis w `business_claim_log` i wiadomość do
+    zgłaszającego. Log jest jedyną pamięcią po odrzuceniu (kasuje ono profil),
+    a bez maila człowiek nie miał jak się dowiedzieć, że sprawa jest zamknięta.
+    """
+    from src.database.schema import User
+
     async with async_session() as session:
         result = await session.execute(
             select(BusinessProfile).where(BusinessProfile.id == claim_id)
@@ -906,6 +1099,17 @@ async def moderate_claim(
         profile = result.scalar_one_or_none()
         if not profile:
             raise HTTPException(status_code=404, detail="Zgłoszenie nie zostało znalezione")
+
+        # Dane do logu i maila pobieramy PRZED skasowaniem czegokolwiek —
+        # przy odrzuceniu wpisu ręcznego znika i profil, i firma
+        claimant = (await session.execute(
+            select(User).where(User.id == profile.user_id)
+        )).scalar_one_or_none()
+        claimant_email = claimant.email if claimant else None
+        claimed_name = (await session.execute(
+            select(CEIDGBusiness.nazwa).where(CEIDGBusiness.id == profile.business_id)
+        )).scalar_one_or_none() or f"firma #{profile.business_id}"
+        claimant_user_id = profile.user_id
 
         if action == "reject":
             # Odrzucenie KASUJE wiersz, nie oznacza go statusem.
@@ -934,7 +1138,18 @@ async def moderate_claim(
                 await session.delete(business)
                 ghost_deleted = True
 
+            session.add(BusinessClaimLog(
+                business_id=business_id,
+                user_id=claimant_user_id,
+                action="rejected",
+                business_name=claimed_name,
+                admin_email=user.email,
+            ))
             await session.commit()
+
+            if claimant_email:
+                await _send_claim_decision(claimant_email, claimed_name, approved=False)
+
             logger.info(
                 f"Claim {claim_id} reject by admin {user.email} — profil skasowany, "
                 + (f"wpis ręczny {business_id} usunięty z bazy"
@@ -947,7 +1162,17 @@ async def moderate_claim(
         profile.verified_at = datetime.utcnow()
         profile.updated_at = datetime.utcnow()
         session.add(profile)
+        session.add(BusinessClaimLog(
+            business_id=profile.business_id,
+            user_id=claimant_user_id,
+            action="approved",
+            business_name=claimed_name,
+            admin_email=user.email,
+        ))
         await session.commit()
+
+        if claimant_email:
+            await _send_claim_decision(claimant_email, claimed_name, approved=True)
 
         logger.info(f"Claim {claim_id} approve by admin {user.email}")
         return {"status": "ok", "claim_status": profile.claim_status}
