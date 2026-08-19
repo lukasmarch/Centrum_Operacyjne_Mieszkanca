@@ -131,9 +131,10 @@ CAST: dict[str, dict] = {
     "ola": {
         "name": "Ola",
         "look": (
-            "OLA, a 24-year-old white woman with dark-blonde hair in a high ponytail with a "
-            "blunt fringe, freckles across her nose, small gold hoop earrings, wide bright "
-            "eyes, wearing a sunny-yellow cropped windbreaker over a white t-shirt"
+            "OLA, a woman in her late twenties with dark-blonde hair in a high ponytail "
+            "with a blunt fringe, light freckles across her nose, small gold hoop earrings, "
+            "an open friendly expression, wearing an unzipped sunny-yellow windbreaker "
+            "over a white t-shirt"
         ),
         "kiedy": "jest w środku wydarzeń — festyny, wydarzenia, weekend, sport, dobre wiadomości, ludzie",
     },

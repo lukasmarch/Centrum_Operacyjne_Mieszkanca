@@ -23,7 +23,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from src.services import social_card as sc
-from src.services.social_content import BRAND_STYLE, CAST, generate_image
+from src.services.social_content import BRAND_STYLE, CAST, CAST_ASSET_DIR, generate_image
 
 WIDTH, HEIGHT = 1080, 1350
 MARGIN = 78
@@ -80,6 +80,47 @@ def compose(illustration: bytes, claim: str, kicker: str) -> bytes:
     return out.getvalue()
 
 
+# ── drugi silnik graficzny ────────────────────────────────────────────────────
+# 19.08.2026: kie.ai (`nano-banana-pro`, model Google) odrzuca KAŻDY prompt z Olą —
+# „violated Google's Generative AI Prohibited Use policy" — niezależnie od sceny,
+# od opisu postaci i od tego, czy idzie arkusz referencyjny. Kontrola rozstrzygnęła:
+# ten sam prompt z mężczyzną przechodzi za pierwszym razem, więc to filtr po stronie
+# modelu, nie nasz tekst. `gpt-image-2` przez OpenAI przyjmuje ten sam prompt bez oporu.
+#
+# Arkusz referencyjny idzie tu jako obraz wejściowy do /images/edits — to odpowiednik
+# `image_input` w kie.ai i tak samo trzyma twarz w ryzach.
+OPENAI_IMAGE_MODEL = "gpt-image-2"
+
+
+def generate_image_openai(prompt: str, cast_id: str) -> bytes:
+    """Ilustracja z OpenAI, z arkuszem postaci jako referencją. Zwraca bajty PNG."""
+    import base64
+
+    import httpx
+
+    from src.config import settings
+
+    key = settings.OPENAI_API_KEY
+    sheet = CAST_ASSET_DIR / f"{cast_id}.jpg"
+    payload = {
+        "model": OPENAI_IMAGE_MODEL,
+        "prompt": f"{prompt}\n\nThe attached image is the character reference sheet — "
+                  "keep the same face, hair and clothing.",
+        "size": "1024x1536",   # 2:3; `compose` dokadruje do 1080×1350
+        "quality": "high",
+    }
+    response = httpx.post(
+        "https://api.openai.com/v1/images/edits",
+        headers={"Authorization": f"Bearer {key}"},
+        data=payload,
+        files={"image[]": (sheet.name, sheet.read_bytes(), "image/jpeg")},
+        timeout=300.0,
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"OpenAI odrzuciło zadanie: {response.text[:300]}")
+    return base64.b64decode(response.json()["data"][0]["b64_json"])
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--claim", required=True)
@@ -87,6 +128,9 @@ async def main() -> int:
     ap.add_argument("--cast", default="bartek", choices=list(CAST))
     ap.add_argument("--scene", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--engine", default="kie", choices=("kie", "openai"),
+                    help="kie = nano-banana-pro (domyślny); openai = gpt-image-2 "
+                         "(jedyna droga dla Oli — patrz DESIGN/OBSADA.md)")
     ap.add_argument("--dry", action="store_true")
     args = ap.parse_args()
 
@@ -106,13 +150,18 @@ async def main() -> int:
             "or badges, no manufacturer logos, no shop signage, no product packaging."
         )
         prompt = f"{BRAND_STYLE}\n{no_marks}\n\nSCENE: {args.scene}\n\nCHARACTER: {member_look}"
-        print(f"[kie.ai] generuję ({args.cast})…", flush=True)
-        url = await generate_image(prompt, aspect_ratio="3:4", resolution="2K",
-                                   references=[CAST_URL.format(args.cast)])
-        import httpx
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            raw = (await client.get(url)).content
-        print(f"[kie.ai] pobrano {len(raw) // 1024} kB", flush=True)
+        if args.engine == "openai":
+            print(f"[openai] generuję ({args.cast}, {OPENAI_IMAGE_MODEL})…", flush=True)
+            raw = generate_image_openai(prompt, args.cast)
+            print(f"[openai] odebrano {len(raw) // 1024} kB", flush=True)
+        else:
+            print(f"[kie.ai] generuję ({args.cast})…", flush=True)
+            url = await generate_image(prompt, aspect_ratio="3:4", resolution="2K",
+                                       references=[CAST_URL.format(args.cast)])
+            import httpx
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                raw = (await client.get(url)).content
+            print(f"[kie.ai] pobrano {len(raw) // 1024} kB", flush=True)
 
     Path(args.out).write_bytes(compose(raw, args.claim, args.kicker))
     print(f"zapisano: {args.out}", flush=True)
