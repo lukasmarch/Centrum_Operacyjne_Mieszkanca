@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { HealthTodayResponse } from '../../types';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
 
 export function useHealthToday() {
   const [data, setData] = useState<HealthTodayResponse | null>(null);

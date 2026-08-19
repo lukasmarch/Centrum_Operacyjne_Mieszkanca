@@ -19,6 +19,7 @@ import ReportsMini from '../../components/simple/ReportsMini';
 import NewsletterCta from '../../components/simple/NewsletterCta';
 import CinemaCard from '../../components/simple/CinemaCard';
 import RoadStatusStrip from '../../components/simple/RoadStatusStrip';
+import HealthTodayCard from '../../components/simple/HealthTodayCard';
 import AskBar from '../../components/simple/AskBar';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
@@ -272,10 +273,13 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
                     />
                 </div>
 
-                {/* Stan dróg jako stopka sekcji, nie piąta karta: to jedno zdanie
-                    przez większość dni w roku, więc nie zasługuje na własne pole
-                    w siatce — ale gdy coś się dzieje, ma być widoczne od razu */}
-                <div className="mt-3">
+                {/* Zdrowie i drogi jako stopka sekcji, nie kolejne karty w siatce:
+                    oba przez większość dni mówią „bez zmian", więc nie zasługują
+                    na własne pole — ale gdy coś się dzieje (lekarz dziś nie
+                    przyjmuje, droga zamknięta), mają być widoczne od razu.
+                    Zdrowie idzie pierwsze: dotyczy wizyty, którą trzeba odwołać */}
+                <div className="mt-3 space-y-3">
+                    <HealthTodayCard />
                     <RoadStatusStrip />
                 </div>
             </section>
@@ -303,7 +307,7 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
               przeczytać briefing i wiadomości, więc „to samo co tydzień na maila"
               jest propozycją, a nie bramką przy wejściu.
             */}
-            <NewsletterCta town={town} onOpenPrivacy={() => onNavigate('privacy')} />
+            <NewsletterCta onRegister={() => onNavigate('register')} />
 
             {/*
               Zgłoszenia 24 PRZED reklamą: to jedyne miejsce, w którym mieszkaniec

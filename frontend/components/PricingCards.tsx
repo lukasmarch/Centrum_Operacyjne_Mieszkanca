@@ -35,7 +35,12 @@ export const PLANS: Plan[] = [
       { text: 'Harmonogram wywozu śmieci — cała gmina, bez konta', tooltip: 'Wybierasz miejscowość na stronie i widzisz pełny rok: zmieszane, bio, papier, szkło, metale, popiół i wielkogabarytowe. Konto nie jest potrzebne' },
       { text: 'Rozkład autobusu Rybno–Działdowo na żywo', tooltip: 'Przystanki, mapa i pozycja kursu w trasie' },
       { text: 'Zgłoszenia 24 ze zdjęciem' },
-      { text: 'Newsletter tygodniowy — za darmo', tooltip: 'W sobotę rano jeden mail: co się działo w gminie i co przed nami. Wystarczy adres e-mail, konto nie jest potrzebne' },
+      // Do 19.08.2026 obiecywaliśmy tu „wystarczy adres e-mail, konto nie jest
+      // potrzebne". Endpoint nadal to przyjmuje, ale strona główna prowadzi
+      // zapis przez rejestrację i nie ma już w serwisie formularza na sam adres
+      // — obietnica, której nie da się nigdzie spełnić, jest gorsza niż brak
+      // obietnicy. Newsletter zostaje darmowy: dostaje go każde konto, także Free.
+      { text: 'Newsletter tygodniowy — za darmo', tooltip: 'W sobotę rano jeden mail: co się działo w gminie i co przed nami. Dostajesz go z każdym kontem, także darmowym' },
       { text: '5 pytań AI dziennie' },
       { text: 'Podstawowe dane GUS (9 wskaźników)' },
     ],

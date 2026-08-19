@@ -1,26 +1,32 @@
 import React, { useState } from 'react';
-import { Mail, Check, X } from 'lucide-react';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
+import { Mail, X, Bell, Sparkles, ArrowRight } from 'lucide-react';
+import { useAuth } from '../../src/context/AuthContext';
 
 /**
- * Zapis na tygodniowy newsletter — jedyny punkt na stronie głównej, w którym
- * prosimy o adres e-mail.
+ * Zaproszenie do konta — jedyne miejsce na stronie głównej, w którym prosimy
+ * mieszkańca o cokolwiek.
  *
  * Po co tu stoi: push dociera tylko do tego, kto zgodził się na powiadomienia
  * w przeglądarce, a serwis nie ma ŻADNEGO innego sposobu, żeby wrócić do
- * mieszkańca, który raz wszedł i wyszedł. Kampania pokazała, że bloker jest
- * po stronie dystrybucji, nie produktu — adres e-mail to druga (i jedyna
- * pozostała) droga powrotna.
+ * kogoś, kto raz wszedł i wyszedł. Kampania pokazała, że bloker jest po stronie
+ * dystrybucji, nie produktu — droga powrotna do mieszkańca jest tu stawką.
  *
- * Dlaczego akurat tygodniowy: `POST /api/newsletter/subscribe` przyjmuje
- * `weekly` od każdego, także bez konta; `daily` wymaga Premium i zwróciłby 403.
- * Zapis tutaj NIE zakłada konta i nie prowadzi do płatności — prośba o pieniądze
- * na stronie głównej kosztowałaby więcej zaufania, niż warta jest konwersja.
+ * **Zmiana z 19.08.2026: prowadzimy przez konto, nie przez sam adres e-mail.**
+ * Wcześniej kafel przyjmował adres i zapisywał na tygodniowy newsletter bez
+ * zakładania konta (`POST /newsletter/subscribe`, `frequency: weekly`).
+ * Mechanizm działał i działa nadal — ale zostawiał nas z adresem, do którego
+ * nie da się przypisać niczego więcej: ani miejscowości, ani zgody na push,
+ * ani pytań do asystenta. Sierpniowa rolka o drodze 1255N dała 3637 zasięgu
+ * i trzy wejścia na stronę; przy takim ruchu decyduje, ile zostaje z jednej
+ * wizyty, a konto zostawia nieporównanie więcej niż sam wpis na listę.
  *
- * RODO: backend wysyła mail z potwierdzeniem (double opt-in), więc sam wpis
- * w formularzu nikogo jeszcze nie zapisuje; link do polityki prywatności
- * i informacja o wypisie stoją przy przycisku, nie w stopce.
+ * Rejestracja daje 30 dni Premium bez karty (`trial_ends_at`, wygaszane przez
+ * `trial_expiry_job`), więc obietnica jest prawdziwa: newsletter jest w tym
+ * zawarty, a nie zamiast niego.
+ *
+ * ⚠️ Zapis samym adresem NIE znika z serwisu — endpoint zostaje, bo korzysta
+ * z niego stopka newslettera i mail powitalny. Zmieniamy tylko to, co strona
+ * główna proponuje jako pierwsze.
  */
 
 const DISMISS_KEY = 'rl_newsletter_cta_dismissed_at';
@@ -37,18 +43,18 @@ const wasDismissed = (): boolean => {
 };
 
 interface NewsletterCtaProps {
-    /** Miejscowość mieszkańca — backend trzyma ją przy zapisie (pole `location`) */
-    town: string;
-    onOpenPrivacy: () => void;
+    /** Przejście do rejestracji — konto zakłada się w jednym kroku, bez karty */
+    onRegister: () => void;
 }
 
-const NewsletterCta: React.FC<NewsletterCtaProps> = ({ town, onOpenPrivacy }) => {
-    const [email, setEmail] = useState('');
-    const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
-    const [message, setMessage] = useState('');
+const NewsletterCta: React.FC<NewsletterCtaProps> = ({ onRegister }) => {
+    const { isAuthenticated } = useAuth();
     const [dismissed, setDismissed] = useState(wasDismissed);
 
-    if (dismissed) return null;
+    // Zalogowanemu nie proponuje się założenia konta. Ustawienia newslettera
+    // ma w profilu (zakładka Preferencje) — kafel byłby tu tylko szumem.
+    // Dopóki kafel zbierał sam adres, sens miał dla wszystkich; od 19.08 nie
+    if (isAuthenticated || dismissed) return null;
 
     const close = () => {
         try {
@@ -59,59 +65,9 @@ const NewsletterCta: React.FC<NewsletterCtaProps> = ({ town, onOpenPrivacy }) =>
         setDismissed(true);
     };
 
-    const submit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const address = email.trim();
-        if (!address) return;
-
-        setState('busy');
-        try {
-            const res = await fetch(`${API_URL}/newsletter/subscribe`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: address, frequency: 'weekly', location: town }),
-            });
-
-            if (res.ok) {
-                // Zapamiętujemy zapis — inaczej ten sam baner witałby przy każdym
-                // wejściu kogoś, kto właśnie podał adres
-                setState('done');
-                try {
-                    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-                } catch { /* bez zapamiętania, ale zapis się udał */ }
-                return;
-            }
-
-            // 400 = adres już zapisany. To nie jest błąd użytkownika i nie ma
-            // powodu, żeby brzmiało jak awaria
-            const detail = (await res.json().catch(() => null))?.detail as string | undefined;
-            setState('error');
-            setMessage(
-                res.status === 400 && detail?.includes('already')
-                    ? 'Ten adres jest już zapisany — sprawdź skrzynkę.'
-                    : 'Nie udało się zapisać. Spróbuj proszę za chwilę.',
-            );
-        } catch {
-            setState('error');
-            setMessage('Brak połączenia z serwerem. Spróbuj proszę za chwilę.');
-        }
-    };
-
-    if (state === 'done') {
-        return (
-            <section
-                aria-label="Zapis na newsletter"
-                className="flex items-center gap-2.5 rounded-2xl border border-emerald-800/30 bg-emerald-950/30 p-4 text-sm text-emerald-300"
-            >
-                <Check size={16} className="shrink-0" aria-hidden />
-                Sprawdź skrzynkę — wysłaliśmy link, który potwierdza zapis.
-            </section>
-        );
-    }
-
     return (
         <section
-            aria-label="Zapis na newsletter"
+            aria-label="Załóż konto"
             className="relative rounded-2xl border border-white/10 bg-[#0d1117] p-5"
         >
             <button
@@ -130,39 +86,39 @@ const NewsletterCta: React.FC<NewsletterCtaProps> = ({ town, onOpenPrivacy }) =>
                     </h2>
                     <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">
                         W sobotę rano jeden mail: co się działo w gminie i co przed nami.
-                        Za darmo, bez zakładania konta.
+                        Wystarczy konto — zakładasz je w minutę, bez karty.
                     </p>
                 </div>
             </div>
 
-            <form onSubmit={submit} className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="twoj@email.pl"
-                    aria-label="Twój adres e-mail"
-                    className="min-h-[48px] min-w-0 flex-1 rounded-xl border border-white/10 bg-[#020617] px-4 text-base text-white outline-none transition-colors placeholder:text-neutral-600 focus:border-blue-500/60"
-                />
-                <button
-                    type="submit"
-                    disabled={state === 'busy'}
-                    className="min-h-[48px] shrink-0 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
-                >
-                    {state === 'busy' ? 'Zapisuję…' : 'Zapisz mnie'}
-                </button>
-            </form>
+            {/* Co dokładnie dostaje mieszkaniec. Trzy rzeczy, nie lista dziesięciu:
+                obietnica, której nie da się przeczytać jednym rzutem oka, nie
+                działa jak obietnica */}
+            <ul className="mt-3.5 space-y-1.5 pl-1">
+                <li className="flex items-center gap-2 text-sm text-neutral-300">
+                    <Mail size={13} className="shrink-0 text-blue-400" aria-hidden />
+                    Newsletter tygodniowy w sobotę rano
+                </li>
+                <li className="flex items-center gap-2 text-sm text-neutral-300">
+                    <Bell size={13} className="shrink-0 text-amber-400" aria-hidden />
+                    Powiadomienia o awariach prądu i wody
+                </li>
+                <li className="flex items-center gap-2 text-sm text-neutral-300">
+                    <Sparkles size={13} className="shrink-0 text-violet-400" aria-hidden />
+                    30 dni Premium gratis: mail codziennie rano i asystent bez limitu
+                </li>
+            </ul>
 
-            {state === 'error' && (
-                <p className="mt-2 text-xs text-amber-400">{message}</p>
-            )}
+            <button
+                onClick={onRegister}
+                className="group mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white transition-colors hover:bg-blue-500"
+            >
+                Załóż konto — 30 dni Premium gratis
+                <ArrowRight size={16} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
+            </button>
 
-            <p className="mt-2 text-xs leading-relaxed text-neutral-600">
-                Wypisujesz się jednym kliknięciem w stopce każdego maila.{' '}
-                <button onClick={onOpenPrivacy} className="underline hover:text-neutral-400">
-                    Polityka prywatności
-                </button>
+            <p className="mt-2 text-center text-xs leading-relaxed text-neutral-600">
+                Bez karty i bez zobowiązań. Po 30 dniach konto działa dalej za darmo.
             </p>
         </section>
     );
