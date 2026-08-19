@@ -7,6 +7,19 @@ BACKEND_DIR = Path(__file__).parent.parent
 
 class Settings(BaseSettings):
     DATABASE_URL: str
+
+    # Harmonogram zadań. Domyślnie WŁĄCZONY, żeby produkcja działała bez zmian
+    # w swoim `.env` — wyłącza się go świadomie, wpisem w środowisku lokalnym.
+    #
+    # Po co przełącznik (19.08.2026): `start_scheduler()` był wołany bezwarunkowo,
+    # więc każde `uvicorn` na MacBooku stawało się DRUGIM schedulerem gminy.
+    # Lokalna baza jest własna i produkcji nie rusza, ale trzy zasoby są wspólne:
+    # token Apify (darmowy limit $5/mies), klucz OpenAI oraz — najgorsze — klucz
+    # VAPID razem z prawdziwymi endpointami push w bazie. `alert_push` chodzi
+    # co 15 minut i przy pierwszej awarii prądu wysłałby powiadomienie na cudze
+    # telefony, zapisując `alert_pushed_at` LOKALNIE. Produkcja nie wiedziałaby
+    # o tym i kwadrans później wysłała to samo drugi raz.
+    SCHEDULER_ENABLED: bool = True
     # REDIS_URL removed (2026-02-17): Not used - all cache in PostgreSQL
     OPENAI_API_KEY: str
     OPENWEATHER_API_KEY: str
