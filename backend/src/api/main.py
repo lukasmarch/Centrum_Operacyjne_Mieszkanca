@@ -8,6 +8,7 @@ from src.models import ArticleOutput
 from src.integrations.weather import WeatherService
 from src.scheduler.scheduler import start_scheduler
 from src.config import settings
+from src.utils.logger import setup_logger
 from datetime import datetime
 from src.api.endpoints import cinema
 from src.api.weather import router as weather_router
@@ -48,6 +49,8 @@ from src.ai.agents import (
     orchestrator, RedaktorAgent, UrzednikAgent,
     GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent, OrganizatorAgent
 )
+
+logger = setup_logger("API")
 
 app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
 
@@ -131,7 +134,15 @@ app.include_router(council_router)  # /api/council/*
 @app.on_event("startup")
 async def startup_event():
     """Start scheduler and register AI agents on app startup"""
-    start_scheduler()
+    if settings.SCHEDULER_ENABLED:
+        start_scheduler()
+    else:
+        # Środowisko lokalne: API działa, zadania nie ruszają. Patrz komentarz
+        # przy SCHEDULER_ENABLED w config.py — chodzi o Apify, OpenAI i push
+        logger.warning(
+            "SCHEDULER_ENABLED=false — harmonogram zadań NIE wystartował "
+            "(scraping, AI, alerty push i newslettery są wyłączone)"
+        )
     # Register all AI agents with the orchestrator
     for agent_cls in [RedaktorAgent, UrzednikAgent, GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent, OrganizatorAgent]:
         orchestrator.register_agent(agent_cls())
