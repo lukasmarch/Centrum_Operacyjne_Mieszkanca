@@ -29,10 +29,22 @@ export const PLANS: Plan[] = [
       { text: 'Wiadomości i artykuły lokalne' },
       { text: 'Alerty push o awariach i zagrożeniach', tooltip: 'Pożary, wypadki, awarie prądu i wody, smog — bezpieczeństwo zawsze za darmo' },
       { text: 'Pogoda i jakość powietrza' },
-      { text: 'Harmonogram wywozu śmieci' },
+      // „24 miejscowości" było nieprawdą w obie strony: miejscowości jest 22, sołectw 20,
+      // a 24 to pozycje w wyborze harmonogramu (Rybno dzieli się na R1 i R2, osobno domki
+      // letniskowe). Ta sama pomyłka poszła kiedyś na fanpage — piszemy „cała gmina".
+      { text: 'Harmonogram wywozu śmieci — cała gmina, bez konta', tooltip: 'Wybierasz miejscowość na stronie i widzisz pełny rok: zmieszane, bio, papier, szkło, metale, popiół i wielkogabarytowe. Konto nie jest potrzebne' },
+      { text: 'Rozkład autobusu Rybno–Działdowo na żywo', tooltip: 'Przystanki, mapa i pozycja kursu w trasie' },
       { text: 'Zgłoszenia 24 ze zdjęciem' },
-      { text: 'Newsletter tygodniowy' },
+      // Do 19.08.2026 obiecywaliśmy tu „wystarczy adres e-mail, konto nie jest
+      // potrzebne". Endpoint nadal to przyjmuje, ale strona główna prowadzi zapis
+      // przez rejestrację i nie ma już w serwisie formularza na sam adres — obietnica,
+      // której nie da się nigdzie spełnić, jest gorsza niż brak obietnicy.
+      // Tygodniowy jest darmowy; CODZIENNY briefing zaczyna się dopiero od Premium
+      // (`newsletter_job.send_daily_newsletter` filtruje po tierze).
+      { text: 'Newsletter tygodniowy — za darmo', tooltip: 'W sobotę rano jeden mail: co się działo w gminie i co przed nami. Dostajesz go z każdym kontem, także darmowym. Codzienny poranny briefing jest w planie Premium' },
       { text: '5 pytań AI dziennie' },
+      // Liczba policzona na kodzie: `get_gmina_variables_for_tier('free')` = 8.
+      // Rejestr `gus_variables.py` ma 9 pozycji, ale jedna nie ma danych dla gminy.
       { text: 'Podstawowe dane GUS (8 wskaźników)' },
     ],
     btnText: 'Aktualny plan',
@@ -46,12 +58,27 @@ export const PLANS: Plan[] = [
     highlighted: true,
     price: { monthly: 9.99, yearly: 84 },
     features: [
+      // Bez „nowego ogłoszenia BIP" — takiego powiadomienia nigdy nie wysyłał żaden job.
+      // `proactive_alerts_job` (18:00) ma dokładnie dwie ścieżki: wywóz jutro i mróz tej nocy.
       { text: 'Proaktywny Asystent AI — nie pytasz, portal sam Cię uprzedzi', tooltip: 'Wieczorem o 18:00: jutro wywóz odpadów, mróz na drogach tej nocy' },
       { text: 'Nieograniczone pytania AI' },
-      { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 7:15 — skrót dnia, pogoda, awarie i wywóz odpadów' },
+      // Godzina musi zgadzać się ze schedulerem (`newsletter_daily`, pon–pt 7:15):
+      // cennik mówił 6:30, a mail wychodzi 7:15. Tygodniowy zostaje NA DODATEK,
+      // nie zamiast — i trzeba to powiedzieć, bo inaczej wygląda na zamianę.
+      { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 7:15 — skrót dnia, pogoda, awarie i wywóz odpadów. Newsletter tygodniowy dostajesz dalej' },
       { text: '37 wskaźników GUS dla gminy', tooltip: 'Demografia, rynek pracy, finanse gminy, mieszkalnictwo, edukacja, zdrowie — każdy z porównaniem do powiatu działdowskiego' },
-      { text: 'Personalizacja dashboardu' },
-      { text: 'Brak reklam' },
+      // Harmonogram jest jawny dla wszystkich, więc Premium nie sprzedaje DOSTĘPU do niego.
+      // Różnicą jest przypomnienie: `proactive_alerts_job` o 18:00 wysyła push dzień PRZED
+      // wywozem, dopasowany do rejonu (`waste_policy`). Do 21.08.2026 stało tu „rano" —
+      // job chodził o 6:50, czyli po przejeździe śmieciarki.
+      { text: 'Przypomnienie o wywozie wieczorem dzień wcześniej', tooltip: 'Harmonogram widzą wszyscy — Premium dostaje o 18:00 powiadomienie o jutrzejszym wywozie dla swojego rejonu, więc pojemnik wystawiasz na czas' },
+      // „Personalizacja dashboardu" wypadła razem z panelem bento (11.08.2026):
+      // obietnica w cenniku musi opisywać to, co plan naprawdę daje.
+      //
+      // Reklamy widzi wyłącznie plan darmowy — bramkę mają `AdBoard` (strona główna),
+      // `NewsFeed` (ogłoszenia firm) i newsletter (`_marketing_consent` + brak promo
+      // w briefingu dziennym). Trzy powierzchnie, jedna obietnica.
+      { text: 'Brak reklam — ani na stronie, ani w mailu' },
       { text: 'Wszystko z planu Dla Każdego' },
     ],
     btnText: 'Wybierz Premium',
@@ -66,7 +93,10 @@ export const PLANS: Plan[] = [
     features: [
       { text: 'Wyróżniona wizytówka w katalogu firm', tooltip: 'Logo, opis, godziny otwarcia, telefon, link — na górze katalogu' },
       { text: 'Oznaczenie „Polecane w Rybnie"' },
-      { text: 'Statystyki wyświetleń wizytówki' },
+      // Dwie różne miary od 12.08.2026 (`add_business_impressions`): `impressions_count`
+      // = karta pojawiła się na ekranie, `views_count` = ktoś kliknął telefon lub www.
+      // Samo „wyświetlenia" znaczyło co innego przed tym rozdzieleniem.
+      { text: 'Statystyki: ile osób zobaczyło wizytówkę i ile kliknęło kontakt' },
       { text: 'Komplet 53 wskaźników GUS dla gminy', tooltip: 'Pełne dane statystyczne gminy Rybno z porównaniem do powiatu działdowskiego' },
       { text: 'Analizy lokalnego rynku od agenta AI', tooltip: 'GUS-Analityk odpowiada na pytania o demografię, rynek pracy i finanse gminy' },
       { text: 'Wszystko z planu Premium' },
