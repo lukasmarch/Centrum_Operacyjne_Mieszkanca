@@ -76,7 +76,7 @@ async def migrate() -> None:
                 "WHERE views_count > 0"
             ))
             print(f"  ~ przepisano historię dla {result.rowcount} wizytówek "
-                  f"(dotychczasowe „wyświetlenia" to były pokazy karty)")
+                  f"(dotychczasowe „wyświetlenia” to były pokazy karty)")
 
         await session.commit()
         print("Migracja zakończona.")
