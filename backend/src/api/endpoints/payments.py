@@ -145,6 +145,42 @@ async def _activate_subscription(
     return sub
 
 
+async def _send_purchase_confirmation(
+    session: AsyncSession,
+    user: User,
+    sub: Subscription,
+    period: str,
+    amount_grosze: int,
+) -> None:
+    """Mail z zakresem i okresem usługi po zaksięgowaniu płatności (regulamin §6.4).
+
+    Stopka każdego naszego maila ma link wypisu, a ten wymaga rekordu subskrybenta.
+    Konta zakładane od 20.08.2026 mają go z rejestracji; starsze mogą nie mieć —
+    wtedy zakładamy go tutaj, zamiast rezygnować z potwierdzenia. Wypis świadomy
+    (`unsubscribed`) pozostaje nietknięty: `ensure_subscription` zwraca wtedy `None`.
+    """
+    from src.newsletter.subscriptions import ensure_subscription
+    from src.newsletter.email_service import EmailService
+
+    subscriber = await ensure_subscription(session, user)
+    if subscriber is None:
+        logger.info(f"User {user.id} wypisany z newslettera — potwierdzenie zakupu bez maila")
+        return
+    await session.commit()
+    await session.refresh(subscriber)
+
+    await EmailService().send_purchase_confirmation(
+        to_email=user.email,
+        recipient_name=user.full_name,
+        tier=sub.tier,
+        period=period,
+        amount_pln=round(amount_grosze / 100, 2),
+        expires_at=sub.expires_at,
+        order_id=sub.p24_order_id,
+        unsubscribe_token=subscriber.unsubscribe_token,
+    )
+
+
 # =======================
 # Endpoints
 # =======================
@@ -287,7 +323,15 @@ async def p24_webhook(
     period = parts[3] if len(parts) >= 5 else "monthly"
 
     # Aktywuj subskrypcję
-    await _activate_subscription(session, user, tier, period, session_id, order_id)
+    activated = await _activate_subscription(session, user, tier, period, session_id, order_id)
+
+    # Potwierdzenie zawarcia umowy — regulamin §6.4 obiecuje je wprost, a pierwsza
+    # prawdziwa płatność (20.08.2026) nie wywołała żadnego maila. Wysyłka NIE może
+    # wywrócić IPN-a: P24 ponawia webhooka po błędzie, a subskrypcja jest już aktywna.
+    try:
+        await _send_purchase_confirmation(session, user, activated, period, amount)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Potwierdzenie zakupu do {user.email} nie wyszło: {exc}")
 
     return {"status": "ok"}
 

@@ -114,6 +114,14 @@ class Subscription(SQLModel, table=True):
     expires_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
 
+    # Który mail o kończącym się okresie opłaconym już poszedł: week → last_day → ended.
+    # Ten sam mechanizm co `users.trial_reminder_stage`, tylko dla płatnych: job chodzi
+    # codziennie, więc bez znacznika wysłałby to samo przypomnienie siedem razy.
+    # Plan nie odnawia się automatycznie (regulamin §6.5), więc cisza przed wygaśnięciem
+    # oznaczała, że płacący klient tracił dostęp bez ostrzeżenia.
+    reminder_stage: Optional[str] = Field(default=None, max_length=20)
+    reminder_sent_at: Optional[datetime] = None
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
