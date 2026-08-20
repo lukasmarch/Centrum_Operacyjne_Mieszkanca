@@ -29,10 +29,9 @@ export const PLANS: Plan[] = [
       { text: 'Wiadomości i artykuły lokalne' },
       { text: 'Alerty push o awariach i zagrożeniach', tooltip: 'Pożary, wypadki, awarie prądu i wody, smog — bezpieczeństwo zawsze za darmo' },
       { text: 'Pogoda i jakość powietrza' },
-      { text: 'Harmonogram wywozu śmieci — wszystkie 24 miejscowości', tooltip: 'Pełny rok dla Twojej miejscowości: zmieszane, bio, papier, szkło, metale, popiół i wielkogabarytowe' },
-      { text: 'Rozkład autobusu Rybno–Działdowo na żywo', tooltip: 'Przystanki, mapa i pozycja kursu w trasie' },
+      { text: 'Harmonogram wywozu śmieci' },
       { text: 'Zgłoszenia 24 ze zdjęciem' },
-      { text: 'Newsletter tygodniowy — za darmo', tooltip: 'W sobotę rano jeden mail: co się działo w gminie i co przed nami. Wystarczy adres e-mail, konto nie jest potrzebne' },
+      { text: 'Newsletter tygodniowy' },
       { text: '5 pytań AI dziennie' },
       { text: 'Podstawowe dane GUS (9 wskaźników)' },
     ],
@@ -49,14 +48,10 @@ export const PLANS: Plan[] = [
     features: [
       { text: 'Proaktywny Asystent AI — nie pytasz, portal sam Cię uprzedzi', tooltip: 'Powiadomienia bez pytania: jutro wywóz odpadów, mróz na drogach, nowe ogłoszenie BIP' },
       { text: 'Nieograniczone pytania AI' },
-      // Godzina musi zgadzać się ze schedulerem (`newsletter_daily`, pon–pt 7:15),
-      // bo to obietnica sprzedażowa: cennik mówił 6:30, a mail wychodzi 7:15
-      { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 7:15 — po nocnym zbiorze wiadomości. Newsletter tygodniowy dostajesz dalej' },
+      { text: 'Newsletter dzienny (pon–pt)', tooltip: 'Poranny briefing o 6:30' },
       { text: '57 wskaźników GUS', tooltip: 'Demografia, rynek pracy, finanse gminy, mieszkalnictwo, edukacja, zdrowie + dane powiatu działdowskiego' },
-      // „Personalizacja dashboardu" wypadła razem z bento-panelem (11.08.2026):
-      // obietnica w cenniku musi opisywać to, co plan naprawdę daje
-      { text: 'Twoja miejscowość zapamiętana', tooltip: 'Harmonogram odpadów i alerty liczone dla Twojej wsi, nie dla całej gminy' },
-      { text: 'Brak reklam w feedzie' },
+      { text: 'Personalizacja dashboardu' },
+      { text: 'Brak reklam' },
       { text: 'Wszystko z planu Dla Każdego' },
     ],
     btnText: 'Wybierz Premium',

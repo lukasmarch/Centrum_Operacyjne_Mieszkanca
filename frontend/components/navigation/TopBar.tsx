@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Settings, LogOut, Crown, Zap, LogIn } from 'lucide-react';
+import { User, Settings, LogOut, Crown, Zap } from 'lucide-react';
 import { AppSection } from '../../types';
 
 interface TopBarProps {
@@ -49,54 +49,9 @@ const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate }) =>
   const aiInfo = AI_LIMITS[tier] ?? AI_LIMITS.free;
 
   return (
-    // Przyklejony, bo to jedyne miejsce ze znakiem marki i z „Zarejestruj":
-    // przy stronie długiej na trzy ekrany oba znikały po pierwszym przewinięciu.
-    // Rozmycie zamiast pełnego tła — pasmo powitalne ma pod nim prześwitywać
-    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/5 bg-[#05080f]/80 px-4 py-3 backdrop-blur-md md:px-8">
-      {/*
-        Znak marki. Do 11.08.2026 stał w nagłówku bento-panelu (`Dashboard.tsx`),
-        więc razem z wycofaniem panelu zniknął z CAŁEGO serwisu — zostało tu puste
-        `<div/>`. Miejsce jest teraz właściwsze: górny pasek widać na każdej
-        podstronie, więc „R" i nazwa wracają też na cenniku, w wiadomościach
-        i na stronach, które ktoś otworzy prosto z Google.
-
-        Nazwa stoi obok „R" TAKŻE na telefonie. Wcześniej była ukryta poniżej
-        640 px, bo pełna nazwa i trzy przyciski nie mieszczą się w jednym wierszu
-        — ale to znaczyło, że ktoś wchodzący z Google na telefonie (czyli
-        większość) nie widział nazwy serwisu nigdzie nad zgięciem. Miejsce
-        wygospodarowane po prawej: „Zaloguj" schodzi do samej ikony, a „Cennik"
-        i „Zarejestruj" dostają ciaśniejsze paddingi (zmierzone przy 360 px:
-        122 px po lewej + 188 px po prawej = 310 z 320 dostępnych).
-      */}
-      <a
-        href="/"
-        onClick={(e) => {
-          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-          e.preventDefault();
-          onNavigate('dashboard');
-        }}
-        aria-label="RybnoLive — strona główna"
-        className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-90 sm:gap-2.5"
-      >
-        <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg font-black text-white shadow-lg shadow-blue-500/20"
-          style={{ background: 'linear-gradient(135deg, var(--chart-1), var(--chart-2))' }}
-        >
-          R
-        </span>
-        <span
-          // Poniżej 340 px (stare iPhone'y SE) nazwa znika — tam nawet ciasny
-          // wiersz się nie mieści i pasek zaczyna przewijać się w poziomie
-          className="hidden text-base font-black tracking-tight min-[340px]:inline sm:text-2xl"
-          style={{
-            background: 'linear-gradient(to right, var(--chart-1), var(--chart-2))',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
-        >
-          RybnoLive
-        </span>
-      </a>
+    <header className="relative z-40 px-4 md:px-8 py-3 flex items-center justify-between">
+      {/* Left side */}
+      <div className="flex items-center gap-2.5" />
 
       {/* Location pill - desktop */}
       {isAuthenticated && user && (
@@ -226,11 +181,9 @@ const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate }) =>
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-2">
             {/* Oferta płatna dostępna z każdej podstrony, także bez konta —
-                wymóg weryfikacji Przelewy24 (oferta + przejście przez zakup).
-                Dlatego „Cennik" zostaje słowem także na telefonie: ikona byłaby
-                oszczędnością 20 px kosztem jedynego widocznego wejścia w ofertę */}
+                wymóg weryfikacji Przelewy24 (oferta + przejście przez zakup) */}
             <a
               href="/cennik"
               onClick={(e) => {
@@ -238,25 +191,19 @@ const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate }) =>
                 e.preventDefault();
                 onNavigate('premium');
               }}
-              className="rounded-full px-2 py-1.5 text-[13px] font-medium text-neutral-400 transition-colors hover:text-white sm:px-3 sm:text-sm"
+              className="text-neutral-400 hover:text-white px-3 py-1.5 rounded-full transition-colors font-medium text-sm"
             >
               Cennik
             </a>
-            {/* Na telefonie sama ikona: „Zaloguj" to jedyny z trzech przycisków,
-                który dotyczy wyłącznie osób już zarejestrowanych — a te wiedzą,
-                czego szukają. „Cennik" i „Zarejestruj" mówią do nowego i muszą
-                zostać słowami */}
             <button
               onClick={() => onNavigate('login')}
-              aria-label="Zaloguj się"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-400 transition-colors hover:text-white sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 sm:text-sm sm:font-medium"
+              className="text-neutral-400 hover:text-white px-3 py-1.5 rounded-full transition-colors font-medium text-sm"
             >
-              <LogIn size={18} aria-hidden className="sm:hidden" />
-              <span className="hidden sm:inline">Zaloguj</span>
+              Zaloguj
             </button>
             <button
               onClick={() => onNavigate('register')}
-              className="btn-primary rounded-full !px-3 !py-2.5 !text-[13px] sm:!px-5 sm:!py-3 sm:!text-sm"
+              className="btn-primary rounded-full"
             >
               Zarejestruj
             </button>

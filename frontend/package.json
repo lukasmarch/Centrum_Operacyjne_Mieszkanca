@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node scripts/prerender-meta.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
