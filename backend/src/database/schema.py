@@ -72,6 +72,10 @@ class User(SQLModel, table=True):
 
     # Trial Premium (30 dni po rejestracji, bez karty)
     trial_ends_at: Optional[datetime] = None
+    # Który mail o kończącym się trialu już poszedł: week → last_day → ended.
+    # Job chodzi codziennie, więc bez tego znacznika wysłałby to samo siedem razy.
+    trial_reminder_stage: Optional[str] = Field(default=None, max_length=20)
+    trial_reminder_sent_at: Optional[datetime] = None
 
     # Referral program
     referral_code: Optional[str] = Field(default=None, max_length=20, unique=True)

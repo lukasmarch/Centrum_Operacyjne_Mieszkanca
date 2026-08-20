@@ -2,9 +2,11 @@
 Authentication routes: register, login, logout, refresh
 """
 
+import logging
 import secrets
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from typing import Optional
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -12,6 +14,7 @@ from src.database import get_session, User
 from src.database.schema import Referral, UserTier
 from src.config import settings
 from src.auth.dependencies import get_current_active_user
+from src.newsletter.subscriptions import ensure_subscription
 from .jwt import (
     get_password_hash, verify_password,
     create_access_token, create_refresh_token, verify_token
@@ -28,11 +31,33 @@ COOKIE_SECURE = not settings.APP_URL.startswith("http://localhost")
 # Podbij przy każdej istotnej zmianie regulaminu/polityki prywatności.
 PRIVACY_POLICY_VERSION = "2026-07-07"
 
+logger = logging.getLogger("Auth")
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+async def _send_welcome_email(
+    email: str,
+    full_name: Optional[str],
+    trial_ends_at: Optional[datetime],
+    unsubscribe_token: str,
+) -> None:
+    """Powitanie leci w tle — rejestracja ma się udać także wtedy, gdy Resend milczy."""
+    try:
+        from src.newsletter.email_service import EmailService
+        await EmailService().send_welcome_email(
+            to_email=email,
+            recipient_name=full_name,
+            trial_ends_at=trial_ends_at,
+            unsubscribe_token=unsubscribe_token,
+        )
+    except Exception as exc:  # noqa: BLE001 — konto już istnieje, mail jest dodatkiem
+        logger.error(f"Nie udało się wysłać powitania do {email}: {exc}")
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(
+    background_tasks: BackgroundTasks,
     user_data: UserCreate,
     response: Response,
     session: AsyncSession = Depends(get_session)
@@ -112,6 +137,23 @@ async def register(
         session.add(referrer)
         await session.commit()
         await session.refresh(new_user)
+
+    # Newsletter: cennik obiecuje tygodniowy w planie darmowym i dzienny w Premium,
+    # więc subskrypcja powstaje razem z kontem. Wcześniej trzeba było ją odkryć
+    # samemu w profilu — pierwszy prawdziwy użytkownik nie dostał żadnego maila.
+    subscriber = await ensure_subscription(session, new_user)
+    if subscriber is not None:
+        await session.commit()
+        await session.refresh(subscriber)
+
+        # Jedyny moment, w którym mówimy wprost, że Premium jest na 30 dni.
+        background_tasks.add_task(
+            _send_welcome_email,
+            new_user.email,
+            new_user.full_name,
+            new_user.trial_ends_at,
+            subscriber.unsubscribe_token,
+        )
 
     # Generate tokens
     token_data = {

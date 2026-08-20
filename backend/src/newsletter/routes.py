@@ -23,6 +23,7 @@ from .schemas import (
     NewsletterPreferencesUpdate, SubscriberResponse, SubscriptionStats, MessageResponse
 )
 from .email_service import EmailService
+from .subscriptions import ensure_subscription
 
 router = APIRouter(prefix="/api/newsletter", tags=["newsletter"])
 
@@ -366,30 +367,14 @@ async def update_my_subscription(
         if current_user.tier not in [UserTier.PREMIUM.value, UserTier.BUSINESS.value]:
             raise HTTPException(status_code=403, detail="Daily newsletter requires Premium")
 
-    result = await session.execute(
-        select(NewsletterSubscriber)
-        .where(NewsletterSubscriber.user_id == current_user.id)
-        .where(NewsletterSubscriber.status == NewsletterStatus.ACTIVE.value)
-    )
-    subscriber = result.scalar_one_or_none()
-
-    if not subscriber:
-        # Create new subscriber
-        subscriber = NewsletterSubscriber(
-            email=current_user.email,
-            user_id=current_user.id,
-            frequency=frequency or NewsletterFrequency.WEEKLY.value,
-            status=NewsletterStatus.ACTIVE.value,
-            confirmed_at=datetime.utcnow(),
-            unsubscribe_token=generate_token(),
+    # Ta sama ścieżka co przy rejestracji — jedno miejsce decyduje, jak wygląda
+    # subskrypcja konta (patrz newsletter/subscriptions.py).
+    subscriber = await ensure_subscription(session, current_user, frequency=frequency)
+    if subscriber is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ten adres został wypisany z newslettera — zapisz się ponownie przez formularz",
         )
-        session.add(subscriber)
-    else:
-        if frequency:
-            subscriber.frequency = frequency
-        if not subscriber.confirmed_at:
-            subscriber.confirmed_at = datetime.utcnow()
-        subscriber.updated_at = datetime.utcnow()
 
     await session.commit()
     await session.refresh(subscriber)

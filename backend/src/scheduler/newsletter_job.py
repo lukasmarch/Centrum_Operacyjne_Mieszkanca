@@ -20,6 +20,18 @@ from src.config import settings
 logger = logging.getLogger("Scheduler.Newsletter")
 
 
+async def _marketing_consent(session, subscriber) -> bool:
+    """Czy odbiorca zgodził się na informacje handlowe (blok „Polecane firmy").
+
+    Anonimowy zapis bez konta nie zbiera takiej zgody, więc domyślnie jej nie ma.
+    """
+    if not subscriber.user_id:
+        return False
+    result = await session.execute(select(User).where(User.id == subscriber.user_id))
+    user = result.scalar_one_or_none()
+    return bool(user and user.consent_marketing)
+
+
 async def send_weekly_newsletter():
     """
     Send weekly newsletter to all active 'weekly' subscribers.
@@ -78,7 +90,8 @@ async def send_weekly_newsletter():
                     result = await email_service.send_weekly_newsletter(
                         to_email=subscriber.email,
                         content=content,
-                        unsubscribe_token=subscriber.unsubscribe_token
+                        unsubscribe_token=subscriber.unsubscribe_token,
+                        marketing_consent=await _marketing_consent(session, subscriber),
                     )
 
                     if result["status"] == "sent":
@@ -219,6 +232,7 @@ async def send_daily_newsletter():
                             to_email=subscriber.email,
                             content=content,
                             unsubscribe_token=subscriber.unsubscribe_token,
+                            marketing_consent=user.consent_marketing,
                             weather_temp=weather_temp,
                             recipient_name=first_name
                         )

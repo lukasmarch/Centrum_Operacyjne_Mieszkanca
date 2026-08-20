@@ -3,7 +3,7 @@ Email service using Resend for newsletter delivery
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -178,6 +178,7 @@ class EmailService:
         to_email: str,
         unsubscribe_token: str,
         campaign: str,
+        marketing_consent: bool = False,
     ) -> Dict[str, Any]:
         """Kontekst wspólny dla obu newsletterów: linki, stopka, przełącznik reklam."""
         now = datetime.now()
@@ -193,15 +194,18 @@ class EmailService:
             "url_terms": app_link("/regulamin", campaign),
             "url_reports": app_link("/zgloszenia", campaign),
             "sent_at_label": f"{now.day} {MONTHS_PL[now.month - 1]} {now.year}",
-            # Reklama firm wraca dopiero, gdy sprzedamy plan „Firma lokalna"
-            "ads_enabled": settings.NEWSLETTER_ADS_ENABLED,
+            # Reklama firm wraca dopiero, gdy sprzedamy plan „Firma lokalna" — i tylko
+            # do osób, które zaznaczyły zgodę marketingową przy rejestracji. Blok promocyjny
+            # to informacja handlowa, a checkbox zgody do 20.08.2026 nie sterował niczym.
+            "ads_enabled": settings.NEWSLETTER_ADS_ENABLED and marketing_consent,
         }
 
     async def send_weekly_newsletter(
         self,
         to_email: str,
         content: Dict[str, Any],
-        unsubscribe_token: str
+        unsubscribe_token: str,
+        marketing_consent: bool = False,
     ) -> Dict[str, Any]:
         """
         Send weekly newsletter to a subscriber.
@@ -232,7 +236,7 @@ class EmailService:
 
         # Build context for template
         context = {
-            **self._common_context(to_email, unsubscribe_token, "weekly"),
+            **self._common_context(to_email, unsubscribe_token, "weekly", marketing_consent=marketing_consent),
             "subject": content.get("subject", "Tydzień w gminie Rybno"),
             "preheader": content.get("preview_text", ""),
             "date_header": f"{DAYS_PL[now.weekday()]} · {now.day} {MONTHS_PL[now.month - 1]} {now.year}",
@@ -318,6 +322,7 @@ class EmailService:
         to_email: str,
         content: Dict[str, Any],
         unsubscribe_token: str,
+        marketing_consent: bool = False,
         weather_temp: Optional[float] = None,
         recipient_name: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -365,7 +370,7 @@ class EmailService:
         sources_count = content.get("sources_count") or 0
 
         context = {
-            **self._common_context(to_email, unsubscribe_token, "briefing"),
+            **self._common_context(to_email, unsubscribe_token, "briefing", marketing_consent=marketing_consent),
             "subject": content.get("subject", "Poranny briefing"),
             "preheader": content.get("preview_text", ""),
             "date_header": content.get("date_header", ""),
@@ -440,6 +445,158 @@ class EmailService:
                 results["skipped"] += 1
 
         return results
+
+    async def send_welcome_email(
+        self,
+        to_email: str,
+        recipient_name: Optional[str],
+        trial_ends_at: Optional[datetime],
+        unsubscribe_token: str,
+        now: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Powitanie tuż po rejestracji.
+
+        Jedyny moment, w którym mówimy wprost, że Premium jest na 30 dni. Do 20.08.2026
+        nie wysyłaliśmy go wcale: pierwszy prawdziwy użytkownik dostał ciche Premium,
+        nie wiedział o okresie próbnym i nie miał powodu niczego kupować — cennik
+        oferował mu plan, który już miał.
+        """
+        now = now or datetime.now()
+        days_left = max(0, (trial_ends_at - now).days) if trial_ends_at else 0
+
+        context = self._common_context(to_email, unsubscribe_token, campaign="powitanie")
+        context.update({
+            "subject": (
+                f"Konto gotowe — Premium do {self._date_label(trial_ends_at, with_year=False)}"
+                if trial_ends_at else "Witamy w RybnoLive"
+            ),
+            "preheader": "Bez karty i bez zobowiązań. Pierwszy poranny briefing przyjdzie wkrótce.",
+            "recipient_name": (recipient_name or "").split()[0] if recipient_name else None,
+            "date_header": self._date_label(now),
+            "status_line": "Konto założone. Przez najbliższe 30 dni masz plan Premium — bez karty i bez zobowiązań.",
+            "trial_end_label": self._date_label(trial_ends_at, with_year=False) if trial_ends_at else "—",
+            "trial_end_short": self._date_label(trial_ends_at, with_year=False) if trial_ends_at else "po okresie próbnym",
+            "trial_days": days_left,
+            "trial_days_word": plural_pl(days_left, "dzień", "dni", "dni"),
+            "first_briefing_label": self._next_briefing_label(now),
+            "perks": [
+                {"title": "Poranny briefing na mail", "note": "od poniedziałku do piątku, kwadrans po siódmej"},
+                {"title": "Asystent AI bez limitu pytań", "note": "sześciu agentów, którzy znają gminę"},
+                {"title": "Powiadomienia o awariach", "note": "prąd, woda, pożar — zanim dowiesz się od sąsiada"},
+                {"title": "Przypomnienie o wywozie odpadów", "note": "wieczorem dzień wcześniej"},
+                {"title": "57 wskaźników GUS dla gminy", "note": "w planie darmowym jest dziewięć"},
+            ],
+        })
+
+        html = self.render_template("welcome.html", context)
+        return await self.send_email(
+            to_email=to_email,
+            subject=context["subject"],
+            html_content=html,
+            unsubscribe_url=context["unsubscribe_url"],
+        )
+
+    async def send_trial_reminder(
+        self,
+        to_email: str,
+        recipient_name: Optional[str],
+        stage: str,
+        trial_ends_at: Optional[datetime],
+        unsubscribe_token: str,
+        now: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Koniec okresu próbnego: 'week' (−7 dni), 'last_day' (−1 dzień), 'ended' (po zmianie planu).
+
+        Wygaszenie trialu odbierało dostęp bez słowa — z perspektywy użytkownika
+        wyglądało to jak awaria albo wycofanie obietnicy.
+
+        Zachęta zależy od `P24_SANDBOX`: dopóki bramka stoi w piaskownicy, mail nie
+        pokazuje przycisku zakupu, bo transakcja skończyłaby się błędem.
+        """
+        now = now or datetime.now()
+        days_left = max(0, (trial_ends_at - now).days) if trial_ends_at else 0
+
+        # Job chodzi o 5:00, a trial wygasa o godzinie rejestracji — „jutro" bywa
+        # nieprawdą, gdy okres próbny kończy się jeszcze tego samego wieczoru.
+        when_word = "wkrótce"
+        if trial_ends_at:
+            delta_days = (trial_ends_at.date() - now.date()).days
+            when_word = {0: "dziś", 1: "jutro"}.get(
+                delta_days, f"{trial_ends_at.day} {MONTHS_PL[trial_ends_at.month - 1]}"
+            )
+
+        subjects = {
+            "week": "Za tydzień kończy się Twój okres próbny",
+            "last_day": f"Okres próbny kończy się {when_word}",
+            "ended": "Twoje konto przeszło na plan darmowy",
+        }
+        preheaders = {
+            "week": "Nic nie pobierzemy — nie mamy Twojej karty. Sprawdź tylko, co zostaje.",
+            "last_day": "Potem konto przechodzi na plan Dla Każdego. Alerty o awariach zostają.",
+            "ended": "Alerty, pogoda i harmonogram odpadów działają dalej, za darmo.",
+        }
+
+        context = self._common_context(to_email, unsubscribe_token, campaign=f"trial-{stage}")
+        context.update({
+            "subject": subjects.get(stage, subjects["week"]),
+            "preheader": preheaders.get(stage, preheaders["week"]),
+            "recipient_name": (recipient_name or "").split()[0] if recipient_name else None,
+            "date_header": self._date_label(now),
+            "status_line": (
+                "Konto działa dalej — zmienia się tylko zakres."
+                if stage == "ended"
+                else "Nie pobierzemy żadnej opłaty. Nie mamy Twojej karty i nic nie przedłuża się samo."
+            ),
+            "stage": stage,
+            "when_word": when_word,
+            "trial_end_label": self._date_label(trial_ends_at, with_year=False) if trial_ends_at else "—",
+            "trial_days": days_left,
+            "trial_days_word": plural_pl(days_left, "dzień", "dni", "dni"),
+            "payments_live": not settings.P24_SANDBOX,
+            "losing": [
+                "Poranny briefing na mail (pon.–pt.)",
+                "Asystent AI bez limitu — zostanie pięć pytań dziennie",
+                "Przypomnienie o wywozie odpadów dzień wcześniej",
+                "57 wskaźników GUS — zostanie dziewięć",
+            ],
+            "keeping": [
+                "Alerty o awariach prądu, wody i zagrożeniach",
+                "Pogoda i jakość powietrza",
+                "Harmonogram wywozu odpadów",
+                "Zgłoszenia 24 ze zdjęciem",
+                "Newsletter tygodniowy",
+            ],
+        })
+
+        html = self.render_template("trial_reminder.html", context)
+        return await self.send_email(
+            to_email=to_email,
+            subject=context["subject"],
+            html_content=html,
+            unsubscribe_url=context["unsubscribe_url"],
+        )
+
+    @staticmethod
+    def _date_label(value: Optional[datetime], with_year: bool = True) -> str:
+        """18 września 2026 / 18 września — bez zer wiodących, po polsku."""
+        if not value:
+            return "—"
+        label = f"{value.day} {MONTHS_PL[value.month - 1]}"
+        return f"{label} {value.year}" if with_year else label
+
+    @staticmethod
+    def _next_briefing_label(now: datetime) -> str:
+        """Kiedy przyjdzie pierwszy briefing — job chodzi od poniedziałku do piątku o 7:15."""
+        candidate = now
+        if now.hour >= 7:
+            candidate = now + timedelta(days=1)
+        while candidate.weekday() >= 5:  # sobota, niedziela
+            candidate = candidate + timedelta(days=1)
+        if candidate.date() == now.date():
+            return "dziś rano"
+        if (candidate.date() - now.date()).days == 1:
+            return "jutro rano"
+        return f"w {DAYS_PL[candidate.weekday()].lower()} rano"
 
     async def send_confirmation_email(
         self,
