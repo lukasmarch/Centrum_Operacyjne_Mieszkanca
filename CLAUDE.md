@@ -41,12 +41,9 @@ docker compose -f docker-compose.prod.yml up -d backend
 ```
 
 ## Stack
-- **Backend**: FastAPI + PostgreSQL + pgvector + OpenAI
-- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS
 - **AI**: GPT-4o-mini (routing/kategoryzacja), GPT-4o (summary/GUS), text-embedding-3-small (RAG)
-- **Scheduler**: APScheduler (12 jobów)
-- **Auth**: JWT (tier: free/premium/business)
 - **Lokalizacja**: Gmina Rybno, Powiat Działdowski
+- Wersje bibliotek: `frontend/package.json`, `backend/requirements.txt` (nie duplikujemy ich tutaj — notatka się rozjeżdżała)
 
 ## Uruchomienie
 
@@ -54,33 +51,63 @@ docker compose -f docker-compose.prod.yml up -d backend
 # Backend
 source .venv/bin/activate && cd backend && uvicorn src.api.main:app --reload --port 8000
 
-# Frontend
+# Frontend — MUSI być z katalogu frontend, tam leży vite.config.ts
 cd frontend && npm run dev   # port 3001
 
-# Docker (PostgreSQL + pgvector)
-docker-compose up -d
+# Docker (PostgreSQL + pgvector) — plik compose leży w backend/, NIE w korzeniu
+cd backend && docker compose up -d
+```
+Lokalna baza: kontener `backend-postgres-1` (:5432), Adminer :8080.
+CORS backendu dopuszcza `localhost:3001/3002/5173` — podgląd na innym porcie
+nie dogada się z API.
+
+## WYRÓWNANIE BAZ — testujemy lokalnie, nie na produkcji (2026-08-18)
+
+**Kod ma się pokrywać, różnić mają się tylko rekordy.** 18.08 okazało się, że
+lokalna baza była o **3 tabele i 7 kolumn** za produkcją — stąd odruch
+sprawdzania rzeczy „na żywym", bo lokalnie kod po prostu nie działał.
+
+**Przyczyna, którą trzeba znać:** `alembic_version` pokazuje **tę samą wersję
+`22fbd3a7c45e` w obu bazach**, a schematy się różnią. Każda zmiana schematu idzie
+ręcznym skryptem z `backend/scripts/migrations/` (**34 sztuki**) i **żaden nie
+dopisuje nic do `alembic_version`**. Nie ma więc licznika, który powie, czego
+brakuje — rozjazd narasta po cichu.
+
+**Sprawdzenie rozjazdu (rób to przed każdą dłuższą pracą na bazie):**
+```bash
+Q="select table_name||'.'||column_name from information_schema.columns where table_schema='public' order by 1"
+docker exec backend-postgres-1 sh -c "psql -U \$POSTGRES_USER -d centrum_operacyjne -tAc \"$Q\"" | sort > /tmp/local.txt
+ssh root@91.99.142.30 "docker exec centrum-db-1 sh -c \"psql -U \\\$POSTGRES_USER -d centrum_operacyjne -tAc \\\"$Q\\\"\"" | sort > /tmp/prod.txt
+comm -13 /tmp/local.txt /tmp/prod.txt   # czego brakuje LOKALNIE
+comm -23 /tmp/local.txt /tmp/prod.txt   # co mamy ponad produkcję
 ```
 
-## Scheduler Timeline (13 jobów)
+**Wyrównanie lokalnej bazy** — uruchom brakujące migracje (są idempotentne):
+```bash
+cd backend && python -m scripts.migrations.<nazwa>
 ```
-6:00  → Article Scraping
-6:15  → AI Processing (batch=100, kategoryzacja)
-6:20  → Embedding Job (RAG, text-embedding-3-small)
-6:50  → Proactive Alerts (Premium: mróz, śmietnik)
-7:00  → Daily Summary
-Co 15 min → Alerty push o awariach (prąd, woda, pożar, wypadek)
-Co 1h → Weather Update
-Co 4h → Air Quality (Airly)
-9/12/15/18/21:05 → Energa (wyłączenia prądu)
-2/6/10/14/18/22h → Traffic Cache (Gemini)
-13:00–13:45 → Popołudniowy przebieg (scraping → AI → summary → embedding)
-8:00  → Cinema Repertoire
-Niedz 3:00 → CEIDG Sync
-Niedz 4:00 → Wiedza stała z BIP (statut, procedury, podatki, programy)
-Sob 10:00 → Newsletter Weekly
-Pn-Pt 7:15 → Newsletter Daily (Premium)
-1.01/04/07/10 → GUS Statistics
-```
+⚠️ **NIE odpalać wszystkich 34 hurtem** — część to operacje na DANYCH, nie na
+schemacie: `clean_database.py`, `remove_duplicate_events.py`,
+`disable_risky_sources.py`, `normalize_ceidg_casing.py`, `ceidg_minimalizacja_rodo.py`.
+
+**Kierunek rozjazdu ma znaczenie:**
+- **Produkcja z przodu** = błąd. Kodu nie da się uruchomić u siebie, więc testuje
+  się na żywym. Wyrównaj natychmiast.
+- **Lokalnie z przodu** = stan normalny. Kolumna jest u nas, bo TU testujemy kod,
+  który dopiero czeka na wdrożenie.
+
+**Reguła wdrożeniowa: migracja idzie na produkcję PRZED kodem, nigdy odwrotnie.**
+Kolumna, której stary kod nie używa, nie szkodzi nikomu — kod bez kolumny to 500
+na każdym zapytaniu. GitHub Actions **nie uruchamia migracji**: robi tylko
+`git pull && build && up -d`.
+
+## Podział gałęzi (2026-08-18)
+- **`strona-glowna-etap0`** — praca przenikająca front i backend (przebudowa strony
+  głównej, wątek firm, kino, Zgłoszenia 24). Zostaje na gałęzi **aż wdrożymy
+  całość**, sprawdzana **lokalnie**. Wyciąganie z niej samego backendu zostawia
+  funkcję bez interfejsu i wymusza rozcinanie commitów, których nie da się rozciąć.
+- **`main`** — bieżące poprawki, kampania, materiały social. Wypychane od razu
+  (push → GitHub Actions → deploy backendu; **front zawsze ręcznie**).
 
 ## Alerty push (2026-07-28)
 **Awaria nie czeka na okno pipeline'u.** `alert_push_job` chodzi co 15 min i wysyła
@@ -217,129 +244,6 @@ dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykr
   sam BIP nie wydał obwieszczenia. Uboczne: scraper próbuje paginacji `?start=N`,
   a BIP używa `/112/2/` — czyta więc tylko pierwszą stronę (bez znaczenia przy cutoff 2 dni)
 
-## Struktura Backend
-
-```
-backend/src/
-├── ai/
-│   ├── agents/         # 5 agentów AI + orchestrator
-│   │   ├── orchestrator.py   # routing GPT-4o-mini
-│   │   ├── base_agent.py     # RAG + streaming (SSE)
-│   │   ├── redaktor.py       # wiadomości lokalne
-│   │   ├── urzednik.py       # BIP, przetargi
-│   │   ├── gus_analityk.py   # statystyki (❌ wymaga SQL)
-│   │   ├── przewodnik.py     # wydarzenia, pogoda
-│   │   └── straznik.py       # awarie, bezpieczeństwo
-│   ├── embeddings.py   # EmbeddingService (pgvector)
-│   ├── chunker.py      # tekst → chunki
-│   └── ...             # kategoryzacja, summary
-├── api/endpoints/
-│   ├── chat.py         # POST /api/chat/message (SSE), GET /history /suggestions /agents
-│   ├── articles.py
-│   ├── weather.py
-│   ├── summary.py
-│   ├── gus.py          # tier-based stats
-│   └── ...
-├── database/
-│   ├── schema.py       # modele (Article, Event, User, GUSGminaStats...)
-│   ├── vectors.py      # Conversation, ChatMessage, DocumentEmbedding
-│   └── connection.py   # async_session()
-├── scheduler/
-│   ├── embedding_job.py  # RAG embeddings
-│   └── ...
-└── integrations/
-    └── gus_variables.py  # 88 zmiennych, 10 kategorii, 3 tiery
-```
-
-## Struktura Frontend
-
-```
-frontend/
-├── App.tsx                    # routing (useState<AppSection>)
-├── components/
-│   ├── ChatInterface.tsx      # chat UI + wybór agenta
-│   ├── ChatMessage.tsx        # bąbelki wiadomości
-│   ├── SourceChip.tsx         # chip z linkiem do źródła
-│   ├── PromptBar.tsx          # hero input (Dashboard)
-│   ├── BentoGrid/Tile         # dashboard layout
-│   ├── AIBriefingTile.tsx     # daily summary tile
-│   ├── WeatherTile.tsx
-│   ├── NewsTile.tsx
-│   ├── EventsTile.tsx
-│   └── gus/                  # GUS components (dark mode ✅)
-└── src/
-    ├── hooks/
-    │   ├── useChat.ts         # SSE streaming hook
-    │   ├── useArticles.ts
-    │   ├── useWeather.ts
-    │   └── useGUSStats.ts
-    ├── pages/
-    │   ├── AssistantPage.tsx  # Asystent AI
-    │   ├── GUSPage.tsx
-    │   ├── WeatherPage.tsx
-    │   └── ...
-    └── context/
-        ├── AuthContext.tsx
-        └── DataCacheContext.tsx
-```
-
-## Główne endpointy API
-```
-GET  /health
-GET  /api/articles
-GET  /api/weather
-GET  /api/summary/daily
-POST /api/auth/login
-GET  /api/chat/agents
-GET  /api/chat/suggestions
-GET  /api/chat/history
-POST /api/chat/message          # SSE streaming
-GET  /api/stats/variables/list  # GUS tier-based
-GET  /api/stats/variable/{key}
-GET  /api/stats/multi-metric    # Business tier
-GET  /api/social/proposal?kind=text|photo   # gotowy post dla n8n (X-Social-Token)
-GET  /api/social/campaign/due               # kalendarz kampanii
-POST /api/social/media                      # grafika z URL → uploads/social/
-```
-
-## Newsletter — szata graficzna marki (2026-07-27)
-- Szablony: `templates/_base.html` (nagłówek, CTA, stopka) + `daily.html` / `weekly.html` dziedziczą przez Jinja `{% extends %}`
-- Ciemna paleta jak w serwisie (#020617 / #0d1117), font Outfit + monospace na liczbach, układ na `<table>` (Outlook), 600 px, ~25 KB
-- Briefing: temat i nagłówek **składane w kodzie** (`Rybno, pon. 27 lipca · 18° · powietrze bardzo dobre`) — model potrafił wstawić złą datę; AI daje tylko `status_line` + `highlights` z polem `agent` (Redaktor/Urzędnik/Strażnik/Przewodnik/Organizator → kolor karty; walidacja w `email_service.AGENT_COLORS`, fallback Redaktor)
-- Wypis działa: `GET /api/newsletter/unsubscribe?token=` (strona z przyciskiem, sam GET nic nie zmienia — skanery poczty odwiedzają linki) + `POST` (formularz, JSON, one-click). Mail wysyłany z nagłówkami `List-Unsubscribe` / `List-Unsubscribe-Post`
-- Stopka: wydawca Lu-Mar-Go, Żabiny 96 + „serwis niezależny, nieprowadzony przez Urząd Gminy Rybno" (makieta miała adres urzędu)
-- Sekcja „Polecane firmy" wyłączona flagą `NEWSLETTER_ADS_ENABLED=false` — wraca po pierwszej sprzedaży planu Firma lokalna
-- Podgląd bez wysyłki: `python scripts/test_newsletter_send.py x@example.com --preview-dir /tmp/nl`
-
-## Automatyzacja social media (2026-07-25, grafiki w każdym poście 2026-07-26)
-**Backend robi treść, n8n tylko akceptuje i publikuje.**
-- `services/social_content.py` — treść postów, prompt graficzny, klient kie.ai (`nano-banana-pro`), `CAMPAIGN_PLAN`
-- `services/social_card.py` — **karta dnia**: grafika 1200×630 składana lokalnie (Pillow) z `headline`; 0 zł, ~0,1 s; font `backend/assets/fonts/Outfit.ttf` + kadr `backend/assets/social/orb.jpg` (`COPY assets/` w Dockerfile)
-- **Obsada grafik W2 (2026-08-03)**: trzy powracające postacie — **Kuba** (urząd, dane, ciekawostki),
-  **Ola** (wydarzenia, weekend, ludzie), **Bartek** (awarie, drogi, odpady, pogoda). Postać do zdarzenia
-  wybiera gpt-4o (`cast` w JSON-ie), wygląd trzyma arkusz referencyjny `backend/assets/social/cast/<id>.jpg`
-  podawany kie.ai w polu **`image_input`** (NIE `image_urls` — to inny model i zostałoby zignorowane bez błędu).
-  Endpoint kopiuje arkusz do `uploads/social/cast/`, bo tylko ten katalog jest publiczny.
-  Styl: naklejka komiksowa, gruby biały kontur, pociągnięcia pędzla; granat #05080f i błękit #3a81f6
-  marki + żółć/magenta/fiolet. Prompt pilnuje **nowoczesnej** wsi (bez chałup z bali) i ubrań bez cudzych logo.
-  Arkusze: `python -m scripts.build_social_cast [--only ola] [--force]`;
-  podgląd posta bez publikacji: `python -m scripts.test_social_photo [--db] [--reference URL]`
-- **Oba rodzaje postów idą jako `/photos`** (nie `/feed`) — zdjęcie zamiast karty linku; `rybnolive.pl` zostaje w treści
-- OG w `frontend/index.html`: domena `rybnolive.pl` + `og-image.jpg` 1200×630 (było `rybno.pl/icon-512.png` → pusty kwadrat pod postami)
-- Grafiki: **jedno miejsce** `uploads/social/` → `api.rybnolive.pl/uploads/social/…` (wolumen `uploads`).
-  Zlikwidowane duplikaty: `frontend/public/kampania/` i `/campaign/` na wolumenie frontendu
-- n8n: 3 workflowy generowane z `automation/n8n/build_workflows.py` (W1 tekstowy 7:45, W2 graficzny wt+czw 17:00, W3 kampania)
-- Akceptacja przez `$execution.resumeUrl` node'a Wait — jednorazowy, bez timeoutu (**fail-closed**: brak kliknięcia = brak publikacji)
-- Sekrety: `automation/.env` (gitignore); w backendzie `SOCIAL_MEDIA_TOKEN`, `KIE_API_KEY`
-- Klucz Public API n8n wygasa **2026-08-23**; po 10.08 **dezaktywuj W3**
-Docs: http://localhost:8000/docs
-
-## Stan RAG / Embeddings
-- **Osadzone**: 100 artykułów, 50 eventów → 170 chunków w `document_embeddings`
-- **Nieosadzone**: ~1065 artykułów (uruchomić embedding_job)
-- **Model**: text-embedding-3-small (1536 dim)
-- **Tabela**: `document_embeddings` (pgvector 0.8.1)
-
 ## Stan Agentów AI
 | Agent | Status | Dane |
 |-------|--------|------|
@@ -385,6 +289,7 @@ develop  # nieaktywna
 - `.git-rules.md` - zasady Git i workflow
 - `backend/scripts/diagnostics/` - narzędzia diagnostyczne
 - `backend/logs/scheduler.log` - logi schedulera (rotacja 10MB)
+- Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-07-19*
+*Ostatnia aktualizacja: 2026-08-18*
