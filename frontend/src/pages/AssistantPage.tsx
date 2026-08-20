@@ -19,6 +19,8 @@ interface AgentDef {
   about: string;
   capabilities: string[];
   image: string | null;
+  /** Wariant miniatury (kółko 60 px na liście, awatar 32 px w czacie) — patrz `AGENT_IMAGES` w ChatMessage.tsx */
+  thumb: string | null;
   video: string | null;
   icon: React.ReactNode;
   color: string;
@@ -31,7 +33,8 @@ const AGENTS: AgentDef[] = [
     desc: 'Automatyczny dobór agenta',
     about: 'System automatycznie rozpoznaje temat pytania i kieruje je do najlepszego agenta.',
     capabilities: ['Pytania ogólne', 'Automatyczny routing', 'Wszystkie tematy'],
-    image: '/agents/auto.jpeg',
+    image: '/agents/auto-hero.webp',
+    thumb: '/agents/auto-thumb.webp',
     video: '/agents/auto.mp4',
     icon: <Bot size={22} />,
     color: 'from-blue-600 to-violet-600',
@@ -42,7 +45,8 @@ const AGENTS: AgentDef[] = [
     desc: 'Wiadomości i aktualności',
     about: 'Zna wszystkie lokalne artykuły, ogłoszenia i aktualności z gminy Rybno.',
     capabilities: ['Wiadomości lokalne', 'Ogłoszenia', 'Aktualności', 'Artykuły prasowe'],
-    image: '/agents/redaktor.webp',
+    image: '/agents/redaktor-hero.webp',
+    thumb: '/agents/redaktor-thumb.webp',
     video: '/agents/redaktor.mp4',
     icon: <Newspaper size={22} />,
     color: 'from-sky-500 to-blue-700',
@@ -53,7 +57,8 @@ const AGENTS: AgentDef[] = [
     desc: 'BIP, przetargi i urząd',
     about: 'Pomaga w sprawach urzędowych, przetargach, decyzjach i dokumentach BIP gminy.',
     capabilities: ['BIP i dokumenty', 'Przetargi', 'Procedury urzędowe', 'Zarządzenia'],
-    image: '/agents/urzednik.jpeg',
+    image: '/agents/urzednik-hero.webp',
+    thumb: '/agents/urzednik-thumb.webp',
     video: '/agents/urzednik.mp4',
     icon: <Landmark size={22} />,
     color: 'from-amber-500 to-orange-700',
@@ -64,7 +69,8 @@ const AGENTS: AgentDef[] = [
     desc: 'Awarie i bezpieczeństwo',
     about: 'Informuje o awariach sieci, alertach RCB, zagrożeniach i zdarzeniach kryzysowych.',
     capabilities: ['Awarie wody i prądu', 'Alerty RCB', 'Bezpieczeństwo', 'Zdarzenia drogowe'],
-    image: '/agents/straznik.webp',
+    image: '/agents/straznik-hero.webp',
+    thumb: '/agents/straznik-thumb.webp',
     video: '/agents/straznik.mp4',
     icon: <ShieldAlert size={22} />,
     color: 'from-red-500 to-rose-700',
@@ -75,7 +81,8 @@ const AGENTS: AgentDef[] = [
     desc: 'Wydarzenia i atrakcje',
     about: 'Doradza w kwestiach wydarzeń lokalnych, atrakcji turystycznych i prognozy pogody.',
     capabilities: ['Imprezy lokalne', 'Atrakcje turystyczne', 'Pogoda', 'Miejsca w gminie'],
-    image: '/agents/przewodnik.webp',
+    image: '/agents/przewodnik-hero.webp',
+    thumb: '/agents/przewodnik-thumb.webp',
     video: '/agents/przewodnik.mp4',
     icon: <Map size={22} />,
     color: 'from-emerald-500 to-teal-700',
@@ -86,7 +93,8 @@ const AGENTS: AgentDef[] = [
     desc: 'Śmieci i usługi',
     about: 'Zna pełny harmonogram odbioru odpadów w każdej miejscowości gminy Rybno na 2026 rok.',
     capabilities: ['Harmonogram śmieci', 'Segregacja odpadów', 'Punkty PSZOK', 'Usługi komunalne'],
-    image: '/agents/organizator.jpeg',
+    image: '/agents/organizator-hero.webp',
+    thumb: '/agents/organizator-thumb.webp',
     video: '/agents/organizator.mp4',
     icon: <CalendarDays size={22} />,
     color: 'from-purple-500 to-fuchsia-700',
@@ -98,6 +106,7 @@ const AGENTS: AgentDef[] = [
     about: 'Analizuje dane statystyczne GUS dotyczące gminy Rybno i powiatu działdowskiego.',
     capabilities: ['Dane demograficzne', 'Finanse gminy', 'Porównania krajowe', 'Trendy'],
     image: null,
+    thumb: null,
     video: null,
     icon: <BarChart3 size={22} />,
     color: 'from-cyan-500 to-blue-700',
@@ -149,6 +158,8 @@ const AssistantPage: React.FC<AssistantPageProps> = ({ initialQuery, onNavigate,
                 <img
                   src={activeAgent.image}
                   alt={activeAgent.label}
+                  loading="lazy"
+                  decoding="async" 
                   className="w-full h-full"
                   style={{ objectFit: 'cover', objectPosition: 'center 20%', display: 'block' }}
                 />
@@ -256,9 +267,12 @@ const AssistantPage: React.FC<AssistantPageProps> = ({ initialQuery, onNavigate,
                   >
                     {/* Kontener miniatury */}
                     <div className="w-full h-full rounded-full overflow-hidden p-[2px] relative z-10 bg-transparent">
-                      {agent.image ? (
+                      {agent.thumb ? (
                         <img
-                          src={agent.image}
+                          src={agent.thumb}
+                          loading="lazy"
+                          width={120}
+                          height={120}
                           alt={agent.label}
                           className="w-full h-full rounded-full"
                           style={{ objectFit: 'cover', objectPosition: 'center 20%' }}

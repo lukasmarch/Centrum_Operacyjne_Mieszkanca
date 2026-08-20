@@ -16,13 +16,19 @@ interface ChatMessageProps {
   showFollowups?: boolean;
 }
 
-// Agent images – must match frontend/public/agents/
+// Awatary agentów — warianty `-thumb` z frontend/public/agents/.
+//
+// 20.08.2026: stało tu `redaktor.png`, czyli plik 2752×1536 i 5,8 MB, wstawiany
+// w kółko o boku 32 px. Miniatury mają wysokość 256 px (zapas na ekrany 2×/3×)
+// i ważą 7–16 kB. Te same pliki karmią listę wyboru w AssistantPage, więc agent
+// wygląda tak samo w czacie i nad nim — wcześniej Strażnik miał w obu miejscach
+// dwa różne zdjęcia.
 const AGENT_IMAGES: Record<string, string> = {
-  redaktor: '/agents/redaktor.png',
-  urzednik: '/agents/urzednik.jpeg',
-  straznik: '/agents/straznik.jpeg',
-  przewodnik: '/agents/przewodnik.png',
-  organizator: '/agents/organizator.jpeg',
+  redaktor: '/agents/redaktor-thumb.webp',
+  urzednik: '/agents/urzednik-thumb.webp',
+  straznik: '/agents/straznik-thumb.webp',
+  przewodnik: '/agents/przewodnik-thumb.webp',
+  organizator: '/agents/organizator-thumb.webp',
 };
 
 const AGENT_COLORS: Record<string, string> = {
@@ -190,6 +196,10 @@ const AgentAvatar: React.FC<{ agentName?: string }> = ({ agentName }) => {
       <img
         src={imgSrc}
         alt={name}
+        loading="lazy"
+        decoding="async"
+        width={32}
+        height={32}
         className="w-8 h-8 rounded-full object-cover object-top flex-shrink-0 border border-white/10"
       />
     );
