@@ -17,50 +17,69 @@ interface ProfilePageProps {
   initialTab?: 'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj';
 }
 
+/** Ile pełnych dni okresu próbnego zostało; null, gdy trial nie działa.
+ *
+ *  Do 20.08.2026 front nie znał słowa „trial": pokazywał sam plan Premium, więc
+ *  użytkownik nie wiedział, że ma go na 30 dni, i nie miał powodu niczego kupić —
+ *  cennik oferował mu to, co już miał. */
+const trialDaysLeft = (trialEndsAt?: string | null): number | null => {
+  if (!trialEndsAt) return null;
+  // Backend zapisuje czas w UTC bez sufiksu strefy — bez „Z" przeglądarka
+  // potraktowałaby go jako lokalny i doba potrafiłaby zniknąć.
+  const iso = /[Zz]|[+-]\d{2}:\d{2}$/.test(trialEndsAt) ? trialEndsAt : `${trialEndsAt}Z`;
+  const end = new Date(iso).getTime();
+  if (Number.isNaN(end)) return null;
+  const days = Math.ceil((end - Date.now()) / 86_400_000);
+  return days > 0 ? days : null;
+};
+
+const formatTrialEnd = (trialEndsAt: string): string => {
+  const iso = /[Zz]|[+-]\d{2}:\d{2}$/.test(trialEndsAt) ? trialEndsAt : `${trialEndsAt}Z`;
+  return new Date(iso).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
+};
+
 const NewsletterPrefs: React.FC<{ isPremium: boolean; apiBase: string }> = ({ isPremium, apiBase }) => {
-  const [weekly, setWeekly] = useState<boolean | null>(null);
-  const [daily, setDaily] = useState<boolean | null>(null);
+  // `subscribed === null` = jeszcze nie wiemy. Wcześniej brak subskrypcji (404) był
+  // pokazywany jako włączony tygodnik — użytkownik widział zaznaczony checkbox
+  // i nie dostawał żadnego maila.
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [daily, setDaily] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const token = getAccessToken();
-    if (!token) { setWeekly(true); setDaily(false); return; }
+    if (!token) { setSubscribed(false); return; }
     fetch(`${apiBase}/newsletter/my-subscription`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(data => {
-        if (data) {
-          setWeekly(true); // weekly zawsze aktywny
-          setDaily(data.frequency === 'daily');
-        } else {
-          setWeekly(true);
-          setDaily(false);
-        }
+        setSubscribed(Boolean(data));
+        setDaily(data?.frequency === 'daily');
       })
-      .catch(() => { setWeekly(true); setDaily(false); });
+      .catch(() => { setSubscribed(false); });
   }, [apiBase]);
 
-  const save = async (newWeekly: boolean, newDaily: boolean) => {
+  const save = async (frequency: 'daily' | 'weekly') => {
     const token = getAccessToken();
     if (!token) return;
     setSaving(true);
-    const frequency = newDaily ? 'daily' : 'weekly';
-    await fetch(`${apiBase}/newsletter/my-subscription`, {
+    const res = await fetch(`${apiBase}/newsletter/my-subscription`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ frequency }),
-    }).catch(() => {});
+    }).catch(() => null);
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (res?.ok) {
+      setSubscribed(true);
+      setDaily(frequency === 'daily');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
 
-  const toggleWeekly = (v: boolean) => { setWeekly(v); save(v, daily ?? false); };
-  const toggleDaily  = (v: boolean) => { setDaily(v);  save(weekly ?? true, v); };
-
-  if (weekly === null) return (
+  if (subscribed === null) return (
     <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
       <h2 className="text-xl font-bold mb-4">Newsletter</h2>
       <div className="h-20 flex items-center justify-center">
@@ -76,43 +95,59 @@ const NewsletterPrefs: React.FC<{ isPremium: boolean; apiBase: string }> = ({ is
         {saving && <span className="text-xs text-neutral-500">Zapisywanie...</span>}
         {saved && !saving && <span className="text-xs text-emerald-400">Zapisano ✓</span>}
       </div>
-      <div className="space-y-3">
-        <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
-          <div>
-            <p className="font-semibold">Newsletter tygodniowy</p>
-            <p className="text-sm text-neutral-500">Podsumowanie tygodnia co sobotę</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={weekly ?? true}
-            onChange={e => toggleWeekly(e.target.checked)}
-            className="w-5 h-5 rounded accent-blue-600"
-          />
-        </label>
 
-        {isPremium ? (
-          <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
+      {!subscribed ? (
+        <div className="p-4 bg-gray-900 rounded-xl">
+          <p className="font-semibold">Newsletter jest wyłączony</p>
+          <p className="text-sm text-neutral-500 mt-1">
+            Nie wysyłamy Ci żadnych podsumowań. Możesz to zmienić jednym kliknięciem.
+          </p>
+          <button
+            onClick={() => save(isPremium ? 'daily' : 'weekly')}
+            disabled={saving}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl text-sm font-semibold transition-colors"
+          >
+            Włącz {isPremium ? 'poranny briefing' : 'newsletter tygodniowy'}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Częstotliwość to jedna wartość w bazie, nie dwie niezależne flagi —
+              tygodnik jest podstawą subskrypcji, dzienny go zastępuje. */}
+          <div className="flex items-center justify-between p-4 bg-gray-900 rounded-xl">
             <div>
-              <p className="font-semibold">Newsletter dzienny</p>
-              <p className="text-sm text-neutral-500">Poranny briefing pon–pt o 6:30 — newsy, śmietnik, BIP, pogoda</p>
+              <p className="font-semibold">Newsletter tygodniowy</p>
+              <p className="text-sm text-neutral-500">Podsumowanie tygodnia co sobotę</p>
             </div>
-            <input
-              type="checkbox"
-              checked={daily ?? false}
-              onChange={e => toggleDaily(e.target.checked)}
-              className="w-5 h-5 rounded accent-blue-600"
-            />
-          </label>
-        ) : (
-          <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl opacity-50">
-            <div>
-              <p className="font-semibold">Newsletter dzienny</p>
-              <p className="text-sm text-neutral-500">Dostępny w planie Premium</p>
-            </div>
-            <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-lg">Premium</span>
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
+              {daily ? 'zastąpiony dziennym' : 'włączony'}
+            </span>
           </div>
-        )}
-      </div>
+
+          {isPremium ? (
+            <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
+              <div>
+                <p className="font-semibold">Newsletter dzienny</p>
+                <p className="text-sm text-neutral-500">Poranny briefing pon–pt o 7:15 — newsy, śmietnik, BIP, pogoda</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={daily}
+                onChange={e => save(e.target.checked ? 'daily' : 'weekly')}
+                className="w-5 h-5 rounded accent-blue-600"
+              />
+            </label>
+          ) : (
+            <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl opacity-50">
+              <div>
+                <p className="font-semibold">Newsletter dzienny</p>
+                <p className="text-sm text-neutral-500">Dostępny w planie Premium</p>
+              </div>
+              <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-lg">Premium</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -294,10 +329,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
     }
   };
 
+  const daysLeft = trialDaysLeft(user?.trial_ends_at);
+
   const getTierBadge = (tier: UserTier) => {
     switch (tier) {
       case 'premium':
-        return (
+        return daysLeft !== null ? (
+          <span className="px-3 py-1 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-full text-sm font-bold">
+            Premium &middot; okres próbny
+          </span>
+        ) : (
           <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
             Premium
           </span>
@@ -363,6 +404,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               <h3 className="font-bold text-lg">{user.full_name}</h3>
               <p className="text-neutral-400 text-sm">{user.email}</p>
               <div className="mt-2">{getTierBadge(user.tier as UserTier)}</div>
+              {daysLeft !== null && user.trial_ends_at && (
+                <p className="mt-2 text-xs text-neutral-400 leading-relaxed">
+                  do <span className="font-semibold text-neutral-200">{formatTrialEnd(user.trial_ends_at)}</span>
+                  {' '}({daysLeft} {daysLeft === 1 ? 'dzień' : 'dni'})
+                  <br />
+                  potem plan Dla Każdego — nic nie pobieramy
+                </p>
+              )}
             </div>
 
             {/* Navigation */}

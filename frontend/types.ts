@@ -434,6 +434,8 @@ export interface User {
   preferences: Record<string, unknown> | null;
   created_at: string;
   last_login: string | null;
+  /** Koniec okresu próbnego Premium (30 dni od rejestracji). null = plan kupiony lub darmowy. */
+  trial_ends_at?: string | null;
   avatarUrl?: string;
 }
 

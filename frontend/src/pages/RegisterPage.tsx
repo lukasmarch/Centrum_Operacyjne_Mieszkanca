@@ -229,10 +229,25 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                   className="mt-0.5 accent-blue-500 shrink-0"
                 />
                 <span className="text-xs text-neutral-400 leading-relaxed">
-                  Chcę otrzymywać newsletter i informacje o nowych funkcjach serwisu
+                  Chcę dostawać informacje o nowościach w serwisie i oferty lokalnych firm
                   (opcjonalne, zgodę można cofnąć w każdej chwili)
                 </span>
               </label>
+            </div>
+
+            {/* Co daje konto — mówimy to PRZED rejestracją.
+                Do 20.08.2026 informacja o 30 dniach Premium istniała wyłącznie
+                w regulaminie: użytkownik dostawał pełny dostęp, nie wiedział,
+                że jest ograniczony, i nie miał powodu niczego kupować. */}
+            <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
+              <p className="text-xs font-bold text-amber-300">
+                30 dni planu Premium — bez karty płatniczej
+              </p>
+              <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
+                Poranny briefing na mail, asystent AI bez limitu i powiadomienia o awariach.
+                Potem konto przechodzi na darmowy plan Dla Każdego — nic nie pobieramy
+                automatycznie i uprzedzimy Cię mailem tydzień wcześniej.
+              </p>
             </div>
 
             {/* Submit */}
