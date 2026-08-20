@@ -77,29 +77,47 @@ async def _activate_subscription(
 ) -> Subscription:
     """Aktywuje subskrypcję po potwierdzeniu płatności przez P24."""
     # Anuluj poprzednią aktywną subskrypcję (jeśli istnieje)
+    # Anuluj poprzednie aktywne subskrypcje. `scalars().all()`, nie `scalar_one_or_none()`:
+    # przy dwóch aktywnych wpisach to drugie rzuca MultipleResultsFound i wywraca IPN.
     result = await session.execute(
         select(Subscription).where(
             Subscription.user_id == user.id,
             Subscription.status == SubscriptionStatus.ACTIVE.value,
+            Subscription.p24_session_id != p24_session_id,
         )
     )
-    existing = result.scalar_one_or_none()
-    if existing:
+    for existing in result.scalars().all():
         existing.status = SubscriptionStatus.CANCELLED.value
         existing.cancelled_at = datetime.utcnow()
         existing.updated_at = datetime.utcnow()
 
-    # Nowa subskrypcja
     expires_at = datetime.utcnow() + timedelta(days=PERIOD_DAYS[period])
-    sub = Subscription(
-        user_id=user.id,
-        tier=tier,
-        status=SubscriptionStatus.ACTIVE.value,
-        p24_order_id=p24_order_id,
-        p24_session_id=p24_session_id,
-        started_at=datetime.utcnow(),
-        expires_at=expires_at,
+
+    # Rekord `pending` powstał już przy /create-transaction — aktywujemy JEGO, zamiast
+    # zakładać drugi z tym samym `p24_session_id`. Pierwsza prawdziwa płatność
+    # (20.08.2026) zostawiła po sobie taką parę, przez co `/verify` zwróciło klientowi
+    # błąd 500 zaraz po udanym zakupie: zapłacił, dostał Premium i zobaczył awarię.
+    pending_result = await session.execute(
+        select(Subscription)
+        .where(Subscription.p24_session_id == p24_session_id)
+        .order_by(Subscription.id)
     )
+    sub = pending_result.scalars().first()
+
+    if sub is None:
+        sub = Subscription(
+            user_id=user.id,
+            p24_session_id=p24_session_id,
+            started_at=datetime.utcnow(),
+        )
+        session.add(sub)
+
+    sub.tier = tier
+    sub.status = SubscriptionStatus.ACTIVE.value
+    sub.p24_order_id = p24_order_id
+    sub.started_at = datetime.utcnow()
+    sub.expires_at = expires_at
+    sub.updated_at = datetime.utcnow()
     session.add(sub)
 
     # Upgrade user tier
@@ -284,13 +302,18 @@ async def verify_payment(
     Weryfikacja statusu płatności po powrocie z P24.
     Frontend wywołuje po przekierowaniu z success URL.
     """
+    # Najnowszy wpis dla tej sesji. `first()`, nie `scalar_one_or_none()` — konta
+    # sprzed 20.08.2026 mają po dwa rekordy na jedną płatność i tamten wariant
+    # kończył się błędem 500 na stronie powrotu z bramki.
     result = await session.execute(
-        select(Subscription).where(
+        select(Subscription)
+        .where(
             Subscription.p24_session_id == session_id,
             Subscription.user_id == user.id,
         )
+        .order_by(Subscription.id.desc())
     )
-    sub = result.scalar_one_or_none()
+    sub = result.scalars().first()
 
     if not sub:
         raise HTTPException(status_code=404, detail="Transakcja nie znaleziona")
@@ -317,7 +340,7 @@ async def get_subscription_status(
             Subscription.status == SubscriptionStatus.ACTIVE.value,
         ).order_by(Subscription.expires_at.desc())
     )
-    sub = result.scalar_one_or_none()
+    sub = result.scalars().first()  # dwie aktywne subskrypcje nie mogą wywrócić profilu
 
     is_trial = bool(
         user.trial_ends_at and
