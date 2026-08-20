@@ -80,6 +80,16 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
         consent_terms: consentTerms,
         consent_marketing: consentMarketing,
       });
+      // Mail powitalny obiecuje alerty o awariach i przypomnienie o wywozie — oba
+      // jadą wyłącznie pushem, a ten wymaga zgody w przeglądarce. Do 21.08.2026
+      // prośbę o nią widział tylko ten, kto trafił na feed w dniu realnej awarii,
+      // więc świeże konto zostawało z obietnicą bez włącznika. Znacznik czyta
+      // Dashboard (AlertPushPrompt).
+      try {
+        localStorage.setItem('rl_registered_at', String(Date.now()));
+      } catch {
+        // tryb prywatny bez localStorage — baner po prostu się nie pokaże
+      }
       onNavigate('dashboard');
     } catch {
       // Error handled by AuthContext

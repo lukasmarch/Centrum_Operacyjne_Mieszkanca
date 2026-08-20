@@ -21,15 +21,21 @@ logger = logging.getLogger("Scheduler.Newsletter")
 
 
 async def _marketing_consent(session, subscriber) -> bool:
-    """Czy odbiorca zgodził się na informacje handlowe (blok „Polecane firmy").
+    """Czy odbiorca ma dostać blok „Polecane firmy".
 
-    Anonimowy zapis bez konta nie zbiera takiej zgody, więc domyślnie jej nie ma.
+    Dwa warunki, nie jeden:
+    - **zgoda** — anonimowy zapis bez konta nigdy jej nie zbiera, więc domyślnie brak;
+    - **plan darmowy** — cennik sprzedaje Premium m.in. hasłem „Brak reklam",
+      a do 21.08.2026 blok zależał wyłącznie od zgody. Płacący klient z zaznaczonym
+      checkboxem dostałby reklamę, za której brak zapłacił.
     """
     if not subscriber.user_id:
         return False
     result = await session.execute(select(User).where(User.id == subscriber.user_id))
     user = result.scalar_one_or_none()
-    return bool(user and user.consent_marketing)
+    if not user or not user.consent_marketing:
+        return False
+    return user.tier == UserTier.FREE.value
 
 
 async def send_weekly_newsletter():
@@ -195,11 +201,10 @@ async def send_daily_newsletter():
                 except Exception as e:
                     logger.error(f"Failed to generate weekly card: {str(e)}")
 
-            # Sekcja „Polecane firmy" — wspólna dla wszystkich lokalizacji
+            # Briefing dzienny ma tylko odbiorców Premium/Business, a ci kupili m.in.
+            # „Brak reklam" — blok „Polecane firmy" zostaje w newsletterze tygodniowym,
+            # który i tak dociera do wszystkich. Ogłoszenia firm żyją poza tym w feedzie.
             promo = {}
-            if settings.NEWSLETTER_ADS_ENABLED:
-                from src.newsletter.promo import get_newsletter_promo
-                promo = await get_newsletter_promo(session)
 
             # Generate and send per location
             for location, subs in by_location.items():
@@ -214,15 +219,11 @@ async def send_daily_newsletter():
 
                 for subscriber, user in subs:
                     try:
-                        # Get weather temp for this location
-                        from src.database import Weather
-                        weather_result = await session.execute(
-                            select(Weather)
-                            .where(Weather.location == location)
-                            .where(Weather.is_current == True)
-                            .limit(1)
-                        )
-                        weather = weather_result.scalar_one_or_none()
+                        # Temperatura do nagłówka maila — ten sam fallback co w generatorze:
+                        # pomiar istnieje tylko dla Rybna i Działdowa, a konto może wskazać
+                        # dowolną z 24 miejscowości gminy (mieszkaniec Dębienia dostawał
+                        # briefing bez pogody, bo zapytanie nie miało czego znaleźć).
+                        weather = await generator._weather_for(session, location)
                         weather_temp = weather.temperature if weather else None
 
                         # Imię w mianowniku — tylko do powitania „Dzień dobry, X."
@@ -232,7 +233,9 @@ async def send_daily_newsletter():
                             to_email=subscriber.email,
                             content=content,
                             unsubscribe_token=subscriber.unsubscribe_token,
-                            marketing_consent=user.consent_marketing,
+                            # Odbiorcą briefingu jest wyłącznie plan płatny — patrz filtr
+                            # `premium_subscribers` wyżej. „Brak reklam" to część oferty.
+                            marketing_consent=False,
                             weather_temp=weather_temp,
                             recipient_name=first_name
                         )

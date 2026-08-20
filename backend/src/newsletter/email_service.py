@@ -388,6 +388,7 @@ class EmailService:
             "cinema_evening": content.get("cinema_evening", []),
             "reports_today": reports,
             "reports_date_label": content.get("reports_date_label", "dzisiaj"),
+            "waste": content.get("waste"),
             "events": events,
             "events_word": plural_pl(len(events), "wydarzenie", "wydarzenia", "wydarzeń"),
             "promoted_businesses": content.get("promoted_businesses", []),
@@ -479,13 +480,20 @@ class EmailService:
             "trial_days": days_left,
             "trial_days_word": plural_pl(days_left, "dzień", "dni", "dni"),
             "first_briefing_label": self._next_briefing_label(now),
+            # Każda pozycja musi mieć pokrycie w kodzie — 20.08 mail obiecywał
+            # przypomnienie o odpadach, którego nie wysyłał ŻADEN kanał, i 57 wskaźników
+            # przy 37 realnie widocznych. Zmieniając tę listę, sprawdź czym to dowozimy.
             "perks": [
                 {"title": "Poranny briefing na mail", "note": "od poniedziałku do piątku, kwadrans po siódmej"},
                 {"title": "Asystent AI bez limitu pytań", "note": "sześciu agentów, którzy znają gminę"},
                 {"title": "Powiadomienia o awariach", "note": "prąd, woda, pożar — zanim dowiesz się od sąsiada"},
-                {"title": "Przypomnienie o wywozie odpadów", "note": "wieczorem dzień wcześniej"},
-                {"title": "57 wskaźników GUS dla gminy", "note": "w planie darmowym jest dziewięć"},
+                {"title": "Przypomnienie o wywozie odpadów", "note": "wieczorem dzień wcześniej, o 18:00"},
+                {"title": "37 wskaźników GUS dla gminy", "note": "w planie darmowym jest osiem"},
             ],
+            # Dwie z pięciu obietnic wyżej jadą wyłącznie powiadomieniami push, a te
+            # wymagają zgody w przeglądarce. Bez tego akapitu mail obiecuje coś,
+            # czego odbiorca nie ma jak włączyć — i nie wie, że musi.
+            "push_hint": True,
         })
 
         html = self.render_template("welcome.html", context)
@@ -495,6 +503,150 @@ class EmailService:
             html_content=html,
             unsubscribe_url=context["unsubscribe_url"],
         )
+
+    async def send_subscription_reminder(
+        self,
+        to_email: str,
+        recipient_name: Optional[str],
+        stage: str,
+        expires_at: Optional[datetime],
+        unsubscribe_token: str,
+        tier: str = "premium",
+        now: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Koniec OPŁACONEGO okresu: 'week' (−7 dni), 'last_day' (−1 dzień), 'ended'.
+
+        Osobna droga od `send_trial_reminder`, bo różnica nie jest kosmetyczna:
+        klient zapłacił, więc nie namawiamy go na zakup pierwszy raz, tylko mówimy,
+        że plan **nie odnawia się sam** (regulamin §6.5) i bez jednej płatności
+        dostęp zniknie. Do 21.08.2026 przypomnienia widziały wyłącznie konta
+        z triałem — płacący nie dostawał nic.
+        """
+        now = now or datetime.now()
+        days_left = max(0, (expires_at - now).days) if expires_at else 0
+        plan_name = "Firma lokalna" if tier == "business" else "Premium"
+
+        when_word = "wkrótce"
+        if expires_at:
+            delta_days = (expires_at.date() - now.date()).days
+            when_word = {0: "dziś", 1: "jutro"}.get(
+                delta_days, f"{expires_at.day} {MONTHS_PL[expires_at.month - 1]}"
+            )
+
+        subjects = {
+            "week": f"Za tydzień kończy się Twój plan {plan_name}",
+            "last_day": f"Plan {plan_name} kończy się {when_word}",
+            "ended": f"Plan {plan_name} wygasł — konto działa dalej za darmo",
+        }
+        preheaders = {
+            "week": "Plan nie odnawia się sam. Przedłużysz go jedną płatnością.",
+            "last_day": "Potem konto wraca na plan Dla Każdego. Alerty o awariach zostają.",
+            "ended": "Alerty, pogoda i harmonogram odpadów działają dalej, za darmo.",
+        }
+
+        context = self._common_context(to_email, unsubscribe_token, campaign=f"subskrypcja-{stage}")
+        context.update({
+            "subject": subjects.get(stage, subjects["week"]),
+            "preheader": preheaders.get(stage, preheaders["week"]),
+            "recipient_name": (recipient_name or "").split()[0] if recipient_name else None,
+            "date_header": self._date_label(now),
+            "mode": "paid",
+            "plan_name": plan_name,
+            "status_line": (
+                "Konto działa dalej — zmienia się tylko zakres."
+                if stage == "ended"
+                else "Nie pobierzemy żadnej opłaty automatycznie: nie mamy Twojej karty, "
+                     "a plan nie przedłuża się sam."
+            ),
+            "stage": stage,
+            "when_word": when_word,
+            "trial_end_label": self._date_label(expires_at, with_year=False) if expires_at else "—",
+            "trial_days": days_left,
+            "trial_days_word": plural_pl(days_left, "dzień", "dni", "dni"),
+            "payments_live": not settings.P24_SANDBOX,
+            "losing": self._premium_perks_lost(),
+            "keeping": self._free_perks_kept(),
+        })
+
+        html = self.render_template("trial_reminder.html", context)
+        return await self.send_email(
+            to_email=to_email,
+            subject=context["subject"],
+            html_content=html,
+            unsubscribe_url=context["unsubscribe_url"],
+        )
+
+    async def send_purchase_confirmation(
+        self,
+        to_email: str,
+        recipient_name: Optional[str],
+        tier: str,
+        period: str,
+        amount_pln: float,
+        expires_at: Optional[datetime],
+        order_id: Optional[str],
+        unsubscribe_token: str,
+        now: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Potwierdzenie zawarcia umowy po zaksięgowaniu płatności.
+
+        Regulamin §6.4 obiecuje je wprost („Potwierdzenie zawarcia umowy wraz
+        z informacją o zakresie i okresie usługi Użytkownik otrzymuje na adres
+        e-mail"), a pierwsza prawdziwa płatność (20.08.2026) nie wywołała żadnego
+        maila. Mail mówi też o dacie końca i o tym, że nic nie odnowi się samo —
+        to ta sama informacja, którą potem powtarza przypomnienie.
+        """
+        now = now or datetime.now()
+        plan_name = "Firma lokalna" if tier == "business" else "Premium"
+        period_label = "rok" if period == "yearly" else "miesiąc"
+
+        context = self._common_context(to_email, unsubscribe_token, campaign="zakup")
+        context.update({
+            "subject": f"Płatność przyjęta — plan {plan_name} do {self._date_label(expires_at, with_year=False)}",
+            "preheader": f"Dziękujemy. Plan {plan_name} działa od teraz.",
+            "recipient_name": (recipient_name or "").split()[0] if recipient_name else None,
+            "date_header": self._date_label(now),
+            "plan_name": plan_name,
+            "period_label": period_label,
+            "amount_label": f"{amount_pln:.2f}".replace(".", ",") + " zł",
+            "expires_label": self._date_label(expires_at) if expires_at else "—",
+            "order_id": order_id or "—",
+            "perks": self._premium_perks_lost(),
+        })
+
+        html = self.render_template("purchase.html", context)
+        return await self.send_email(
+            to_email=to_email,
+            subject=context["subject"],
+            html_content=html,
+            unsubscribe_url=context["unsubscribe_url"],
+        )
+
+    @staticmethod
+    def _premium_perks_lost() -> List[str]:
+        """Co znika razem z planem płatnym — jedno źródło dla maili o końcu i o zakupie.
+
+        Liczba wskaźników GUS jest tu REALNA (37, nie 57): endpoint oddaje
+        `get_gmina_variables_for_tier`, który odrzuca zmienne dostępne wyłącznie
+        na poziomie powiatu. 57 to zawartość rejestru, nie tego, co widzi człowiek.
+        """
+        return [
+            "Poranny briefing na mail (pon.–pt.)",
+            "Asystent AI bez limitu — zostanie pięć pytań dziennie",
+            "Wieczorne przypomnienie o wywozie odpadów",
+            "37 wskaźników GUS dla gminy — zostanie osiem",
+        ]
+
+    @staticmethod
+    def _free_perks_kept() -> List[str]:
+        """Co zostaje na zawsze, za darmo — plan Dla Każdego."""
+        return [
+            "Alerty o awariach prądu, wody i zagrożeniach",
+            "Pogoda i jakość powietrza",
+            "Harmonogram wywozu odpadów",
+            "Zgłoszenia 24 ze zdjęciem",
+            "Newsletter tygodniowy",
+        ]
 
     async def send_trial_reminder(
         self,
@@ -553,19 +705,12 @@ class EmailService:
             "trial_days": days_left,
             "trial_days_word": plural_pl(days_left, "dzień", "dni", "dni"),
             "payments_live": not settings.P24_SANDBOX,
-            "losing": [
-                "Poranny briefing na mail (pon.–pt.)",
-                "Asystent AI bez limitu — zostanie pięć pytań dziennie",
-                "Przypomnienie o wywozie odpadów dzień wcześniej",
-                "57 wskaźników GUS — zostanie dziewięć",
-            ],
-            "keeping": [
-                "Alerty o awariach prądu, wody i zagrożeniach",
-                "Pogoda i jakość powietrza",
-                "Harmonogram wywozu odpadów",
-                "Zgłoszenia 24 ze zdjęciem",
-                "Newsletter tygodniowy",
-            ],
+            "mode": "trial",
+            "plan_name": "Premium",
+            # Jedna lista dla trialu, zakupu i wygaśnięcia — trzy kopie rozjechałyby się
+            # przy pierwszej zmianie oferty, a to są zdania, z których jesteśmy rozliczani.
+            "losing": self._premium_perks_lost(),
+            "keeping": self._free_perks_kept(),
         })
 
         html = self.render_template("trial_reminder.html", context)

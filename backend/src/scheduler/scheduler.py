@@ -393,13 +393,16 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # Proactive AI Asystent — codziennie o 6:50 (po summary 6:45, przed newsletterem 7:15)
-    # Wysyła spersonalizowane push dla Premium: wywóz śmieci, mróz
+    # Wieczorne powiadomienia proaktywne — codziennie o 18:00.
+    # Push o tym, co trzeba zrobić PRZED jutrem: wystawić pojemnik, przygotować się
+    # na mróz. Do 21.08.2026 job chodził o 6:50 — przypomnienie o wywozie przychodziło
+    # rano tego samego dnia, czyli po przejeździe śmieciarki, a mail powitalny
+    # obiecywał je „wieczorem dzień wcześniej".
     scheduler.add_job(
         func=run_proactive_alerts,
-        trigger=CronTrigger(hour=6, minute=50),
+        trigger=CronTrigger(hour=18, minute=0),
         id='proactive_alerts',
-        name='Proactive AI Asystent (Premium push)',
+        name='Wieczorne przypomnienia (Premium push): wywóz jutro, mróz',
         replace_existing=True
     )
 

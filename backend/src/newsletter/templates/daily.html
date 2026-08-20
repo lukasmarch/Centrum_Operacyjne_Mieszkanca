@@ -68,6 +68,25 @@
   </td>
   </tr>
 
+  {% if waste %}
+  <!-- WYWÓZ ODPADÓW — tylko gdy jedzie dziś albo jutro -->
+  <tr>
+  <td class="rl-pad" style="padding:14px 24px 4px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="background-color:#0d1117; border:1px solid #312e5f; border-radius:20px;">
+    <tr><td style="padding:16px 18px;">
+      <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#a78bfa; padding-bottom:8px;">Wyw&oacute;z odpad&oacute;w &middot; {{ waste.when }}</div>
+      {% for zone in waste.zones %}
+      <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; font-weight:600; line-height:22px; mso-line-height-rule:exactly; color:#fafafa;">{{ zone.types_label }}<span style="font-weight:400; color:#a1a1a1;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;{{ zone.town }}</span></div>
+      {% endfor %}
+      {% if waste.ambiguous %}
+      <div style="padding-top:8px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:12px; line-height:18px; mso-line-height-rule:exactly; color:#737373;">Rybno ma dwa rejony wywozu. Ustaw sw&oacute;j w profilu, a b&#281;dziemy pisa&#263; tylko o nim.</div>
+      {% endif %}
+    </td></tr>
+    </table>
+  </td>
+  </tr>
+  {% endif %}
+
   {% if highlights %}
   <!-- AI PODSUMOWANIE -->
   <tr>
