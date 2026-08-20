@@ -5,58 +5,86 @@
   },
   "/harmonogram-odpadow": {
     "title": "Harmonogram wywozu odpadów — Gmina Rybno 2026 | RybnoLive",
-    "description": "Terminy wywozu śmieci dla wszystkich miejscowości Gminy Rybno: odpady zmieszane, bio, papier, szkło, metale i wielkogabarytowe. Wybierz swoją miejscowość i sprawdź najbliższy odbiór."
+    "description": "Terminy wywozu śmieci dla wszystkich miejscowości Gminy Rybno: odpady zmieszane, bio, papier, szkło, metale i wielkogabarytowe. Wybierz swoją miejscowość i sprawdź najbliższy odbiór.",
+    "short": "Harmonogram odpadów",
+    "type": "WebPage"
   },
   "/autobus": {
     "title": "Autobus Rybno – Działdowo: rozkład jazdy na żywo | RybnoLive",
-    "description": "Rozkład jazdy autobusu Rybno – Działdowo z przystankami, mapą i pozycją kursu na żywo. Sprawdź, czy autobus już jedzie i o której jest następny."
+    "description": "Rozkład jazdy autobusu Rybno – Działdowo z przystankami, mapą i pozycją kursu na żywo. Sprawdź, czy autobus już jedzie i o której jest następny.",
+    "short": "Autobus",
+    "type": "WebPage"
   },
   "/kino": {
     "title": "Kino Działdowo — repertuar i godziny seansów | RybnoLive",
-    "description": "Aktualny repertuar Kina Działdowo: co grają dziś i w najbliższych dniach, godziny seansów i plakaty. Najbliższe kino dla mieszkańców gminy Rybno."
+    "description": "Aktualny repertuar Kina Działdowo: co grają dziś i w najbliższych dniach, godziny seansów i plakaty. Najbliższe kino dla mieszkańców gminy Rybno.",
+    "short": "Kino",
+    "type": "WebPage"
   },
   "/wiadomosci": {
     "title": "Wiadomości z Gminy Rybno — aktualności i alerty | RybnoLive",
-    "description": "Najnowsze wiadomości z Gminy Rybno i powiatu działdowskiego: awarie prądu i wody, komunikaty urzędu, ostrzeżenia pogodowe. Aktualizowane kilka razy dziennie."
+    "description": "Najnowsze wiadomości z Gminy Rybno i powiatu działdowskiego: awarie prądu i wody, komunikaty urzędu, ostrzeżenia pogodowe. Aktualizowane kilka razy dziennie.",
+    "short": "Wiadomości",
+    "type": "CollectionPage"
   },
   "/wydarzenia": {
     "title": "Wydarzenia w Gminie Rybno — co robić w weekend | RybnoLive",
-    "description": "Kalendarz wydarzeń Gminy Rybno i okolic: festyny, koncerty, sport, repertuar kina w Działdowie. Sprawdź, co dzieje się dziś i w weekend."
+    "description": "Kalendarz wydarzeń Gminy Rybno i okolic: festyny, koncerty, sport, repertuar kina w Działdowie. Sprawdź, co dzieje się dziś i w weekend.",
+    "short": "Wydarzenia",
+    "type": "CollectionPage"
   },
   "/pogoda": {
     "title": "Pogoda i jakość powietrza — Gmina Rybno | RybnoLive",
-    "description": "Aktualna pogoda, prognoza godzinowa i jakość powietrza dla Gminy Rybno. Ostrzeżenia meteo i indeks czystości powietrza na żywo."
+    "description": "Aktualna pogoda, prognoza godzinowa i jakość powietrza dla Gminy Rybno. Ostrzeżenia meteo i indeks czystości powietrza na żywo.",
+    "short": "Pogoda",
+    "type": "WebPage"
   },
   "/statystyki": {
     "title": "Statystyki GUS dla Gminy Rybno — dane i wykresy | RybnoLive",
-    "description": "Ludność, dochody gminy, bezrobocie i kilkadziesiąt innych wskaźników GUS dla Gminy Rybno — na tle powiatu, województwa i Polski."
+    "description": "Ludność, dochody gminy, bezrobocie i kilkadziesiąt innych wskaźników GUS dla Gminy Rybno — na tle powiatu, województwa i Polski.",
+    "short": "Statystyki",
+    "type": "WebPage"
   },
   "/firmy": {
     "title": "Firmy z Gminy Rybno — katalog lokalnych usług | RybnoLive",
-    "description": "Katalog firm działających w Gminie Rybno: usługi, handel, budownictwo. Znajdź lokalnego wykonawcę albo dodaj wizytówkę swojej firmy."
+    "description": "Katalog firm działających w Gminie Rybno: usługi, handel, budownictwo. Znajdź lokalnego wykonawcę albo dodaj wizytówkę swojej firmy.",
+    "short": "Firmy",
+    "type": "CollectionPage"
   },
   "/asystent": {
     "title": "Asystent AI Gminy Rybno — zapytaj o cokolwiek | RybnoLive",
-    "description": "Zapytaj o awarie, terminy wywozu odpadów, wydarzenia albo sprawy urzędowe. Pięciu asystentów AI zna Gminę Rybno i odpowiada w kilka sekund."
+    "description": "Zapytaj o awarie, terminy wywozu odpadów, wydarzenia albo sprawy urzędowe. Pięciu asystentów AI zna Gminę Rybno i odpowiada w kilka sekund.",
+    "short": "Asystent AI",
+    "type": "WebPage"
   },
   "/cennik": {
     "title": "Cennik — plany Premium i Firma lokalna | RybnoLive",
-    "description": "Darmowy dostęp do wiadomości i alertów. Premium: newsletter codzienny, powiadomienia push i AI bez limitu od 9,99 zł/mc. Trial 30 dni bez karty."
+    "description": "Darmowy dostęp do wiadomości i alertów. Premium: newsletter codzienny, powiadomienia push i AI bez limitu od 9,99 zł/mc. Trial 30 dni bez karty.",
+    "short": "Cennik",
+    "type": "WebPage"
   },
   "/zgloszenia": {
     "title": "Zgłoszenia mieszkańców — Gmina Rybno | RybnoLive",
-    "description": "Zgłoś awarię, dziurę w drodze albo problem w swojej miejscowości. Przegląd zgłoszeń mieszkańców Gminy Rybno."
+    "description": "Zgłoś awarię, dziurę w drodze albo problem w swojej miejscowości. Przegląd zgłoszeń mieszkańców Gminy Rybno.",
+    "short": "Zgłoszenia 24",
+    "type": "CollectionPage"
   },
   "/regulamin": {
     "title": "Regulamin serwisu | RybnoLive",
-    "description": "Regulamin serwisu RybnoLive — zasady korzystania, plany płatne, prawa użytkownika."
+    "description": "Regulamin serwisu RybnoLive — zasady korzystania, plany płatne, prawa użytkownika.",
+    "short": "Regulamin",
+    "type": "WebPage"
   },
   "/polityka-prywatnosci": {
     "title": "Polityka prywatności | RybnoLive",
-    "description": "Polityka prywatności serwisu RybnoLive — jakie dane przetwarzamy, po co i jak je usunąć."
+    "description": "Polityka prywatności serwisu RybnoLive — jakie dane przetwarzamy, po co i jak je usunąć.",
+    "short": "Polityka prywatności",
+    "type": "WebPage"
   },
   "/polityka-cookies": {
     "title": "Polityka cookies | RybnoLive",
-    "description": "Polityka cookies serwisu RybnoLive — czego używamy i co można wyłączyć."
+    "description": "Polityka cookies serwisu RybnoLive — czego używamy i co można wyłączyć.",
+    "short": "Polityka cookies",
+    "type": "WebPage"
   }
 }
