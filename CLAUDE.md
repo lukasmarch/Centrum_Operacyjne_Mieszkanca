@@ -101,6 +101,27 @@ Kolumna, której stary kod nie używa, nie szkodzi nikomu — kod bez kolumny to
 na każdym zapytaniu. GitHub Actions **nie uruchamia migracji**: robi tylko
 `git pull && build && up -d`.
 
+## Scheduler Timeline (13 jobów)
+```
+6:00  → Article Scraping
+6:15  → AI Processing (batch=100, kategoryzacja)
+6:20  → Embedding Job (RAG, text-embedding-3-small)
+18:00 → Wieczorne przypomnienia push (Premium: wywóz JUTRO, mróz tej nocy)
+7:00  → Daily Summary
+Co 15 min → Alerty push o awariach (prąd, woda, pożar, wypadek)
+Co 1h → Weather Update
+Co 4h → Air Quality (Airly)
+9/12/15/18/21:05 → Energa (wyłączenia prądu)
+2/6/10/14/18/22h → Traffic Cache (Gemini)
+13:00–13:45 → Popołudniowy przebieg (scraping → AI → summary → embedding)
+8:00  → Cinema Repertoire
+Niedz 3:00 → CEIDG Sync
+Niedz 4:00 → Wiedza stała z BIP (statut, procedury, podatki, programy)
+Sob 10:00 → Newsletter Weekly
+Pn-Pt 7:15 → Newsletter Daily (Premium)
+1.01/04/07/10 → GUS Statistics
+```
+
 ## Podział gałęzi (2026-08-18)
 - **`strona-glowna-etap0`** — praca przenikająca front i backend (przebudowa strony
   głównej, wątek firm, kino, Zgłoszenia 24). Zostaje na gałęzi **aż wdrożymy
@@ -264,18 +285,70 @@ dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykr
 - Redis usunięty - cache w PostgreSQL
 
 ## Tier System (ceny od 2026-07-19)
-- **Free (0 zł)**: 9 zmiennych GUS, 5 pytań AI/dzień (anonim: 3)
-- **Premium (9,99 zł/mc · 84 zł/rok)**: 57 zmiennych GUS, AI bez limitu, newsletter daily, push, proaktywny asystent; **trial 30 dni bez karty** po rejestracji
-- **Firma lokalna (tier `business`, 49 zł/mc · 490 zł/rok, B2B §11 regulaminu)**: 88 zmiennych GUS + wyróżniona wizytówka („Polecane w Rybnie", is_premium na business_profiles — auto-aktywacja po płatności P24)
+- **Free (0 zł)**: **8** zmiennych GUS, 5 pytań AI/dzień (anonim: 3)
+- **Premium (9,99 zł/mc · 84 zł/rok)**: **37** zmiennych GUS, AI bez limitu, newsletter daily, push, proaktywny asystent; **trial 30 dni bez karty** po rejestracji
+- ⚠️ **Rejestr ≠ oferta**: `gus_variables.py` ma 9/57/88 pozycji, ale endpointy oddają
+  `get_gmina_variables_for_tier` (odrzuca zmienne z danymi tylko dla powiatu) → realnie **8/37/53**.
+  Do 21.08.2026 cennik i mail obiecywały liczby z rejestru. Dane powiatowe istnieją, ale wyłącznie
+  jako **porównanie** przy zmiennej gminnej
+- **Firma lokalna (tier `business`, 49 zł/mc · 490 zł/rok, B2B §11 regulaminu)**: **53** zmienne GUS + wyróżniona wizytówka („Polecane w Rybnie", is_premium na business_profiles — auto-aktywacja po płatności P24)
 - Płatności: Przelewy24 (`p24_service.py`); IPN → `API_URL/api/payments/webhook` (api.rybnolive.pl!); powrót → `APP_URL/payment/success` (PaymentReturnBanner.tsx); wygaszanie subskrypcji/trialu/wizytówek: trial_expiry_job (5:00)
 
+## Obietnice oferty a kod (audyt 2026-08-20, naprawa 21.08)
+**Mail powitalny wymienia pięć rzeczy — dwie z nich nie docierały do nikogo.** Każda pozycja
+listy `perks` w `email_service.send_welcome_email` musi mieć pokrycie w kodzie; zmieniając
+ofertę, sprawdź, czym ją dowozimy.
+
+| Obietnica | Czym dowozimy | Pułapka |
+|---|---|---|
+| Briefing pon.–pt. 7:15 | `newsletter_daily` (7:15 **Europe/Warsaw**) | cennik pisał 6:30 — nieprawda |
+| Asystent bez limitu | `DAILY_LIMITS["premium"] = None` | — |
+| Powiadomienia o awariach | `alert_push_job` co 15 min | **tylko push**; plan Dla Każdego, nie Premium |
+| Wywóz odpadów wieczorem | `proactive_alerts_job` **18:00** + blok w briefingu | patrz niżej |
+| Wskaźniki GUS | `get_gmina_variables_for_tier` | 37, nie 57 |
+
+- **Odpady, dwa kanały**: `services/waste_policy.py` to jedyne miejsce łączące lokalizację konta
+  z rejonem wywozu. Rano briefing pisze „dziś/jutro", wieczorem o 18:00 idzie push „wystaw pojemnik".
+  Do 20.08 push chodził o 6:50 (po przejeździe śmieciarki) i **wykluczał** posiadaczy newslettera
+  dziennego z adnotacją „dostaną w mailu" — czego briefing nigdy nie robił. Newsletter dzienny jest
+  dla Premium domyślny, więc wykluczenie obejmowało dokładnie wszystkich adresatów obietnicy
+- ⚠️ **Rybno ma dwa rejony** (`Rybno R1`/`Rybno R2`) różniące się o tydzień. Dawne dopasowanie
+  `town in location` wysyłało oba naraz. `match_towns` robi trafienie dokładne, potem przedrostek,
+  bez „zawiera"; konta sprzed 20.08 z zapisem „Rybno" dostają oba terminy **z adnotacją**
+- **Push wymaga zgody w przeglądarce**, a prośbę o nią pokazywał tylko feed w dniu realnej awarii.
+  Świeże konto zostawało z obietnicą bez włącznika → `RegisterPage` stawia `rl_registered_at`,
+  a `AlertPushPrompt` czyta ten znacznik przez 7 dni (`fresh`). Mail powitalny mówi o tym wprost
+- **Pogoda**: pomiar istnieje tylko dla `Rybno` i `Działdowo`, a konto wybiera jedną z 24 wsi →
+  `NewsletterGenerator._weather_for` ma fallback na Rybno (mieszkaniec Dębienia dostawał briefing
+  bez pogody — zapytanie o jego lokalizację nie miało prawa niczego znaleźć)
+- **„Brak reklam" w Premium**: blok „Polecane firmy" zależał WYŁĄCZNIE od zgody marketingowej.
+  Teraz `_marketing_consent` wymaga też `tier == free`, a briefing dzienny nie dostaje promo wcale
+- Testy: `python -m scripts.test_waste_reminder` (20 sprawdzeń), `python -m scripts.test_trial_lifecycle` (8 scenariuszy)
+
+## Koniec planu płatnego = mail, nie cisza (2026-08-21)
+**Plan nie odnawia się automatycznie (regulamin §6.5), więc przypomnienie jest jedyną drogą do
+przedłużenia.** Przypomnienia zbudowane 20.08 patrzyły wyłącznie na `users.trial_ends_at`, a zakup
+Premium czyści to pole → klient, który ZAPŁACIŁ, tracił dostęp bez ostrzeżenia.
+- `subscriptions.reminder_stage` / `reminder_sent_at` (migracja `add_subscription_reminder`) —
+  znacznik na SUBSKRYPCJI, nie na koncie: kolejny zakup zaczyna cykl od zera
+- `trial_expiry_job._send_paid_reminders` — −7 dni, −1 dzień; `ended` przy wygaszaniu. Obejmuje też
+  `cancelled` (dostęp trwa do końca opłaconego okresu)
+- **Potwierdzenie zakupu** (`send_purchase_confirmation`, szablon `purchase.html`) — regulamin §6.4
+  obiecuje je wprost, a pierwsza prawdziwa płatność (20.08) nie wywołała żadnego maila. Wysyłka jest
+  owinięta w `try` — IPN nie może paść przez pocztę, bo P24 ponawia webhooka
+- `_close_abandoned_payments` — wpis `pending` starszy niż **doba** → `expired`. Rekord powstaje przy
+  `/create-transaction`, więc każda porzucona płatność zostawiała sierotę. Doba, nie godzina: BLIK
+  i przelew bywają wolniejsze niż sesja w przeglądarce
+- Kasowanie kont testowych: `python -m scripts.cleanup_test_accounts --emails a@x.pl [--apply]`
+  (bez `--apply` tylko podgląd; `conversations`/`subscriptions` mają `NO ACTION`, więc samo
+  `DELETE FROM users` nie przejdzie, a `business_profiles` ma CASCADE i zabiera wizytówkę)
+
 ## TODO (Kolejne priorytety)
-- [ ] P24 go-live: rejestracja merchanta (Łukasz), wpis P24_* do .env.production, P24_SANDBOX=false, test end-to-end
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
 - [ ] Filtrowanie artykułów po kategoriach
 - [ ] Panel administracyjny
-- [ ] Ogłoszenia firm w feedzie (2/mc dla planu Firma lokalna — obiecane w BusinessPage)
+- [ ] Wybór rejonu wywozu dla kont z zapisem „Rybno” (dziś dostają oba terminy)
 
 Uwaga: ~1065 historycznych artykułów poza RAG — **celowo** (decyzja 2026-07-19), embedded=True jako marker.
 

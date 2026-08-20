@@ -13,8 +13,13 @@ from src.config import settings
 from src.database import Article, Event, Weather, DailySummary, AirQuality, Report
 from src.database.schema import CinemaShowtime
 from src.newsletter.name_days import get_name_days, get_special_day
+from src.services import waste_policy
 
 logger = logging.getLogger("Newsletter")
+
+# Własny pomiar pogody mają tylko dwie lokalizacje (`weather_job`): Rybno i Działdowo.
+# Konto może wskazać dowolną z 24 miejscowości gminy — wtedy pogodę bierzemy z Rybna.
+WEATHER_FALLBACK_LOCATION = "Rybno"
 
 # Poland timezone: UTC+1 (CET)
 POLAND_TZ = timezone(timedelta(hours=1))
@@ -149,6 +154,29 @@ class NewsletterGenerator:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
+    async def _weather_for(self, session: AsyncSession, location: str) -> Optional[Weather]:
+        """Pogoda dla lokalizacji konta, a gdy jej nie ma — dla gminy.
+
+        `weather_job` pobiera dwa punkty pomiarowe (Rybno, Działdowo), a użytkownik
+        wybiera przy rejestracji jedną z 24 miejscowości. Bez tego fallbacku briefing
+        mieszkańca Dębienia przychodził bez pogody: zapytanie o `location='Dębień'`
+        nie miało prawa niczego znaleźć. Jedna stacja obsługuje całą gminę — lepszy
+        pomiar z Rybna niż puste miejsce w mailu.
+        """
+        for candidate in (location, WEATHER_FALLBACK_LOCATION):
+            if not candidate:
+                continue
+            result = await session.execute(
+                select(Weather)
+                .where(Weather.location == candidate)
+                .where(Weather.is_current == True)
+                .limit(1)
+            )
+            weather = result.scalar_one_or_none()
+            if weather:
+                return weather
+        return None
+
     async def generate_weekly(
         self,
         session: AsyncSession,
@@ -188,13 +216,7 @@ class NewsletterGenerator:
         events = result.scalars().all()
 
         # Get current weather
-        result = await session.execute(
-            select(Weather)
-            .where(Weather.location == location)
-            .where(Weather.is_current == True)
-            .limit(1)
-        )
-        weather = result.scalar_one_or_none()
+        weather = await self._weather_for(session, location)
 
         # Get weather history (7 days) for weekly stats
         result = await session.execute(
@@ -419,13 +441,7 @@ class NewsletterGenerator:
         events = result.scalars().all()
 
         # Get current weather
-        result = await session.execute(
-            select(Weather)
-            .where(Weather.location == location)
-            .where(Weather.is_current == True)
-            .limit(1)
-        )
-        weather = result.scalar_one_or_none()
+        weather = await self._weather_for(session, location)
 
         # Get current air quality (Airly)
         result = await session.execute(
@@ -601,6 +617,13 @@ class NewsletterGenerator:
         content["name_days"] = name_days
         content["special_day"] = special_day
         content["cinema_evening"] = cinema_data
+
+        # Wywóz odpadów — dziś albo jutro. Mail powitalny obiecuje przypomnienie,
+        # a do 20.08.2026 briefing nie wiedział o harmonogramie nic: `proactive_alerts_job`
+        # pomijał posiadaczy newslettera dziennego z adnotacją „dostaną w emailu".
+        content["waste"] = await waste_policy.next_collection_for_location(
+            session, location, within_days=1, now=now_pl.replace(tzinfo=None)
+        )
         content["reports_today"] = reports_data
         content["reports_date_label"] = reports_date_label
 

@@ -1,0 +1,91 @@
+{% extends "_base.html" %}
+
+{% block kicker %}Konto za&#322;o&#380;one{% endblock %}
+
+{% block headline %}{% if recipient_name %}Dzie&#324; dobry, {{ recipient_name }}.{% else %}Dzie&#324; dobry.{% endif %}{% endblock %}
+
+{% block content %}
+
+  <!-- OKRES PRÓBNY — najważniejsza informacja, dlatego stoi pierwsza i sama -->
+  <tr>
+  <td class="rl-pad" style="padding:20px 24px 4px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="background-color:#0d1117; border:1px solid #1f2937; border-radius:20px;">
+    <tr><td style="padding:18px 20px;">
+      <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#a1a1a1; padding-bottom:10px;">Plan Premium &mdash; okres pr&oacute;bny do</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td class="rl-big" valign="bottom" style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:32px; font-weight:500; line-height:34px; mso-line-height-rule:exactly; color:#fafafa; padding-right:12px;">{{ trial_end_label }}</td>
+        <td valign="bottom" style="padding-bottom:4px; font-family:'Outfit',Arial,Helvetica,sans-serif;">
+          <div style="font-size:13px; font-weight:700; line-height:17px; mso-line-height-rule:exactly; color:#4ade80;">{{ trial_days }} {{ trial_days_word }}</div>
+          <div style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:#a1a1a1;">bez karty p&#322;atniczej</div>
+        </td>
+      </tr></table>
+    </td></tr>
+    </table>
+  </td>
+  </tr>
+
+  <!-- CO JEST W ŚRODKU -->
+  <tr>
+  <td class="rl-pad" style="padding:16px 24px 4px;">
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373; padding-bottom:12px;">Co masz przez ten czas</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      {% for item in perks %}
+      <tr>
+        <td valign="top" width="18" style="width:18px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; line-height:22px; mso-line-height-rule:exactly; color:#91c5ff; padding-bottom:10px;">&bull;</td>
+        <td valign="top" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; line-height:22px; mso-line-height-rule:exactly; color:#e5e5e5; padding-bottom:10px;">
+          <strong style="color:#fafafa; font-weight:600;">{{ item.title }}</strong>{% if item.note %}<span style="color:#a1a1a1;"> &mdash; {{ item.note }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td>
+  </tr>
+
+  <!-- NEWSLETTER: co i kiedy przyjdzie -->
+  <tr>
+  <td class="rl-pad" style="padding:8px 24px 4px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0b0f18" style="background-color:#0b0f18; border:1px solid #1f2937; border-radius:20px;">
+    <tr><td style="padding:16px 18px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:14px; line-height:21px; mso-line-height-rule:exactly; color:#a1a1a1;">
+      <span style="font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373;">Poranny briefing</span><br>
+      <span style="color:#e5e5e5;">Pierwszy przyjdzie <strong style="color:#fafafa; font-weight:600;">{{ first_briefing_label }}</strong> &mdash; skr&oacute;t dnia w gminie, pogoda, awarie i terminy.</span>
+      Wolisz jedno podsumowanie tygodnia zamiast codziennego maila? Prze&#322;&#261;czysz to w profilu, w zak&#322;adce Preferencje.
+    </td></tr>
+    </table>
+  </td>
+  </tr>
+
+  {% if push_hint %}
+  <!-- POWIADOMIENIA: dwie obietnice z listy wyżej jadą wyłącznie pushem -->
+  <tr>
+  <td class="rl-pad" style="padding:8px 24px 4px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="background-color:#0d1117; border:1px solid #3b3016; border-radius:20px;">
+    <tr><td style="padding:16px 18px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:14px; line-height:21px; mso-line-height-rule:exactly; color:#a1a1a1;">
+      <span style="font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#fbbf24;">Jeden krok do ko&#324;ca</span><br>
+      <span style="color:#e5e5e5;">Awarie i przypomnienie o wywozie przychodz&#261; jako <strong style="color:#fafafa; font-weight:600;">powiadomienia w telefonie</strong> &mdash; a te wymagaj&#261; Twojej zgody w przegl&#261;darce.</span>
+      W&#322;&#261;czysz je w profilu (zak&#322;adka Preferencje) albo przyciskiem, kt&oacute;ry poka&#380;emy przy pierwszej awarii.
+      Bez tego dwie rzeczy z listy wy&#380;ej nie maj&#261; jak do Ciebie dotrze&#263;.
+    </td></tr>
+    </table>
+  </td>
+  </tr>
+  {% endif %}
+
+  <!-- CO PO OKRESIE PRÓBNYM — uczciwie, zanim zapyta -->
+  <tr>
+  <td class="rl-pad" style="padding:12px 24px 20px;">
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373; padding-bottom:8px;">Co si&#281; stanie {{ trial_end_short }}</div>
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:14px; line-height:21px; mso-line-height-rule:exactly; color:#a1a1a1;">
+      Konto przejdzie na plan <strong style="color:#e5e5e5; font-weight:600;">Dla Ka&#380;dego</strong> &mdash; darmowy, bez wygasania.
+      <strong style="color:#e5e5e5; font-weight:600;">Nie pobierzemy &#380;adnej op&#322;aty</strong>: nie mamy Twojej karty i nic nie przed&#322;u&#380;a si&#281; samo.
+      Zostaj&#261; alerty o awariach, pogoda, harmonogram wywozu odpad&oacute;w i pi&#281;&#263; pyta&#324; do asystenta dziennie.
+      Odezwiemy si&#281; tydzie&#324; wcze&#347;niej, &#380;eby to nie by&#322;a niespodzianka.
+    </div>
+  </td>
+  </tr>
+
+{% endblock %}
+
+{% block cta_title %}Zacznij od strony g&#322;&oacute;wnej{% endblock %}
+{% block cta_text %}Pogoda, powietrze, awarie, wydarzenia i asystent AI &mdash; wszystko dla gminy Rybno.{% endblock %}
+{% block cta_button %}Otw&oacute;rz serwis &rarr;{% endblock %}
+{% block footer_tagline %}Witamy w RybnoLive &middot; Twoja gmina. Na &#380;ywo.{% endblock %}

@@ -60,7 +60,10 @@ function rotateByDay<T>(items: T[], take: number): T[] {
 
 const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
     const { user } = useAuth();
-    const hidesAds = user?.tier === 'premium';
+    // Obietnica „brak reklam" należy do KAŻDEGO planu płatnego, nie tylko Premium
+    // — `business` kosztuje pięć razy więcej i widziałby ogłoszenia konkurencji.
+    // Ta sama bramka stoi w `NewsFeed` (ogłoszenia firm) i w newsletterze.
+    const hidesAds = user?.tier === 'premium' || user?.tier === 'business';
 
     const [firms, setFirms] = useState<CatalogCard[]>([]);
     const [ads, setAds] = useState<ActiveAnnouncement[]>([]);

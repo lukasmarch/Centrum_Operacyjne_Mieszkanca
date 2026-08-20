@@ -14,6 +14,7 @@ Użycie:
 import asyncio
 import sys
 import argparse
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # Add parent to path
@@ -116,11 +117,91 @@ async def test_daily_newsletter(session: AsyncSession, to_email: str):
     return result
 
 
+async def test_welcome_email(to_email: str):
+    """Mail powitalny — nie dotyka bazy, dane są syntetyczne."""
+    print("\n" + "=" * 60)
+    print("📨 MAIL POWITALNY (rejestracja)")
+    print("=" * 60)
+    now = datetime.now()
+    service = EmailService()
+    await service.send_welcome_email(
+        to_email=to_email,
+        recipient_name="Mariusz Puczek",
+        trial_ends_at=now + timedelta(days=30),
+        unsubscribe_token="podglad-token",
+        now=now,
+    )
+
+
+async def test_trial_reminders(to_email: str):
+    """Trzy etapy przypomnienia o końcu okresu próbnego."""
+    now = datetime.now()
+    service = EmailService()
+    for stage, ends_in in (("week", 7), ("last_day", 1), ("ended", 0)):
+        print("\n" + "=" * 60)
+        print(f"⏳ PRZYPOMNIENIE O TRIALU — etap: {stage}")
+        print("=" * 60)
+        await service.send_trial_reminder(
+            to_email=to_email,
+            recipient_name="Mariusz Puczek",
+            stage=stage,
+            trial_ends_at=now + timedelta(days=ends_in),
+            unsubscribe_token="podglad-token",
+            now=now,
+        )
+
+
+async def test_subscription_reminders(to_email: str):
+    """Trzy etapy przypomnienia o kończącej się subskrypcji OPŁACONEJ.
+
+    Inna droga niż trial: klient już zapłacił, więc mail nie namawia na pierwszy
+    zakup, tylko mówi, że plan nie odnawia się sam (regulamin §6.5).
+    """
+    now = datetime.now()
+    service = EmailService()
+    for stage, ends_in in (("week", 7), ("last_day", 1), ("ended", 0)):
+        print("\n" + "=" * 60)
+        print(f"💳 PRZYPOMNIENIE O SUBSKRYPCJI — etap: {stage}")
+        print("=" * 60)
+        await service.send_subscription_reminder(
+            to_email=to_email,
+            recipient_name="Mariusz Puczek",
+            stage=stage,
+            expires_at=now + timedelta(days=ends_in),
+            unsubscribe_token="podglad-token",
+            tier="premium",
+            now=now,
+        )
+
+
+async def test_purchase_confirmation(to_email: str):
+    """Potwierdzenie zawarcia umowy po płatności (regulamin §6.4)."""
+    now = datetime.now()
+    print("\n" + "=" * 60)
+    print("🧾 POTWIERDZENIE ZAKUPU")
+    print("=" * 60)
+    await EmailService().send_purchase_confirmation(
+        to_email=to_email,
+        recipient_name="Mariusz Puczek",
+        tier="premium",
+        period="monthly",
+        amount_pln=9.99,
+        expires_at=now + timedelta(days=30),
+        order_id="123456789",
+        unsubscribe_token="podglad-token",
+        now=now,
+    )
+
+
 async def main():
     parser = argparse.ArgumentParser(description='Test wysyłki newslettera')
     parser.add_argument('email', help='Adres email do testu')
-    parser.add_argument('--type', choices=['weekly', 'daily', 'both'],
-                        default='both', help='Typ newslettera (default: both)')
+    parser.add_argument('--type', choices=['weekly', 'daily', 'both', 'welcome', 'trial',
+                                           'subskrypcja', 'zakup', 'konto'],
+                        default='both',
+                        help='Typ maila: newsletter (weekly/daily/both) albo transakcyjny '
+                             '(welcome, trial, subskrypcja, zakup; konto = wszystkie transakcyjne). '
+                             'Transakcyjne nie potrzebują bazy.')
     parser.add_argument('--preview-dir', default=None,
                         help='Zapisz HTML do katalogu zamiast wysyłać maila')
 
@@ -141,6 +222,20 @@ async def main():
         return
     else:
         print(f"🔑 Resend API: {settings.RESEND_API_KEY[:10]}...")
+
+    if args.type in ('welcome', 'konto'):
+        await test_welcome_email(args.email)
+    if args.type in ('subskrypcja', 'konto'):
+        await test_subscription_reminders(args.email)
+    if args.type in ('zakup', 'konto'):
+        await test_purchase_confirmation(args.email)
+    if args.type in ('trial', 'konto'):
+        await test_trial_reminders(args.email)
+    if args.type in ('welcome', 'trial', 'subskrypcja', 'zakup', 'konto'):
+        print("\n" + "=" * 60)
+        print("✅ GOTOWE")
+        print("=" * 60 + "\n")
+        return
 
     # Połącz z bazą
     engine = create_async_engine(settings.DATABASE_URL, echo=False)

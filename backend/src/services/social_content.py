@@ -15,7 +15,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -28,6 +28,23 @@ logger = logging.getLogger(__name__)
 
 SITE_URL = "https://rybnolive.pl"
 HASHTAGS = "#Rybno #GminaRybno #PowiatDziałdowski"
+
+
+def tracked_url(medium: str, day: Optional[str] = None) -> str:
+    """
+    Adres do PIERWSZEGO KOMENTARZA pod postem — nigdy do treści.
+
+    Pomiar z 19–20.08: rolka z linkiem w przypiętym komentarzu dowiozła 10 wejść,
+    a posty z linkiem w treści zero. Facebook tnie zasięg materiału, który wyprowadza
+    z platformy, i nie liczy kliknięć z komentarza — jedynym pomiarem jest log Caddy,
+    stąd `utm_*` obowiązkowo. `utm_campaign` niesie rodzaj i dzień, bo `traffic_report`
+    grupuje właśnie po nim (`utm_content` ignoruje).
+    """
+    # Data bywa obiektem `date` (z bazy) albo pełnym znacznikiem czasu — do adresu
+    # wchodzi zawsze sam dzień.
+    day = str(day)[:10] if day else date.today().isoformat()
+    return (f"{SITE_URL}/?utm_source=facebook&utm_medium={medium}"
+            f"&utm_campaign={medium}-{day}")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Post tekstowy (dzienne podsumowanie AI)
@@ -53,11 +70,12 @@ def build_text_post(summary: dict) -> dict:
     parts = [f"{headline}\n\n{highlights}".strip()]
     if events:
         parts.append("Nadchodzące wydarzenia:\n" + "\n".join(events))
-    parts.append(f"👉 Więcej na {SITE_URL}\n{HASHTAGS}")
+    parts.append(HASHTAGS)
 
     return {
         "kind": "text",
         "message": "\n\n".join(p for p in parts if p),
+        "first_comment": tracked_url("karta", summary.get("date")),
         "headline": headline,
         "date": content.get("date") or summary.get("date"),
     }
@@ -131,9 +149,10 @@ CAST: dict[str, dict] = {
     "ola": {
         "name": "Ola",
         "look": (
-            "OLA, a 24-year-old white woman with dark-blonde hair in a high ponytail with a "
-            "blunt fringe, freckles across her nose, small gold hoop earrings, wide bright "
-            "eyes, wearing a sunny-yellow cropped windbreaker over a white t-shirt"
+            "OLA, a woman in her late twenties with dark-blonde hair in a high ponytail "
+            "with a blunt fringe, light freckles across her nose, small gold hoop earrings, "
+            "an open friendly expression, wearing an unzipped sunny-yellow windbreaker "
+            "over a white t-shirt"
         ),
         "kiedy": "jest w środku wydarzeń — festyny, wydarzenia, weekend, sport, dobre wiadomości, ludzie",
     },
@@ -299,11 +318,13 @@ async def build_photo_post(summary: dict) -> dict:
 
     # Claim NIE wchodzi do treści posta — jest już wypalony na grafice, a powtórzenie
     # wyglądałoby jak błąd. (Nie używamy tu capitalize(): psuje nazwy własne — „w rybnie”.)
-    message = f"{caption}\n\n👉 {SITE_URL}\n{HASHTAGS}"
+    # Adresu też tu nie ma: idzie osobnym polem `first_comment` do pierwszego komentarza.
+    message = f"{caption}\n\n{HASHTAGS}"
 
     return {
         "kind": "photo",
         "message": message,
+        "first_comment": tracked_url("post", content.get("date") or summary.get("date")),
         "claim": claim,
         "cast": cast_id,
         "prompt": prompt,

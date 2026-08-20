@@ -1,71 +1,62 @@
 """
-Proaktywny AI Asystent — job schedulera (codziennie o 6:50)
+Wieczorne powiadomienia proaktywne — job schedulera (codziennie o 18:00)
 
-ZASADA KANAŁÓW (brak duplikatów):
-- Newsletter dzienny (email 6:30) = pełny briefing: newsy, śmietnik, BIP, pogoda
-- Push proaktywny = TYLKO rzeczy pilne i nieplanowane, których newsletter nie obejmuje:
-    1. Mróz < -5°C (pogoda tej nocy — pilna, time-sensitive)
-    2. Śmietnik jutro — dla Premium bez newslettera dziennego
+ZASADA KANAŁÓW (brak duplikatów, ale i brak dziur):
+- Poranny briefing 7:15 (mail, Premium) = pełny obraz dnia, w tym wywóz odpadów
+- **Wieczór 18:00 (push)** = to, co trzeba zrobić PRZED jutrem: wystawić pojemnik,
+  przygotować się na mróz. Wiadomość o 6:50 rano przychodziła po tym, jak śmieciarka
+  już jechała przez wieś.
+- Awarie NIE są tu obsługiwane — od 27.07.2026 robi to `alert_push_job` (co 15 min,
+  dla wszystkich subskrybentów). Awaria nie czeka na okno pipeline'u.
 
-Śmietnik i BIP NIE są wysyłane push jeśli user ma newsletter dzienny (duplikat).
+Dwie zmiany z 21.08.2026, obie wynikają z obietnicy w mailu powitalnym
+(„Przypomnienie o wywozie odpadów — wieczorem dzień wcześniej"):
 
-Awarie NIE są tu obsługiwane — od 27.07.2026 robi to `alert_push_job` (co 15 min,
-dla wszystkich subskrybentów, nie tylko Premium). Ścieżka, która stała w tym
-miejscu, szukała artykułów z ostatnich 2 h według `published_at` i przy raz
-dziennym przebiegu o 6:50 nie wysłała ani jednego powiadomienia o wyłączeniu
-prądu: Energa datuje ogłoszenia kilka dni wstecz, a wpisy wpadają w ciągu dnia.
+1. **Godzina**: 6:50 → 18:00. Rano dzień wcześniej to nie jest „wieczorem",
+   a rano tego samego dnia jest już za późno.
+2. **Odbiorcy**: koniec wykluczania osób z newsletterem dziennym. Wykluczenie
+   stało tu z adnotacją „dostaną to w emailu", a briefing o odpadach nie mówił
+   ani słowa — `WasteSchedule` nie było nawet zaimportowane w generatorze.
+   Newsletter dzienny jest dla Premium DOMYŚLNY, więc wykluczenie obejmowało
+   dokładnie tych, którym obiecaliśmy przypomnienie. Teraz briefing pisze
+   o wywozie rano, a push przypomina wieczorem — inny moment, inne zadanie.
 
-Odbiorca: Premium/Business userzy z aktywną subskrypcją push.
+Odbiorca: Premium/Business z aktywną subskrypcją push.
 """
 import asyncio
 from datetime import datetime, date, timedelta
-from typing import List, Set
+from typing import List
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
 from src.config import settings
-from src.database.schema import User, UserTier, WasteSchedule
+from src.database.schema import User, UserTier
+from src.services import waste_policy
 from src.services.push_service import push_service
 from src.utils.logger import setup_logger
 
 logger = setup_logger("ProactiveAlertsJob")
 
 
-async def _get_premium_user_ids(session) -> List[int]:
-    """Premium/Business userzy z aktywnym kontem."""
+async def _get_premium_users(session) -> List[User]:
+    """Premium/Business z aktywnym kontem — z lokalizacją, bo od niej zależy rejon wywozu."""
     result = await session.execute(
-        select(User.id).where(
+        select(User).where(
             User.tier.in_([UserTier.PREMIUM.value, UserTier.BUSINESS.value]),
-            User.is_active == True,
+            User.is_active == True,  # noqa: E712 — SQLAlchemy wymaga porównania
         )
     )
     return list(result.scalars().all())
 
 
-async def _get_daily_newsletter_user_ids(session) -> Set[int]:
+async def _send_frost_alert(session, user_ids: List[int]) -> int:
     """
-    Userzy którzy mają aktywny newsletter dzienny (pon-pt 6:30).
-    Oni już dostają briefing emailem — nie dublujemy śmietnik/BIP pushem.
-    """
-    from src.database.schema import NewsletterSubscriber
+    Alert mrozowy gdy prognoza < -5°C.
 
-    result = await session.execute(
-        select(NewsletterSubscriber.user_id).where(
-            NewsletterSubscriber.frequency == "daily",
-            NewsletterSubscriber.status == "active",
-            NewsletterSubscriber.confirmed_at != None,
-            NewsletterSubscriber.user_id != None,
-        )
-    )
-    return set(result.scalars().all())
-
-
-async def _send_frost_alert(session, premium_ids: List[int]) -> int:
-    """
-    Alert mrozowy gdy prognoza < -5°C — PILNE, time-sensitive.
-    Newsletter nie obejmuje alertów pogodowych na daną noc → wysyłamy push.
+    O 18:00 ma sens, jakiego nie miał o 6:50: „tej nocy" to jeszcze przyszłość,
+    więc da się przełożyć wyjazd albo okryć instalację.
     """
     from src.database.schema import Weather
 
@@ -80,10 +71,10 @@ async def _send_frost_alert(session, premium_ids: List[int]) -> int:
     if temp is None or temp >= -5:
         return 0
 
-    logger.info(f"Frost alert: temp={temp}°C → sending to {len(premium_ids)} Premium users")
+    logger.info(f"Frost alert: temp={temp}°C → sending to {len(user_ids)} Premium users")
     return await push_service.send_proactive_reminder(
         session=session,
-        user_ids=premium_ids,
+        user_ids=user_ids,
         title=f"Uwaga: mróz {temp:.0f}°C tej nocy",
         body="Możliwe silne oblodzenie dróg i chodników. Jedź ostrożnie.",
         url="/pogoda",
@@ -91,52 +82,38 @@ async def _send_frost_alert(session, premium_ids: List[int]) -> int:
     )
 
 
-async def _send_waste_reminder_no_newsletter(session, premium_ids: List[int], newsletter_ids: Set[int]) -> int:
+async def _send_waste_reminder(session, users: List[User], now: datetime) -> int:
+    """Przypomnienie o jutrzejszym wywozie — jeden push na użytkownika.
+
+    Rejon liczy `waste_policy`, nie zapytanie „nazwa zawiera nazwę": Rybno ma dwa
+    rejony różniące się o tydzień, a warunek `town in location` wysyłał mieszkańcowi
+    Rybna oba terminy naraz. Konto bez rozpoznanej miejscowości nie dostaje nic —
+    cudzy termin jest gorszy niż cisza.
     """
-    Przypomnienie o wywozię śmieci — TYLKO dla Premium bez newslettera dziennego.
-    Użytkownicy z newsletterem dostają tę info w emailu → bez duplikatu.
-    """
-    # Odfiltruj userów mających newsletter dzienny
-    target_ids = [uid for uid in premium_ids if uid not in newsletter_ids]
-    if not target_ids:
+    tomorrow = (now + timedelta(days=1)).date()
+    day_name = waste_policy.DAY_NAMES_PL[tomorrow.weekday()]
+
+    towns_all = await waste_policy.known_towns(session)
+    tomorrow_collections = await waste_policy.collections_on(session, tomorrow)
+    if not tomorrow_collections:
         return 0
-
-    tomorrow = date.today() + timedelta(days=1)
-    day_names = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
-    tomorrow_name = day_names[tomorrow.weekday()]
-
-    result = await session.execute(
-        select(WasteSchedule).where(WasteSchedule.collection_date == tomorrow)
-    )
-    schedules = result.scalars().all()
-    if not schedules:
-        return 0
-
-    # Grupuj typy per miejscowość
-    by_town: dict[str, list[str]] = {}
-    for s in schedules:
-        by_town.setdefault(s.town, []).append(s.waste_type)
-
-    result2 = await session.execute(
-        select(User.id, User.location).where(User.id.in_(target_ids))
-    )
-    users_loc = result2.all()
 
     total = 0
-    for town, waste_types in by_town.items():
-        town_lower = town.lower().strip()
-        matching = [
-            uid for uid, loc in users_loc
-            if loc and (town_lower in loc.lower() or loc.lower() in town_lower)
-        ]
-        if not matching:
+    for user in users:
+        zones = waste_policy.match_towns(user.location, towns_all)
+        mine = {t: types for t, types in tomorrow_collections.items() if t in zones}
+        if not mine:
             continue
-        types_str = " i ".join(waste_types)
+
+        types_label = waste_policy.join_types(
+            sorted({t for types in mine.values() for t in types})
+        )
+        where = " i ".join(sorted(mine))
         sent = await push_service.send_proactive_reminder(
             session=session,
-            user_ids=matching,
-            title=f"Jutro ({tomorrow_name}) wywóz śmieci",
-            body=f"{types_str} — {town}",
+            user_ids=[user.id],
+            title=f"Jutro ({day_name}) wywóz — wystaw pojemnik",
+            body=f"{types_label} — {where}",
             url="/",
             icon="/icon-192.png",
         )
@@ -149,27 +126,26 @@ async def run_proactive_alerts_async():
     """Główna funkcja jobu."""
     logger.info("=== Proactive Alerts Job START ===")
     start = datetime.utcnow()
+    now = datetime.now()  # czas lokalny — „jutro" liczymy po polskiej dacie
     total_sent = 0
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
-        premium_ids = await _get_premium_user_ids(session)
-        if not premium_ids:
+        users = await _get_premium_users(session)
+        if not users:
             logger.info("Proactive: brak Premium userów")
+            await engine.dispose()
             return
 
-        newsletter_ids = await _get_daily_newsletter_user_ids(session)
-        logger.info(f"Proactive: {len(premium_ids)} Premium, {len(newsletter_ids)} mają newsletter dzienny")
+        logger.info(f"Proactive: {len(users)} kont Premium/Business")
 
-        # 1. Mróz — push do WSZYSTKICH Premium (newsletter tego nie obejmuje)
-        sent = await _send_frost_alert(session, premium_ids)
-        total_sent += sent
+        # 1. Wywóz jutro — wieczorem dzień wcześniej, dokładnie jak obiecuje mail powitalny
+        total_sent += await _send_waste_reminder(session, users, now)
 
-        # 2. Śmietnik jutro — TYLKO Premium bez newslettera dziennego (reszta dostaje w emailu)
-        sent = await _send_waste_reminder_no_newsletter(session, premium_ids, newsletter_ids)
-        total_sent += sent
+        # 2. Mróz tej nocy
+        total_sent += await _send_frost_alert(session, [u.id for u in users])
 
     await engine.dispose()
     elapsed = (datetime.utcnow() - start).total_seconds()

@@ -90,6 +90,9 @@ class UserResponse(BaseModel):
     preferences: Optional[dict] = None
     created_at: datetime
     last_login: Optional[datetime] = None
+    # Bez tego pola front nie ma skąd wiedzieć, że Premium jest na 30 dni — pokazywał
+    # sam plan i użytkownik dowiadywał się o końcu okresu próbnego dopiero po fakcie.
+    trial_ends_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

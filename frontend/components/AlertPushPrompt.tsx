@@ -33,6 +33,23 @@ const DISMISS_KEY = 'rl_push_prompt_dismissed_at';
 // Znacznik w adresie z linków kampanijnych (post, komentarz, opis Reelsa)
 const CAMPAIGN_PARAM = 'alerty';
 
+// Świeżo założone konto — stawia go RegisterPage po udanej rejestracji.
+// Mail powitalny obiecuje alerty o awariach i wieczorne przypomnienie o wywozie;
+// jedno i drugie jedzie pushem, więc prośba o zgodę musi paść od razu, a nie
+// dopiero w dniu, w którym w feedzie stanie awaria.
+const REGISTERED_KEY = 'rl_registered_at';
+const REGISTERED_WINDOW_DAYS = 7;
+
+function justRegistered(): boolean {
+  try {
+    const raw = localStorage.getItem(REGISTERED_KEY);
+    if (!raw) return false;
+    return (Date.now() - Number(raw)) / 86400000 < REGISTERED_WINDOW_DAYS;
+  } catch {
+    return false;
+  }
+}
+
 function cameFromCampaign(): boolean {
   try {
     return new URLSearchParams(window.location.search).has(CAMPAIGN_PARAM);
@@ -71,11 +88,12 @@ type Props = {
 const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert' }) => {
   const { status, isSubscribed, isSupported, subscribe } = usePushNotifications();
   const [dismissed, setDismissed] = useState(wasDismissed);
+  const [fresh] = useState(justRegistered);
   const [busy, setBusy] = useState(false);
   const [justEnabled, setJustEnabled] = useState(false);
 
   const hide =
-    (campaignOnly && !cameFromCampaign()) ||
+    (campaignOnly && !cameFromCampaign() && !fresh) ||
     dismissed ||
     !isSupported ||
     isSubscribed ||
@@ -130,6 +148,7 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
           <p className="text-xs text-neutral-400 mt-0.5">
             Powiadomimy o wyłączeniach prądu, braku wody, pożarach i wypadkach
             w gminie Rybno. Za darmo, bez konta — i nic poza tym.
+            {fresh && ' Tym samym kanałem przypomnimy wieczorem o jutrzejszym wywozie odpadów.'}
           </p>
         </div>
       </div>

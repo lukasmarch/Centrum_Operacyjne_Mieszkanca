@@ -1,0 +1,90 @@
+{% extends "_base.html" %}
+
+{% block kicker %}{% if stage == 'ended' %}Zmiana planu{% elif mode == 'paid' %}Subskrypcja{% else %}Okres pr&oacute;bny{% endif %}{% endblock %}
+
+{% block headline %}
+{%- if stage == 'week' -%}
+Za tydzie&#324; ko&#324;czy si&#281; {% if mode == 'paid' %}Tw&oacute;j plan {{ plan_name }}{% else %}okres pr&oacute;bny{% endif %}.
+{%- elif stage == 'last_day' -%}
+{% if mode == 'paid' %}Plan {{ plan_name }}{% else %}Okres pr&oacute;bny{% endif %} ko&#324;czy si&#281; {{ when_word }}.
+{%- else -%}
+{% if mode == 'paid' %}Plan {{ plan_name }} wygas&#322;{% else %}Okres pr&oacute;bny dobieg&#322; ko&#324;ca{% endif %}.
+{%- endif -%}
+{% endblock %}
+
+{% block content %}
+
+  <!-- DATA / STAN -->
+  <tr>
+  <td class="rl-pad" style="padding:20px 24px 4px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0d1117" style="background-color:#0d1117; border:1px solid {% if stage == 'ended' %}#1f2937{% else %}#3b3016{% endif %}; border-radius:20px;">
+    <tr><td style="padding:18px 20px;">
+      <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#a1a1a1; padding-bottom:10px;">{% if stage == 'ended' %}Plan od dzi&#347;{% else %}{{ plan_name | default('Premium') }} dzia&#322;a do{% endif %}</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td class="rl-big" valign="bottom" style="font-family:'SFMono-Regular',Consolas,'Courier New',monospace; font-size:32px; font-weight:500; line-height:34px; mso-line-height-rule:exactly; color:#fafafa; padding-right:12px;">{% if stage == 'ended' %}Dla Ka&#380;dego{% else %}{{ trial_end_label }}{% endif %}</td>
+        <td valign="bottom" style="padding-bottom:4px; font-family:'Outfit',Arial,Helvetica,sans-serif;">
+          <div style="font-size:13px; font-weight:700; line-height:17px; mso-line-height-rule:exactly; color:{% if stage == 'ended' %}#a1a1a1{% else %}#fbbf24{% endif %};">{% if stage == 'ended' %}plan darmowy{% else %}{{ trial_days }} {{ trial_days_word }}{% endif %}</div>
+          <div style="font-size:12px; line-height:16px; mso-line-height-rule:exactly; color:#a1a1a1;">{% if stage == 'ended' %}bez op&#322;at{% elif mode == 'paid' %}op&#322;acone z g&oacute;ry{% else %}bez op&#322;at, bez karty{% endif %}</div>
+        </td>
+      </tr></table>
+    </td></tr>
+    </table>
+  </td>
+  </tr>
+
+  <!-- CO ZOSTAJE / CO ZNIKA -->
+  <tr>
+  <td class="rl-pad" style="padding:16px 24px 4px;">
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373; padding-bottom:12px;">{% if stage == 'ended' %}Co w&#322;a&#347;nie si&#281; zmieni&#322;o{% else %}Co przestanie dzia&#322;a&#263; po tej dacie{% endif %}</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      {% for item in losing %}
+      <tr>
+        <td valign="top" width="18" style="width:18px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; line-height:22px; mso-line-height-rule:exactly; color:#737373; padding-bottom:10px;">&minus;</td>
+        <td valign="top" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; line-height:22px; mso-line-height-rule:exactly; color:#a1a1a1; padding-bottom:10px;">{{ item }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </td>
+  </tr>
+
+  <tr>
+  <td class="rl-pad" style="padding:8px 24px 4px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#0b0f18" style="background-color:#0b0f18; border:1px solid #1f2937; border-radius:20px;">
+    <tr><td style="padding:16px 18px;">
+      <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:9px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#737373; padding-bottom:10px;">{% if stage == 'ended' %}Co masz nadal, za darmo{% else %}Co zostaje na zawsze, za darmo{% endif %}</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        {% for item in keeping %}
+        <tr>
+          <td valign="top" width="18" style="width:18px; font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; line-height:22px; mso-line-height-rule:exactly; color:#4ade80; padding-bottom:8px;">&check;</td>
+          <td valign="top" style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:15px; line-height:22px; mso-line-height-rule:exactly; color:#e5e5e5; padding-bottom:8px;">{{ item }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </td></tr>
+    </table>
+  </td>
+  </tr>
+
+  <!-- ZACHĘTA — treść zależy od tego, czy płatności są uruchomione -->
+  <tr>
+  <td class="rl-pad" style="padding:12px 24px 20px;">
+    <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:14px; line-height:21px; mso-line-height-rule:exactly; color:#a1a1a1;">
+      {% if mode == 'paid' %}
+        Plan <strong style="color:#e5e5e5; font-weight:600;">nie odnawia si&#281; automatycznie</strong> &mdash; nie mamy Twojej karty i nic nie pobierzemy bez Twojej decyzji. &#379;eby zosta&#263; przy planie {{ plan_name }}, wystarczy jedna p&#322;atno&#347;&#263;: {% if plan_name == 'Firma lokalna' %}49 z&#322; za miesi&#261;c albo 490 z&#322; za rok{% else %}9,99 z&#322; za miesi&#261;c albo 84 z&#322; za rok{% endif %}.
+      {% elif payments_live %}
+        Je&#380;eli te dwa tygodnie da&#322;y Ci co&#347; realnego &mdash; jeden termin, kt&oacute;rego nie przegapi&#322;e&#347;, albo jedno wy&#322;&#261;czenie pr&#261;du, o kt&oacute;rym wiedzia&#322;e&#347; wcze&#347;niej &mdash; Premium kosztuje <strong style="color:#e5e5e5; font-weight:600;">9,99 z&#322; miesi&#281;cznie</strong> (84 z&#322; za rok). Mo&#380;esz zrezygnowa&#263; w dowolnym momencie.
+      {% else %}
+        Chcesz zatrzyma&#263; Premium? <strong style="color:#e5e5e5; font-weight:600;">Odpisz na tego maila</strong> &mdash; w&#322;&#261;czymy przed&#322;u&#380;enie r&#281;cznie. Serwis prowadzi jedna osoba z gminy, wi&#281;c po drugiej stronie odpisze cz&#322;owiek, nie formularz.
+      {% endif %}
+      {% if stage != 'ended' %} Nic nie musisz robi&#263;, &#380;eby przej&#347;&#263; na plan darmowy &mdash; stanie si&#281; to samo.{% endif %}
+    </div>
+  </td>
+  </tr>
+
+{% endblock %}
+
+{% block cta_title %}{% if mode == 'paid' %}Przed&#322;u&#380; {{ plan_name }}{% elif payments_live %}Zatrzymaj pe&#322;ny dost&#281;p{% else %}Zajrzyj, co dzi&#347; w gminie{% endif %}{% endblock %}
+{% block cta_text %}{% if mode == 'paid' or payments_live %}Poranny briefing, asystent bez limitu i powiadomienia o awariach.{% else %}Briefing, awarie, wydarzenia i asystent AI &mdash; codziennie od nowa.{% endif %}{% endblock %}
+{% block cta_href %}{% if mode == 'paid' or payments_live %}{{ url_premium }}{% else %}{{ url_dashboard }}{% endif %}{% endblock %}
+{% block cta_button %}{% if mode == 'paid' %}Przed&#322;u&#380; plan &rarr;{% elif payments_live %}Zachowaj Premium &rarr;{% else %}Otw&oacute;rz serwis &rarr;{% endif %}{% endblock %}
+{% block footer_tagline %}{% if stage == 'ended' %}Plan Dla Ka&#380;dego{% elif mode == 'paid' %}Plan {{ plan_name }}{% else %}Okres pr&oacute;bny Premium{% endif %} &middot; Twoja gmina. Na &#380;ywo.{% endblock %}

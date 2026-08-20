@@ -5,6 +5,7 @@ import ArticleImage, { getCategoryTheme } from './ArticleImage';
 import AlertPushPrompt from './AlertPushPrompt';
 import { Article } from '../types';
 import { fetchActiveAnnouncements, ActiveAnnouncement } from '../src/services/businessApi';
+import { useAuth } from '../src/context/AuthContext';
 
 interface NewsFeedProps {
   initialCategory?: string;
@@ -112,9 +113,17 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
   const [chipsExpanded, setChipsExpanded] = useState(false);
   const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
 
+  // Reklamy widzi wyłącznie plan darmowy — cennik sprzedaje ich brak w planach
+  // płatnych. Do 21.08.2026 bramkę miał tylko `AdBoard` na stronie głównej (i tylko
+  // dla `premium`), więc płacący widział ogłoszenia w feedzie mimo obietnicy,
+  // a firma za 49 zł/mc — mimo pozycji „Wszystko z planu Premium".
+  const { user } = useAuth();
+  const hidesAds = user?.tier === 'premium' || user?.tier === 'business';
+
   useEffect(() => {
+    if (hidesAds) return;
     fetchActiveAnnouncements(4).then(setAnnouncements).catch(() => {});
-  }, []);
+  }, [hidesAds]);
 
   // Category counts
   const categoryCounts = useMemo(() => {

@@ -77,29 +77,47 @@ async def _activate_subscription(
 ) -> Subscription:
     """Aktywuje subskrypcję po potwierdzeniu płatności przez P24."""
     # Anuluj poprzednią aktywną subskrypcję (jeśli istnieje)
+    # Anuluj poprzednie aktywne subskrypcje. `scalars().all()`, nie `scalar_one_or_none()`:
+    # przy dwóch aktywnych wpisach to drugie rzuca MultipleResultsFound i wywraca IPN.
     result = await session.execute(
         select(Subscription).where(
             Subscription.user_id == user.id,
             Subscription.status == SubscriptionStatus.ACTIVE.value,
+            Subscription.p24_session_id != p24_session_id,
         )
     )
-    existing = result.scalar_one_or_none()
-    if existing:
+    for existing in result.scalars().all():
         existing.status = SubscriptionStatus.CANCELLED.value
         existing.cancelled_at = datetime.utcnow()
         existing.updated_at = datetime.utcnow()
 
-    # Nowa subskrypcja
     expires_at = datetime.utcnow() + timedelta(days=PERIOD_DAYS[period])
-    sub = Subscription(
-        user_id=user.id,
-        tier=tier,
-        status=SubscriptionStatus.ACTIVE.value,
-        p24_order_id=p24_order_id,
-        p24_session_id=p24_session_id,
-        started_at=datetime.utcnow(),
-        expires_at=expires_at,
+
+    # Rekord `pending` powstał już przy /create-transaction — aktywujemy JEGO, zamiast
+    # zakładać drugi z tym samym `p24_session_id`. Pierwsza prawdziwa płatność
+    # (20.08.2026) zostawiła po sobie taką parę, przez co `/verify` zwróciło klientowi
+    # błąd 500 zaraz po udanym zakupie: zapłacił, dostał Premium i zobaczył awarię.
+    pending_result = await session.execute(
+        select(Subscription)
+        .where(Subscription.p24_session_id == p24_session_id)
+        .order_by(Subscription.id)
     )
+    sub = pending_result.scalars().first()
+
+    if sub is None:
+        sub = Subscription(
+            user_id=user.id,
+            p24_session_id=p24_session_id,
+            started_at=datetime.utcnow(),
+        )
+        session.add(sub)
+
+    sub.tier = tier
+    sub.status = SubscriptionStatus.ACTIVE.value
+    sub.p24_order_id = p24_order_id
+    sub.started_at = datetime.utcnow()
+    sub.expires_at = expires_at
+    sub.updated_at = datetime.utcnow()
     session.add(sub)
 
     # Upgrade user tier
@@ -125,6 +143,42 @@ async def _activate_subscription(
     await session.refresh(sub)
     logger.info(f"Subscription activated: user_id={user.id}, tier={tier}, period={period}, expires={expires_at.date()}")
     return sub
+
+
+async def _send_purchase_confirmation(
+    session: AsyncSession,
+    user: User,
+    sub: Subscription,
+    period: str,
+    amount_grosze: int,
+) -> None:
+    """Mail z zakresem i okresem usługi po zaksięgowaniu płatności (regulamin §6.4).
+
+    Stopka każdego naszego maila ma link wypisu, a ten wymaga rekordu subskrybenta.
+    Konta zakładane od 20.08.2026 mają go z rejestracji; starsze mogą nie mieć —
+    wtedy zakładamy go tutaj, zamiast rezygnować z potwierdzenia. Wypis świadomy
+    (`unsubscribed`) pozostaje nietknięty: `ensure_subscription` zwraca wtedy `None`.
+    """
+    from src.newsletter.subscriptions import ensure_subscription
+    from src.newsletter.email_service import EmailService
+
+    subscriber = await ensure_subscription(session, user)
+    if subscriber is None:
+        logger.info(f"User {user.id} wypisany z newslettera — potwierdzenie zakupu bez maila")
+        return
+    await session.commit()
+    await session.refresh(subscriber)
+
+    await EmailService().send_purchase_confirmation(
+        to_email=user.email,
+        recipient_name=user.full_name,
+        tier=sub.tier,
+        period=period,
+        amount_pln=round(amount_grosze / 100, 2),
+        expires_at=sub.expires_at,
+        order_id=sub.p24_order_id,
+        unsubscribe_token=subscriber.unsubscribe_token,
+    )
 
 
 # =======================
@@ -269,7 +323,15 @@ async def p24_webhook(
     period = parts[3] if len(parts) >= 5 else "monthly"
 
     # Aktywuj subskrypcję
-    await _activate_subscription(session, user, tier, period, session_id, order_id)
+    activated = await _activate_subscription(session, user, tier, period, session_id, order_id)
+
+    # Potwierdzenie zawarcia umowy — regulamin §6.4 obiecuje je wprost, a pierwsza
+    # prawdziwa płatność (20.08.2026) nie wywołała żadnego maila. Wysyłka NIE może
+    # wywrócić IPN-a: P24 ponawia webhooka po błędzie, a subskrypcja jest już aktywna.
+    try:
+        await _send_purchase_confirmation(session, user, activated, period, amount)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Potwierdzenie zakupu do {user.email} nie wyszło: {exc}")
 
     return {"status": "ok"}
 
@@ -284,13 +346,18 @@ async def verify_payment(
     Weryfikacja statusu płatności po powrocie z P24.
     Frontend wywołuje po przekierowaniu z success URL.
     """
+    # Najnowszy wpis dla tej sesji. `first()`, nie `scalar_one_or_none()` — konta
+    # sprzed 20.08.2026 mają po dwa rekordy na jedną płatność i tamten wariant
+    # kończył się błędem 500 na stronie powrotu z bramki.
     result = await session.execute(
-        select(Subscription).where(
+        select(Subscription)
+        .where(
             Subscription.p24_session_id == session_id,
             Subscription.user_id == user.id,
         )
+        .order_by(Subscription.id.desc())
     )
-    sub = result.scalar_one_or_none()
+    sub = result.scalars().first()
 
     if not sub:
         raise HTTPException(status_code=404, detail="Transakcja nie znaleziona")
@@ -317,7 +384,7 @@ async def get_subscription_status(
             Subscription.status == SubscriptionStatus.ACTIVE.value,
         ).order_by(Subscription.expires_at.desc())
     )
-    sub = result.scalar_one_or_none()
+    sub = result.scalars().first()  # dwie aktywne subskrypcje nie mogą wywrócić profilu
 
     is_trial = bool(
         user.trial_ends_at and

@@ -72,6 +72,10 @@ class User(SQLModel, table=True):
 
     # Trial Premium (30 dni po rejestracji, bez karty)
     trial_ends_at: Optional[datetime] = None
+    # Który mail o kończącym się trialu już poszedł: week → last_day → ended.
+    # Job chodzi codziennie, więc bez tego znacznika wysłałby to samo siedem razy.
+    trial_reminder_stage: Optional[str] = Field(default=None, max_length=20)
+    trial_reminder_sent_at: Optional[datetime] = None
 
     # Referral program
     referral_code: Optional[str] = Field(default=None, max_length=20, unique=True)
@@ -109,6 +113,14 @@ class Subscription(SQLModel, table=True):
     started_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
+
+    # Który mail o kończącym się okresie opłaconym już poszedł: week → last_day → ended.
+    # Ten sam mechanizm co `users.trial_reminder_stage`, tylko dla płatnych: job chodzi
+    # codziennie, więc bez znacznika wysłałby to samo przypomnienie siedem razy.
+    # Plan nie odnawia się automatycznie (regulamin §6.5), więc cisza przed wygaśnięciem
+    # oznaczała, że płacący klient tracił dostęp bez ostrzeżenia.
+    reminder_stage: Optional[str] = Field(default=None, max_length=20)
+    reminder_sent_at: Optional[datetime] = None
 
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
