@@ -176,41 +176,80 @@ async def run_db() -> int:
     async with async_session() as session:
         pairs = (await session.execute(text("""
             SELECT ea.id, eb.id, round((1 - (a.embedding <=> b.embedding))::numeric, 2),
-                   left(ea.title, 40), left(eb.title, 40), date(ea.event_date)
+                   left(ea.title, 40), left(eb.title, 40), date(ea.event_date),
+                   ea.location, eb.location
             FROM events ea
             JOIN events eb ON ea.id < eb.id
                           AND date(ea.event_date) = date(eb.event_date)
             JOIN document_embeddings a ON a.source_type='event' AND a.source_id=ea.id
             JOIN document_embeddings b ON b.source_type='event' AND b.source_id=eb.id
             WHERE ea.canonical_id IS NULL AND eb.canonical_id IS NULL
+              -- tylko to, co mieszkaniec faktycznie widzi
+              AND (ea.locality IS NULL OR ea.locality >= :minimum)
+              AND (eb.locality IS NULL OR eb.locality >= :minimum)
               AND ea.event_date >= now() - interval '7 days'
               AND 1 - (a.embedding <=> b.embedding) >= :threshold
             ORDER BY 3 DESC
-        """), {"threshold": DUPLICATE_SIMILARITY})).all()
+        """), {"threshold": DUPLICATE_SIMILARITY, "minimum": MIN_EVENT_LOCALITY})).all()
 
-        if pairs:
+        # Para o ZGODNYM miejscu to błąd pipeline'u — dedup miał ją scalić.
+        # Para o różnym miejscu to sprawa dla człowieka: reguła miejsca celowo
+        # nie scala w razie wątpliwości („Zagroda Edukacyjna w Sąpach" kontra
+        # „Sąpy, gmina Młynary"), bo dwie różne imprezy tego samego dnia w tej
+        # samej wsi kosztują więcej niż jedna powtórka.
+        missed, review = [], []
+        for row in pairs:
+            key_a, key_b = _place_key(row[6]), _place_key(row[7])
+            same_place = not (key_a and key_b) or key_a == key_b
+            (missed if same_place else review).append(row)
+
+        if missed:
             failed += 1
-            print(f"  ✗ Powtórki wciąż widoczne ({len(pairs)} par):")
-            for id_a, id_b, sim, title_a, title_b, day in pairs[:15]:
+            print(f"  ✗ Powtórki wciąż widoczne ({len(missed)} par):")
+            for id_a, id_b, sim, title_a, title_b, day, _, _ in missed[:15]:
                 print(f"      {sim}  {day}  #{id_a} {title_a}  ==  #{id_b} {title_b}")
             print("    → python -m scripts.dedupe_events --apply")
         else:
-            print("  ✓ Brak par powyżej progu wśród widocznych wydarzeń (7 dni)")
+            print("  ✓ Brak nierozstrzygniętych powtórek wśród widocznych wydarzeń (7 dni)")
 
-        far = (await session.execute(text("""
+        if review:
+            print(f"  … do przejrzenia ({len(review)}): podobne, ale różne miejsce")
+            for id_a, id_b, sim, title_a, title_b, day, loc_a, loc_b in review[:10]:
+                print(f"      {sim}  {day}  #{id_a} {title_a} ({loc_a or '—'})")
+                print(f"            == #{id_b} {title_b} ({loc_b or '—'})")
+
+        # Sprawdzamy to, co mieszkaniec WIDZI — czyli wpisy przechodzące przez
+        # `visible_event_conditions`. Wpis z oceną poniżej progu jest już ukryty
+        # i nie jest błędem; błędem jest obcy ośrodek, który mimo bramki został.
+        # Lista obcych ośrodków pochodzi z migracji — jedna na projekt.
+        from scripts.migrations.add_locality_and_event_dedup import OBCE_PLACES
+        from src.services.alert_policy import _flat
+
+        visible = (await session.execute(text("""
             SELECT id, title, location, locality FROM events
-            WHERE canonical_id IS NULL AND locality IS NOT NULL AND locality < :minimum
+            WHERE canonical_id IS NULL
+              AND (locality IS NULL OR locality >= :minimum)
               AND event_date >= now()
-            ORDER BY event_date LIMIT 10
+            ORDER BY event_date LIMIT 200
         """), {"minimum": MIN_EVENT_LOCALITY})).all()
+
+        far = [
+            row for row in visible
+            if any(name in _flat(f"{row[2] or ''} {row[1] or ''}") for name in OBCE_PLACES)
+        ]
+        hidden = (await session.execute(text("""
+            SELECT count(*) FROM events
+            WHERE canonical_id IS NULL AND locality IS NOT NULL AND locality < :minimum
+        """), {"minimum": MIN_EVENT_LOCALITY})).scalar()
 
         if far:
             failed += 1
-            print(f"  ✗ Wydarzenia spoza powiatu w kalendarzu ({len(far)}):")
+            print(f"  ✗ Obcy ośrodek WIDOCZNY w kalendarzu ({len(far)}):")
             for row in far:
                 print(f"      #{row[0]} [{row[3]}] {row[1][:50]} ({row[2] or '—'})")
         else:
-            print("  ✓ Brak wydarzeń z oceną poniżej progu lokalności")
+            print(f"  ✓ Żaden obcy ośrodek nie przechodzi bramki "
+                  f"({len(visible)} widocznych, {hidden} ukrytych lokalnością)")
 
         stats = (await session.execute(text("""
             SELECT count(*) FILTER (WHERE canonical_id IS NULL),

@@ -28,9 +28,21 @@ Powtórki z tego samego artykułu to 39 rekordów na 129 z ostatnich 30 dni —
 ten sam post szedł do gpt-4o kilka razy, a model za każdym razem tytułował
 inaczej i unikat `(title, event_date, location)` tego nie widział.
 
-Kolumny są NULL-owalne i nic nie backfillujemy: ocena powstaje przy kategoryzacji
-i ekstrakcji, więc po jednym przebiegu (6:15 / 13:15) świeży materiał ma komplet.
-Stary kod działa przed i po migracji.
+Kolumny są NULL-owalne, a `articles.locality` nie jest backfillowana: ocena powstaje
+przy kategoryzacji, więc po jednym przebiegu (6:15 / 13:15) świeży materiał ma komplet,
+a wpisy bez oceny mają w feedzie fallback na `places_in`.
+
+`events.locality` backfillujemy — inaczej naprawa nie dotyczy tego, co JUŻ wisi
+w kalendarzu: widok przepuszcza NULL (żeby nie skasować lokalnych wpisów sprzed
+migracji), więc III Ciechanowski Festiwal zostałby w mailu mimo poprawnego kodu.
+Backfill jest deterministyczny i wąski — bez modelu, bez zgadywania:
+  3  nazwa z gminy Rybno pada w lokalizacji lub tytule (`alert_policy.places_in`)
+  2  ośrodek powiatu działdowskiego
+  0  ZAMKNIĘTA lista obcych ośrodków, które realnie zalały kalendarz przez feed
+     Radia 7 (Sierpc, Ciechanów, Mława, Żuromin, Płońsk, Warszawa…)
+  NULL bez zmian — wszystko inne zostaje widoczne. Wyjazd organizowany przez gminę
+     („Wakacyjna wycieczka do Ciechocinka") ma obcą lokalizację, a jest nasz, więc
+     lista obcych nie może być domysłem „skoro nie znam, to nie nasze".
 
 Idempotentna. Migracja idzie na produkcję PRZED kodem.
 
@@ -48,6 +60,28 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.config import settings
+from src.services.alert_policy import _flat, places_in
+
+# Ośrodki powiatu działdowskiego — mieszkaniec Rybna tam pojedzie (locality 2).
+POWIAT_PLACES = ("dzialdow", "lidzbark", "plosnic", "ilow", "narzym", "burkat",
+                 "uzdow", "grodki", "turza")
+
+# Zamknięta lista ośrodków, które przez feedy Radia 7, Radia Olsztyn i Powiatu
+# weszły do kalendarza, a z gminą Rybno nie mają wspólnego nic (locality 0).
+# Dwie grupy: mazowieckie (Radio 7 obsługuje ciechanowskie i płockie) oraz
+# warmińsko-mazurskie spoza powiatu działdowskiego. Wpis, którego nie ma tu ani
+# w POWIAT_PLACES, zostaje NULL i pozostaje widoczny — patrz Ciechocinek.
+# ⚠️ „lidzbark" wyżej złapie też Lidzbark Warmiński jako powiatowy. Świadomie:
+# jedno wydarzenie za dużo w kalendarzu boli mniej niż zniknięcie Lidzbarka
+# Welskiego, do którego z Rybna jedzie się 20 minut.
+OBCE_PLACES = (
+    # mazowieckie
+    "sierpc", "ciechanow", "mlaw", "zuromin", "plonsk", "warszaw",
+    "golotczyzn", "poswietn", "rosciszew", "sochaczew",
+    # warmia i mazury poza powiatem działdowskim
+    "olsztyn", "ostrod", "morag", "nidzic", "mragow", "gizyck", "ketrzyn",
+    "szczytn", "elblag", "ilaw", "lubaw", "byszwald", "brodnic", "chrosle",
+)
 
 
 async def migrate():
@@ -112,9 +146,37 @@ async def migrate():
             ))
             print("✓ unikat: jeden artykuł = jedno wydarzenie")
 
+        # --- backfill events.locality -----------------------------------------
+        rows = (await conn.execute(text(
+            "SELECT id, title, location FROM events WHERE locality IS NULL"
+        ))).all()
+
+        counts = {3: 0, 2: 0, 0: 0}
+        for event_id, title, location in rows:
+            haystack = f"{location or ''} {title or ''}"
+            flat = _flat(haystack)
+            if places_in(location, title):
+                score = 3
+            elif any(name in flat for name in POWIAT_PLACES):
+                score = 2
+            elif any(name in flat for name in OBCE_PLACES):
+                score = 0
+            else:
+                continue  # nieznane — zostaje NULL, czyli widoczne
+            await conn.execute(
+                text("UPDATE events SET locality = :s WHERE id = :i"),
+                {"s": score, "i": event_id},
+            )
+            counts[score] += 1
+
+        print(f"\n✓ backfill lokalności: gmina {counts[3]}, powiat {counts[2]}, "
+              f"poza {counts[0]}, bez zmian {len(rows) - sum(counts.values())}")
+
         total = (await conn.execute(text("SELECT COUNT(*) FROM events"))).scalar()
-        print(f"\n  wydarzeń w bazie: {total} "
-              f"(lokalność dostaną przy kolejnej ekstrakcji)")
+        hidden = (await conn.execute(text(
+            "SELECT COUNT(*) FROM events WHERE locality IS NOT NULL AND locality < 2"
+        ))).scalar()
+        print(f"  wydarzeń w bazie: {total}, w tym {hidden} zniknie z kalendarza")
 
     await engine.dispose()
     print("\n✓ Gotowe.")

@@ -154,18 +154,34 @@ async def ground_event(
     return output
 
 
+# Separatory dopisku do nazwy miejscowości: „Ciechanów, dziedziniec Zamku",
+# „Rybno – Zarybinek", „Grądy, Gmina Rybno". Myślnik dopisany 21.08.2026 — bez
+# niego ten sam wyścig MTB stał w kalendarzu dwa razy, bo „Rybno" i „Rybno –
+# Zarybinek" liczyły się jako dwa różne miejsca.
+_PLACE_SEPARATORS = (",", "–", "—", " - ", "/")
+
+
 def _place_key(location: Optional[str]) -> str:
     """
-    Miejscowość w postaci porównywalnej: pierwszy człon przed przecinkiem.
+    Miejscowość w postaci porównywalnej: nazwa bez dopisku o miejscu w niej.
 
     „Ciechanów" i „Ciechanów, dziedziniec Zamku Książąt Mazowieckich" to jedno
     miejsce — dwa rekordy tego samego festiwalu z tego samego artykułu różniły
     się wyłącznie tym dopiskiem i unikat `(title, event_date, location)` ich
     nie widział.
+
+    ⚠️ Klucz nie rozpoznaje opisowych lokalizacji („Zagroda Edukacyjna w Sąpach"
+    kontra „Sąpy, gmina Młynary"). Takie pary zostają nierozstrzygnięte
+    i wypisuje je `scripts/test_event_dedup.py --db` do przejrzenia — celowo:
+    reguła miejsca ma chronić przed scaleniem dwóch różnych imprez tego samego
+    dnia, więc w razie wątpliwości nie scala.
     """
     from src.services.alert_policy import _flat
 
-    return _flat((location or "").split(",")[0]).strip()
+    text = location or ""
+    for separator in _PLACE_SEPARATORS:
+        text = text.split(separator)[0]
+    return _flat(text).strip()
 
 
 async def find_duplicate(
