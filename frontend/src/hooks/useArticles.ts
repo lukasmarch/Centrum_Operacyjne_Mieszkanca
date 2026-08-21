@@ -22,7 +22,12 @@ interface ArticleApiResponse {
   is_pinned: boolean;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Fallback musi zawierać /api — endpointy doklejają samą ścieżkę („/events").
+// Bez tego `npm run dev` bez jawnej zmiennej trafiał w :8000/events → 404:
+// vite.config ma envDir wskazujący ../backend, więc frontend/.env NIE jest
+// wczytywany, a produkcja działa tylko dlatego, że deploy-frontend.sh podaje
+// VITE_API_URL w linii poleceń.
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 /**
  * Format scraped_at timestamp to readable format

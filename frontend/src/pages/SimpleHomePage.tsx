@@ -6,6 +6,14 @@ import { useArticles } from '../hooks/useArticles';
 import { useWeather } from '../hooks/useWeather';
 import { useWasteSchedule } from '../hooks/useWasteSchedule';
 import { useEvents } from '../hooks/useEvents';
+import {
+    dayLabel,
+    endOf,
+    isInWeekend,
+    phaseOf,
+    timeSuffix,
+    upcomingFirst,
+} from '../utils/eventTime';
 import HeroBand from '../../components/simple/HeroBand';
 import BriefingCard from '../../components/simple/BriefingCard';
 import AlertOfTheDay from '../../components/simple/AlertOfTheDay';
@@ -108,31 +116,39 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
      * „Dziś w gminie" — wydarzenie z godziną, a gdy dziś nic nie ma, mówimy to
      * wprost i kierujemy na najbliższe. „Zobacz kalendarz wydarzeń" brzmiało
      * jak nazwa przycisku, a nie jak odpowiedź na pytanie „co się dzieje?".
+     *
+     * Karta liczy się z zegarem, nie z kalendarzem: do 21.08.2026 porównywała
+     * sam DZIEŃ, więc o 10:25 zapraszała na posiedzenie komisji zakończone
+     * o 9:00. `phaseOf` rozstrzyga, co minęło, co trwa, a co dopiero będzie.
      */
     const todaySubtitle = useMemo(() => {
         if (!events?.length) return 'Sprawdź, co się dzieje w okolicy';
         const now = new Date();
-        const today = now.toDateString();
-        const todayEvents = events.filter(e => new Date(e.date).toDateString() === today);
+        const ahead = upcomingFirst(events, now);
+        const todayAhead = ahead.filter(e => {
+            const phase = phaseOf(e, now);
+            return phase === 'ongoing' || phase === 'today';
+        });
 
-        if (todayEvents.length) {
-            const first = todayEvents[0];
-            // Wydarzenia całodniowe mają w bazie 00:00 — godzina „0:00" niczego
-            // nie mówi, więc przy północy pomijamy ją zamiast wypisywać
-            const start = new Date(first.date);
-            const time = start.getHours() === 0 && start.getMinutes() === 0
-                ? ''
-                : `, ${start.toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' })}`;
-            const more = todayEvents.length > 1 ? ` (i ${todayEvents.length - 1} więcej)` : '';
-            return `${first.title}${time}${more}`;
+        if (todayAhead.length) {
+            const first = todayAhead[0];
+            const more = todayAhead.length > 1 ? ` (i ${todayAhead.length - 1} więcej)` : '';
+            if (phaseOf(first, now) === 'ongoing') {
+                const until = endOf(first).toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' });
+                return `teraz: ${first.title}, do ${until}${more}`;
+            }
+            return `${first.title}${timeSuffix(first)}${more}`;
         }
 
-        const next = events
-            .filter(e => new Date(e.date) > now)
-            .sort((a, b) => +new Date(a.date) - +new Date(b.date))[0];
+        const next = ahead[0];
         if (!next) return 'Dziś spokojnie — zajrzyj po nowe wydarzenia';
-        const day = new Date(next.date).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'numeric' });
-        return `Dziś nic nie planowano · najbliższe: ${next.title}, ${day}`;
+        // Rozróżniamy dwa różne dni: „nic nie planowano" znaczy co innego niż
+        // „było, ale się skończyło" — a mieszkaniec o 20:00 pyta o to drugie
+        const somethingHappenedToday = events.some(
+            e => new Date(e.date).toDateString() === now.toDateString() && phaseOf(e, now) === 'past',
+        );
+        const opener = somethingHappenedToday ? 'Dziś już po wszystkim' : 'Dziś nic nie planowano';
+        return `${opener} · najbliższe: ${next.title}, ${dayLabel(next)}`;
     }, [events]);
 
     const wasteSubtitle = useMemo(() => {
@@ -188,29 +204,25 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
     }, [bus, busStops]);
 
     /**
-     * Weekend: najbliższy piątek–niedziela (dziś, jeśli weekend trwa).
+     * Weekend: piątek po południu – niedziela (od TERAZ, jeśli weekend trwa).
      * `null` znaczy „nic nie ma" i tak też brzmi na karcie — wcześniej pustka
      * dostawała zdanie „Kino, koncerty i atrakcje w okolicy", które wyglądało
-     * jak zapowiedź, a było wypełniaczem
+     * jak zapowiedź, a było wypełniaczem.
+     *
+     * Zakres liczy `weekendRange`. Wcześniej piątek zaczynał się o północy,
+     * więc w piątek rano karta powtarzała treść „Dziś w gminie" i pokazywała
+     * poranne posiedzenie komisji zamiast niedzielnego wyścigu MTB.
      */
     const weekendSubtitle = useMemo<string | null>(() => {
         if (!events?.length) return null;
         const now = new Date();
-        const friday = new Date(now);
-        friday.setHours(0, 0, 0, 0);
-        friday.setDate(friday.getDate() + ((5 - friday.getDay() + 7) % 7));
-        if (now.getDay() === 6 || now.getDay() === 0) friday.setDate(friday.getDate() - 7);
-        const monday = new Date(friday);
-        monday.setDate(friday.getDate() + 3);
-        const weekendEvents = events.filter(e => {
-            const d = new Date(e.date);
-            return d >= friday && d < monday;
-        });
+        const weekendEvents = upcomingFirst(events, now).filter(e => isInWeekend(e, now));
         if (!weekendEvents.length) return null;
-        const first = weekendEvents[0].title;
+        const first = weekendEvents[0];
+        const label = `${first.title}${timeSuffix(first)}`;
         return weekendEvents.length > 1
-            ? `${first} i jeszcze ${weekendEvents.length - 1} więcej`
-            : first;
+            ? `${label} i jeszcze ${weekendEvents.length - 1} więcej`
+            : label;
     }, [events]);
 
     const ask = (query: string) => {
