@@ -200,6 +200,59 @@ ze słowami „nowe" i „gmina" (Działdowo 2.08, Płośnica 25.02, Lubowidz 19
   używa go Strażnik i Redaktor. ⚠️ `summary_generator._time_label` to nadal osobna kopia;
   scalenie wymaga przebiegu `test_summary_headline`
 
+## Kalendarz wydarzeń: lokalność i powtórki (2026-08-21)
+**Mail z 21.08 wysłał „Dziś w okolicy: III Ciechanowski Festiwal" — dwa razy — i dwa
+Posiedzenia tej samej Komisji.** Ekstrakcja wydarzeń nie miała ANI bramki miejsca,
+ANI działającej deduplikacji: 129 wydarzeń z 30 dni pochodziło z 90 artykułów,
+a ~74 na 130 dotyczyło Sierpca, Ciechanowa, Mławy czy Warszawy.
+
+- **`articles.locality` / `events.locality`** (migracja `add_locality_and_event_dedup`) —
+  ocena 0–3 z kategoryzacji BYŁA liczona i wyrzucana: `article_processor` dodawał ją do
+  użyteczności i zapisywał wyłącznie sumę `content_score`. Wpis z Ciechanowa użyteczny
+  (0+3) miał ten sam wynik co lokalna ciekawostka (3+0), więc każde miejsce, które
+  potrzebowało lokalności, budowało własną heurystykę — a newsletter miał **czwartą kopię
+  listy miejscowości** (12 nazw, z „wymój", bez Tuczek). Dziś: jedna liczba w bazie
+- **`feed_policy.visible_event_conditions(Event)`** — jeden warunek widoczności dla
+  kalendarza, briefingu, newslettera i Przewodnika: `canonical_id IS NULL` + próg
+  `MIN_EVENT_LOCALITY = 2` (gmina + sąsiednie gminy powiatu; Sierpc i Ciechanów odpadają)
+- **`is_pinned_alert` ma wreszcie bramkę miejsca.** Push miał ją od początku
+  (`alert_policy.evaluate`), feed nie miał wcale — stąd przypięte „wyłączenie prądu
+  w Iłowie-Osadzie" (art. 5322). Ostrzeżenia meteo są z niej wyłączone: IMGW ostrzega
+  dla powiatu i nazwa gminy w komunikacie nie pada
+- **Reguły w Pydantic, nie w prompcie**: `ExtractedEvent` dostał `is_upcoming` i `locality`,
+  a `event_extractor.ground_event` (output_validator) przycina odpowiedź do tekstu —
+  ten sam wzorzec co `ground_categorization`. Relacja z dożynek nie jest już zapowiedzią
+- **Deduplikacja wydarzeń — embedding, nie tekst.** Pomiar 21.08 na `document_embeddings`
+  (typ `event`, 40 par): duplikaty 0,66–0,98, różne wydarzenia ≤ 0,54 → próg **0,60**
+  wewnątrz jednego DNIA. Tekst tego nie umie i nie da się go dostroić: „Pożegnanie księdza
+  Tomasza" vs „Msza Święta dziękczynna w Rybnie" = zawieranie rdzeni **0,00** (to samo
+  wydarzenie), „Komisja Skarg" vs „Komisja Rewizyjna" = **0,50** (dwa różne).
+  ⚠️ Te 1156 chunków `event` leżało w bazie nieużywane — semantyka była już opłacona
+- **Embedding wydarzenia liczy EKSTRAKTOR**, nie `embedding_job` o 6:50: wpisy z jednego
+  przebiegu muszą się widzieć nawzajem. Job został siatką bezpieczeństwa (`embedded=False`)
+- **Jeden artykuł = jedno wydarzenie** (częściowy unikat na `source_article_id`). Powtórki
+  brały się z tego, że okno liczy się od `scraped_at`, który re-scrape NADPISUJE — ten sam
+  post szedł do gpt-4o przy obu przebiegach dnia i za każdym razem dostawał inny tytuł
+- Scalanie, nie kasowanie: `events.canonical_id`. Sprzątanie bazy:
+  `python -m scripts.dedupe_events [--apply] [--days N]` (na prodzie 21.08: **84 rekordy
+  ze 167 do scalenia**). ⚠️ `scripts/migrations/remove_duplicate_events.py` jest martwy —
+  szuka po `(title, event_date, location)`, czyli po kluczu, który tych powtórek nie widzi
+- Test: `python -m scripts.test_event_dedup [--db]` (14 sprawdzeń + stan bazy)
+
+## Newsletter jest obrazem feedu (2026-08-21)
+**Mail miał własne zapytania SQL i własne listy — więc pokazywał to, czego na stronie nie
+było.** Teraz `NewsletterGenerator` woła te same funkcje polityki co feed:
+`publishable_conditions` + `article_score` + `collapse_duplicates` (turniej w Tuczkach
+opisało 20.08 sześć postów i wszystkie sześć szło do modelu jako osobne wiadomości)
+oraz `visible_event_conditions` dla wydarzeń.
+- **Czas gramatyczny rozstrzyga kod, nie model**: prompt dostaje DWA bloki — „JUŻ SIĘ
+  WYDARZYŁO (relacje — czas przeszły)" i „DZIŚ I PRZED NAMI" — a każdy wpis ma etykietę
+  z `feed_policy.time_label()` (`[wczoraj 14:45]`, `[ZDARZENIE dziś 09:00–14:00 — TRWA
+  TERAZ]`). Do 21.08 model dostawał `{"title", "category"}` — **ani jednej daty** — i sam
+  zgadywał, co się dopiero wydarzy
+- „Dziś w okolicy" ma okno **jednodniowe**; wcześniej dwudniowe, więc jutrzejszy festyn
+  czytało się jako dzisiejszy
+
 ## Kto czyta RAG (stan 2026-08-09)
 | Agent | Wiedza | Uwagi |
 |---|---|---|
@@ -349,6 +402,9 @@ Premium czyści to pole → klient, który ZAPŁACIŁ, tracił dostęp bez ostrz
 - [ ] Filtrowanie artykułów po kategoriach
 - [ ] Panel administracyjny
 - [ ] Wybór rejonu wywozu dla kont z zapisem „Rybno” (dziś dostają oba terminy)
+- [ ] Widget ruchu: zdarzenie chwilowe (spadłe bele, kolizja) musi WYGASAĆ — 21.08 trasa
+      do Iławy pokazywała utrudnienie z 19.08; `road_context` nie odróżnia incydentu od prac
+- [ ] Uruchomić `add_locality_and_event_dedup` + `dedupe_events --apply` (prod i lokalnie)
 
 Uwaga: ~1065 historycznych artykułów poza RAG — **celowo** (decyzja 2026-07-19), embedded=True jako marker.
 
@@ -365,4 +421,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-08-18*
+*Ostatnia aktualizacja: 2026-08-21*

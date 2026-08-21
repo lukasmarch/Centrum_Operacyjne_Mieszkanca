@@ -14,6 +14,20 @@ ArticleCategoryName = Literal[
 ]
 
 
+# Jedna definicja lokalności dla wszystkiego, co model ocenia — artykułów
+# i wydarzeń. Wcześniej wydarzenia nie miały jej wcale i do kalendarza wchodził
+# Sierpc, Ciechanów i Warszawa; dopisanie tego opisu drugi raz w innym brzmieniu
+# skończyłoby się dwiema różnymi definicjami „lokalności" w jednym systemie.
+LOCALITY_DESCRIPTION = (
+    "Na ile wpis dotyczy gminy Rybno i jej mieszkańców. "
+    "3 = dzieje się w gminie Rybno lub bezpośrednio jej dotyczy; "
+    "2 = sąsiednia gmina powiatu działdowskiego, mieszkaniec Rybna to odczuje "
+    "(Działdowo, Lidzbark, Płośnica, Iłowo); "
+    "1 = powiat lub region bez związku z gminą; "
+    "0 = poza powiatem (Żuromin, Mława, Olsztyn) albo temat ogólnopolski."
+)
+
+
 class ArticleCategory(BaseModel):
     """Response z kategoryzacji artykułu"""
 
@@ -67,14 +81,7 @@ class ArticleCategory(BaseModel):
     )
     locality: int = Field(
         default=0, ge=0, le=3,
-        description=(
-            "Na ile wpis dotyczy gminy Rybno i jej mieszkańców. "
-            "3 = dzieje się w gminie Rybno lub bezpośrednio jej dotyczy; "
-            "2 = sąsiednia gmina powiatu działdowskiego, mieszkaniec Rybna to odczuje "
-            "(Działdowo, Lidzbark, Płośnica, Iłowo); "
-            "1 = powiat lub region bez związku z gminą; "
-            "0 = poza powiatem (Żuromin, Mława, Olsztyn) albo temat ogólnopolski."
-        )
+        description=LOCALITY_DESCRIPTION
     )
     usefulness: int = Field(
         default=0, ge=0, le=3,
@@ -106,10 +113,35 @@ class ArticleCategory(BaseModel):
 
 
 class ExtractedEvent(BaseModel):
-    """Wydarzenie wyekstrahowane z artykułu"""
+    """
+    Wydarzenie wyekstrahowane z artykułu.
+
+    Rubryki są tu po to, żeby nie musiały być prośbami w prompcie: model
+    wypełnia pola, a `event_extractor.ground_event` sprawdza je kontra tekst
+    źródłowy i po cichu przycina to, co nie ma pokrycia — ten sam wzorzec, co
+    `article_processor.ground_categorization`. Reguła zapisana jako pole jest
+    egzekwowalna, reguła zapisana w prompcie jest prośbą.
+    """
 
     is_event: bool = Field(
-        description="Czy artykuł opisuje konkretne wydarzenie"
+        description=(
+            "Czy artykuł ZAPOWIADA konkretne wydarzenie, na które mieszkaniec "
+            "może przyjść. False dla relacji z tego, co już się odbyło, dla "
+            "podsumowań i dla wpisów bez konkretnego terminu."
+        )
+    )
+    is_upcoming: bool = Field(
+        default=True,
+        description=(
+            "True = wpis zapowiada (\"odbędzie się\", \"zapraszamy\", \"w sobotę\"); "
+            "False = wpis relacjonuje to, co już było (\"odbyły się\", \"dziękujemy "
+            "za przybycie\", wyniki, zdjęcia z imprezy). Relacja NIE jest "
+            "wydarzeniem do kalendarza, choćby padała w niej data."
+        )
+    )
+    locality: int = Field(
+        default=0, ge=0, le=3,
+        description=LOCALITY_DESCRIPTION
     )
     title: Optional[str] = None
     description: Optional[str] = None

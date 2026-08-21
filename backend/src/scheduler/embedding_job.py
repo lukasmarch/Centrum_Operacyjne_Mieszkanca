@@ -107,9 +107,13 @@ async def _embed_articles(session):
 
 async def _embed_events(session):
     """Embed unembedded events"""
+    # Powtórki (canonical_id) nie są materiałem RAG — wydarzenie ma w wyszukiwarce
+    # stać raz. Ich embedding policzył już ekstraktor, żeby je w ogóle rozpoznać,
+    # ale do bazy nie trafił.
     result = await session.execute(
         select(Event)
         .where(Event.embedded == False)
+        .where(Event.canonical_id.is_(None))
         .limit(MAX_BATCH_SIZE)
     )
     events = result.scalars().all()

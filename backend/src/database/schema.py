@@ -210,6 +210,13 @@ class Article(SQLModel, table=True):
     # publikujący najczęściej — pomiar 11.08.2026: pierwsza piątka Dashboardu
     # gorsza od średniej materiału w trzech wymiarach na cztery.
     content_score: Optional[int] = None
+    # Sama lokalność (0–3) z tej samej oceny co `content_score`, trzymana osobno,
+    # bo suma jej nie oddaje: wpis z Ciechanowa użyteczny (0+3) ma ten sam
+    # `content_score` co lokalna ciekawostka (3+0). 3 = gmina Rybno, 2 = sąsiednia
+    # gmina powiatu, 1 = powiat/region, 0 = dalej. NULL = nieocenione (wpisy
+    # sprzed 21.08.2026 i poniżej progu treści) — konsumenci mają wtedy fallback
+    # na heurystykę źródła (`feed_policy.is_local_article`).
+    locality: Optional[int] = None
     scraped_at: datetime = Field(default_factory=datetime.utcnow)
     category: Optional[str] = Field(default=None, max_length=100)
     tags: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAY(String)))
@@ -241,6 +248,15 @@ class Event(SQLModel, table=True):
     address: Optional[str] = None
     category: Optional[str] = Field(default=None, max_length=100)
     source_article_id: Optional[int] = Field(default=None, foreign_key="articles.id")
+    # Lokalność wydarzenia w tej samej skali co `articles.locality`. Do 21.08.2026
+    # kalendarz nie miał bramki miejsca żadnej i na 130 wydarzeń z 30 dni ~74
+    # dotyczyło Sierpca, Ciechanowa, Mławy czy Warszawy — mieszkaniec dostawał je
+    # mailem jako „Dziś w okolicy".
+    locality: Optional[int] = None
+    # To samo wydarzenie opisane przez kilka źródeł: powtórka wskazuje wpis główny.
+    # Scalamy zamiast kasować — rekord niesie własne `source_article_id`, a decyzja
+    # ma być odwracalna. Widoki pokazują wyłącznie `canonical_id IS NULL`.
+    canonical_id: Optional[int] = Field(default=None, foreign_key="events.id")
     external_url: Optional[str] = None
     image_url: Optional[str] = None
     organizer: Optional[str] = Field(default=None, max_length=255)

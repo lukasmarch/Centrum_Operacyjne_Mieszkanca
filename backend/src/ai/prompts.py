@@ -166,6 +166,9 @@ EVENT_EXTRACTION_PROMPT = """Jesteś ekspertem od identyfikacji wydarzeń w loka
    - Ogólne newsy bez konkretnej daty
    - Trwające sytuacje (np. "remont drogi")
    - Ogłoszenia bez terminu
+   - RELACJE z tego, co już się odbyło ("odbyły się zawody", "dziękujemy za
+     przybycie", wyniki, zdjęcia z imprezy) — kalendarz zbiera zaproszenia,
+     nie sprawozdania. Rozstrzyga pole is_upcoming
 
 **Zadanie:**
 1. Oceń czy artykuł opisuje konkretne wydarzenie (is_event: true/false)
@@ -189,6 +192,7 @@ EVENT_EXTRACTION_PROMPT = """Jesteś ekspertem od identyfikacji wydarzeń w loka
 - Nie domyślaj się - tylko faktyczne informacje z tekstu
 - Lokalizację podaj WYŁĄCZNIE jeśli jest wprost napisana w tekście — nie dedukuj z nazwy organizatora, firmy ani kontekstu
 - Krótki opis: najważniejsze info w 1-2 zdaniach, lokalizację wpisuj tylko jeśli wynika z tekstu
+- Pola is_upcoming i locality wypełnij zgodnie z ich opisem w schemacie odpowiedzi
 """
 
 DAILY_SUMMARY_PROMPT = """Jesteś redaktorem wiadomości lokalnych dla mieszkańców gminy Rybno (Rybno i okoliczne sołectwa).

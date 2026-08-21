@@ -20,6 +20,8 @@ from datetime import datetime, time
 from typing import Callable, Iterable, Optional, TypeVar
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import or_
+
 from src.services.alert_policy import places_in
 from src.services.weather_alert import expired as weather_alert_expired
 from src.services.weather_alert import is_weather_alert
@@ -180,6 +182,35 @@ def publishable_conditions(article_model):
     return [
         article_model.is_filler == False,        # noqa: E712 — SQLAlchemy
         article_model.is_promotional == False,   # noqa: E712
+    ]
+
+
+# Kalendarz mieszkańca gminy Rybno kończy się na sąsiednich gminach powiatu:
+# do Działdowa czy Lidzbarka pojedzie, na Senioralia Powiatu Płońskiego nie.
+# Pomiar 21.08.2026 na 130 wydarzeniach z 30 dni: gmina Rybno ~56, reszta to
+# Sierpc (14), Działdowo (12), Ciechanów (9), Żuromin (8), Mława (6), Warszawa (3).
+# Bramki miejsca nie było wcześniej żadnej — Radio 7 obsługuje ciechanowskie
+# i płockie, więc newsletter wysłał „Dziś w okolicy: III Ciechanowski Festiwal".
+MIN_EVENT_LOCALITY = 2
+
+
+def visible_event_conditions(event_model):
+    """
+    Warunki SQL „to wydarzenie pokazujemy mieszkańcowi" — dla kalendarza,
+    briefingu, newslettera i Przewodnika naraz.
+
+    Dwa powody, dla których wydarzenie zostaje w bazie, ale nie na ekranie:
+    jest powtórzeniem innego (`canonical_id`) albo dzieje się za daleko
+    (`locality`). NULL w lokalności to wpis sprzed 21.08.2026 — pokazujemy go,
+    bo cofnięcie się z oceną wstecz kosztowałoby przebieg modelu po całej tabeli,
+    a stare wpisy i tak wychodzą z okien czasowych.
+    """
+    return [
+        event_model.canonical_id.is_(None),
+        or_(
+            event_model.locality.is_(None),
+            event_model.locality >= MIN_EVENT_LOCALITY,
+        ),
     ]
 
 
@@ -432,13 +463,21 @@ def is_pinned_alert(
     event_until: Optional[datetime] = None,
     title: Optional[str] = None,
     content: Optional[str] = None,
+    locality: Optional[int] = None,
 ) -> bool:
     """
-    Na szczycie stoi to, co dotyczy najbliższych godzin: awaria i obowiązujące
-    ostrzeżenie meteorologiczne.
+    Na szczycie stoi to, co dotyczy najbliższych godzin I NASZEJ GMINY: awaria
+    oraz obowiązujące ostrzeżenie meteorologiczne.
 
     Ten sam próg rozstrzyga o nagłówku briefingu — feed i briefing nie mogą
     inaczej odpowiadać na pytanie „czy to jest sprawa teraz".
+
+    Bramka miejsca dopisana 21.08.2026. Push miał ją od początku
+    (`alert_policy.evaluate`), feed nie miał wcale — i tego dnia pokazał
+    mieszkańcom Rybna przypięte „Planowane wyłączenie prądu w Iłowie-Osadzie"
+    (art. 5322), a na 24.08 czekały w kolejce dwa wyłączenia w Działdowie.
+    Feedy Energi obejmują cały powiat, więc bez tej bramki przypięcie znaczyło
+    tylko tyle, że coś jest awarią — nie, że dotyczy czytelnika.
     """
     now = now or datetime.utcnow()
 
@@ -453,6 +492,16 @@ def is_pinned_alert(
         return not weather_alert_expired(title, content, published_at, event_until, now)
 
     if not category or "awari" not in category.lower():
+        return False
+
+    # Miejsce. `locality` pochodzi z kategoryzacji (3 = gmina Rybno) i jest
+    # tam już przycięte do nazwy padającej w tekście (`ground_categorization`).
+    # Dla wpisów nieocenionych — sprzed 21.08.2026 albo poniżej progu treści —
+    # pytamy o to samo wprost, tą samą listą sołectw, co bramka push.
+    # Ostrzeżenia meteo wyszły z tej ścieżki wyżej: IMGW ostrzega dla powiatu
+    # i nazwa gminy w komunikacie nie pada.
+    in_gmina = locality >= 3 if locality is not None else bool(places_in(title, content))
+    if not in_gmina:
         return False
 
     if event_at:

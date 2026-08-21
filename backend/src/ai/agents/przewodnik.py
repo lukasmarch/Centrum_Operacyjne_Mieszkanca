@@ -228,6 +228,11 @@ WYNIKI NA ZYWO (Premium):
             FROM events
             WHERE event_date >= now()
               AND event_date <= now() + INTERVAL '14 days'
+              -- powtórki scalone i wydarzenia spoza powiatu: te same dwa warunki,
+              -- co w `feed_policy.visible_event_conditions` (tu SQL-em, bo agent
+              -- nie używa ORM-a)
+              AND canonical_id IS NULL
+              AND (locality IS NULL OR locality >= 2)
             ORDER BY event_date ASC
             LIMIT 10
         """))

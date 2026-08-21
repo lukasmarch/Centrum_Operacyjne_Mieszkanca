@@ -21,6 +21,7 @@ from src.services.feed_policy import (
     collapse_duplicates,
     dedup_text,
     is_local_article,
+    visible_event_conditions,
     is_pinned_alert,
     publishable_conditions,
     same_topic,
@@ -313,6 +314,7 @@ class SummaryGenerator:
             select(Event)
             .where(Event.event_date >= events_start)
             .where(Event.event_date < events_end)
+            .where(*visible_event_conditions(Event))
             .order_by(Event.event_date.asc())
             .limit(10)
         )
@@ -615,6 +617,9 @@ class SummaryGenerator:
             now,
             article.event_at,
             article.event_until,
+            article.title,
+            article.content,
+            article.locality,
         )
         return priority if is_now else self.DISTANT_ALERT_PRIORITY
 

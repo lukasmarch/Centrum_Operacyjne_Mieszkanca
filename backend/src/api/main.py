@@ -254,7 +254,7 @@ async def get_articles(
         bucket = pinned if is_pinned_alert(
             article.category, article.published_at, article.scraped_at, now,
             article.event_at, article.event_until,
-            article.title, article.content,
+            article.title, article.content, article.locality,
         ) else regular
         bucket.append((article, source_name))
 
@@ -391,7 +391,7 @@ async def get_upcoming_events(
     session: AsyncSession = Depends(get_session)
 ):
     """Get upcoming events with source name (scraped from)"""
-    from sqlalchemy import outerjoin
+    from src.services.feed_policy import visible_event_conditions
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -400,6 +400,9 @@ async def get_upcoming_events(
         .outerjoin(Article, Event.source_article_id == Article.id)
         .outerjoin(Source, Article.source_id == Source.id)
         .where(Event.event_date >= today_start)
+        # powtórki scalone i wydarzenia spoza powiatu zostają w bazie, ale nie
+        # w kalendarzu — `feed_policy.visible_event_conditions`
+        .where(*visible_event_conditions(Event))
         .order_by(Event.event_date.asc())
         .limit(limit)
     )

@@ -11,9 +11,21 @@ from openai import AsyncOpenAI
 
 from src.config import settings
 from src.database import Article, Event, Weather, DailySummary, AirQuality, Report
-from src.database.schema import CinemaShowtime
+from src.database.schema import CinemaShowtime, Source
 from src.newsletter.name_days import get_name_days, get_special_day
 from src.services import waste_policy
+# Newsletter jest obrazem feedu: ten sam materiał, ta sama polityka. Wcześniej
+# miał własne zapytania (zwykłe `order by published_at`) i własną listę
+# miejscowości, więc mieszkaniec dostawał mailem to, czego na stronie nie było:
+# duplikaty i wydarzenia z Ciechanowa.
+from src.services.feed_policy import (
+    article_score,
+    collapse_duplicates,
+    dedup_text,
+    publishable_conditions,
+    time_label,
+    visible_event_conditions,
+)
 
 logger = logging.getLogger("Newsletter")
 
@@ -121,6 +133,15 @@ to, co czytelnik ma wiedzieć, zanim wyjdzie z domu. Bez daty, bez powitania.
 Pole "meta" to krótka etykieta kontekstu (max 30 znaków), np. "Komunikat urzędowy",
 "Droga wojewódzka 538", "Kultura · Rybno". Pole "text" to jedno-dwa zdania konkretu.
 
+**CZAS GRAMATYCZNY — materiał jest rozdzielony i nie wolno go mieszać:**
+- Wpisy z bloku JUŻ SIĘ WYDARZYŁO opisuj w czasie PRZESZŁYM: „w Hartowcu
+  przeprowadzono…", „wczoraj w Rybnie odbyło się…". To relacje, nie zaproszenia.
+- Wpisy z bloku DZIŚ I PRZED NAMI opisuj jako sprawę bieżącą lub nadchodzącą:
+  „dziś o 9:00 zbiera się…", „w sobotę wystartuje…".
+- Etykieta w nawiasie kwadratowym przed każdym wpisem podaje jego czas
+  ([wczoraj 14:00], [ZDARZENIE dziś 09:00–14:00 — TRWA TERAZ], [jutro 18:00]).
+  Trzymaj się jej — jest wyliczona z bazy, nie zgadywana.
+
 **Ważne wytyczne:**
 - Nie wymyślaj informacji — korzystaj wyłącznie z podanych danych
 - Nazwy miejsc podawaj tylko jeśli są w danych
@@ -133,7 +154,12 @@ Dane wejściowe:
 - Dzisiejsze podsumowanie: {summary}
 - Jakość powietrza (Airly): {air_quality_summary}
 - Dzisiejsze wydarzenia: {events}
-- Nowe artykuły: {articles}
+
+JUŻ SIĘ WYDARZYŁO (relacje — czas przeszły):
+{articles_past}
+
+DZIŚ I PRZED NAMI (sprawy bieżące i zapowiedzi):
+{articles_ahead}
 
 Zwróć treść w formacie JSON:
 {{
@@ -210,6 +236,7 @@ class NewsletterGenerator:
             select(Event)
             .where(Event.event_date >= datetime.utcnow())
             .where(Event.event_date <= datetime.utcnow() + timedelta(days=10))
+            .where(*visible_event_conditions(Event))
             .order_by(Event.event_date.asc())
             .limit(10)
         )
@@ -372,9 +399,8 @@ class NewsletterGenerator:
         content["weekly_weather"] = weekly_weather
         content["weekly_reports"] = weekly_reports
 
-        # Daty wydarzeń liczone WPROST z bazy (nie z AI — koniec ze znakami "?")
-        LOCAL_TOWNS = {"rybno", "hartowiec", "koszelewy", "żabiny", "wymój", "gralewo",
-                       "jeglia", "dębień", "naguszewo", "rumian", "kopaniarze", "truszczyny"}
+        # Daty wydarzeń liczone WPROST z bazy (nie z AI — koniec ze znakami "?"),
+        # plakietka lokalna z `locality` — patrz komentarz w `generate_daily`
         content["events_db"] = [
             {
                 "title": e.title,
@@ -382,7 +408,7 @@ class NewsletterGenerator:
                 "month": MONTHS_PL_SHORT[e.event_date.month - 1],
                 "location": e.location or "",
                 "time": e.event_time or "",
-                "is_local": (e.location or "").strip().lower() in LOCAL_TOWNS,
+                "is_local": (e.locality or 0) >= 3,
             }
             for e in events
         ]
@@ -430,11 +456,15 @@ class NewsletterGenerator:
         )
         summary = result.scalar_one_or_none()
 
-        # Get today's events
+        # Wydarzenia na DZIŚ. Okno było dwudniowe pod nagłówkiem „Dziś w okolicy",
+        # więc jutrzejszy festyn czytało się jako dzisiejszy; teraz sekcja mówi
+        # to, co obiecuje. Powtórki i wydarzenia spoza powiatu odsiewa wspólny
+        # warunek widoczności — ten sam, co w kalendarzu na stronie.
         result = await session.execute(
             select(Event)
             .where(Event.event_date >= today_utc)
-            .where(Event.event_date < today_utc + timedelta(days=2))
+            .where(Event.event_date < today_utc + timedelta(days=1))
+            .where(*visible_event_conditions(Event))
             .order_by(Event.event_date.asc())
             .limit(5)
         )
@@ -459,14 +489,31 @@ class NewsletterGenerator:
             )
             air_quality = result.scalar_one_or_none()
 
-        # Get recent articles (last 24h)
+        # Materiał z ostatniej doby — dokładnie ten, który widzi mieszkaniec
+        # w feedzie: bez zapychaczy i cudzych reklam (`publishable_conditions`),
+        # uszeregowany rankingiem feedu i zdeduplikowany. Bez tego mail brał
+        # dziesięć najświeższych wpisów jak leci: 20.08 turniej w Tuczkach
+        # opisało sześć postów i wszystkie sześć poszło do modelu jako osobne
+        # wiadomości.
         result = await session.execute(
-            select(Article)
+            select(Article, Source.name)
+            .join(Source, Article.source_id == Source.id)
             .where(Article.published_at >= today_utc - timedelta(days=1))
+            .where(*publishable_conditions(Article))
             .order_by(Article.published_at.desc())
-            .limit(10)
+            .limit(40)
         )
-        articles = result.scalars().all()
+        rows = list(result)
+        now_naive = datetime.utcnow()
+        rows.sort(
+            key=lambda row: article_score(
+                row[0].published_at, row[0].scraped_at, row[1], now_naive,
+                row[0].event_at, row[0].event_until, row[0].content_score,
+            ),
+            reverse=True,
+        )
+        rows = collapse_duplicates(rows, text_of=lambda row: dedup_text(row[0]))
+        articles = [article for article, _ in rows[:10]]
 
         # Get cinema showtimes for tonight
         result = await session.execute(
@@ -555,14 +602,35 @@ class NewsletterGenerator:
             )
 
         events_data = [
-            {"title": e.title, "time": e.event_time or "", "location": e.location or ""}
+            {
+                "title": e.title,
+                "time": e.event_time or "",
+                "location": e.location or "",
+                "when": time_label(None, e.event_date, e.end_date, now_naive),
+            }
             for e in events
         ]
 
-        articles_data = [
-            {"title": a.title, "category": a.category}
-            for a in articles
-        ]
+        # Model dostawał `{"title", "category"}` — ANI JEDNEJ daty — i sam
+        # rozstrzygał, co się dopiero wydarzy: 21.08 briefing zapowiadał
+        # posiedzenie komisji, które trwało, i pisał o wczorajszym wydarzeniu
+        # w czasie przyszłym. Materiał rozdzielamy tu, w kodzie, bo o tym,
+        # co minęło, rozstrzyga zegar, nie model.
+        def _entry(article) -> dict:
+            return {
+                "when": time_label(
+                    article.published_at or article.scraped_at,
+                    article.event_at, article.event_until, now_naive,
+                ),
+                "title": article.display_title or article.title,
+                "category": article.category,
+            }
+
+        ahead, past = [], []
+        for article in articles:
+            reference = article.event_at or article.published_at or article.scraped_at
+            target = ahead if reference and reference >= today_utc else past
+            target.append(_entry(article))
 
         # Generate with AI
         prompt = DAILY_NEWSLETTER_PROMPT.format(
@@ -573,7 +641,8 @@ class NewsletterGenerator:
             air_quality_summary=air_quality_summary,
             weather=weather_data,
             events=events_data,
-            articles=articles_data,
+            articles_past=past or "brak",
+            articles_ahead=ahead or "brak",
         )
 
         response = await self.client.chat.completions.create(
@@ -637,9 +706,13 @@ class NewsletterGenerator:
             "wind_kmh": round(weather.wind_speed * 3.6) if weather and weather.wind_speed is not None else None,
         } if weather else None
 
-        # Daty wydarzeń wprost z bazy (chip dzień/miesiąc, marker lokalny)
-        LOCAL_TOWNS = {"rybno", "hartowiec", "koszelewy", "żabiny", "wymój", "gralewo",
-                       "jeglia", "dębień", "naguszewo", "rumian", "kopaniarze", "truszczyny"}
+        # Daty wydarzeń wprost z bazy (chip dzień/miesiąc, marker lokalny).
+        # Plakietkę „Gmina Rybno" rozstrzyga `locality` z ekstrakcji — ta sama
+        # ocena, która decyduje o wpuszczeniu wydarzenia do kalendarza. Do 21.08
+        # stała tu CZWARTA w projekcie lista miejscowości: dwanaście nazw zamiast
+        # dwudziestu dwóch, z „wymój", bez Tuczek i Koszelewek, dopasowywana
+        # dokładnym stringiem — więc turniej w Tuczkach plakietki nie dostawał,
+        # a „Ciechanów, dziedziniec Zamku" i tak wchodził do maila.
         content["events_today_db"] = [
             {
                 "title": e.title,
@@ -647,7 +720,7 @@ class NewsletterGenerator:
                 "month": MONTHS_PL_SHORT[e.event_date.month - 1],
                 "location": e.location or "",
                 "time": e.event_time or "",
-                "is_local": (e.location or "").strip().lower() in LOCAL_TOWNS,
+                "is_local": (e.locality or 0) >= 3,
             }
             for e in events
         ]

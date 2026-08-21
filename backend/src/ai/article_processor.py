@@ -344,6 +344,10 @@ class ArticleProcessor:
             # `feed_policy.content_factor`. Liczony RAZ, tutaj, bo ranking feedu
             # chodzi przy każdym żądaniu i nie może pytać modelu.
             article.content_score = category_data.locality + category_data.usefulness
+            # Sama lokalność zostaje osobno: w sumie z użytecznością jest nie do
+            # odzyskania, a pytają o nią feed (przypięte awarie), kalendarz
+            # i newsletter. Bez tego każdy z nich zgadywał ją własną heurystyką.
+            article.locality = category_data.locality
             article.processed = True
 
             # Ostrzeżenie meteo obowiązuje do godziny wpisanej w jego treść

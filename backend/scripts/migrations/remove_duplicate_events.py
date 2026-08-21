@@ -1,10 +1,18 @@
 """
 Remove duplicate events from database
 
+⚠️ ZASTĄPIONY 21.08.2026 przez `scripts/dedupe_events.py`. Ten skrypt szuka
+powtórek po dokładnym `(title, event_date, location)` — kluczu, który realnych
+duplikatów nie widzi: model tytułuje ten sam turniej za każdym razem inaczej
+(„Turniej Charytatywny o Puchar BUDMAR" / „Charytatywny Turniej Piłki Nożnej
+i Piknik Rodzinny"), a „Ciechanów" i „Ciechanów, dziedziniec Zamku" to dla
+niego dwa różne miejsca. Nowy skrypt rozstrzyga embeddingiem i SCALA
+(`canonical_id`) zamiast kasować.
+
+Zostaje w repo, bo jest wymieniony w historii migracji — nie uruchamiaj go.
+
 Finds and removes duplicate events (same title + event_date + location),
 keeping only the oldest entry (first created).
-
-Run this BEFORE adding unique constraint if duplicates exist.
 """
 import asyncio
 import sys
