@@ -330,6 +330,10 @@ dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykr
 
 ## Ważne reguły techniczne
 - `VITE_API_URL = http://localhost:8000/api` → hooki NIE dodają `/api/` prefixu
+- ⚠️ `vite.config.ts` ma `envDir: ../backend`, więc **`frontend/.env` NIE jest wczytywany**.
+  Lokalnie zmienna jest pusta i działa fallback w kodzie (od 21.08 poprawny, z `/api`);
+  produkcja stoi na tym, że `deploy-frontend.sh` podaje `VITE_API_URL=…` w linii poleceń.
+  Zwykłe `npm run build` z ręki daje bundle z `localhost:8000` — nie wgrywaj takiego `dist/`
 - Auth dependency: `get_optional_user` (nie `get_current_user_optional`)
 - SSE split: po `\n` + `trim()` (nie `\n\n` - base_agent yield ma trailing `\n`)
 - pgvector insert: `$emb$[...]$emb$::vector`, `$meta${json}$meta$::jsonb` (dollar-quoting)
