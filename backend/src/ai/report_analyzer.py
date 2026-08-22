@@ -5,19 +5,35 @@ Enhanced with Gmina Rybno-specific priority rules.
 """
 import json
 import logging
-import base64
 from typing import Optional, Dict, Any
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
+
 from ..config import settings
 
 logger = logging.getLogger(__name__)
 
 
-def _get_model():
-    """Initialize Gemini model with API key."""
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    return genai.GenerativeModel(settings.GEMINI_MODEL)
+def _get_client():
+    """
+    Klient Gemini — SDK `google-genai`.
+
+    ⚠️ Do 22.08.2026 ten moduł importował `google.generativeai`, czyli SDK
+    STARE, którego w obrazie produkcyjnym nie ma: `requirements.txt` wymienia
+    `google-genai`. Efektem był `ModuleNotFoundError` łapany przez `except`
+    w `analyze_report`, zamieniany na „AI analysis failed, using defaults" —
+    więc KAŻDE zgłoszenie mieszkańca dostawało po cichu kategorię `other`.
+    Wyszło to 22.08, w dniu nawałnicy, przy zgłoszeniu „Brak Wody" z Żabin:
+    awaria wody trafiła do bazy jako „inne".
+
+    Wybór SDK: `google-genai`. Jest w `requirements.txt`, jest w obrazie i tak
+    rozmawiają z Gemini dwa działające moduły (`traffic_service`,
+    `places_service`). `google-generativeai` to biblioteka wycofywana —
+    dokładanie jej z powrotem znaczyłoby dwa SDK do tego samego API w jednym
+    obrazie, przy czym ten drugi martwy.
+    """
+    return genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
 ANALYSIS_PROMPT = """Jesteś dyżurnym operatorem Centrum Powiadamiania o Zdarzeniach w gminie Rybno (powiat działdowski, woj. warmińsko-mazurskie).
@@ -169,7 +185,7 @@ async def analyze_report(
     Returns:
         Dict with analysis results (category, objects, condition, summary, severity, is_spam)
     """
-    model = _get_model()
+    client = _get_client()
     
     if image_bytes:
         image_instruction = "Zdjęcie zostało dołączone do zgłoszenia. Przeanalizuj je dokładnie – szukaj zagrożeń, uszkodzeń, obiektów. W polu 'summary' KONIECZNIE opisz krótko co widać na zdjęciu i połącz to z opisem tekstowym mieszkańca."
@@ -189,15 +205,23 @@ async def analyze_report(
     
     try:
         if image_bytes:
-            # Vision analysis with image
-            image_part = {
-                "mime_type": image_mime_type,
-                "data": base64.b64encode(image_bytes).decode("utf-8")
-            }
-            response = model.generate_content([prompt, image_part])
+            # Zdjęcie idzie jako SUROWE bajty — nowe SDK koduje je samo.
+            # Stare wymagało base64 w słowniku i to jedyna różnica, która
+            # potrafi przejść testy, a wywrócić się na produkcji.
+            contents = [
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=image_mime_type or "image/jpeg",
+                ),
+                prompt,
+            ]
         else:
-            # Text-only analysis
-            response = model.generate_content(prompt)
+            contents = prompt
+
+        response = client.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=contents,
+        )
         
         result_text = response.text.strip()
         
@@ -299,10 +323,62 @@ async def analyze_report(
         return _default_result(description)
 
 
+# Zapasowa klasyfikacja zgłoszeń — wzorce w rejestrze MIESZKAŃCA, nie komunikatu.
+#
+# Pierwsza wersja (22.08.2026) sięgała po `alert_policy.incident_of`, żeby nie
+# mnożyć list. Nie działa: tamte wzorce są pisane pod język ogłoszeń („brak wody",
+# „przerwa w dostawie energii") i na zgłoszeniu „Brak bieżącej wody" zwracają
+# None — `brak\w*\s+wody` nie przeskoczy słowa „bieżącej". Rozluźnianie ich jest
+# wykluczone: to ta sama lista, która decyduje o obudzeniu telefonu w nocy,
+# i celowo woli przegapić odmianę niż wysłać alert z powodu opadów gradu.
+#
+# Stąd druga lista, świadomie. Wolno jej być zgrubna: to zapas na wypadek
+# niedostępnego modelu, a każde zgłoszenie i tak przechodzi przez moderację.
+# Kolejność ma znaczenie — sprawdzamy od najcięższego.
+_FALLBACK_CATEGORIES: tuple[tuple[str, str], ...] = (
+    ("emergency", r"wypadek|wypadku|potracen|utonie|utonal|zawali|zerwan\w*\s+lini"
+                  r"|ulatnia|wyciek\w*\s+gazu|ewakuac"),
+    ("fire",      r"pozar|pali\s+sie|plonie|plonel|dym\b|spalil|zapalil"),
+    ("water",     r"wod[aeyą]|wody|wode|wodociag|kanaliz|sciek|hydrofor|przeciek|zalan"),
+    ("safety",    r"powalon|przewrocon\w*\s+drzew|zerwan|znak\w*\s+drogow"
+                  r"|barierk|sygnalizac|przejscie\s+dla\s+pieszych"),
+    ("waste",     r"smiec|odpad|kosz\w*\s+na|wysypisk|gruz|dziki\s+wysyp"),
+    ("greenery",  r"drzew|galaz|konar|krzak|trawnik|park\b|zielen"),
+    ("infrastructure", r"prad|pradu|latarni|oswietleni|dziur\w*\s+w\s+(drodze|jezdni)"
+                       r"|chodnik|jezdni|most\b|przepust"),
+)
+
+
+def _category_from_text(description: str) -> str:
+    """
+    Kategoria wyliczona z TREŚCI, gdy model nie odpowiada.
+
+    22.08.2026, w dniu nawałnicy, zgłoszenie „Brak Wody / Brak bieżącej wody"
+    wylądowało w bazie jako `other`: analiza AI padła na brakującym SDK, a wynik
+    zapasowy wpisywał `other` bez patrzenia w tekst. Awaria wody wyglądała wtedy
+    dokładnie tak samo jak przewrócony kosz.
+
+    Model bywa niedostępny — limit, 503, zła zależność. Słowo „woda" jest wtedy
+    nadal w zgłoszeniu, więc kategoria nie ma prawa być losowa.
+    """
+    import re
+
+    try:
+        from src.services.alert_policy import _flat
+
+        text = _flat(description or "")
+        for category, pattern in _FALLBACK_CATEGORIES:
+            if re.search(pattern, text):
+                return category
+    except Exception as e:  # zapas nie może sam się wywrócić
+        logger.error(f"Zapasowa klasyfikacja zgłoszenia zawiodła: {e}")
+    return "other"
+
+
 def _default_result(description: str) -> Dict[str, Any]:
-    """Fallback result when AI analysis fails."""
+    """Wynik, gdy analiza AI zawiodła — kategoria nadal z treści, nie z powietrza."""
     return {
-        "category": "other",
+        "category": _category_from_text(description),
         "detected_objects": [],
         "condition": "",
         "summary": description[:200],
@@ -315,7 +391,7 @@ def _default_result(description: str) -> Dict[str, Any]:
 
 async def generate_summary(description: str) -> str:
     """Generate a concise summary from a report description."""
-    model = _get_model()
+    client = _get_client()
     
     prompt = f"""Wygeneruj krótkie streszczenie (1-2 zdania) tego zgłoszenia od mieszkańca gminy Rybno.
 Pisz w 3. osobie, rzeczowo, po polsku.
@@ -325,7 +401,10 @@ Zgłoszenie: "{description}"
 Streszczenie:"""
     
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=prompt,
+        )
         return response.text.strip()
     except Exception as e:
         logger.error(f"Summary generation failed: {e}")
