@@ -171,10 +171,10 @@ def _place_key(location: Optional[str]) -> str:
     nie widział.
 
     ⚠️ Klucz nie rozpoznaje opisowych lokalizacji („Zagroda Edukacyjna w Sąpach"
-    kontra „Sąpy, gmina Młynary"). Takie pary zostają nierozstrzygnięte
-    i wypisuje je `scripts/test_event_dedup.py --db` do przejrzenia — celowo:
-    reguła miejsca ma chronić przed scaleniem dwóch różnych imprez tego samego
-    dnia, więc w razie wątpliwości nie scala.
+    kontra „Sąpy, gmina Młynary") i nie ma go tego uczyć — to zgadywanie bez
+    końca. Reguła miejsca ma chronić przed scaleniem dwóch różnych imprez tego
+    samego dnia, więc w razie wątpliwości nie scala; wątpliwość kończy się tam,
+    gdzie zaczyna się pewność semantyczna (`same_event`, 22.08.2026).
     """
     from src.services.alert_policy import _flat
 
@@ -182,6 +182,34 @@ def _place_key(location: Optional[str]) -> str:
     for separator in _PLACE_SEPARATORS:
         text = text.split(separator)[0]
     return _flat(text).strip()
+
+
+# Powyżej tego podobieństwa różnica miejsca przestaje wetować scalenie.
+# 22.08.2026 w kalendarzu stały dwa razy te same warsztaty (1.09, „Ziołowe
+# rzemiosło"): podobieństwo 0,96, ale lokalizacje zapisano jako „Zagroda
+# Edukacyjna w Sąpach" i „Sąpy, gmina Młynary", więc `_place_key` widział dwa
+# różne miejsca. Uczenie klucza opisowych lokalizacji to zgadywanie bez końca —
+# tańsza i pewniejsza jest granica pewności: pomiar z 21.08 dał duplikatom
+# 0,66–0,98, a różnym wydarzeniom ≤ 0,54, więc 0,90 leży głęboko w strefie
+# duplikatów i nie sklei dwóch różnych imprez tego samego dnia.
+PLACE_VETO_MAX_SIMILARITY = 0.90
+
+
+def same_event(similarity: float, location: Optional[str], other: Optional[str]) -> bool:
+    """
+    Czy to jedno wydarzenie — jedyne miejsce, gdzie łączymy podobieństwo z miejscem.
+
+    Reguła miejsca celowo NIE scala w razie wątpliwości: dwie różne imprezy tego
+    samego dnia w tej samej wsi kosztują mieszkańca więcej niż jedna powtórka.
+    Ale wątpliwość kończy się tam, gdzie zaczyna się pewność semantyczna — patrz
+    `PLACE_VETO_MAX_SIMILARITY`.
+    """
+    if similarity < DUPLICATE_SIMILARITY:
+        return False
+    key, other_key = _place_key(location), _place_key(other)
+    if key and other_key and key != other_key:
+        return similarity >= PLACE_VETO_MAX_SIMILARITY
+    return True
 
 
 async def find_duplicate(
@@ -233,12 +261,8 @@ async def find_duplicate(
         LIMIT 10
     """), params)).all()
 
-    key = _place_key(location)
     for event_id, other_location, sim in rows:
-        other_key = _place_key(other_location)
-        if key and other_key and key != other_key:
-            continue  # dwie różne miejscowości tego samego dnia
-        if sim >= DUPLICATE_SIMILARITY:
+        if same_event(float(sim), location, other_location):
             return int(event_id), float(sim)
     return None
 

@@ -41,7 +41,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.ai.event_extractor import DUPLICATE_SIMILARITY, _place_key
+from src.ai.event_extractor import DUPLICATE_SIMILARITY, _place_key, same_event
 from src.config import settings
 
 
@@ -134,11 +134,9 @@ async def dedupe(days: int, apply: bool) -> None:
             for row in sorted(candidates, key=_richness, reverse=True):
                 for cluster in clusters:
                     head = cluster[0]
-                    key_a, key_b = _place_key(row.location), _place_key(head.location)
-                    if key_a and key_b and key_a != key_b:
-                        continue
                     sim = sims.get((min(row.id, head.id), max(row.id, head.id)), 0.0)
-                    if sim >= DUPLICATE_SIMILARITY:
+                    # Jedna reguła na projekt — ta sama, którą stosuje ekstraktor
+                    if same_event(sim, row.location, head.location):
                         cluster.append(row)
                         break
                 else:

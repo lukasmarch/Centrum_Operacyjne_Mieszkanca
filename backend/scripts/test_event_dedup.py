@@ -1,13 +1,15 @@
 """
 Weryfikacja bramek kalendarza wydarzeń (`ai/event_extractor.py`, `feed_policy`).
 
-Trzy części:
+Cztery części:
   1. GROUNDING  — czy `ground_event` przycina odpowiedź modelu do tekstu:
                   relacja z przeszłości odpada, data bez śladu odpada,
                   miejsce spoza tekstu znika, locality=3 wymaga nazwy z gminy;
   2. BRAMKA MIEJSCA — czy `is_pinned_alert` przypina wyłącznie awarie z gminy
                   (21.08.2026 feed przypiął wyłączenie w Iłowie-Osadzie);
-  3. BAZA (--db) — czy zapytanie dedupu w ogóle się wykonuje (patrz `find_duplicate`)
+  3. WETO MIEJSCA — dokąd sięga reguła „różne miejsce = różne wydarzenia"
+                  i gdzie ustępuje pewności semantycznej (`same_event`);
+  4. BAZA (--db) — czy zapytanie dedupu w ogóle się wykonuje (patrz `find_duplicate`)
                   oraz czy w kalendarzu NIE MA już powtórek i wpisów spoza powiatu:
                   dla każdego dnia liczy pary widocznych wydarzeń o podobieństwie
                   ≥ progu. To jest test, który 20.08 wyłapałby maila z sześcioma
@@ -27,7 +29,13 @@ backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
 from src.ai.article_processor import SourceText
-from src.ai.event_extractor import DUPLICATE_SIMILARITY, ground_event, _place_key
+from src.ai.event_extractor import (
+    DUPLICATE_SIMILARITY,
+    PLACE_VETO_MAX_SIMILARITY,
+    ground_event,
+    _place_key,
+    same_event,
+)
 from src.ai.models import ExtractedEvent
 from src.services.feed_policy import MIN_EVENT_LOCALITY, is_pinned_alert
 
@@ -153,6 +161,29 @@ def run_cases() -> int:
         print(f"  {'✓' if ok else '✗'} „{a}” {'=' if same else '≠'} „{b}”")
 
     print()
+    print("=" * 72)
+    print("4. WETO MIEJSCA — dokąd sięga i gdzie ustępuje pewności")
+    print("=" * 72)
+    # 22.08.2026: te same warsztaty stały w kalendarzu dwa razy (1.09, „Ziołowe
+    # rzemiosło"), bo lokalizacje zapisano opisowo — „Zagroda Edukacyjna
+    # w Sąpach" kontra „Sąpy, gmina Młynary".
+    for sim, a, b, expected, label in [
+        (0.96, "Zagroda Edukacyjna w Sąpach", "Sąpy, gmina Młynary", True,
+         "opisowa lokalizacja nie broni już powtórki (0,96)"),
+        (0.66, "Dąbrówno", "Tuczki", False,
+         "dwa turnieje tego samego dnia w różnych wsiach zostają osobno"),
+        (0.80, "Rybno", "Rybno", True,
+         "to samo miejsce, podobieństwo nad progiem → scalone"),
+        (0.50, "Rybno", "Rybno", False,
+         "to samo miejsce, ale za mało podobne → osobno"),
+        (0.88, "Rybno", "Tuczki", False,
+         "tuż pod progiem pewności miejsce nadal wetuje"),
+    ]:
+        ok = same_event(sim, a, b) == expected
+        failed += 0 if ok else 1
+        print(f"  {'✓' if ok else '✗'} {sim:.2f}  {label}")
+
+    print()
     print(f"{'✓ Wszystko zielone' if not failed else f'✗ Błędów: {failed}'}")
     return failed
 
@@ -216,11 +247,13 @@ async def run_db() -> int:
         # nie scala w razie wątpliwości („Zagroda Edukacyjna w Sąpach" kontra
         # „Sąpy, gmina Młynary"), bo dwie różne imprezy tego samego dnia w tej
         # samej wsi kosztują więcej niż jedna powtórka.
+        # Klasyfikuje TA SAMA funkcja, którą stosuje ekstraktor — inaczej test
+        # mówiłby co innego niż kod. Para, którą `same_event` uznaje za jedno
+        # wydarzenie, a która stoi w kalendarzu dwa razy, to błąd do posprzątania;
+        # para zatrzymana przez weto miejsca idzie do przejrzenia przez człowieka.
         missed, review = [], []
         for row in pairs:
-            key_a, key_b = _place_key(row[6]), _place_key(row[7])
-            same_place = not (key_a and key_b) or key_a == key_b
-            (missed if same_place else review).append(row)
+            (missed if same_event(float(row[2]), row[6], row[7]) else review).append(row)
 
         if missed:
             failed += 1
