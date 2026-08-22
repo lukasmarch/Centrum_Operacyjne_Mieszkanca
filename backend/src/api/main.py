@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -9,7 +9,7 @@ from src.integrations.weather import WeatherService
 from src.scheduler.scheduler import start_scheduler
 from src.config import settings
 from src.utils.logger import setup_logger
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.api.endpoints import cinema
 from src.api.weather import router as weather_router
 
@@ -320,6 +320,66 @@ async def takedown_article(
     await session.commit()
 
     return {"status": "deleted", "article_id": article_id, "title": title}
+
+
+@app.post("/api/admin/storm-run")
+async def force_storm_run(
+    background: BackgroundTasks,
+    force: bool = False,
+    session: AsyncSession = Depends(get_session),
+    user=Depends(get_admin_user),
+):
+    """
+    Ręczne wymuszenie przebiegu sztormowego — „ściągnij Facebooka TERAZ".
+
+    Wartownik (`storm_watch`, co 30 min) sam decyduje na podstawie feedu Energi
+    i ostrzeżeń IMGW. Ale 22.08.2026 pokazało, że człowiek wie o awarii wcześniej
+    niż jakikolwiek automat: mieszkańcy pisali o braku wody, a żadne źródło
+    maszynowe o wodzie nie mówi — Energa zna wyłącznie prąd. Ten endpoint jest
+    dla takiej chwili.
+
+    Hamulec odstępu (`storm_policy.MIN_GAP_H`) obowiązuje domyślnie i tutaj:
+    plan Apify to 5 US$/mies., a cykl 22.06–21.07 zamknął się PONAD limitem.
+    `force=true` go pomija — świadomie, bo czasem trzeba.
+
+    Scrapowanie idzie w tle: aktor Apify chodzi minutami, a żądanie nie ma na
+    co czekać. Efekt zobaczysz w feedzie, a push (jeśli to awaria) w ciągu
+    kwadransa — `alert_push_job` czyta tekst, nie kategorię.
+    """
+    from src.scheduler.article_job import STORM_SOCIAL_SOURCES, update_articles_job
+    from src.services import storm_policy
+
+    now = datetime.utcnow()
+    last_scraped = (await session.execute(
+        select(Source.last_scraped).where(Source.name.in_(STORM_SOCIAL_SOURCES))
+        .order_by(Source.last_scraped.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    if not force and not storm_policy.enough_gap(last_scraped, now):
+        minut = int((timedelta(hours=storm_policy.MIN_GAP_H) - (now - last_scraped)).total_seconds() // 60)
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Profile pobrano {last_scraped:%H:%M} UTC — odstęp "
+                f"{storm_policy.MIN_GAP_H} h minie za {minut} min. "
+                f"Użyj ?force=true, jeśli to nie może czekać."
+            ),
+        )
+
+    # Korutynę podajemy wprost — Starlette sam ją doczeka w pętli. Owijanie
+    # w `asyncio.run` byłoby proszeniem się o „loop already running".
+    background.add_task(
+        update_articles_job,
+        exclude_types=["social_media"],
+        include_names=STORM_SOCIAL_SOURCES,
+    )
+    return {
+        "status": "started",
+        "sources": STORM_SOCIAL_SOURCES,
+        "forced": force,
+        "last_scraped": last_scraped.isoformat() if last_scraped else None,
+        "note": "Przebieg chodzi w tle. Push o awarii pójdzie w ciągu 15 min.",
+    }
 
 
 @app.get("/api/summary/daily")
