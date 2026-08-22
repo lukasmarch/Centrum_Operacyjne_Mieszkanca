@@ -163,6 +163,68 @@ const MiniKPI: React.FC<{ chart: ChartConfig }> = ({ chart }) => (
   </div>
 );
 
+// ── Pasek prognozy ─────────────────────────────────────────────────────────
+
+/**
+ * Prognoza pod odpowiedzią Przewodnika — dane z narzędzia `weather_forecast`.
+ *
+ * Model opisuje pogodę słowami, ale „18 stopni i mała szansa deszczu" czyta się
+ * gorzej niż trzy kafelki obok siebie. Liczby idą TU, nie przez tekst modelu:
+ * to, czego model nie musi przepisywać, nie może przekręcić.
+ *
+ * Ikony z tego samego źródła co WeatherTile, żeby prognoza w czacie i na
+ * stronie głównej nie wyglądały jak dwa różne serwisy.
+ */
+const ForecastStrip: React.FC<{ chart: ChartConfig }> = ({ chart }) => {
+  const days = chart.days ?? [];
+  if (days.length === 0) return null;
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <p className="text-xs text-neutral-400 truncate">{chart.title}</p>
+        {chart.uv_index != null && (
+          <p className="text-[11px] text-neutral-500 shrink-0">
+            UV {Math.round(chart.uv_index)}
+          </p>
+        )}
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {days.map((day, i) => (
+          <div
+            key={i}
+            className="flex-1 min-w-[92px] bg-neutral-800/60 rounded-xl px-3 py-2 text-center"
+          >
+            <p className="text-xs font-medium text-neutral-200 capitalize truncate">
+              {day.dzien}
+            </p>
+            <p className="text-[10px] text-neutral-500 mb-1">{day.data.slice(0, 5)}</p>
+            {day.icon && (
+              <img
+                src={`https://openweathermap.org/img/wn/${day.icon}@2x.png`}
+                alt=""
+                className="w-10 h-10 mx-auto object-contain"
+              />
+            )}
+            <p className="text-sm text-white leading-tight">
+              <span className="font-semibold">{Math.round(day.temp_max_c)}°</span>
+              <span className="text-neutral-500"> / {Math.round(day.temp_min_c)}°</span>
+            </p>
+            <p className="text-[11px] text-neutral-400 truncate" title={day.opis}>
+              {day.opis}
+            </p>
+            {day.szansa_opadow_proc > 0 && (
+              <p className="text-[11px] text-sky-400 mt-0.5">
+                💧 {day.szansa_opadow_proc}%
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ── Avatar helpers ─────────────────────────────────────────────────────────
 
 const UserAvatar: React.FC<{ avatarUrl?: string; fullName?: string }> = ({ avatarUrl, fullName }) => {
@@ -322,6 +384,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onFollowUp, showFoll
                   <TrendChart data={chart.data} title={chart.title} height={180} color="#3b82f6" />
                 )}
                 {chart.chart_type === 'kpi' && <MiniKPI chart={chart} />}
+                {chart.chart_type === 'forecast' && <ForecastStrip chart={chart} />}
               </div>
             ))}
           </div>

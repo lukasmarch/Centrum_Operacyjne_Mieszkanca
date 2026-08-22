@@ -35,8 +35,20 @@ export interface ChatSource {
   source_name?: string;
 }
 
+export interface ForecastDay {
+  dzien: string;          // "dziś" / "jutro" / "w czwartek"
+  data: string;           // DD.MM.YYYY
+  temp_min_c: number;
+  temp_max_c: number;
+  opis: string;
+  szansa_opadow_proc: number;
+  opad_mm: number;
+  wiatr_max_m_s?: number | null;
+  icon?: string;          // kod ikony OpenWeather (np. "04d")
+}
+
 export interface ChartConfig {
-  chart_type: 'trend' | 'kpi';
+  chart_type: 'trend' | 'kpi' | 'forecast';
   title: string;
   // trend
   data?: Array<{ year: number; value: number }>;
@@ -46,6 +58,9 @@ export interface ChartConfig {
   year?: number;
   trend_pct?: number | null;
   sparkline?: Array<{ year: number; value: number }>;
+  // forecast — prognoza z narzędzia `weather_forecast`
+  days?: ForecastDay[];
+  uv_index?: number | null;
 }
 
 export interface ChatMessageData {

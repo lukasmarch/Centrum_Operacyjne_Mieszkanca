@@ -1,0 +1,182 @@
+"""
+Narzędzia agentów — rejestr i kontrakt (2026-08-22)
+
+**Po co to powstało.** 21.08 o 19:07 mieszkaniec pyta „jak pogoda będzie jutro",
+Przewodnik odpowiada „nie mam tego w aktualnej bazie". Prognoza była: 40 slotów
+w `weather.forecast`, odświeżanych co godzinę. Agent jej nie przeczytał, bo
+`_build_context` jej nie składał — a model nie miał jak o nią poprosić.
+
+To nie był wyjątek, tylko reguła. Dane pobierało się PRZED zrozumieniem pytania,
+na podstawie słów kluczowych:
+
+    wanted = {k for k, kws in INTENT_KEYWORDS.items() if any(kw in msg for kw in kws)}
+
+Pytanie „Godziny pracy" (18.08) nie trafiło w żaden wzorzec, więc Organizator
+dostał komplet czterech sekcji i dopytał zamiast odpowiedzieć. Sześć takich
+heurystyk żyło w pięciu plikach: `INTENT_KEYWORDS`, `PLACE_KEYWORDS`,
+`_GENERIC_QUESTION`, `_is_place_query`, `_detect_place_category`,
+`_classify_gus_query`.
+
+**Co się zmienia.** Funkcja `_fetch_waste` była narzędziem od zawsze — miała
+sygnaturę i zwracała strukturę. Brakowało jej dwóch rzeczy: opisu dla modelu
+i tego, żeby to MODEL decydował o wywołaniu. Rejestr dokłada jedno i drugie.
+
+**Dlaczego to nie jest tylko wygodniejszy `if`.** Pętla w `base_agent` biegnie
+kilka razy, więc model widzi WYNIK narzędzia i może dobrać następne. Pytanie
+„czy uchwała o sieci szkół ma sens przy naszej demografii" wymaga uchwały
+(`legal_acts`), szeregu GUS (`gus_gmina_stats`) i zrozumienia, po co się sieć
+szkół zmienia. Żadna heurystyka słów kluczowych tego nie połączy, bo musiałaby
+z góry wiedzieć, że pytanie o uchwałę potrzebuje demografii.
+
+**Granice, świadomie wąskie:**
+
+* narzędzia są WYŁĄCZNIE do odczytu. Zapis (zgłoszenie, subskrypcja) to inna
+  klasa ryzyka — model, który się pomyli przy odczycie, kłamie; przy zapisie
+  zostawia ślad w bazie;
+* `ToolContext.now` wstrzykiwane, nie `datetime.utcnow()` w środku funkcji.
+  Regresji z 7.08 (Strażnik gubiący wyłączenie prądu) nie dałoby się powtórzyć
+  po fakcie, gdyby czas brał się z zegara — patrz `straznik._fetch_alert_articles`;
+* każde narzędzie ma `status_message` — użytkownik widzi „Sprawdzam prognozę…",
+  a nie zastanawia się, czemu odpowiedź idzie dwie sekundy dłużej;
+* schemat parametrów pisany wprost jako JSON Schema, nie generowany z sygnatury.
+  Opis pola trafia do modelu i decyduje o trafności wywołania — to treść
+  promptu, a nie metadana, którą można wyprowadzić z typu.
+
+Test: `cd backend && python -m scripts.test_agent_tools`
+"""
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Awaitable, Callable, Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.utils.logger import setup_logger
+
+logger = setup_logger("AgentTools")
+
+
+@dataclass
+class ToolContext:
+    """Wszystko, czego narzędzie potrzebuje poza własnymi argumentami.
+
+    `user` bywa `None` (rozmowa anonimowa) — narzędzie nie może na nim polegać
+    bez sprawdzenia. `now` jest naiwnym UTC, jak cała baza.
+    """
+    session: AsyncSession
+    user: Optional[Any] = None
+    now: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ToolResult:
+    """Wynik narzędzia w trzech rozłącznych warstwach.
+
+    `content` idzie do modelu jako wiadomość `tool` (JSON). `sources` i `charts`
+    NIE idą — wędrują obok, prosto do interfejsu. Model nie musi przepisywać
+    adresu URL ani serii danych, żeby użytkownik je zobaczył; przepisywanie
+    było jedynym powodem, dla którego mógłby je przekręcić.
+
+    `empty=True` mówi „szukałem i nie ma", co jest inną informacją niż błąd
+    narzędzia. Prompt agenta traktuje te dwa przypadki inaczej: pustka to
+    odpowiedź („nie ma awarii"), błąd to powód, żeby się do niego przyznać.
+    """
+    content: Any
+    sources: list = field(default_factory=list)
+    charts: list = field(default_factory=list)
+    empty: bool = False
+    error: Optional[str] = None
+
+
+ToolFn = Callable[..., Awaitable[ToolResult]]
+
+
+@dataclass
+class Tool:
+    name: str
+    description: str
+    parameters: dict          # JSON Schema obiektu argumentów
+    fn: ToolFn
+    status_message: str       # widoczny krok pracy w UI
+    # Jednozdaniowy opis do bloku „TWOJE NARZĘDZIA". Krótszy niż `description`,
+    # bo tamten czyta model przy KAŻDYM wywołaniu, a ten trafia do promptu raz.
+    short: str = ""
+
+    def schema(self) -> dict:
+        """Definicja w formacie OpenAI `tools`."""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.parameters,
+            },
+        }
+
+
+TOOL_REGISTRY: dict[str, Tool] = {}
+
+
+def register(tool: Tool) -> Tool:
+    """Dopisuje narzędzie do rejestru. Nazwa musi być unikalna w całym projekcie
+    — agent wskazuje narzędzia po nazwie, więc cicha podmianka byłaby cichą
+    zmianą zachowania kilku agentów naraz."""
+    if tool.name in TOOL_REGISTRY:
+        raise ValueError(f"Narzędzie '{tool.name}' jest już zarejestrowane")
+    TOOL_REGISTRY[tool.name] = tool
+    return tool
+
+
+def get(name: str) -> Optional[Tool]:
+    return TOOL_REGISTRY.get(name)
+
+
+def schemas_for(names: list[str]) -> list[dict]:
+    """Definicje narzędzi dla `chat.completions(tools=...)`.
+
+    Nieznana nazwa to błąd konfiguracji agenta, nie sytuacja do obsłużenia
+    w locie — ale wywalenie się na starcie rozmowy byłoby gorsze od odpowiedzi
+    bez jednego narzędzia, więc log i pomijamy.
+    """
+    schemas = []
+    for name in names:
+        tool = TOOL_REGISTRY.get(name)
+        if tool is None:
+            logger.error(f"Agent żąda nieznanego narzędzia '{name}' — pomijam")
+            continue
+        schemas.append(tool.schema())
+    return schemas
+
+
+def describe_for(names: list[str]) -> str:
+    """Blok `system` „TWOJE NARZĘDZIA" — świadomość własnego zasięgu.
+
+    Bez niego agent nie wie, czego NIE MA, i na pytanie spoza zakresu
+    („uchwała z 2019") zgaduje albo milczy. Z nim potrafi powiedzieć, gdzie
+    kończy się jego wiedza — a to jedyna odpowiedź, która nie wprowadza
+    mieszkańca w błąd.
+
+    Lista jest krótka celowo: rozdęty blok konkuruje o uwagę modelu
+    z materiałem źródłowym — ten sam argument, przez który karta gminy
+    ma limit 2 kB.
+    """
+    lines = []
+    for name in names:
+        tool = TOOL_REGISTRY.get(name)
+        if tool is None:
+            continue
+        lines.append(f"- {tool.name} — {tool.short or tool.description}")
+    if not lines:
+        return ""
+    return (
+        "TWOJE NARZĘDZIA (wołaj je zamiast zgadywać; wynik narzędzia ma "
+        "pierwszeństwo przed twoją wiedzą ogólną):\n"
+        + "\n".join(lines)
+        + "\n\nJeśli pytanie wykracza poza to, co potrafisz sprawdzić — powiedz "
+        "WPROST, czego nie masz, i wskaż, gdzie mieszkaniec to znajdzie. "
+        "Nie udawaj, że sprawdziłeś."
+    )
+
+
+# Import modułów narzędziowych rejestruje je w `TOOL_REGISTRY`. Trzyma się tu,
+# na dole, bo moduły importują `register`/`Tool` z tego pliku.
+from src.ai.tools import places, weather  # noqa: E402,F401

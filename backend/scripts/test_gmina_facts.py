@@ -57,14 +57,39 @@ check(any("sołect" in m["content"] for m in msgs), "karta jest w kontekście ba
 check(any("AKTUALNA DATA" in m["content"] for m in msgs), "data nadal jest w kontekście")
 
 print("\n== Agenci z własnym respond() ==")
-# Karta dopisana ręcznie w jednym agencie ominęłaby pozostałych, dlatego
-# każdy z nich musi sięgać po wspólny helper.
+# Karta dopisana ręcznie w jednym agencie ominęłaby pozostałych, dlatego każdy,
+# kto składa `messages` po swojemu, musi sięgnąć po wspólny helper.
+#
+# Lista agentów jest WYKRYWANA, nie wpisana: sprawdzamy, którzy nadpisują
+# `respond()`. Wpisana ręcznie zaczęła kłamać 22.08, gdy Przewodnik przeszedł
+# na narzędzia i przestał mieć własne `respond()` — test wołał o brak czegoś,
+# co przestało być potrzebne.
+import inspect  # noqa: E402
 import pathlib  # noqa: E402
 
-agents_dir = pathlib.Path(__file__).resolve().parents[1] / "src" / "ai" / "agents"
-for fname in ("gus_analityk.py", "straznik.py", "przewodnik.py", "organizator.py"):
-    src = (agents_dir / fname).read_text(encoding="utf-8")
-    check("base_context_messages" in src, f"{fname} używa wspólnego kontekstu")
+from src.ai.agents.base_agent import BaseAgent  # noqa: E402
+from src.ai.agents.gus_analityk import GUSAnalitykAgent  # noqa: E402
+from src.ai.agents.organizator import OrganizatorAgent  # noqa: E402
+from src.ai.agents.przewodnik import PrzewodnikAgent  # noqa: E402
+from src.ai.agents.redaktor import RedaktorAgent  # noqa: E402
+from src.ai.agents.straznik import StraznikAgent  # noqa: E402
+from src.ai.agents.urzednik import UrzednikAgent  # noqa: E402
+
+ALL_AGENTS = (
+    GUSAnalitykAgent, OrganizatorAgent, PrzewodnikAgent,
+    RedaktorAgent, StraznikAgent, UrzednikAgent,
+)
+
+for cls in ALL_AGENTS:
+    fname = pathlib.Path(inspect.getfile(cls)).name
+    if cls.respond is BaseAgent.respond:
+        # Kontekst bazowy dostaje z `BaseAgent` — obiema ścieżkami, RAG-ową
+        # i narzędziową.
+        check(True, f"{fname} dziedziczy respond() → kartę dostaje automatycznie")
+        continue
+    src = pathlib.Path(inspect.getfile(cls)).read_text(encoding="utf-8")
+    check("base_context_messages" in src,
+          f"{fname} ma własne respond() i używa wspólnego kontekstu")
 
 print(f"\n{'=' * 50}")
 if failures:

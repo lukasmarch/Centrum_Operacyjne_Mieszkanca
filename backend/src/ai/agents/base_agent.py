@@ -1,19 +1,39 @@
 """
 BaseAgent - abstract base for all specialized AI agents
+
+Dwie ścieżki odpowiedzi, świadomie obie utrzymywane:
+
+* **`tools` puste** → dotychczasowa ścieżka RAG: retrieval przed rozmową,
+  rerank, jeden strzał do modelu. Tak działają agenci, których jeszcze nie
+  przeniesiono;
+* **`tools` niepuste** → pętla narzędziowa: model sam decyduje, czego mu trzeba,
+  widzi wynik i może dobrać następne narzędzie (`ai/tools/__init__.py`).
+
+Migracja idzie agentem po agencie, bo każdy niesie własne wnioski z awarii
+(okna czasowe Strażnika, blok świeżego feedu Redaktora) i przenoszenie ich
+hurtem oznaczałoby powtórzenie tych awarii naraz.
 """
+import asyncio
 import json
 import openai
 from datetime import datetime, timezone
 from typing import Optional, AsyncGenerator, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.ai import tools as agent_tools
 from src.ai.embeddings import embedding_service
+from src.ai.tools import ToolContext, ToolResult
 from src.config import settings
 from src.services.gmina_facts import gmina_facts
 from src.services.search_synonyms import expand_query
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BaseAgent")
+
+# Ile sekund czekamy na jedno narzędzie. Zapytanie do bazy idzie w milisekundach;
+# powyżej tego progu coś jest nie tak i lepiej odpowiedzieć bez tego narzędzia
+# niż trzymać mieszkańca na wirującym kółku.
+TOOL_TIMEOUT_S = 15.0
 
 _POLISH_DAYS = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela"]
 _POLISH_MONTHS = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
@@ -72,6 +92,17 @@ class BaseAgent:
     source_types: list[str] = []  # RAG filter
     example_questions: list[str] = []
 
+    # Nazwy narzędzi z `ai.tools.TOOL_REGISTRY`. Puste = dotychczasowa ścieżka RAG.
+    # Lista jest per agent, nie globalna: definicje narzędzi wchodzą do KAŻDEGO
+    # wywołania (~80 tokenów sztuka), a Urzędnik i GUS chodzą na gpt-4o.
+    tools: list[str] = []
+
+    # Ile razy model może sięgnąć po narzędzia, zanim musi odpowiedzieć.
+    # Trzy, bo tyle wymaga realne złożenie odpowiedzi z dwóch źródeł: pobrać
+    # dokument, zobaczyć czego w nim brakuje, dobrać dane liczbowe. Ostatnia
+    # runda leci BEZ narzędzi, więc pętla nie ma jak się zapętlić.
+    max_tool_rounds: int = 3
+
     # RAG parameters (per-agent overrides)
     # Progi skalibrowane na realnym korpusie (07.2026): trafne wyniki mają
     # kosinus 0.43-0.63, więc 0.50 odcinało połowę trafień.
@@ -93,7 +124,15 @@ class BaseAgent:
         stream: bool = False,
         user=None
     ) -> Union[dict, AsyncGenerator]:
-        """Generate a response using RAG context"""
+        """Generate a response using RAG context (albo pętlę narzędziową)"""
+        # Agent z narzędziami nie robi retrievalu na zapas — o materiał prosi
+        # model, wtedy gdy go potrzebuje. Wyszukiwarka jest wówczas jednym
+        # z narzędzi, a nie podatkiem doliczanym do każdego pytania.
+        if self.tools:
+            return await self._respond_with_tools(
+                session, user_message, conversation_history, stream, user
+            )
+
         # 0. Pytania kontynuacyjne ("a w zeszłym roku?") są bezużyteczne jako
         # zapytanie do wyszukiwarki — przepisz na samodzielne z kontekstem rozmowy
         search_query = user_message
@@ -210,6 +249,284 @@ class BaseAgent:
             "model": self.model,
             "agent_name": self.name
         }
+
+    # ------------------------------------------------------------------
+    # Ścieżka narzędziowa
+    # ------------------------------------------------------------------
+
+    async def _respond_with_tools(
+        self,
+        session: AsyncSession,
+        user_message: str,
+        conversation_history: Optional[list[dict]],
+        stream: bool,
+        user,
+    ) -> Union[dict, AsyncGenerator]:
+        """Rozmowa, w której o dane prosi model, a nie wzorzec słów kluczowych."""
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            *base_context_messages(),
+        ]
+        tools_block = agent_tools.describe_for(self.tools)
+        if tools_block:
+            messages.append({"role": "system", "content": tools_block})
+
+        if conversation_history:
+            for msg in conversation_history[-10:]:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": user_message})
+
+        ctx = ToolContext(session=session, user=user)
+
+        if stream:
+            return await self._agentic_stream(messages, ctx)
+        return await self._agentic_complete(messages, ctx)
+
+    async def _call_tool(self, ctx: ToolContext, name: str, raw_args: str) -> ToolResult:
+        """Jedno wywołanie narzędzia — z limitem czasu i bez prawa do wywrócenia rozmowy.
+
+        Każdy błąd wraca do modelu jako treść wiadomości `tool`, a nie jako
+        wyjątek. Model, który wie, że narzędzie zawiodło, powie o tym
+        mieszkańcowi; wyjątek zostawiłby go z komunikatem o błędzie serwera.
+        """
+        tool = agent_tools.get(name)
+        if tool is None:
+            logger.error(f"Model[{self.name}] zawołał nieznane narzędzie '{name}'")
+            return ToolResult(content={"blad": f"Narzędzie '{name}' nie istnieje."},
+                              error="unknown_tool")
+        try:
+            args = json.loads(raw_args) if raw_args else {}
+            if not isinstance(args, dict):
+                raise ValueError("argumenty muszą być obiektem JSON")
+        except Exception as e:
+            logger.warning(f"Tool[{name}] złe argumenty: {raw_args[:120]} ({e})")
+            return ToolResult(content={"blad": f"Nieprawidłowe argumenty: {e}"},
+                              error="bad_arguments")
+
+        try:
+            result = await asyncio.wait_for(tool.fn(ctx, **args), timeout=TOOL_TIMEOUT_S)
+            logger.info(
+                f"Tool[{self.name}:{name}] args={args} "
+                f"{'PUSTO' if result.empty else 'ok'}"
+            )
+            return result
+        except asyncio.TimeoutError:
+            logger.error(f"Tool[{name}] przekroczyło {TOOL_TIMEOUT_S}s")
+            return ToolResult(content={"blad": "Narzędzie nie odpowiedziało na czas."},
+                              error="timeout")
+        except TypeError as e:
+            # Model podał argument spoza schematu — jego błąd, nie nasz crash.
+            logger.warning(f"Tool[{name}] złe wywołanie: {e}")
+            return ToolResult(content={"blad": f"Nieprawidłowe argumenty: {e}"},
+                              error="bad_arguments")
+        except Exception as e:
+            logger.error(f"Tool[{name}] błąd: {e}", exc_info=True)
+            return ToolResult(content={"blad": "Narzędzie zwróciło błąd."},
+                              error="exception")
+
+    async def _execute_tool_calls(self, ctx: ToolContext, calls: list[dict]) -> dict:
+        """Wykonuje komplet wywołań z jednej rundy i zbiera z nich trzy warstwy.
+
+        **Po kolei, nie równolegle — i to nie jest przeoczenie.** Pierwsza wersja
+        szła przez `asyncio.gather` i pierwszy test na żywym modelu ją obalił:
+        „Co robić w weekend" wywołało prognozę i kalendarz naraz, a drugie
+        zapytanie dostało `InvalidRequestError: This session is provisioning
+        a new connection; concurrent operations are not permitted`.
+        `AsyncSession` obsługuje jedną operację naraz — wszystkie narzędzia
+        dzielą sesję requestu, więc równoległość oznaczałaby tu wyścig.
+
+        Cena jest znikoma: to zapytania do lokalnej bazy, kilka milisekund
+        każde. Gdyby pojawiło się narzędzie naprawdę wolne (HTTP do obcego API),
+        wtedy — i tylko wtedy — warto dać mu własne połączenie.
+        """
+        results = []
+        for call in calls:
+            results.append(await self._call_tool(ctx, call["name"], call["arguments"]))
+
+        tool_messages, sources, charts = [], [], []
+        for call, result in zip(calls, results):
+            payload = result.content
+            if result.empty and isinstance(payload, dict):
+                # Rozróżnienie, na którym stoi cała wiarygodność odpowiedzi:
+                # „szukałem i nie ma" to fakt do zakomunikowania, a nie powód,
+                # żeby model sięgnął po wiedzę ogólną i zgadywał.
+                payload = {**payload, "pusty_wynik": True}
+            tool_messages.append({
+                "role": "tool",
+                "tool_call_id": call["id"],
+                "content": json.dumps(payload, ensure_ascii=False, default=str),
+            })
+            sources.extend(result.sources)
+            charts.extend(result.charts)
+
+        return {"messages": tool_messages, "sources": sources, "charts": charts}
+
+    @staticmethod
+    def _accumulate_tool_calls(acc: dict, deltas) -> None:
+        """Skleja wywołania narzędzi rozsypane po chunkach strumienia.
+
+        OpenAI tnie `arguments` na kawałki, a `index` jest jedynym stabilnym
+        identyfikatorem, dopóki nie dojdzie `id`.
+        """
+        for tc in deltas:
+            slot = acc.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
+            if tc.id:
+                slot["id"] = tc.id
+            if tc.function:
+                if tc.function.name:
+                    slot["name"] += tc.function.name
+                if tc.function.arguments:
+                    slot["arguments"] += tc.function.arguments
+
+    def _round_kwargs(self, messages: list[dict], allow_tools: bool) -> dict:
+        """Argumenty jednej rundy. Ostatnia leci bez `tools` — model nie ma
+        wtedy wyjścia poza napisaniem odpowiedzi, więc pętla zawsze się kończy."""
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+        }
+        if allow_tools:
+            schemas = agent_tools.schemas_for(self.tools)
+            if schemas:
+                kwargs["tools"] = schemas
+                kwargs["tool_choice"] = "auto"
+        return kwargs
+
+    async def _agentic_complete(self, messages: list[dict], ctx: ToolContext) -> dict:
+        """Wariant bez streamu — używany przez testy i wywołania non-stream."""
+        messages = list(messages)
+        sources, charts, tokens = [], [], 0
+
+        for round_idx in range(self.max_tool_rounds):
+            allow_tools = round_idx < self.max_tool_rounds - 1
+            response = await self.client.chat.completions.create(
+                **self._round_kwargs(messages, allow_tools)
+            )
+            tokens += response.usage.total_tokens if response.usage else 0
+            choice = response.choices[0].message
+
+            if not choice.tool_calls:
+                return {
+                    "answer": choice.content or "",
+                    "sources": sources,
+                    "chart_data": charts,
+                    "tokens_used": tokens,
+                    "model": self.model,
+                    "agent_name": self.name,
+                }
+
+            calls = [
+                {"id": c.id, "name": c.function.name, "arguments": c.function.arguments}
+                for c in choice.tool_calls
+            ]
+            messages.append({
+                "role": "assistant",
+                "content": choice.content,
+                "tool_calls": [
+                    {"id": c["id"], "type": "function",
+                     "function": {"name": c["name"], "arguments": c["arguments"]}}
+                    for c in calls
+                ],
+            })
+            executed = await self._execute_tool_calls(ctx, calls)
+            messages.extend(executed["messages"])
+            sources.extend(executed["sources"])
+            charts.extend(executed["charts"])
+
+        return {
+            "answer": "", "sources": sources, "chart_data": charts,
+            "tokens_used": tokens, "model": self.model, "agent_name": self.name,
+        }
+
+    async def _agentic_stream(self, messages: list[dict], ctx: ToolContext) -> AsyncGenerator:
+        """Pętla narzędziowa ze strumieniem — bez dopłaty, gdy narzędzia nie są potrzebne.
+
+        Strumień rusza OD RAZU z definicjami narzędzi. Gdy model postanawia
+        odpowiedzieć tekstem, litery lecą do przeglądarki tak samo jak dotąd —
+        żadnej dodatkowej rundy „czy potrzebujesz narzędzia". Dopiero gdy w
+        strumieniu pojawią się `tool_calls`, dokładamy kolejny przebieg,
+        przykryty widocznym krokiem pracy.
+        """
+        agent_self = self
+        outer_messages = list(messages)
+
+        async def generate():
+            messages = outer_messages
+            sources, charts, tokens = [], [], 0
+
+            for round_idx in range(agent_self.max_tool_rounds):
+                allow_tools = round_idx < agent_self.max_tool_rounds - 1
+                stream = await agent_self.client.chat.completions.create(
+                    **agent_self._round_kwargs(messages, allow_tools),
+                    stream=True,
+                    stream_options={"include_usage": True},
+                )
+
+                text_buf = ""
+                calls_acc: dict = {}
+                async for chunk in stream:
+                    if chunk.usage:
+                        tokens += chunk.usage.total_tokens
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if delta.tool_calls:
+                        agent_self._accumulate_tool_calls(calls_acc, delta.tool_calls)
+                    if delta.content:
+                        text_buf += delta.content
+                        yield json.dumps({"type": "chunk", "content": delta.content}) + "\n"
+
+                if not calls_acc:
+                    if charts:
+                        yield json.dumps({"type": "chart_data", "charts": charts}) + "\n"
+                    yield json.dumps({"type": "sources", "sources": sources}) + "\n"
+                    yield json.dumps({
+                        "type": "done",
+                        "full_content": text_buf,
+                        "model": agent_self.model,
+                        "agent_name": agent_self.name,
+                        "tokens_used": tokens,
+                    }) + "\n"
+                    return
+
+                calls = [calls_acc[i] for i in sorted(calls_acc)]
+
+                # Widoczny krok pracy — po jednym na narzędzie, w kolejności
+                # wywołania. Użytkownik czyta, CO system sprawdza, zamiast
+                # patrzeć na kółko przez półtorej sekundy.
+                for call in calls:
+                    tool = agent_tools.get(call["name"])
+                    if tool:
+                        yield json.dumps(
+                            {"type": "status", "message": tool.status_message}
+                        ) + "\n"
+
+                messages.append({
+                    "role": "assistant",
+                    "content": text_buf or None,
+                    "tool_calls": [
+                        {"id": c["id"], "type": "function",
+                         "function": {"name": c["name"], "arguments": c["arguments"]}}
+                        for c in calls
+                    ],
+                })
+                executed = await agent_self._execute_tool_calls(ctx, calls)
+                messages.extend(executed["messages"])
+                sources.extend(executed["sources"])
+                charts.extend(executed["charts"])
+
+            # Wyjście awaryjne: ostatnia runda leci bez `tools`, więc tu nie
+            # powinniśmy trafić. Gdyby jednak — strumień musi zostać domknięty,
+            # inaczej przeglądarka wisi na otwartym SSE.
+            logger.error(f"Agent[{agent_self.name}] wyczerpał rundy narzędziowe")
+            yield json.dumps({
+                "type": "done", "full_content": "", "model": agent_self.model,
+                "agent_name": agent_self.name, "tokens_used": tokens,
+            }) + "\n"
+
+        return generate()
 
     async def extra_context(
         self,
