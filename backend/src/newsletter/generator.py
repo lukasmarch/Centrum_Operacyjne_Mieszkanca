@@ -509,6 +509,7 @@ class NewsletterGenerator:
             key=lambda row: article_score(
                 row[0].published_at, row[0].scraped_at, row[1], now_naive,
                 row[0].event_at, row[0].event_until, row[0].content_score,
+                row[0].locality, row[0].title, row[0].content,
             ),
             reverse=True,
         )

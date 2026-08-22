@@ -1,5 +1,5 @@
 """
-Weryfikacja trzeciego czynnika rankingu feedu — oceny treści.
+Weryfikacja trzeciego i czwartego czynnika rankingu feedu — oceny treści i miejsca.
 
 Do 11.08.2026 `article_score` liczył wagę ŹRÓDŁA razy świeżość. Audyt tygodnia
 pokazał skutek: pierwsza piątka Dashboardu była GORSZA od średniej materiału
@@ -9,6 +9,13 @@ w lokalności, konkrecie i przyciąganiu — wygrywał kanał publikujący najcz
 0,7–1,3. Ten test pilnuje dwóch rzeczy naraz, bo ciągną w przeciwne strony:
 czynnik ma realnie przestawiać kolejność, ale NIE MOŻE przebić świeżości —
 inaczej dobry wpis sprzed tygodnia stanąłby nad dzisiejszą awarią.
+
+Czwarty czynnik dołożony 22.08.2026. Pomiar tego dnia: w pierwszej dziesiątce
+feedu był JEDEN wpis o gminie Rybno — resztę zajęły wyłączenia Energi w Płośnicy,
+Lidzbarku i Działdowie, bo `article_score` o miejscu nie wiedział nic, a Energa
+ma najwyższą wagę źródła w całej tabeli. Ten test pilnuje obu stron naraz:
+kara ma zdejmować cudzą gminę ze szczytu, ale NIE MOŻE zepchnąć świeżej awarii
+u sąsiada pod wpisy sprzed kilku dni.
 
 Użycie:
     cd backend && python -m scripts.test_content_score
@@ -22,24 +29,36 @@ sys.path.insert(0, str(backend_path))
 
 from src.services.feed_policy import (
     FRESHNESS_HALFLIFE_H,
+    LOCALITY_FACTOR_FOREIGN,
     article_score,
     content_factor,
+    locality_factor,
 )
 
 NOW = datetime(2026, 8, 14, 12, 0)
 
 SYLA = "Facebook - Syla"          # waga 0,85 — profil publikujący najczęściej
 GMINA = "Gmina Rybno"             # waga 1,35
+ENERGA = "Energa - wyłączenia bieżące (RSS)"   # waga 1,40 — najwyższa w tabeli
+OLSZTYN = "Radio Olsztyn (RSS)"                # źródło wojewódzkie, poza LOCAL_SOURCES
+
+# Prawdziwe tytuły z produkcji, 22.08.2026
+T_RYBNO = "Wyłączenie awaryjne - Region Mława - Rybno gmina wiejska"
+T_LIDZBARK = "Wyłączenie awaryjne - Region Mława - Lidzbark miasto w gminie miejsko-wiejskiej"
+T_OBCE_RYBNO = "Wyłączenie awaryjne - Region Gostynin - Rybno gmina wiejska"
+C_OBCE_RYBNO = "Rybno gmina wiejska 22.08.2026 06:21-13:00 - Antosin, Koszajec, Matyldów, Rybionek, Wężyki."
 
 
-def score(source: str, age_h: float, content_score=None) -> float:
+def score(source: str, age_h: float, content_score=None, locality=None,
+          title=None, content=None) -> float:
     published = NOW - timedelta(hours=age_h)
-    return article_score(published, published, source, NOW, None, None, content_score)
+    return article_score(published, published, source, NOW, None, None, content_score,
+                         locality, title, content)
 
 
 def main() -> int:
     print("=" * 78)
-    print("Ocena treści jako trzeci czynnik rankingu")
+    print("Ocena treści i miejsce jako trzeci i czwarty czynnik rankingu")
     print("=" * 78)
 
     checks = [
@@ -84,6 +103,60 @@ def main() -> int:
             (1.3 / 0.7) < 2 ** 1.0,
             f"1,3/0,7 = {1.3 / 0.7:.2f} < 2,00 "
             f"(półokres {FRESHNESS_HALFLIFE_H:.0f} h)",
+        ),
+
+        # --- czwarty czynnik: miejsce (22.08.2026) -----------------------------
+        # Pomiar tego dnia: w pierwszej dziesiątce feedu był JEDEN wpis lokalny,
+        # resztę zajęły wyłączenia Energi w Płośnicy, Lidzbarku i Działdowie.
+        (
+            "wywołanie bez materiału nie karze (wsteczna zgodność)",
+            locality_factor(None, ENERGA) == 1.0,
+            f"factor(None, {ENERGA!r}) = {locality_factor(None, ENERGA)}",
+        ),
+        (
+            "wyłączenie w naszej gminie zostaje bez kary",
+            locality_factor(None, ENERGA, T_RYBNO) == 1.0,
+            f"{locality_factor(None, ENERGA, T_RYBNO)}",
+        ),
+        (
+            "wyłączenie w Lidzbarku dostaje karę",
+            locality_factor(None, ENERGA, T_LIDZBARK) == LOCALITY_FACTOR_FOREIGN,
+            f"{locality_factor(None, ENERGA, T_LIDZBARK)}",
+        ),
+        (
+            "cudze Rybno (Region Gostynin) dostaje karę mimo nazwy w tekście",
+            locality_factor(None, ENERGA, T_OBCE_RYBNO, C_OBCE_RYBNO)
+            == LOCALITY_FACTOR_FOREIGN,
+            f"{locality_factor(None, ENERGA, T_OBCE_RYBNO, C_OBCE_RYBNO)}",
+        ),
+        (
+            "artykuł o Rybnie w źródle wojewódzkim NIE jest karany",
+            locality_factor(None, OLSZTYN, "Łaciate Mazury MTB zadebiutuje w Rybnie") == 1.0,
+            f"{locality_factor(None, OLSZTYN, 'Łaciate Mazury MTB zadebiutuje w Rybnie')}",
+        ),
+        (
+            "ocena z kategoryzacji może podnieść, nigdy nie obniża źródła lokalnego",
+            locality_factor(2, GMINA, "Sesja Rady") == 1.0
+            and locality_factor(3, ENERGA, T_LIDZBARK) == 1.0,
+            "locality=2 z Gminy → 1,0 · locality=3 przebija tytuł",
+        ),
+        # To jest cel zmiany: świeże wyłączenie w cudzej gminie przestaje
+        # otwierać dzień, w którym gmina ma własne wiadomości
+        (
+            "wyłączenie w Lidzbarku sprzed godziny ustępuje wiadomości z gminy sprzed 6 h",
+            score(ENERGA, 1, None, None, T_LIDZBARK)
+            < score(GMINA, 6, 5, 3, "Sesja Rady Gminy Rybno"),
+            f"{score(ENERGA, 1, None, None, T_LIDZBARK):.4f} < "
+            f"{score(GMINA, 6, 5, 3, 'Sesja Rady Gminy Rybno'):.4f}",
+        ),
+        # A to bezpiecznik w drugą stronę: kara nie może wypchnąć awarii
+        # z sąsiedniej gminy pod wpisy sprzed kilku dni
+        (
+            "wyłączenie w Lidzbarku sprzed godziny nadal bije wpis z gminy sprzed 3 dni",
+            score(ENERGA, 1, None, None, T_LIDZBARK)
+            > score(GMINA, 72, 5, 3, "Sesja Rady Gminy Rybno"),
+            f"{score(ENERGA, 1, None, None, T_LIDZBARK):.4f} > "
+            f"{score(GMINA, 72, 5, 3, 'Sesja Rady Gminy Rybno'):.4f}",
         ),
     ]
 

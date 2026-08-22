@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_
 
-from src.services.alert_policy import places_in
+from src.services.alert_policy import is_foreign_region, places_in
 from src.services.weather_alert import expired as weather_alert_expired
 from src.services.weather_alert import is_weather_alert
 
@@ -148,6 +148,8 @@ def is_local_article(
     """
     if not is_local_source(source_name):
         return False
+    if is_foreign_region(title, content):
+        return False  # cudze Rybno spod Sochaczewa — patrz `alert_policy`
     if source_name in COUNTY_WIDE_SOURCES:
         return bool(places_in(title, content))
     return True
@@ -414,6 +416,51 @@ def content_factor(content_score: Optional[int]) -> float:
     return CONTENT_FACTOR_BASE + CONTENT_FACTOR_STEP * score
 
 
+# Kara za wpis spoza gminy. Mnożnik, nie filtr: zasięg powiatowy bierzemy
+# świadomie, żeby w feedzie nie było pustek, a awaria w Działdowie to dla
+# dojeżdżających realna informacja. Ma zejść pod materiał lokalny, nie zniknąć.
+LOCALITY_FACTOR_FOREIGN = 0.55
+
+
+def locality_factor(
+    locality: Optional[int],
+    source_name: Optional[str],
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+) -> float:
+    """
+    Mnożnik miejsca: 1,0 dla wpisu o gminie Rybno, mniej dla reszty powiatu.
+
+    Powstał 22.08.2026, gdy pomiar dzisiejszego feedu dał **1 wpis lokalny na
+    10 pierwszych** — całą górę zajęły wyłączenia Energi w Płośnicy, Lidzbarku
+    i Działdowie. Przyczyna była w samym wzorze: `article_score` liczył wagę
+    źródła razy świeżość razy ocenę treści i o miejscu nie wiedział NIC.
+    Energa ma najwyższą wagę w tabeli (1,40 — więcej niż Gmina Rybno i BIP),
+    bo przy awarii u nas naprawdę jest najważniejsza; przy awarii w cudzej
+    gminie ta sama waga wypychała na szczyt cudzą wieś. Do tego wpis jeszcze
+    nieskategoryzowany (przyszedł po 6:15 i czeka na 13:15) dostaje neutralne
+    1,0 z `content_factor`, czyli więcej niż lokalna wiadomość z oceną 2.
+
+    Trzy odpowiedzi na pytanie „czy to nasze", w kolejności zaufania:
+    ocena z kategoryzacji (3 = gmina Rybno), przynależność źródła, wreszcie
+    sama nazwa w tekście — ta ostatnia po to, żeby artykuł o Rybnie w Radiu
+    Olsztyn nie był karany za to, że źródło jest wojewódzkie. Ocena może wpis
+    wyłącznie PODNIEŚĆ: model bywa skąpy, a `is_local_article` zna źródła.
+    """
+    if locality is None and title is None and content is None:
+        return 1.0  # wywołanie bez materiału — nie zgadujemy
+
+    if is_foreign_region(title, content):
+        return LOCALITY_FACTOR_FOREIGN  # cudze Rybno
+
+    local = (
+        (locality is not None and locality >= 3)
+        or is_local_article(source_name, title, content)
+        or bool(places_in(title, content))
+    )
+    return 1.0 if local else LOCALITY_FACTOR_FOREIGN
+
+
 def article_score(
     published_at: Optional[datetime],
     scraped_at: Optional[datetime],
@@ -422,9 +469,12 @@ def article_score(
     event_at: Optional[datetime] = None,
     event_until: Optional[datetime] = None,
     content_score: Optional[int] = None,
+    locality: Optional[int] = None,
+    title: Optional[str] = None,
+    content: Optional[str] = None,
 ) -> float:
     """
-    Waga źródła × świeżość × ocena treści.
+    Waga źródła × świeżość × ocena treści × miejsce.
 
     Świeżość liczy się od momentu, który dla mieszkańca się liczy: dla zwykłej
     wiadomości to publikacja, dla zapowiedzi — to z dwóch (publikacja, termin),
@@ -435,6 +485,10 @@ def article_score(
     wychodziła gorsza od średniej materiału w lokalności, konkrecie i przyciąganiu.
     Ocenę liczy raz kategoryzacja (`ai/article_processor`), bo ranking chodzi przy
     każdym żądaniu feedu i nie może pytać modelu.
+
+    Czwarty czynnik — miejsce — dołożony 22.08.2026, patrz `locality_factor`.
+    Wywołanie bez `title`/`content`/`locality` go nie stosuje: lepiej nie ukarać
+    niż ukarać po omacku wpis, którego treści nie widzimy.
     """
     now = now or datetime.utcnow()
     timestamp = _reference_time(published_at, scraped_at, event_at, now)
@@ -451,7 +505,12 @@ def article_score(
     if event_until and now > event_until:
         freshness *= 0.25
 
-    return source_weight(source_name) * freshness * content_factor(content_score)
+    return (
+        source_weight(source_name)
+        * freshness
+        * content_factor(content_score)
+        * locality_factor(locality, source_name, title, content)
+    )
 
 
 def is_pinned_alert(
