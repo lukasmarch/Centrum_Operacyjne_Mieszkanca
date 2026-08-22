@@ -27,6 +27,7 @@ sys.path.insert(0, str(backend_path))
 
 from pydantic_ai import ModelRetry
 
+from src.services import energa
 from src.ai.article_processor import (
     MIN_CONTENT_CHARS,
     SourceText,
@@ -105,6 +106,23 @@ STYPENDIA = FakeArticle(
     display_title="Nabór wniosków o stypendia szkolne dla uczniów z gminy Rybno"
 )
 ENERGA_TITLE = "Wyłączenie planowane - Region Mława - Rybno gmina wiejska"
+
+
+ENERGA_PLANOWANE = "Wyłączenie planowane - Region Mława - Rybno gmina wiejska"
+ENERGA_A = energa.headline(
+    ENERGA_PLANOWANE,
+    "Rybno gmina wiejska 25.08.2026 10:00-15:00 - Rybno ulice Kościelna 1, 3, 5, "
+    "Lubawska 1, 3, Stroma 1, Wyzwolenia 52A, 71, 72, 76A, 89, 91, 269/1, "
+    "Zajeziorna 35, 37, 39, 41, 50, 52, 54, 56, 58.",
+)
+ENERGA_B = energa.headline(
+    ENERGA_PLANOWANE,
+    "Rybno gmina wiejska 25.08.2026 09:30-15:00 - Rybno ulica Wyzwolenia 90, 90/c, 90B, 94b.",
+)
+ENERGA_AWARIA = energa.headline(
+    "Wyłączenie awaryjne - Region Mława - Płośnica gmina wiejska",
+    "Płośnica gmina wiejska 22.08.2026 07:26-13:00 - Gralewo, Gruszka.",
+)
 
 
 def main() -> int:
@@ -296,6 +314,38 @@ def main() -> int:
             "odświeżenie tego samego wyłączenia (ten sam termin) skleja się",
             outage_a_refresh not in outages,
             f"zostało {len(outages)}",
+        ),
+
+        # --- tytuł wyłączenia składa kod, nie model (22.08.2026) --------------
+        # Feed pokazał obok siebie „…w Rybnie 25 sierpnia 2026 roku" i „…w Rybnie
+        # 25 sierpnia 2026" — czytało się to jak powtórka, a to były dwa różne
+        # wyłączenia (inne godziny, inne ulice). Dedup słusznie ich nie scalił.
+        (
+            "dwa wyłączenia tego samego dnia mają ROZRÓŻNIALNE tytuły",
+            ENERGA_A != ENERGA_B
+            and "10:00–15:00" in ENERGA_A and "09:30–15:00" in ENERGA_B,
+            f"{ENERGA_A!r} vs {ENERGA_B!r}",
+        ),
+        (
+            "tytuł niesie ulice, czyli to, po czym mieszkaniec pozna swój dom",
+            "Kościelna" in ENERGA_A and "Wyzwolenia" in ENERGA_B,
+            ENERGA_A,
+        ),
+        (
+            "numery domów nie wchodzą do tytułu",
+            not any(znak.isdigit() for znak in ENERGA_A.split("—", 1)[1]),
+            ENERGA_A.split("—", 1)[1].strip(),
+        ),
+        (
+            "wyłączenie awaryjne nie podaje się za planowane",
+            ENERGA_AWARIA.startswith("Wyłączenie prądu")
+            and ENERGA_A.startswith("Planowane"),
+            f"{ENERGA_AWARIA[:34]!r}",
+        ),
+        (
+            "zwykły artykuł nie jest tytułowany jak wyłączenie",
+            energa.headline("Zebranie wiejskie w Rybnie", "Zebranie 17 września.") is None,
+            "None",
         ),
     ]
 

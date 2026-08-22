@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
-from src.services import weather_alert
+from src.services import energa, weather_alert
 from src.services.alert_policy import _flat, places_in
 from src.services.feed_policy import LOCAL_TZ
 from src.utils.cost_tracker import log_api_cost
@@ -285,8 +285,14 @@ class ArticleProcessor:
         # i `display_title` przy 40 znakach wejścia zamieniają kategoryzację
         # w konfabulację (RyBaśka, 4.08.2026). Summary zostaje, jakie jest
         # (surowe ze scrapera albo None) — to jedyna wersja, która nie kłamie.
+        # Wyłączenia Energi tytułuje KOD, nie model — komunikat jest
+        # ustrukturyzowany, a model gubił w nim to jedno, co odróżnia dwa
+        # wyłączenia tego samego dnia: godzinę i ulicę. Patrz `energa.headline`.
+        # `None` znaczy „to nie ten format" i nie zmienia niczego.
+        energa_headline = energa.headline(article.title, text_content)
+
         if _is_low_content(article.title, text_content):
-            article.display_title = _clean_title(article.title) or None
+            article.display_title = energa_headline or _clean_title(article.title) or None
             article.is_filler = article.is_filler or _looks_like_filler(
                 article.title, text_content
             )
@@ -335,7 +341,7 @@ class ArticleProcessor:
             article.tags = category_data.tags
             article.location_mentioned = category_data.locations_mentioned
             article.summary = category_data.summary
-            article.display_title = category_data.display_title
+            article.display_title = energa_headline or category_data.display_title
             article.is_filler = category_data.is_filler or _looks_like_filler(
                 article.title, text_content
             )

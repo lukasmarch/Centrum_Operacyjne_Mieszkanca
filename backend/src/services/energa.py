@@ -69,6 +69,91 @@ def parse_window(text: Optional[str]) -> tuple[Optional[datetime], Optional[date
         return None, None
 
 
+# Miejsca dotknięte wyłączeniem: wszystko po myślniku zamykającym termin.
+#   „…25.08.2026 10:00-15:00 - Rybno ulice Kościelna 1, 3, 5, Lubawska 1, …"
+#   „…22.08.2026 07:26-13:00 - Gralewo, Gruszka."
+PLACES_RE = re.compile(r"\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\s*-\s*(?P<gdzie>.+)")
+
+# „Rybno ulice Kościelna…", „Rybno ulica Wyzwolenia 90" — nazwa wsi, potem ulice.
+STREETS_RE = re.compile(r"^(?P<wies>.+?)\s+ulic[aey]\s+(?P<ulice>.+)$", re.DOTALL)
+
+_MONTHS = (
+    "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+    "lipca", "sierpnia", "września", "października", "listopada", "grudnia",
+)
+
+# Ile nazw zmieści się w tytule, zanim przestanie być tytułem
+MAX_PLACES_IN_HEADLINE = 4
+
+
+def _names(raw: str) -> list[str]:
+    """Same nazwy ulic albo wsi — bez numerów domów, bez powtórzeń."""
+    names: list[str] = []
+    for part in raw.replace(";", ",").split(","):
+        part = part.strip().rstrip(".").strip()
+        if not part or not part[0].isalpha():
+            continue  # „71", „90/c", „269/1" — numery po nazwie ulicy
+        # „Kościelna 1" → „Kościelna"; „Nowa Wieś" zostaje w całości
+        words = [w for w in part.split() if w[0].isalpha()]
+        name = " ".join(words).strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def headline(title: Optional[str], content: Optional[str]) -> Optional[str]:
+    """
+    Tytuł wyłączenia złożony z KOMUNIKATU, nie z modelu. `None` = nie ten format.
+
+    22.08.2026 feed pokazał obok siebie „Planowane wyłączenie prądu w Rybnie
+    25 sierpnia 2026 roku" i „Planowane wyłączenie prądu w Rybnie 25 sierpnia
+    2026". Czytało się to jak powtórkę, a to były dwa RÓŻNE wyłączenia:
+    10:00–15:00 na Kościelnej, Lubawskiej, Stromej i Zajeziornej oraz
+    9:30–15:00 na Wyzwolenia 90. Deduplikacja słusznie ich nie scaliła —
+    scalenie ukryłoby przed mieszkańcem Wyzwolenia 90, że jemu prąd znika
+    pół godziny wcześniej. Wada była w tytule: model dostaje dwa komunikaty
+    różniące się godziną i listą ulic, a produkuje nagłówki różniące się
+    słowem „roku".
+
+    Komunikat Energi jest ustrukturyzowany, więc tytuł składa kod — ten sam
+    wzorzec co `ground_categorization`: regułę sprawdzalną kodem sprawdza kod.
+    Zero kosztu modelu, zero konfabulacji.
+
+    Bez odmiany przez przypadki („w Rybnie" wymagałoby miejscownika, a nazw
+    jest 22 i część ma nieoczywistą odmianę) — miejscowość stoi po myślniku:
+        Planowane wyłączenie prądu 25 sierpnia, 10:00–15:00 — Rybno: Kościelna, …
+        Wyłączenie prądu 22 sierpnia, 7:26–13:00 — Gralewo, Gruszka
+    """
+    text = content or ""
+    start, end = parse_window(text)
+    if start is None or end is None:
+        return None
+
+    match = PLACES_RE.search(text)
+    if not match:
+        return None
+
+    where = match.group("gdzie").strip().split("\n")[0]
+    streets = STREETS_RE.match(where)
+    prefix = f"{streets.group('wies').strip()}: " if streets else ""
+    names = _names(streets.group("ulice") if streets else where)
+    if not names:
+        return None
+
+    shown = names[:MAX_PLACES_IN_HEADLINE]
+    places = ", ".join(shown) + (" i inne" if len(names) > len(shown) else "")
+
+    # „Planowane" tylko wtedy, gdy tak mówi kanał — dla mieszkańca to różnica
+    # między „wyłączą mi prąd w poniedziałek" a „nie mam prądu teraz".
+    planned = "planowane" in (title or "").lower()
+    kind = "Planowane wyłączenie prądu" if planned else "Wyłączenie prądu"
+
+    return (
+        f"{kind} {start.day} {_MONTHS[start.month - 1]}, "
+        f"{start:%H:%M}–{end:%H:%M} — {prefix}{places}"
+    )
+
+
 def canonical_id(url: Optional[str]) -> Optional[str]:
     """Wspólny identyfikator zdarzenia dla obu kanałów."""
     if not url:
