@@ -244,6 +244,89 @@ def run_midday_article_job():
     ))
 
 
+# Profile, po które sięgamy w trybie sztormowym. Syla jest tu, a nie w przebiegu
+# południowym, świadomie: to najszybsze lokalne źródło w całym zestawie, ale
+# płatne przez Apify, więc płacimy za nie tylko w dniu, w którym jest potrzebne.
+STORM_SOCIAL_SOURCES = MIDDAY_SOCIAL_SOURCES + [
+    "Facebook - Syla",   # najszybsze źródło o awariach w gminie
+]
+
+
+async def _storm_watch():
+    """Sprawdź, czy dziś jest dzień sztormowy — i jeśli tak, dociągnij materiał."""
+    from src.services import storm_policy, weather_alert
+    from src.services.feed_policy import LOCAL_TZ, is_local_article
+    from src.database.schema import Article
+
+    now = datetime.utcnow()
+    now_local = datetime.now(LOCAL_TZ)
+
+    if not storm_policy.within_active_hours(now_local):
+        return
+
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with async_session() as session:
+            # Hamulec odstępu liczony ze STANU BAZY, nie z licznika w pamięci —
+            # przeżywa restart kontenera, a deploy nie zeruje budżetu.
+            last_scraped = (await session.execute(
+                select(Source.last_scraped).where(Source.name.in_(STORM_SOCIAL_SOURCES))
+                .order_by(Source.last_scraped.desc()).limit(1)
+            )).scalar_one_or_none()
+            if not storm_policy.enough_gap(last_scraped, now):
+                return
+
+            since = now - timedelta(hours=storm_policy.LOOKBACK_H)
+            rows = (await session.execute(
+                select(Article, Source.name)
+                .join(Source, Article.source_id == Source.id)
+                .where(Article.scraped_at >= since)
+            )).all()
+
+            # „W gminie" rozstrzyga ta sama funkcja co feed i alerty — razem
+            # z bramką obcego rejonu, żeby wyłączenie w cudzym Rybnie nie
+            # uruchamiało płatnego przebiegu.
+            outages = sum(
+                1 for article, source_name in rows
+                if (source_name or "").startswith("Energa")
+                and storm_policy.is_ongoing(article.event_at, article.event_until, now)
+                and is_local_article(source_name, article.title, article.content)
+            )
+            alert = any(
+                weather_alert.is_weather_alert(article.title, article.content)
+                and not weather_alert.expired(
+                    article.title, article.content, article.published_at,
+                    article.event_until, now,
+                )
+                for article, _ in rows
+            )
+
+        reason = storm_policy.storm_reason(outages, alert)
+    finally:
+        await engine.dispose()
+
+    if not reason:
+        return
+
+    logger.warning(f"TRYB SZTORMOWY — {reason}. Dociągam materiał poza rozkładem.")
+    await update_articles_job(
+        exclude_types=["social_media"],
+        include_names=STORM_SOCIAL_SOURCES,
+    )
+    logger.warning("Tryb sztormowy: przebieg zakończony — push zobaczy nowe wpisy w ciągu 15 min")
+
+
+def run_storm_watch_job():
+    """
+    Wartownik pogodowy: co pół godziny pyta, czy dzień jest zwyczajny.
+
+    Sam w sobie kosztuje jedno zapytanie SQL — płacimy dopiero wtedy, gdy
+    odpowiedź brzmi „nie". Uzasadnienie i hamulce: `services/storm_policy.py`.
+    """
+    asyncio.run(_storm_watch())
+
+
 def run_energa_job():
     """Scrapuje tylko źródła Energa (wyłączenia prądu) — częściej niż główny pipeline,
     bo komunikaty o awariach pojawiają się w ciągu dnia i tracą wartość po fakcie."""

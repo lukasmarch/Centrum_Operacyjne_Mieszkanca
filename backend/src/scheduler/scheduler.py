@@ -12,7 +12,12 @@ import threading
 from datetime import datetime, timedelta
 
 from src.scheduler.weather_job import run_weather_job
-from src.scheduler.article_job import run_article_job, run_energa_job, run_midday_article_job
+from src.scheduler.article_job import (
+    run_article_job,
+    run_energa_job,
+    run_midday_article_job,
+    run_storm_watch_job,
+)
 from src.scheduler.ai_jobs import run_ai_job
 from src.scheduler.summary_job import run_summary_job, run_summary_refresh_job
 from src.scheduler.gus_job import run_gus_job
@@ -223,6 +228,21 @@ def start_scheduler():
         trigger=CronTrigger(hour='9,12,15,18,21', minute=5),
         id='energa_update',
         name='Update Energa outages (RSS, co 3h)',
+        replace_existing=True
+    )
+
+    # ── Wartownik sztormowy ────────────────────────────────────────────────
+    # 22.08.2026: przez gminę przeszła nawałnica, Energa zgłosiła wyłączenia
+    # w trzech sołectwach, mieszkaniec zgłosił brak wody — a strona milczała,
+    # bo Facebooka poza profilem gminy czytamy raz na dobę (Apify kosztuje).
+    # Ten job nie scrapuje: pyta co pół godziny, czy dzień jest zwyczajny,
+    # i dopiero gdy nie jest, sięga po płatne źródła. Hamulce (odstęp 2 h,
+    # godziny 6–22, próg dwóch wyłączeń w gminie) — `services/storm_policy.py`.
+    scheduler.add_job(
+        func=run_storm_watch_job,
+        trigger=IntervalTrigger(minutes=30),
+        id='storm_watch',
+        name='Wartownik sztormowy (FB poza rozkładem przy awariach)',
         replace_existing=True
     )
 
