@@ -46,12 +46,26 @@ LOOKBACK_H = 3
 # z czego trzy dotyczyły przyszłego tygodnia).
 ONGOING_MARGIN_H = 2
 
-# Minimalny odstęp między płatnymi przebiegami. Dwie godziny, nie jedna:
-# przy sześciogodzinnej wichurze daje to trzy dodatkowe pobrania, a nie sześć.
-MIN_GAP_H = 2.0
+# Minimalny odstęp między płatnymi przebiegami.
+#
+# Liczby, nie przeczucie (pomiar 22.08.2026 na koncie Apify):
+#   plan FREE = 5 US$/mies.; cykl 22.06–21.07 zamknął się na **5,03 US$**,
+#   czyli PONAD limitem; cykl 22.07–21.08 na 3,93 US$. Zapas na tryb sztormowy
+#   to więc około **1 US$ miesięcznie**, a jeden profil FB kosztuje ~0,027 US$.
+#
+# Przy odstępie 2 h i oknie 6–22 mieściło się osiem przebiegów na dobę
+# (0,65 US$) — czyli półtora dnia sztormowego na miesiąc. Przy trzech godzinach
+# i oknie 7–20 są cztery przebiegi (0,33 US$) i ponad trzy takie dni.
+#
+# W praktyce jest taniej: aktor liczy sobie ZA POST (`PAID_ACTORS_PER_EVENT`),
+# a przebieg dwie godziny po poprzednim zabiera tylko to, co przybyło. Górna
+# granica jest tu po to, żeby zła passa pogodowa nie zjadła limitu w tydzień.
+MIN_GAP_H = 3.0
 
-# Godziny lokalne, w których tryb sztormowy w ogóle się uruchamia
-ACTIVE_HOURS = (6, 22)
+# Godziny lokalne, w których tryb sztormowy w ogóle się uruchamia. Wąsko,
+# bo każde uruchomienie to pieniądze: o 6 rano komunikat i tak złapie poranny
+# przebieg, a po 20:00 awarię zgłasza się telefonem, nie czyta na stronie.
+ACTIVE_HOURS = (7, 20)
 
 
 def within_active_hours(now_local: datetime) -> bool:

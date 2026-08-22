@@ -82,19 +82,19 @@ def run_cases() -> int:
             "04:00 poza oknem",
         ),
         (
-            "o 23:00 też nie",
-            not storm_policy.within_active_hours(NOW_LOCAL.replace(hour=23)),
-            "23:00 poza oknem",
+            "o 21:00 też nie — awarię zgłasza się wtedy telefonem",
+            not storm_policy.within_active_hours(NOW_LOCAL.replace(hour=21)),
+            "21:00 poza oknem",
         ),
         (
-            "pobranie sprzed 30 minut blokuje kolejne",
-            not storm_policy.enough_gap(NOW - timedelta(minutes=30), NOW),
+            "pobranie sprzed dwóch godzin blokuje kolejne",
+            not storm_policy.enough_gap(NOW - timedelta(hours=2), NOW),
             f"odstęp min. {storm_policy.MIN_GAP_H} h",
         ),
         (
-            "po trzech godzinach wolno znowu",
-            storm_policy.enough_gap(NOW - timedelta(hours=3), NOW),
-            "3 h > próg",
+            "po czterech godzinach wolno znowu",
+            storm_policy.enough_gap(NOW - timedelta(hours=4), NOW),
+            "4 h > próg",
         ),
         (
             "źródło nigdy nie pobierane nie ma czego oszczędzać",
@@ -103,10 +103,16 @@ def run_cases() -> int:
         ),
         # Bezpiecznik kosztowy: przy sześciogodzinnej wichurze w oknie 6–22
         # tryb może dołożyć najwyżej tyle przebiegów, ile mieści się w odstępie.
+        # Bezpiecznik kosztowy wprost z rachunku: plan Apify FREE to 5 US$/mies.,
+        # poprzedni cykl zamknął się na 3,93 US$, jeden profil FB kosztuje ~0,027 US$.
+        # Zapas ≈ 1 US$, więc doba sztormowa nie może kosztować więcej niż ~0,33 US$.
         (
-            "sześciogodzinna wichura to najwyżej trzy dodatkowe przebiegi",
-            int(6 / storm_policy.MIN_GAP_H) == 3,
-            f"6 h / {storm_policy.MIN_GAP_H} h = {int(6 / storm_policy.MIN_GAP_H)}",
+            "doba sztormowa mieści się w zapasie budżetu Apify",
+            (int((storm_policy.ACTIVE_HOURS[1] - storm_policy.ACTIVE_HOURS[0])
+                 / storm_policy.MIN_GAP_H) * 3 * 0.027) <= 0.35,
+            f"{int((storm_policy.ACTIVE_HOURS[1] - storm_policy.ACTIVE_HOURS[0]) / storm_policy.MIN_GAP_H)}"
+            f" przebiegów × 3 profile × 0,027 US$ = "
+            f"{int((storm_policy.ACTIVE_HOURS[1] - storm_policy.ACTIVE_HOURS[0]) / storm_policy.MIN_GAP_H) * 3 * 0.027:.2f} US$",
         ),
 
         # --- trwa czy dopiero będzie ------------------------------------------
