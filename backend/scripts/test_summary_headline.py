@@ -45,6 +45,7 @@ def article(
     published_h: Optional[float] = None,
     event_h: Optional[float] = None,
     until_h: Optional[float] = None,
+    locality: Optional[int] = None,
 ) -> SimpleNamespace:
     """Wpis w postaci, jakiej potrzebuje wybór nagłówka. Godziny względem NOW."""
     return SimpleNamespace(
@@ -59,6 +60,10 @@ def article(
         scraped_at=NOW - timedelta(hours=published_h or 0),
         event_at=NOW + timedelta(hours=event_h) if event_h is not None else None,
         event_until=NOW + timedelta(hours=until_h) if until_h is not None else None,
+        # Od 21.08.2026 `_headline_priority` pyta o ocenę lokalności z kategoryzacji
+        # (`articles.locality`). Domyślne None znaczy „wpis sprzed migracji" —
+        # wtedy o miejscu rozstrzyga treść, dokładnie jak w produkcji.
+        locality=locality,
     )
 
 
