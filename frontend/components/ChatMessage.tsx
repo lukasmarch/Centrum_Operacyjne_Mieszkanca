@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import {
   Bot, BarChart3, Newspaper, Landmark, ShieldAlert, Map, CalendarDays,
-  Check, ThumbsUp, ThumbsDown, CornerDownRight,
+  Check, ThumbsUp, ThumbsDown, CornerDownRight, SearchX, AlertTriangle, Info,
 } from 'lucide-react';
-import { ChatMessageData, ChartConfig, sendChatFeedback } from '../src/hooks/useChat';
+import { AgentStep, ChatMessageData, ChartConfig, sendChatFeedback } from '../src/hooks/useChat';
 import { useAuth } from '../src/context/AuthContext';
 import SourceChip from './SourceChip';
 import TrendChart from './gus/charts/TrendChart';
@@ -162,6 +162,74 @@ const MiniKPI: React.FC<{ chart: ChartConfig }> = ({ chart }) => (
     )}
   </div>
 );
+
+// ── Kroki pracy agenta ─────────────────────────────────────────────────────
+
+/**
+ * Jeden krok pracy agenta: co sprawdza, czego szuka, co zastał.
+ *
+ * Po co to widać. Do 22.08 agent milczał przez półtorej sekundy, a potem
+ * pisał odpowiedź — użytkownik nie wiedział ani czy system go zrozumiał, ani
+ * na czym stoi odpowiedź. Teraz widzi „Sprawdzam harmonogram wywozu ·
+ * Hartowiec", więc gdy padnie tam zła miejscowość, poprawia pytanie od razu,
+ * zamiast czytać do końca coś nie na temat.
+ *
+ * Stan pustego wyniku ma osobną ikonę i osobny kolor, bo to inna wiadomość niż
+ * „gotowe": agent sprawdził i NIE ZNALAZŁ, więc odpowiedź poniżej będzie
+ * ostrożna — i wiadomo dlaczego.
+ */
+const STEP_ICONS: Record<string, React.ReactNode> = {
+  done: <Check size={12} className="text-emerald-500 shrink-0" />,
+  empty: <SearchX size={12} className="text-amber-500 shrink-0" />,
+  error: <AlertTriangle size={12} className="text-red-400 shrink-0" />,
+  warning: <AlertTriangle size={12} className="text-amber-500 shrink-0" />,
+  info: <Info size={12} className="text-neutral-500 shrink-0" />,
+};
+
+const AgentStepRow: React.FC<{
+  step: AgentStep;
+  isLast: boolean;
+  isStreaming: boolean;
+  hasContent: boolean;
+}> = ({ step, isLast, isStreaming, hasContent }) => {
+  // „W toku" pokazujemy tylko dopóki naprawdę trwa: po dojściu treści albo po
+  // zamknięciu strumienia kręcące się kółko kłamałoby.
+  const spinning =
+    step.state === 'running' || (isStreaming && !hasContent && isLast && !step.state);
+
+  return (
+    <div className="flex items-start gap-1.5 text-[11px] leading-tight">
+      <span className="mt-[3px]">
+        {spinning ? (
+          <span className="block w-3 h-3 rounded-full border border-blue-400 border-t-transparent animate-spin shrink-0" />
+        ) : (
+          STEP_ICONS[step.state || 'info'] ?? STEP_ICONS.info
+        )}
+      </span>
+      <span className="min-w-0">
+        <span className={step.state === 'error' ? 'text-red-400' : 'text-neutral-500'}>
+          {step.message}
+        </span>
+        {step.detail && (
+          <span className="text-neutral-600"> · {step.detail}</span>
+        )}
+        {step.result && (
+          <span
+            className={
+              step.state === 'empty'
+                ? 'text-amber-500/80'
+                : step.state === 'error'
+                ? 'text-red-400/80'
+                : 'text-neutral-600'
+            }
+          >
+            {' '}→ {step.result}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+};
 
 // ── Pasek prognozy ─────────────────────────────────────────────────────────
 
@@ -340,22 +408,18 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onFollowUp, showFoll
           </p>
         )}
 
-        {/* Widoczne kroki pracy agenta (wzorzec Perplexity) */}
+        {/* Praca agenta na żywo — co sprawdza, czego szuka, co zastał */}
         {message.steps && message.steps.length > 0 && (
-          <div className="mb-1.5 pl-1 space-y-0.5">
-            {message.steps.map((step, i) => {
-              const isCurrent = message.isStreaming && !message.content && i === message.steps!.length - 1;
-              return (
-                <p key={i} className="flex items-center gap-1.5 text-[11px] text-neutral-500">
-                  {isCurrent ? (
-                    <span className="w-3 h-3 rounded-full border border-blue-400 border-t-transparent animate-spin shrink-0" />
-                  ) : (
-                    <Check size={12} className="text-emerald-500 shrink-0" />
-                  )}
-                  {step}
-                </p>
-              );
-            })}
+          <div className="mb-1.5 pl-1 space-y-1">
+            {message.steps.map((step, i) => (
+              <AgentStepRow
+                key={i}
+                step={step}
+                isLast={i === message.steps!.length - 1}
+                isStreaming={!!message.isStreaming}
+                hasContent={!!message.content}
+              />
+            ))}
           </div>
         )}
 

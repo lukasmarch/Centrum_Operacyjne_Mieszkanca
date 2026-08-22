@@ -324,6 +324,45 @@ class BaseAgent:
             return ToolResult(content={"blad": "Narzędzie zwróciło błąd."},
                               error="exception")
 
+    @staticmethod
+    def _tool_message(call: dict, result: ToolResult) -> dict:
+        """Wynik narzędzia w postaci wiadomości `tool` dla modelu."""
+        payload = result.content
+        if result.empty and isinstance(payload, dict):
+            # Rozróżnienie, na którym stoi cała wiarygodność odpowiedzi:
+            # „szukałem i nie ma" to fakt do zakomunikowania, a nie powód,
+            # żeby model sięgnął po wiedzę ogólną i zgadywał.
+            payload = {**payload, "pusty_wynik": True}
+        return {
+            "role": "tool",
+            "tool_call_id": call["id"],
+            "content": json.dumps(payload, ensure_ascii=False, default=str),
+        }
+
+    @staticmethod
+    def _result_event(call: dict, result: ToolResult) -> dict:
+        """Zdarzenie `status` opisujące, CO narzędzie zastało.
+
+        Trzy stany, bo dla użytkownika to trzy różne sytuacje: znalazłem
+        (można ufać odpowiedzi), nie ma tego w bazie (odpowiedź będzie
+        ostrożna — i wiadomo dlaczego), narzędzie padło (to nasz problem,
+        nie brak danych).
+        """
+        if result.error:
+            state, message = "error", "nie udało się sprawdzić"
+        elif result.empty:
+            state = "empty"
+            message = result.summary or "nie znalazłem tego w bazie"
+        else:
+            state = "done"
+            message = result.summary or "gotowe"
+        return {
+            "type": "status",
+            "tool": call["name"],
+            "state": state,
+            "message": message,
+        }
+
     async def _execute_tool_calls(self, ctx: ToolContext, calls: list[dict]) -> dict:
         """Wykonuje komplet wywołań z jednej rundy i zbiera z nich trzy warstwy.
 
@@ -339,23 +378,10 @@ class BaseAgent:
         każde. Gdyby pojawiło się narzędzie naprawdę wolne (HTTP do obcego API),
         wtedy — i tylko wtedy — warto dać mu własne połączenie.
         """
-        results = []
-        for call in calls:
-            results.append(await self._call_tool(ctx, call["name"], call["arguments"]))
-
         tool_messages, sources, charts = [], [], []
-        for call, result in zip(calls, results):
-            payload = result.content
-            if result.empty and isinstance(payload, dict):
-                # Rozróżnienie, na którym stoi cała wiarygodność odpowiedzi:
-                # „szukałem i nie ma" to fakt do zakomunikowania, a nie powód,
-                # żeby model sięgnął po wiedzę ogólną i zgadywał.
-                payload = {**payload, "pusty_wynik": True}
-            tool_messages.append({
-                "role": "tool",
-                "tool_call_id": call["id"],
-                "content": json.dumps(payload, ensure_ascii=False, default=str),
-            })
+        for call in calls:
+            result = await self._call_tool(ctx, call["name"], call["arguments"])
+            tool_messages.append(self._tool_message(call, result))
             sources.extend(result.sources)
             charts.extend(result.charts)
 
@@ -492,17 +518,6 @@ class BaseAgent:
                     return
 
                 calls = [calls_acc[i] for i in sorted(calls_acc)]
-
-                # Widoczny krok pracy — po jednym na narzędzie, w kolejności
-                # wywołania. Użytkownik czyta, CO system sprawdza, zamiast
-                # patrzeć na kółko przez półtorej sekundy.
-                for call in calls:
-                    tool = agent_tools.get(call["name"])
-                    if tool:
-                        yield json.dumps(
-                            {"type": "status", "message": tool.status_message}
-                        ) + "\n"
-
                 messages.append({
                     "role": "assistant",
                     "content": text_buf or None,
@@ -512,10 +527,45 @@ class BaseAgent:
                         for c in calls
                     ],
                 })
-                executed = await agent_self._execute_tool_calls(ctx, calls)
-                messages.extend(executed["messages"])
-                sources.extend(executed["sources"])
-                charts.extend(executed["charts"])
+
+                # Praca agenta na żywo: przed każdym narzędziem CO sprawdza
+                # i CZEGO w nim szuka, po nim — co zastał. Użytkownik, który
+                # widzi „Szukam miejsc w okolicy · Działdowo", gdy pytał
+                # o Rybno, wie od razu, że został źle zrozumiany — i poprawia
+                # pytanie, zamiast czytać odpowiedź nie na temat.
+                empty_count = 0
+                for call in calls:
+                    tool = agent_tools.get(call["name"])
+                    try:
+                        parsed_args = json.loads(call["arguments"] or "{}")
+                    except Exception:
+                        parsed_args = {}
+                    yield json.dumps({
+                        "type": "status",
+                        "tool": call["name"],
+                        "state": "running",
+                        "message": tool.status_message if tool else f"Wywołuję {call['name']}…",
+                        "detail": agent_tools.args_label(parsed_args if isinstance(parsed_args, dict) else {}),
+                    }) + "\n"
+
+                    result = await agent_self._call_tool(ctx, call["name"], call["arguments"])
+                    yield json.dumps(agent_self._result_event(call, result)) + "\n"
+
+                    if result.empty or result.error:
+                        empty_count += 1
+                    messages.append(agent_self._tool_message(call, result))
+                    sources.extend(result.sources)
+                    charts.extend(result.charts)
+
+                # Wszystko puste = odpowiedź powstanie mimo braku materiału.
+                # Lepiej uprzedzić, niż zostawić użytkownika z wrażeniem, że
+                # agent coś sprawdził i potwierdził.
+                if calls and empty_count == len(calls):
+                    yield json.dumps({
+                        "type": "status",
+                        "state": "warning",
+                        "message": "Nie znalazłem tego w danych — odpowiadam ostrożnie",
+                    }) + "\n"
 
             # Wyjście awaryjne: ostatnia runda leci bez `tools`, więc tu nie
             # powinniśmy trafić. Gdyby jednak — strumień musi zostać domknięty,
@@ -629,11 +679,15 @@ class BaseAgent:
             # Widoczny krok pracy agenta (wzorzec Perplexity) — przed pierwszym
             # chunkiem, żeby użytkownik widział co się wydarzyło w tle
             if context_count is not None:
+                # Krok dokonany, nie trwający — stąd jawny `state`, inaczej
+                # interfejs pokazywałby przy nim kręcące się kółko.
                 if context_count > 0:
                     step = f"Przeszukałem bazę wiedzy — {context_count} trafnych materiałów źródłowych"
+                    state = "done"
                 else:
                     step = "Brak trafnych materiałów w bazie — odpowiadam na podstawie wiedzy ogólnej"
-                yield json.dumps({"type": "status", "message": step}) + "\n"
+                    state = "empty"
+                yield json.dumps({"type": "status", "state": state, "message": step}) + "\n"
 
             full_content = ""
             total_tokens = 0

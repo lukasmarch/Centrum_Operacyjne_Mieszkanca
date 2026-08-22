@@ -145,6 +145,15 @@ def build_days(slots: list, now_utc: datetime, days: int) -> tuple:
             "opad_mm": round(sum(rains), 1),
             "wiatr_max_m_s": round(max(winds), 1) if winds else None,
         }
+        # Doba niepełna — wieczorem z „dziś" zostaje jedno lub dwa okna
+        # 3-godzinne, więc min i max schodzą się do tej samej liczby. Bez tej
+        # adnotacji model podaje „od 13,8 do 13,8°C" jako prognozę całego dnia.
+        if len(entries) < 3:
+            dzien["uwaga"] = (
+                f"doba niepełna — została prognoza na {len(entries) * 3} h, "
+                "nie na cały dzień"
+            )
+
         dni.append(dzien)
         charts_days.append({**dzien, "icon": midday[1].get("icon", "")})
 
@@ -175,6 +184,7 @@ async def current_weather(ctx: ToolContext, location: Optional[str] = None) -> T
         return ToolResult(
             content={"info": f"Brak pomiaru dla lokalizacji {resolved}."},
             empty=True,
+            summary=f"brak pomiaru dla: {resolved}",
         )
 
     fetched = row.get("fetched_at")
@@ -200,7 +210,11 @@ async def current_weather(ctx: ToolContext, location: Optional[str] = None) -> T
     stale = _staleness_note(row, ctx)
     if stale:
         payload["uwaga_swiezosc"] = stale
-    return ToolResult(content=payload)
+    return ToolResult(
+        content=payload,
+        summary=f"{resolved}: {round(row['temperature'])}°C, {row['description']}"
+                + (" (pomiar nieświeży)" if stale else ""),
+    )
 
 
 async def weather_forecast(
@@ -215,6 +229,7 @@ async def weather_forecast(
         return ToolResult(
             content={"info": f"Brak prognozy dla lokalizacji {resolved}."},
             empty=True,
+            summary=f"brak prognozy dla: {resolved}",
         )
 
     try:
@@ -243,6 +258,7 @@ async def weather_forecast(
                 ),
             },
             empty=True,
+            summary="prognoza w bazie jest przeterminowana",
         )
 
     payload = {
@@ -265,7 +281,11 @@ async def weather_forecast(
         "days": charts_days,
         "uv_index": forecast.get("uv_index"),
     }]
-    return ToolResult(content=payload, charts=charts)
+    return ToolResult(
+        content=payload, charts=charts,
+        summary=f"prognoza {resolved}: {len(dni)} dni "
+                f"({round(dni[0]['temp_min_c'])}-{round(dni[0]['temp_max_c'])}°C dziś)",
+    )
 
 
 async def air_quality(ctx: ToolContext, location: Optional[str] = None) -> ToolResult:
@@ -286,9 +306,10 @@ async def air_quality(ctx: ToolContext, location: Optional[str] = None) -> ToolR
         return ToolResult(
             content={"info": f"Brak pomiaru jakości powietrza dla {resolved}."},
             empty=True,
+            summary=f"brak pomiaru powietrza dla: {resolved}",
         )
     data = dict(row._mapping)
-    return ToolResult(content={
+    return ToolResult(summary=f"CAQI {round(data['caqi'])} ({data['caqi_level']})", content={
         "lokalizacja": resolved,
         "pm25_ug_m3": data["pm25"],
         "pm10_ug_m3": data["pm10"],
@@ -338,7 +359,14 @@ register(Tool(
             "location": _LOCATION_PARAM,
             "days": {
                 "type": "integer",
-                "description": "Liczba dni prognozy, 1-5. Domyślnie 3.",
+                "description": (
+                    "Ile dni ma objąć prognoza, licząc DZISIAJ jako dzień pierwszy. "
+                    "Pytanie o JUTRO wymaga days=2 (dziś + jutro), o pojutrze — "
+                    "days=3, o weekend — tyle, by objąć sobotę i niedzielę. "
+                    "days=1 zwraca wyłącznie resztę dzisiejszego dnia. "
+                    "Zakres 1-5, domyślnie 3. Każdy dzień ma etykietę „dzień” "
+                    "(dziś/jutro/pojutrze/nazwa) — opisuj TĘ, o którą pytano."
+                ),
                 "minimum": 1,
                 "maximum": MAX_FORECAST_DAYS,
             },

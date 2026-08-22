@@ -258,6 +258,41 @@ async def run_loop_tests():
     check("".join(e["content"] for e in events if e["type"] == "chunk") == "strumień",
           "treść dociera w całości")
 
+    # Kroki pracy: najpierw „sprawdzam X · argumenty", potem „→ co zastałem".
+    statuses = [e for e in events if e["type"] == "status"]
+    running = [s for s in statuses if s.get("state") == "running"]
+    finished = [s for s in statuses if s.get("state") in ("done", "empty", "error")]
+    check(len(running) == 1, "każde narzędzie melduje START pracy")
+    check(running[0].get("tool") == "_t_echo", "krok niesie nazwę narzędzia")
+    check(running[0].get("detail") == "s",
+          "krok pokazuje ARGUMENTY — po nich widać złe zrozumienie pytania",
+          f"detail={running[0].get('detail')!r}")
+    check(len(finished) == 1, "każde narzędzie melduje WYNIK")
+    check(finished[0].get("state") == "done", "wynik niepusty ma stan `done`")
+
+    # Pustka ma własny stan — to inna wiadomość niż „gotowe".
+    async def _empty_tool(ctx, **kw):
+        return ToolResult(content={"info": "nic"}, empty=True, summary="nic nie znalazłem")
+
+    TOOL_REGISTRY["_t_empty"] = Tool(
+        name="_t_empty", description="atrapa pustego wyniku testowa",
+        parameters={"type": "object", "properties": {}, "required": []},
+        fn=_empty_tool, status_message="Szukam…",
+    )
+    agent = _StubAgent([("text", "x")])
+    agent.tools = ["_t_empty"]
+    agent.client.chat.completions = _StreamFake([
+        ("tools", [("_t_empty", "{}")]), ("text", "ostrożna odpowiedź"),
+    ])
+    events = []
+    async for line in await agent._agentic_stream([{"role": "user", "content": "?"}],
+                                                  ToolContext(session=None)):
+        events.append(json.loads(line))
+    states = [e.get("state") for e in events if e["type"] == "status"]
+    check("empty" in states, "pusty wynik ma własny stan, nie udaje sukcesu")
+    check("warning" in states,
+          "gdy WSZYSTKO puste — użytkownik jest uprzedzony przed odpowiedzią")
+
     # 7. Limit czasu — wolne narzędzie nie trzyma mieszkańca w nieskończoność.
     agent = _StubAgent([("text", "x")])
     agent.tools = ["_t_slow"]
@@ -373,21 +408,34 @@ async def run_live_tests():
 
     Koszt: kilka wywołań gpt-4o-mini, rzędu jednego centa.
     """
+    from src.ai.agents.organizator import OrganizatorAgent
     from src.ai.agents.przewodnik import PrzewodnikAgent
+    from src.ai.agents.straznik import StraznikAgent
     from src.database.connection import async_session
 
     print("\n== Model na żywo (--live) ==")
 
     cases = [
-        ("Jak pogoda będzie jutro?", {"weather_forecast"}, None),
-        ("Co robić w weekend w Rybnie?", {"weather_forecast", "upcoming_events"}, None),
-        ("Gdzie zjeść w okolicy?", {"local_places"}, None),
+        # „Jutro” musi objąć DWA dni (dziś + jutro) — przy days=1 model dostawał
+        # resztkę dzisiejszego wieczoru i opisywał ją jako jutrzejszy dzień.
+        (PrzewodnikAgent, "Jak pogoda będzie jutro?", {"weather_forecast"}, "23"),
+        (PrzewodnikAgent, "Co robić w weekend w Rybnie?",
+         {"weather_forecast", "upcoming_events"}, None),
+        (PrzewodnikAgent, "Gdzie zjeść w okolicy?", {"local_places"}, None),
         # Kontrolne: odpowiedź jest w karcie gminy, żadne narzędzie nie pomoże.
-        ("Kto jest wójtem gminy Rybno?", set(), "Węgrzynowski"),
+        (PrzewodnikAgent, "Kto jest wójtem gminy Rybno?", set(), "Węgrzynowski"),
+        # Organizator — pytania, które przegrał 18.08.
+        (OrganizatorAgent, "Godziny pracy", {"office_hours"}, None),
+        (OrganizatorAgent, "Jak pracuje gops", {"office_hours"}, "GOPS"),
+        (OrganizatorAgent, "Kiedy wywóz śmieci w Hartowcu?", {"waste_schedule"}, None),
+        # Strażnik — regresja z 7.08 i szablon „zapowiedziano brak przerw”.
+        (StraznikAgent, "Czy dziś nie będzie prądu?", {"active_alerts"}, None),
+        (StraznikAgent, "Czy są planowane przerwy w dostawie prądu?",
+         {"active_alerts"}, None),
     ]
 
-    for question, expected_any, must_contain in cases:
-        agent = PrzewodnikAgent()
+    for agent_cls, question, expected_any, must_contain in cases:
+        agent = agent_cls()
         used: list = []
         original = agent._call_tool
 

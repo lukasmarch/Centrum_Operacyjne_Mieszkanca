@@ -85,6 +85,10 @@ class ToolResult:
     charts: list = field(default_factory=list)
     empty: bool = False
     error: Optional[str] = None
+    # Jedno zdanie dla CZŁOWIEKA o tym, co narzędzie znalazło („6 terminów
+    # wywozu", „kalendarz pusty"). Idzie do interfejsu, nie do modelu — użytkownik
+    # ma widzieć, na czym stoi odpowiedź, zanim ta odpowiedź powstanie.
+    summary: Optional[str] = None
 
 
 ToolFn = Callable[..., Awaitable[ToolResult]]
@@ -114,6 +118,30 @@ class Tool:
 
 
 TOOL_REGISTRY: dict[str, Tool] = {}
+
+
+def args_label(args: dict) -> str:
+    """Argumenty wywołania w postaci czytelnej dla człowieka.
+
+    „Rybno · 3 dni" zamiast `{"location": "Rybno", "days": 3}`. Interfejs
+    pokazuje NIE TYLKO to, że agent coś sprawdza, ale CZEGO dokładnie szuka —
+    bo to jest moment, w którym użytkownik widzi, że został źle zrozumiany
+    („szukam w: Działdowo", gdy pytał o Rybno) i może poprawić pytanie, zamiast
+    czekać na odpowiedź nie na temat.
+    """
+    if not args:
+        return ""
+    parts = []
+    for key, value in args.items():
+        if value is None or value == "":
+            continue
+        if isinstance(value, bool):
+            parts.append(key if value else f"bez {key}")
+        elif key in ("days", "hours"):
+            parts.append(f"{value} {'dni' if key == 'days' else 'h'}")
+        else:
+            parts.append(str(value))
+    return " · ".join(parts)[:80]
 
 
 def register(tool: Tool) -> Tool:
@@ -179,4 +207,4 @@ def describe_for(names: list[str]) -> str:
 
 # Import modułów narzędziowych rejestruje je w `TOOL_REGISTRY`. Trzyma się tu,
 # na dole, bo moduły importują `register`/`Tool` z tego pliku.
-from src.ai.tools import places, weather  # noqa: E402,F401
+from src.ai.tools import alerts, daily, places, weather  # noqa: E402,F401

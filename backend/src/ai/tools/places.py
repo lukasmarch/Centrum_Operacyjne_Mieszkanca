@@ -85,6 +85,7 @@ async def upcoming_events(
                 ),
             },
             empty=True,
+            summary=f"kalendarz pusty w oknie {days} dni",
         )
 
     wydarzenia = []
@@ -99,7 +100,10 @@ async def upcoming_events(
             "opis": (ev.description or "")[:200],
         })
 
-    return ToolResult(content={"okno_dni": days, "wydarzenia": wydarzenia})
+    return ToolResult(
+        content={"okno_dni": days, "wydarzenia": wydarzenia},
+        summary=f"{len(wydarzenia)} wydarzeń w oknie {days} dni",
+    )
 
 
 async def local_places(
@@ -118,10 +122,13 @@ async def local_places(
         from src.integrations.places_service import places_service
         live = await places_service.search_live(query, category=category)
         if live:
-            return ToolResult(content={
-                "zrodlo": "Google Maps — wyszukiwanie na żywo",
-                "miejsca": [_place_row(p) for p in live[:MAX_PLACES]],
-            })
+            return ToolResult(
+                content={
+                    "zrodlo": "Google Maps — wyszukiwanie na żywo",
+                    "miejsca": [_place_row(p) for p in live[:MAX_PLACES]],
+                },
+                summary=f"{len(live[:MAX_PLACES])} miejsc (wyszukiwanie na żywo)",
+            )
         logger.warning("Live search bez wyniku — sięgam do cache'u")
 
     if category:
@@ -159,12 +166,16 @@ async def local_places(
                 ),
             },
             empty=True,
+            summary=f"brak miejsc w bazie ({category or 'wszystkie kategorie'})",
         )
 
-    return ToolResult(content={
-        "zrodlo": "baza miejsc RybnoLive (Google Maps)",
-        "miejsca": [_place_row(p) for p in rows],
-    })
+    return ToolResult(
+        content={
+            "zrodlo": "baza miejsc RybnoLive (Google Maps)",
+            "miejsca": [_place_row(p) for p in rows],
+        },
+        summary=f"{len(rows)} miejsc z bazy",
+    )
 
 
 def _place_row(place: dict) -> dict:

@@ -143,24 +143,40 @@ class Case:
 # --- materiał, który agent zobaczy (etap 1) -----------------------------------
 
 async def _straznik_context(session: AsyncSession, question: str) -> str:
-    from src.ai.agents.straznik import StraznikAgent
+    """Materiał Strażnika — to, co zwracają jego narzędzia.
 
-    agent = StraznikAgent()
-    return agent._build_context(
-        await agent._fetch_recent_reports(session),
-        await agent._fetch_alert_articles(session),
-        await agent._fetch_recent_bip(session),
+    Od 22.08.2026 Strażnik nie pobiera danych sam: `_fetch_alert_articles`
+    i `_fetch_recent_reports` przeniosły się do `ai/tools/alerts.py`. Wyrocznia
+    sprawdza więc narzędzia, bo to one są teraz jedynym źródłem jego wiedzy
+    o awariach.
+    """
+    import json
+
+    from src.ai.tools import ToolContext
+    from src.ai.tools.alerts import active_alerts, citizen_reports
+
+    ctx = ToolContext(session=session)
+    alerts = await active_alerts(ctx)
+    reports = await citizen_reports(ctx)
+    return json.dumps(
+        [alerts.content, reports.content], ensure_ascii=False, default=str
     )
 
 
 async def _straznik_context_at_incident(session: AsyncSession, question: str) -> str:
-    """Materiał Strażnika widziany z chwili, w której odpowiedział błędnie."""
-    from src.ai.agents.straznik import StraznikAgent
+    """Materiał Strażnika widziany z chwili, w której odpowiedział błędnie.
 
-    agent = StraznikAgent()
-    return agent._build_context(
-        [], await agent._fetch_alert_articles(session, now=INCIDENT_AT), []
-    )
+    `ToolContext.now` jest tu jedynym powodem, dla którego da się to odtworzyć:
+    gdyby narzędzie brało czas z zegara, regresji z 7.08 nie sposób byłoby
+    powtórzyć po fakcie.
+    """
+    import json
+
+    from src.ai.tools import ToolContext
+    from src.ai.tools.alerts import active_alerts
+
+    result = await active_alerts(ToolContext(session=session, now=INCIDENT_AT))
+    return json.dumps(result.content, ensure_ascii=False, default=str)
 
 
 def _rag_probe(agent_name: str) -> Callable[[AsyncSession, str], Awaitable[str]]:

@@ -35,6 +35,26 @@ export interface ChatSource {
   source_name?: string;
 }
 
+/**
+ * Krok pracy agenta pokazywany na żywo pod pytaniem.
+ *
+ * Nie jest to ozdoba ładowania: `detail` niesie argumenty wywołania
+ * („Rybno · 3 dni”), więc mieszkaniec widzi, CZEGO agent szuka — i poznaje
+ * moment, w którym został źle zrozumiany, zanim przeczyta odpowiedź nie na
+ * temat. `state` rozdziela trzy sytuacje, które dla czytającego znaczą co
+ * innego: znalazłem / nie ma tego w danych / narzędzie zawiodło.
+ */
+export interface AgentStep {
+  message: string;
+  /** Nazwa narzędzia — łączy krok „w toku” z jego wynikiem */
+  tool?: string;
+  state?: 'running' | 'done' | 'empty' | 'error' | 'warning' | 'info';
+  /** Argumenty w formie czytelnej: „Rybno · 3 dni” */
+  detail?: string;
+  /** Co narzędzie zastało: „prognoza Rybno: 3 dni”, „kalendarz pusty” */
+  result?: string;
+}
+
 export interface ForecastDay {
   dzien: string;          // "dziś" / "jutro" / "w czwartek"
   data: string;           // DD.MM.YYYY
@@ -71,8 +91,8 @@ export interface ChatMessageData {
   agent_name?: string;
   isStreaming?: boolean;
   chartData?: ChartConfig[];
-  /** Widoczne kroki pracy agenta ("Przeszukałem bazę wiedzy — 4 materiały…") */
-  steps?: string[];
+  /** Widoczne kroki pracy agenta — co sprawdza, czego szuka, co zastał */
+  steps?: AgentStep[];
   /** Pytania pomocnicze — klikalne chipy pod odpowiedzią */
   followups?: string[];
   /** ID wiadomości w bazie — potrzebne do ocen 👍/👎 */
@@ -194,9 +214,28 @@ export function useChat(options: UseChatOptions = {}) {
             if (data.type === 'start') {
               setConversationId(data.conversation_id);
             } else if (data.type === 'status') {
-              setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, steps: [...(m.steps || []), data.message] } : m
-              ));
+              // Wynik narzędzia DOMYKA krok „w toku”, zamiast dopisywać drugi
+              // wiersz o tym samym. Lista ma być zapisem pracy, nie logiem.
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                const steps = [...(m.steps || [])];
+                const incoming: AgentStep = {
+                  message: data.message,
+                  tool: data.tool,
+                  state: data.state || 'info',
+                  detail: data.detail || undefined,
+                };
+                if (data.tool && data.state && data.state !== 'running') {
+                  const idx = steps.map(s => s.tool === data.tool && s.state === 'running')
+                                   .lastIndexOf(true);
+                  if (idx !== -1) {
+                    // Etykieta „co sprawdzam” zostaje, dochodzi wynik.
+                    steps[idx] = { ...steps[idx], state: incoming.state, result: incoming.message };
+                    return { ...m, steps };
+                  }
+                }
+                return { ...m, steps: [...steps, incoming] };
+              }));
             } else if (data.type === 'followups') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, followups: data.questions } : m
