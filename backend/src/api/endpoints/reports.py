@@ -387,7 +387,107 @@ async def create_report(
 
         logger.info(f"Report created (pending moderation): id={report.id}, title='{report.title}', category={report.category}")
 
+        # Dzwonek do redakcji — bez niego moderacja jest tylko nazwą (22.08.2026)
+        if report.status == ReportStatus.PENDING.value:
+            await _notify_admin_new_report(report)
+
         return ReportResponse.model_validate(report)
+
+
+# Nazwy kategorii po polsku — mail ma być czytelny na telefonie, bez zaglądania
+# do kodu. Front trzyma własną kopię w `reportsApi.ts` (widok mieszkańca).
+_CATEGORY_LABELS = {
+    "emergency": "ZAGROŻENIE ŻYCIA",
+    "fire": "POŻAR",
+    "water": "WODA / KANALIZACJA",
+    "safety": "BEZPIECZEŃSTWO",
+    "infrastructure": "infrastruktura",
+    "waste": "odpady",
+    "greenery": "zieleń",
+    "other": "inne",
+}
+
+# Kategorie, przy których cisza kosztuje najwięcej — wołają w temacie maila.
+_URGENT_CATEGORIES = {"emergency", "fire", "water", "safety"}
+
+
+async def _notify_admin_new_report(report: Report) -> None:
+    """
+    Dzwonek: mail do redakcji w chwili wpłynięcia zgłoszenia.
+
+    22.08.2026, 11:12 — mieszkaniec zgłosił „Brak Wody" w Żabinach w dniu, w którym
+    przez gminę szła nawałnica. Zgłoszenie usiadło w `pending` i nie zobaczył go
+    NIKT: publikacja wymaga moderacji, a moderator nie miał skąd wiedzieć, że jest
+    co moderować. To jedyny kanał działający w czasie rzeczywistym — Facebooka
+    czytamy dwa razy na dobę, a awarii wody nie zgłasza żadne źródło automatyczne.
+    Od uruchomienia nie dostarczył na stronę ani jednej informacji: zgłoszenie
+    z 12.07 („Zalana posesja Żabiny 50") skończyło jako `rejected`, to z 22.08
+    czekało w kolejce.
+
+    Powiadomienie AUTORA o zmianie statusu istniało od początku
+    (`_notify_report_author`). Brakowało dokładnie tego w drugą stronę.
+
+    Fire-and-forget: błąd wysyłki nie może wywrócić przyjęcia zgłoszenia —
+    mieszkaniec ma dostać potwierdzenie nawet wtedy, gdy poczta leży.
+    """
+    try:
+        from src.config import settings
+        from src.newsletter.email_service import EmailService
+
+        admin_email = getattr(settings, "ADMIN_ALERT_EMAIL", None)
+        if not admin_email:
+            logger.warning("Nowe zgłoszenie bez dzwonka — brak ADMIN_ALERT_EMAIL")
+            return
+
+        category = (report.category or "other").lower()
+        label = _CATEGORY_LABELS.get(category, category)
+        pilne = category in _URGENT_CATEGORIES
+        kiedy = report.created_at.strftime("%H:%M") if report.created_at else "teraz"
+
+        kontakt = " · ".join(filter(None, [
+            report.author_name,
+            report.author_email,
+            report.author_phone,
+        ])) or "zgłoszenie anonimowe"
+
+        subject = (
+            f"{'🔴 PILNE · ' if pilne else ''}Nowe zgłoszenie: {report.title} "
+            f"({report.location_name or 'bez lokalizacji'})"
+        )
+        html = f"""
+        <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
+          <h2 style="color:{'#dc2626' if pilne else '#1d4ed8'};margin-bottom:4px">
+            Zgłoszenia 24 · nowe zgłoszenie
+          </h2>
+          <p style="color:#64748b;font-size:13px;margin-top:0">
+            {label} · wpłynęło o {kiedy}
+          </p>
+          <div style="background:#f1f5f9;padding:16px;border-radius:8px;
+                      border-left:4px solid {'#dc2626' if pilne else '#1d4ed8'}">
+            <strong style="font-size:16px">{report.title}</strong><br>
+            <span style="color:#334155">{report.description or ''}</span><br>
+            <span style="color:#64748b;font-size:13px">
+              📍 {report.location_name or report.address or 'brak lokalizacji'}
+            </span>
+          </div>
+          <p style="font-size:13px;color:#64748b">Zgłaszający: {kontakt}</p>
+          <p style="background:#fef3c7;padding:12px 16px;border-radius:8px;font-size:14px">
+            ⚠️ Zgłoszenie jest <strong>niewidoczne na stronie</strong>, dopóki go nie
+            zatwierdzisz. Kolejka moderacji: zakładka <strong>Zgłoszenia 24</strong>
+            na rybnolive.pl (widoczna po zalogowaniu na konto administratora).
+          </p>
+          <p><a href="https://rybnolive.pl/zgloszenia"
+                style="color:#1d4ed8">Przejdź do moderacji →</a></p>
+        </div>
+        """
+        await EmailService().send_email(
+            to_email=admin_email,
+            subject=subject,
+            html_content=html,
+        )
+        logger.info(f"Dzwonek: zgłoszenie {report.id} ({category}) → {admin_email}")
+    except Exception as e:
+        logger.error(f"Dzwonek nie zadzwonił dla zgłoszenia {report.id}: {e}")
 
 
 def _voter_key(request: Request, user) -> str:
