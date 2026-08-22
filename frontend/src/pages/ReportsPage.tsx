@@ -404,35 +404,50 @@ const ReportDetail: React.FC<{
 
 // ==================== Locality GPS coordinates ====================
 
+// Punkt podstawiany po wyborze miejscowości — dla każdego, kto nie zgodzi się
+// na GPS przeglądarki. To jedyne źródło lokalizacji takiego zgłoszenia, więc
+// błąd tutaj stawia pinezkę w cudzej wsi i nikt tego nie zauważy.
+//
+// 22.08.2026: poprzednia tabela była zmyślona — 11 z 12 sprawdzonych punktów
+// leżało poza swoją miejscowością (Żabiny 8,9 km, Koszelewy 10,7 km, Kozłowo
+// 23,5 km, samo Rybno 6,0 km). Do tego lista wyboru wymieniała pod nagłówkiem
+// „Gmina Rybno" 16 wsi z OBCYCH gmin (Grodziczno, Szreńsk, Radomno…), a 15
+// prawdziwych miejscowości gminy w ogóle w niej nie było.
+//
+// Nazwy pochodzą z `services/alert_policy.py` (_PLACES) — jedynej kanonicznej
+// listy miejscowości gminy w projekcie. Współrzędne: Nominatim/OpenStreetMap,
+// zapytanie „<nazwa>, gmina Rybno, powiat działdowski”.
 const LOCALITY_COORDS: Record<string, [number, number]> = {
-    'Rybno': [53.3904, 19.8400],
-    'Hartowiec': [53.3716, 19.7821],
-    'Rumian': [53.4155, 19.8063],
-    'Żabiny': [53.3502, 19.8555],
-    'Koszelewki': [53.3990, 19.8751],
-    'Jeżewo': [53.4056, 19.7635],
-    'Dłutowo': [53.3660, 19.8200],
-    'Fijewo': [53.3835, 19.8750],
-    'Grodziczno': [53.3350, 19.8310],
-    'Jamiełnik': [53.3550, 19.8110],
-    'Koszelewy': [53.3940, 19.8520],
-    'Lewałd Wielki': [53.4100, 19.8380],
-    'Litwa': [53.3750, 19.7950],
-    'Naguszewo': [53.3615, 19.8660],
-    'Olszewko': [53.3450, 19.8400],
-    'Ostaszewo': [53.3800, 19.8620],
-    'Radomno': [53.3700, 19.8450],
-    'Ruda': [53.3560, 19.8290],
-    'Słup': [53.3490, 19.8150],
-    'Starczówek': [53.3860, 19.7740],
-    'Szreńsk': [53.3600, 19.7800],
-    'Trzonki': [53.3950, 19.8150],
-    'Zwiniarz': [53.4000, 19.7900],
-    'Działdowo': [53.2375, 20.1688],
-    'Lidzbark': [53.2619, 19.8285],
-    'Iłowo-Osada': [53.1979, 20.2618],
-    'Płośnica': [53.3180, 20.0670],
-    'Kozłowo': [53.5075, 20.4055],
+    // gmina Rybno
+    'Rybno': [53.383457, 19.929167],
+    'Dębień': [53.395153, 19.900660],
+    'Grabacz': [53.344714, 19.948519],
+    'Gralewo': [53.320128, 20.035088],
+    'Gralewo-Stacja': [53.324807, 20.022768],
+    'Gronowo': [53.373401, 19.867023],
+    'Groszki': [53.423216, 19.966530],
+    'Grądy': [53.357839, 19.859254],
+    'Hartowiec': [53.397837, 19.843383],
+    'Jeglia': [53.387398, 19.878273],
+    'Kopaniarze': [53.348482, 19.905271],
+    'Koszelewki': [53.327099, 19.892420],
+    'Koszelewy': [53.327107, 19.968458],
+    'Naguszewo': [53.418758, 19.960030],
+    'Nowa Wieś': [53.388171, 20.003809],
+    'Prusy': [53.372853, 19.987625],
+    'Rapaty': [53.348831, 20.025953],
+    'Rumian': [53.417703, 19.932398],
+    'Szczupliny': [53.379718, 20.009078],
+    'Truszczyny': [53.417985, 19.873705],
+    'Tuczki': [53.354266, 19.953957],
+    'Wery': [53.352684, 19.887731],
+    'Żabiny': [53.343381, 19.989121],
+    // okolice — poza gminą, ale w zasięgu spraw mieszkańca
+    'Działdowo': [53.240637, 20.184687],
+    'Lidzbark': [53.262804, 19.823184],
+    'Iłowo-Osada': [53.166977, 20.297615],
+    'Płośnica': [53.274575, 20.010217],
+    'Kozłowo': [53.307176, 20.293128],
 };
 
 // ==================== Report Form Modal ====================
@@ -687,28 +702,28 @@ const ReportFormModal: React.FC<{
                                         <option value="">— Wybierz miejscowość —</option>
                                         <optgroup label="Gmina Rybno" className="bg-gray-900">
                                             <option value="Rybno">Rybno</option>
+                                            <option value="Dębień">Dębień</option>
+                                            <option value="Grabacz">Grabacz</option>
+                                            <option value="Gralewo">Gralewo</option>
+                                            <option value="Gralewo-Stacja">Gralewo-Stacja</option>
+                                            <option value="Gronowo">Gronowo</option>
+                                            <option value="Groszki">Groszki</option>
+                                            <option value="Grądy">Grądy</option>
                                             <option value="Hartowiec">Hartowiec</option>
-                                            <option value="Rumian">Rumian</option>
-                                            <option value="Żabiny">Żabiny</option>
+                                            <option value="Jeglia">Jeglia</option>
+                                            <option value="Kopaniarze">Kopaniarze</option>
                                             <option value="Koszelewki">Koszelewki</option>
-                                            <option value="Jeżewo">Jeżewo</option>
-                                            <option value="Dłutowo">Dłutowo</option>
-                                            <option value="Fijewo">Fijewo</option>
-                                            <option value="Grodziczno">Grodziczno</option>
-                                            <option value="Jamiełnik">Jamiełnik</option>
                                             <option value="Koszelewy">Koszelewy</option>
-                                            <option value="Lewałd Wielki">Lewałd Wielki</option>
-                                            <option value="Litwa">Litwa</option>
                                             <option value="Naguszewo">Naguszewo</option>
-                                            <option value="Olszewko">Olszewko</option>
-                                            <option value="Ostaszewo">Ostaszewo</option>
-                                            <option value="Radomno">Radomno</option>
-                                            <option value="Ruda">Ruda</option>
-                                            <option value="Słup">Słup</option>
-                                            <option value="Starczówek">Starczówek</option>
-                                            <option value="Szreńsk">Szreńsk</option>
-                                            <option value="Trzonki">Trzonki</option>
-                                            <option value="Zwiniarz">Zwiniarz</option>
+                                            <option value="Nowa Wieś">Nowa Wieś</option>
+                                            <option value="Prusy">Prusy</option>
+                                            <option value="Rapaty">Rapaty</option>
+                                            <option value="Rumian">Rumian</option>
+                                            <option value="Szczupliny">Szczupliny</option>
+                                            <option value="Truszczyny">Truszczyny</option>
+                                            <option value="Tuczki">Tuczki</option>
+                                            <option value="Wery">Wery</option>
+                                            <option value="Żabiny">Żabiny</option>
                                         </optgroup>
                                         <optgroup label="Okolice" className="bg-gray-900">
                                             <option value="Działdowo">Działdowo</option>
