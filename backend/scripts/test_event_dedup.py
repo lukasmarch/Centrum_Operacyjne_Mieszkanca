@@ -7,7 +7,8 @@ Trzy części:
                   miejsce spoza tekstu znika, locality=3 wymaga nazwy z gminy;
   2. BRAMKA MIEJSCA — czy `is_pinned_alert` przypina wyłącznie awarie z gminy
                   (21.08.2026 feed przypiął wyłączenie w Iłowie-Osadzie);
-  3. BAZA (--db) — czy w kalendarzu NIE MA już powtórek i wpisów spoza powiatu:
+  3. BAZA (--db) — czy zapytanie dedupu w ogóle się wykonuje (patrz `find_duplicate`)
+                  oraz czy w kalendarzu NIE MA już powtórek i wpisów spoza powiatu:
                   dla każdego dnia liczy pary widocznych wydarzeń o podobieństwie
                   ≥ progu. To jest test, który 20.08 wyłapałby maila z sześcioma
                   wersjami turnieju w Tuczkach.
@@ -174,6 +175,24 @@ async def run_db() -> int:
     failed = 0
 
     async with async_session() as session:
+        # Najpierw samo ZAPYTANIE, dopiero potem jego wynik. `find_duplicate`
+        # to jedyna funkcja nowej bramki rozmawiająca z bazą i do 22.08.2026
+        # nie wołał jej żaden test: czternaście zielonych sprawdzeń grounding-u
+        # przepuściło SQL, którego produkcja nie wykonała ani razu. Ekstraktor
+        # woła ją zawsze bez wykluczenia i właśnie ta gałąź się wywracała, więc
+        # `exclude_id` zostaje tu pusty celowo — z ID w środku zapytanie działa.
+        from src.ai.event_extractor import find_duplicate
+
+        probe = [0.0] * 1536
+        probe[0] = 1.0
+        try:
+            await find_duplicate(session, probe, datetime.utcnow(), "Rybno")
+            print("  ✓ find_duplicate wykonuje się bez wykluczenia (ścieżka ekstraktora)")
+        except Exception as exc:
+            failed += 1
+            print(f"  ✗ find_duplicate(exclude_id=None) nie wykonało się: {exc}")
+            await session.rollback()
+
         pairs = (await session.execute(text("""
             SELECT ea.id, eb.id, round((1 - (a.embedding <=> b.embedding))::numeric, 2),
                    left(ea.title, 40), left(eb.title, 40), date(ea.event_date),

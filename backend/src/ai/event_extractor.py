@@ -207,6 +207,20 @@ async def find_duplicate(
     day = event_date.date()
     embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
 
+    # Wykluczenie wchodzi do zapytania jako FRAGMENT SQL, nie jako parametr
+    # o wartości NULL. asyncpg wysyła zapytanie protokołem rozszerzonym i przy
+    # `:exclude_id IS NULL` nie ma z czego wywnioskować typu parametru —
+    # PostgreSQL odpowiada `AmbiguousParameterError: could not determine data
+    # type of parameter $2`. Ekstraktor woła tę funkcję ZAWSZE bez wykluczenia
+    # (wydarzenie jeszcze nie istnieje), więc gałąź z NULL-em była gałęzią
+    # domyślną: od 21.08.2026 wywracała każdą ekstrakcję wydarzenia na
+    # produkcji, a `dedupe_events` działał, bo podaje konkretne ID.
+    params: dict = {"day": day}
+    exclude_clause = ""
+    if exclude_id is not None:
+        exclude_clause = "AND e.id <> :exclude_id"
+        params["exclude_id"] = exclude_id
+
     rows = (await session.execute(sql_text(f"""
         SELECT e.id, e.location, 1 - (d.embedding <=> $emb${embedding_str}$emb$::vector) AS sim
         FROM events e
@@ -214,10 +228,10 @@ async def find_duplicate(
           ON d.source_type = 'event' AND d.source_id = e.id AND d.chunk_index = 0
         WHERE date(e.event_date) = :day
           AND e.canonical_id IS NULL
-          AND (:exclude_id IS NULL OR e.id <> :exclude_id)
+          {exclude_clause}
         ORDER BY sim DESC
         LIMIT 10
-    """), {"day": day, "exclude_id": exclude_id})).all()
+    """), params)).all()
 
     key = _place_key(location)
     for event_id, other_location, sim in rows:
@@ -507,9 +521,21 @@ URL: {article.url}
             f"({len(candidates) - len(articles)} odrzuconych przez bramkę)..."
         )
 
-        # Ekstrahuj wydarzenia
+        # Po pętli chodzą ID, nie obiekty ORM. `extract_event` przy błędzie robi
+        # `session.rollback()`, a rollback UNIEWAŻNIA wszystkie wczytane obiekty
+        # — niezależnie od `expire_on_commit=False`. Sięgnięcie po `article.id`
+        # następnego wpisu próbowałoby wtedy dociągnąć go z bazy w kodzie
+        # synchronicznym i wywracało CAŁY przebieg na `MissingGreenlet`
+        # (22.08.2026: jeden felerny artykuł zabrał pozostałe trzynaście).
+        # `session.get` czyta świadomie i asynchronicznie, więc jeden zły wpis
+        # kosztuje wyłącznie siebie.
+        article_ids = [article.id for article in articles]
+
         event_count = 0
-        for article in articles:
+        for article_id in article_ids:
+            article = await session.get(Article, article_id)
+            if article is None:
+                continue
             event = await self.extract_event(article, session)
             if event:
                 event_count += 1
