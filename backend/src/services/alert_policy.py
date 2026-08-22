@@ -182,6 +182,38 @@ def places_in(title: Optional[str], content: Optional[str] = None) -> tuple[str,
     return tuple(place for place, pattern in _PLACE_RE if pattern.search(text))
 
 
+# Energa opisuje wyłączenia REJONEM ENERGETYCZNYM, nie gminą, i wpisuje go
+# w tytuł: „Wyłączenie awaryjne - Region Mława - Rybno gmina wiejska". Powiat
+# działdowski leży w całości w Regionie Mława (22.08.2026: 35 wpisów Mława,
+# 1 Gostynin — i ten jeden był właśnie fałszywką).
+_OUR_REGION = "mlawa"
+
+# Wzorzec celowo wąski — wymaga myślnika po nazwie, czyli dokładnego formatu
+# tytułu Energi. Zdanie „w naszym regionie warmińsko-mazurskim" z dowolnego
+# innego źródła NIE MOŻE tu wpaść, bo odrzucenie działa na oślep dla wszystkich.
+_REGION_RE = re.compile(r"\bregion\s+([a-z]+)\s*-")
+
+
+def is_foreign_region(title: Optional[str], content: Optional[str] = None) -> bool:
+    """
+    Czy wpis dotyczy rejonu, którego NIE obsługujemy — mimo że padła w nim
+    nazwa z gminy Rybno.
+
+    22.08.2026 o 9:34 poszło powiadomienie „Wyłączenie prądu — Rybno · dziś
+    06:21–13:00" z wpisu „Wyłączenie awaryjne - Region Gostynin - Rybno gmina
+    wiejska" (Antosin, Koszajec, Matyldów, Rybionek, Wężyki). To gmina Rybno
+    w powiecie SOCHACZEWSKIM, 180 km stąd. `places_in` odpowiada na pytanie
+    „czy nazwa padła", a nie „gdzie ta nazwa leży", i samą listą tego nie
+    rozstrzygnie — nazwa jest dosłownie ta sama. Ta sama pułapka, przez którą
+    grupa `gminarybnoforum` okazała się cudzą gminą.
+
+    Odrzucamy WYŁĄCZNIE jawnie obcy rejon. Brak słowa „Region" nie znaczy nic:
+    tak wygląda każde źródło poza Energą, a milczenie nie jest zaprzeczeniem.
+    """
+    match = _REGION_RE.search(_flat(f"{title or ''} {content or ''}"))
+    return bool(match) and match.group(1) != _OUR_REGION
+
+
 # --- bramka 3: czas ----------------------------------------------------------
 
 
@@ -242,6 +274,9 @@ def evaluate(
     places = places_in(title, content)
     if not places:
         return None  # zdarzenie spoza gminy Rybno (Płośnica, Iłowo, Lidzbark…)
+
+    if is_foreign_region(title, content):
+        return None  # cudze Rybno — patrz `is_foreign_region`
 
     if not is_timely(published_at, scraped_at, event_at, event_until, now):
         return None

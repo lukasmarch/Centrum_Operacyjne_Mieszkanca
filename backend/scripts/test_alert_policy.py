@@ -63,7 +63,31 @@ CASES: List[Tuple[str, str, str, Optional[datetime], Optional[datetime], Optiona
         "Hartowiec 27.07.2026 11:00-15:00",
         HOUR_AGO, NOW + timedelta(hours=3), "prad",
     ),
+    (
+        # Energa grupuje po REJONACH, nie po gminach, a lista ulic przekracza
+        # granice gmin: Gralewo leży w gminie Rybno, choć wpis opisano Płośnicą.
+        # Dlatego bramka miejsca czyta TREŚĆ, nie etykietę gminy w tytule.
+        "wyłączenie opisane Płośnicą, ale obejmuje Gralewo z naszej gminy",
+        "Wyłączenie awaryjne - Region Mława - Płośnica gmina wiejska",
+        "ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej "
+        "(wyłączenie prądu), 22.08.2026 07:26–13:00.\n\n"
+        "Płośnica gmina wiejska 22.08.2026 07:26-13:00 - Gralewo, Gruszka.",
+        HOUR_AGO, NOW + timedelta(hours=3), "prad",
+    ),
     # --- MUSI odpaść ----------------------------------------------------------
+    (
+        # 22.08.2026, 9:34 — TO POSZŁO NAPRAWDĘ. „Wyłączenie prądu — Rybno,
+        # dziś 06:21-13:00" z gminy Rybno w powiecie SOCHACZEWSKIM. Nazwa
+        # miejscowości jest dosłownie ta sama, więc rozstrzyga rejon Energi:
+        # powiat działdowski to zawsze Region Mława.
+        "cudze Rybno spod Sochaczewa (Region Gostynin) ← przypadek z 22.08",
+        "Wyłączenie awaryjne - Region Gostynin - Rybno gmina wiejska",
+        "ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej "
+        "(wyłączenie prądu), 22.08.2026 06:21–13:00.\n\n"
+        "Rybno gmina wiejska 22.08.2026 06:21-13:00 - Antosin, Koszajec, "
+        "Matyldów, Rybionek, Wężyki.",
+        HOUR_AGO, NOW + timedelta(hours=3), None,
+    ),
     (
         "wyłączenie prądu w Płośnicy (obca gmina) ← przypadek z 27.07",
         "Wyłączenie planowane - Region Mława - Płośnica gmina wiejska",
