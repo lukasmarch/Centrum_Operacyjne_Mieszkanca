@@ -327,6 +327,20 @@ ACTS_SINCE_LABEL = "2024"
 ACTS_DEFAULT_LIMIT = 5
 ACTS_MAX_LIMIT = 15
 
+# Ile treści oddajemy przy LIŚCIE aktów — tyle, żeby model rozpoznał, o czym
+# jest akt, i nie więcej: pięć uchwał po 8 tys. znaków wypchnęłoby wszystko inne.
+ACTS_PREVIEW_CHARS = 400
+
+# Ile treści oddajemy, gdy trafiony jest DOKŁADNIE JEDEN akt. Wtedy pytanie
+# brzmi „o czym jest ta uchwała", a na to nie da się odpowiedzieć z zajawki.
+#
+# 24.08.2026: „możesz podsumować Uchwałę nr XXIII/180/2026" → agent poszedł do
+# `search_documents`, bo rejestr oddawał mu 400 znaków. Wyszukiwarka wektorowa
+# NIE ZNAJDUJE aktu po numerze (numer nie niesie sensu dla embeddingu), więc
+# wróciła z fragmentami dwóch INNYCH uchwał, a agent uczciwie powiedział, że nie
+# ma podsumowania. Miał je w zasięgu ręki przez cały czas.
+ACTS_FULL_CHARS = 8000
+
 
 async def search_legal_acts(
     ctx: ToolContext,
@@ -412,6 +426,12 @@ async def search_legal_acts(
             summary=f"brak aktów: {czego}",
         )
 
+    # Jeden trafiony akt = pytanie o TEN akt („podsumuj", „o czym jest").
+    # Wtedy oddajemy treść, a nie zajawkę.
+    pojedynczy = len(acts) == 1
+    limit_tresci = ACTS_FULL_CHARS if pojedynczy else ACTS_PREVIEW_CHARS
+    pole_tresci = "tresc_aktu" if pojedynczy else "poczatek_tresci"
+
     pozycje, sources = [], []
     for act in acts:
         pozycje.append({
@@ -421,9 +441,7 @@ async def search_legal_acts(
             "wchodzi_w_zycie": act.effective_from.isoformat() if act.effective_from else None,
             "status": act.status,
             "tytul": act.title,
-            # Treść tylko zajawką: pełny akt bywa 20 tys. znaków, a do czytania
-            # go „po sensie" jest search_documents.
-            "poczatek_tresci": (act.content or "")[:400] or None,
+            pole_tresci: (act.content or "")[:limit_tresci] or None,
         })
         sources.append({
             "type": "legal_act",
@@ -534,13 +552,19 @@ register(Tool(
     name="search_legal_acts",
     description=(
         "Rejestr aktów prawnych gminy: uchwały Rady Gminy i zarządzenia Wójta — "
+        "wraz z TREŚCIĄ aktu. "
         "numer, data podjęcia, data wejścia w życie, status (Obowiązujący / "
         "Uchylony) i tytuł. TO JEST WŁAŚCIWE NARZĘDZIE do pytań „jakie są "
         "najnowsze uchwały”, „czy była uchwała o…”, „jaki numer ma uchwała "
         "o podatku od nieruchomości”. Bez argumentów zwraca NAJNOWSZE akty. "
         "Rejestr obejmuje akty od 2024 r. — starsze są tylko w BIP i musisz "
-        "o tym powiedzieć, gdy nic nie znajdziesz. Pełnej treści aktu szukaj "
-        "przez search_documents; tutaj dostajesz metadane i początek tekstu."
+        "o tym powiedzieć, gdy nic nie znajdziesz.\n"
+        "PYTANIE O KONKRETNY AKT („podsumuj uchwałę nr XXIII/180/2026”, „o czym "
+        "jest to zarządzenie”) załatwiasz TUTAJ — podaj numer jako `query`. "
+        "Gdy trafiony jest dokładnie jeden akt, dostajesz jego TREŚĆ w polu "
+        "`tresc_aktu` i możesz ją streścić. NIE szukaj aktu po numerze przez "
+        "search_documents: wyszukiwarka podobieństwa nie rozpoznaje numerów "
+        "i zwróci fragmenty innych uchwał."
     ),
     parameters={
         "type": "object",

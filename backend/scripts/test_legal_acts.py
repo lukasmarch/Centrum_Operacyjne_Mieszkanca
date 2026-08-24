@@ -142,6 +142,28 @@ async def run_db_tests():
         wiele = await search_legal_acts(ctx, query="dotacja OSP")
         check(not wiele.empty, "zapytanie wielosłowne trafia (wszystkie słowa, nie fraza)")
 
+        # Pytanie o KONKRETNY akt: „podsumuj uchwałę nr…". Zgłoszone przez
+        # Łukasza 24.08 — agent szedł wtedy do `search_documents`, bo rejestr
+        # oddawał 400 znaków. Wyszukiwarka wektorowa nie rozpoznaje numerów
+        # i wracała z fragmentami INNYCH uchwał.
+        numer = res.content["akty"][0]["numer"] if not res.empty else None
+        if numer:
+            jeden = await search_legal_acts(ctx, query=numer)
+            check(not jeden.empty, f"akt znajduje się po samym numerze ({numer})")
+            if not jeden.empty:
+                akt = jeden.content["akty"][0]
+                check("tresc_aktu" in akt,
+                      "pojedyncze trafienie oddaje TREŚĆ, nie zajawkę",
+                      "z 400 znaków nie da się streścić uchwały")
+                check(len(akt.get("tresc_aktu") or "") > 400,
+                      f"treść jest pełna ({len(akt.get('tresc_aktu') or '')} zn.)")
+
+            lista = await search_legal_acts(ctx, rodzaj="uchwały", limit=5)
+            if len(lista.content.get("akty", [])) > 1:
+                check(all("poczatek_tresci" in a for a in lista.content["akty"]),
+                      "LISTA aktów zostaje przy zajawkach",
+                      "pięć uchwał po 8 tys. znaków wypchnęłoby resztę kontekstu")
+
         print("\n== Bramka akceptacji skrótów obrad (--db) ==")
         pending = (await session.execute(
             select(func.count(CouncilSession.id)).where(CouncilSession.status == "pending")
