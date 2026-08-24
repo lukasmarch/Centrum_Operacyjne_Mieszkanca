@@ -421,12 +421,41 @@ dziura ma stały kształt (`ToolResult.empty`), więc daje się policzyć.
   (`retention_job`, 3:30). Liczniki zostają
 - Pełny opis: `AGENCI.md` §4.6
 
+## Push: termin zdarzenia rozstrzyga treść (2026-08-24)
+**24.08 o 6:08 push wysłał alarm o wyłączeniu prądu, które skończyło się poprzedniego
+dnia o 19:00 — i wysłał go dwa razy.** Bramka „po zdarzeniu" (`is_timely`) istniała od
+początku; brakowało jej `event_until`. Post ZGK mówił „W godzinach 16.00 - 19.00", ale
+bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od publikacji.
+- **`services/time_span.py`** — parser godzin wyjęty z `weather_alert`. Ten sam zapis
+  potrzebny jest awariom i nie jest sprawą pogody; `parse_validity` deleguje, API bez zmian.
+  ⚠️ Dwie luki wzorca, odziedziczone: godzina z **kropką** („16.00") i **spacja po myślniku**
+- **Liczone w dwóch miejscach**, jak dla ostrzeżeń meteo: `alert_policy.span_from_text`
+  w locie (działa dla wpisów już w bazie, bez czekania na kategoryzację o 13:15) oraz
+  `article_processor` zapisem do bazy (dla feedu, briefingu i agentów)
+- ⚠️ **Tylko dla awarii** (`incident_of` — zamknięta lista, ta sama co push): „w godzinach
+  8:00–16:00" bywa godzinami urzędowania, a jako `event_at` przestawia wpis w rankingu feedu
+  i w kalendarzu. Drugi bezpiecznik: zakres kończący się PRZED publikacją odrzucamy
+- **`alert_policy.signature` (rodzaj + miejsca + termin)** zwija przedruki. Zwijanie po
+  tekście tej pary NIE łączy — kategoryzacja napisała „Wyłączenie prądu w Rybnie" i „Przerwa
+  w dostawie prądu w Rybnie", czyli podobieństwo **0,43** przy progu 0,72. Progów feedu nie
+  naginamy pod push. Pominięty przedruk i tak dostaje `alert_pushed_at`, inaczej wracałby
+  do oceny co kwadrans; pamięć wysłanych sygnatur: `RECENT_PUSH_MEMORY_H = 24`
+- Test: `python -m scripts.test_alert_policy [--db]` (18 + 9 + 3 sprawdzenia).
+  Backfill: `python -u -m scripts.production.backfill_incident_spans [--days 14] [--apply]`
+- ⚠️ **`is_pinned_alert` wciąż wymaga kategorii z „awari"**, a ta powstaje 6:15/13:15 —
+  art. 5572 (awaria 08:12–12:15) dostał push o 9:08, a na stronie stanął dopiero o 13:15,
+  godzinę po końcu wyłączenia. Dla ostrzeżeń meteo rozwiązano to czytaniem treści
+
 ## TODO (Kolejne priorytety)
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
 - [ ] Filtrowanie artykułów po kategoriach
 - [ ] Panel administracyjny
 - [ ] Wybór rejonu wywozu dla kont z zapisem „Rybno” (dziś dostają oba terminy)
+- [ ] `is_pinned_alert` bez czekania na kategorię — awaria ma trafiać na szczyt feedu
+      od razu po scrapingu, tak jak ostrzeżenia meteo (dziś czeka na 6:15/13:15)
+- [ ] Zgłoszenia 24: przypomnienie o sprawach stojących > 24 h w jednym statusie,
+      starzenie kart awaryjnych, przycisk „już działa" dla mieszkańców (odłożone 24.08)
 - [ ] Widget ruchu: zdarzenie chwilowe (spadłe bele, kolizja) musi WYGASAĆ — 21.08 trasa
       do Iławy pokazywała utrudnienie z 19.08; `road_context` nie odróżnia incydentu od prac
 - [ ] Uruchomić `add_locality_and_event_dedup` + `dedupe_events --apply` (prod i lokalnie)
