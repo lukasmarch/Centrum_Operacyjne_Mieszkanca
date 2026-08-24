@@ -382,6 +382,32 @@ async def run_telemetry_tests():
     check(out.content == {"echo": "bez pomiaru"}, "kontekst bez telemetrii działa jak dotąd")
 
 
+# ------------------------------------------------------ rodzaj zdarzenia
+def run_alert_kind_tests():
+    """Zapowiedź, rzecz trwająca czy relacja — reguła czysta, bez bazy.
+
+    24.08 Strażnik powiedział mieszkańcowi Rybna „zapowiedziano przerwy
+    w dostawie prądu" o MINIONEJ burzy w cudzym powiecie. Model wnioskował
+    rodzaj z opisu; teraz liczy go kod, więc musi być sprawdzony jak kod.
+    """
+    from datetime import datetime, timedelta
+    from src.ai.tools.alerts import _kind
+
+    print("\n== Rodzaj zdarzenia ==")
+    now = datetime(2026, 8, 24, 12, 0)
+    h = lambda n: now + timedelta(hours=n)  # noqa: E731
+
+    check(_kind(None, None, now) == "zgloszone",
+          "wpis bez terminu NIGDY nie jest zapowiedzią",
+          "artykuł o burzy to relacja, nie ostrzeżenie")
+    check(_kind(h(5), h(8), now) == "zapowiedziane", "termin w przyszłości = zapowiedziane")
+    check(_kind(h(-1), h(2), now) == "trwa", "teraz między początkiem a końcem = trwa")
+    check(_kind(h(-5), h(-2), now) == "minione", "termin miniony = minione")
+    check(_kind(h(-5), None, now) == "minione", "sam początek w przeszłości też jest miniony")
+    # Granica: zdarzenie zaczynające się dokładnie teraz jeszcze nie minęło.
+    check(_kind(now, h(3), now) == "trwa", "start dokładnie teraz liczy się jako trwające")
+
+
 # ------------------------------------------------------- składanie prognozy
 def run_forecast_unit_tests():
     """Bez bazy — te reguły muszą działać niezależnie od tego, co w niej stoi."""
@@ -583,6 +609,7 @@ async def run_live_tests():
 
 async def main():
     run_forecast_unit_tests()
+    run_alert_kind_tests()
     await run_loop_tests()
     # Po pętli, bo korzysta z atrap zarejestrowanych w `run_loop_tests`.
     await run_telemetry_tests()

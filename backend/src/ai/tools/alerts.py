@@ -51,6 +51,24 @@ def _local(value: datetime) -> datetime:
     return value.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ)
 
 
+def _kind(event_at: Optional[datetime], event_until: Optional[datetime],
+          now: datetime) -> str:
+    """Zapowiedź, rzecz dziejąca się czy relacja z tego, co minęło.
+
+    Trzy różne odpowiedzi dla mieszkańca — „wyłączą jutro” to ostrzeżenie,
+    „trwa” to instrukcja na teraz, „było wczoraj” to wyjaśnienie. Wpis bez
+    `event_at` NIGDY nie jest zapowiedzią: to zgłoszenie czegoś, co się już
+    wydarzyło (artykuł o burzy, awaria zgłoszona przez mieszkańca).
+    """
+    if not event_at:
+        return "zgloszone"
+    if event_until and event_at <= now <= event_until:
+        return "trwa"
+    if (event_until or event_at) < now:
+        return "minione"
+    return "zapowiedziane"
+
+
 async def active_alerts(ctx: ToolContext) -> ToolResult:
     """Awarie i zdarzenia z terminem — dwa okna, patrz docstring modułu."""
     now = ctx.now
@@ -84,6 +102,7 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
                 article.published_at, article.event_at, article.event_until, now,
                 published_prefix="zgłoszono ",
             ),
+            "rodzaj": _kind(article.event_at, article.event_until, now),
             "zasieg": (
                 "gmina Rybno"
                 if is_local_article(source_name, article.title, article.content)
@@ -118,9 +137,37 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
             summary="brak awarii i zapowiedzianych zdarzeń",
         )
 
+    # Liczby, nie opisy. Model dostawał samą listę i musiał wyliczyć z tekstu,
+    # ile z tego dotyczy gminy i czy cokolwiek jest ZAPOWIEDZIANE — a od tych
+    # dwóch liczb zależy całe brzmienie odpowiedzi. 24.08 przy jednym wpisie
+    # o burzach w regionie (miniona, cudza gmina) odpowiedział mieszkańcowi
+    # Rybna „zapowiedziano przerwy w dostawie prądu": zdarzenie ani nie było
+    # zapowiedziane, ani nie dotyczyło jego gminy. To reguła sprawdzalna kodem,
+    # więc sprawdza ją kod — tak samo jak `is_local_article` w feedzie.
     lokalne = sum(1 for i in items if i["zasieg"] == "gmina Rybno")
+    zapowiedziane = sum(1 for i in items if i["rodzaj"] == "zapowiedziane")
+    trwajace = sum(1 for i in items if i["rodzaj"] == "trwa")
+
+    content = {
+        "w_gminie_rybno": lokalne,
+        "poza_gmina": len(items) - lokalne,
+        "zapowiedziane": zapowiedziane,
+        "trwajace": trwajace,
+        "zdarzenia": items,
+    }
+
+    # Podpowiedź wchodzi tylko w sytuacji, w której sama lista wprowadza w błąd:
+    # coś jest w wyniku, ale nic z tego nie dotyczy gminy pytającego.
+    if lokalne == 0:
+        content["co_powiedziec"] = (
+            "ŻADNE z tych zdarzeń nie dotyczy gminy Rybno. Zacznij od tego wprost "
+            "(„w gminie Rybno nie ma awarii ani zapowiedzianych wyłączeń”), a resztę "
+            "podaj dopiero jako informację o okolicy. NIE pisz „zapowiedziano”, "
+            "jeśli pole „zapowiedziane” wynosi 0."
+        )
+
     return ToolResult(
-        content={"zdarzenia": items},
+        content=content,
         summary=f"{len(items)} zdarzeń ({lokalne} w gminie Rybno)",
     )
 
