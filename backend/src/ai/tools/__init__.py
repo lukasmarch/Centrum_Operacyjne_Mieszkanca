@@ -247,5 +247,6 @@ def describe_for(names: list[str]) -> str:
 # Import modułów narzędziowych rejestruje je w `TOOL_REGISTRY`. Trzyma się tu,
 # na dole, bo moduły importują `register`/`Tool` z tego pliku.
 from src.ai.tools import (  # noqa: E402,F401
-    alerts, council, daily, delegation, handoff, knowledge, places, weather,
+    alerts, council, daily, delegation, handoff, institutions, knowledge,
+    places, weather,
 )

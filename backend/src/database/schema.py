@@ -1031,6 +1031,68 @@ class BipDocument(SQLModel, table=True):
     content_changed_at: Optional[datetime] = None
 
 
+class GminaInstitution(SQLModel, table=True):
+    """
+    Jednostka gminy: urząd, GOPS, szkoła, przedszkole, żłobek, biblioteka,
+    OSiR, ZOZ. Dane teleadresowe + godziny pracy.
+
+    **Skąd się wzięła.** Do 24.08.2026 kontakt do urzędu i GOPS był stałą
+    `OFFICE_HOURS` w `ai/tools/daily.py` — dwie pozycje wpisane ręcznie. Gdy
+    porównaliśmy je z BIP i stroną gminy, OBIE miały błędy: urząd czynny
+    8:00–16:00 (w kodzie 7:15–15:15, godzina różnicy pod zamkniętymi drzwiami),
+    a GOPS ma adres Zajeziorna 58 i telefon 696 63 39 — w kodzie stały dane
+    Urzędu Gminy. Nikt tego nie wychwycił, bo ręcznie wpisana stała nie ma jak
+    się zdezaktualizować głośno.
+
+    **Dlaczego tabela, a nie karta gminy** (`services/gmina_facts.py`). Karta
+    ma twardy limit 2 kB pilnowany testem, bo wchodzi do promptu KAŻDEGO agenta
+    przy KAŻDYM pytaniu — płaci za nią też ktoś pytający o wywóz śmieci.
+    Dwanaście jednostek z adresami, telefonami i godzinami to ~2 kB samo w
+    sobie. Do tego kryterium karty (fakt zmienia się rzadziej niż raz na rok
+    i mieści się w linijce) godziny pracy i dyrektorzy nie spełniają.
+
+    **Trzeci powód, najważniejszy przy pustych polach**: wiedza w prompcie jest
+    niemierzalna — nie wiadomo, czy model jej użył. Odczyt przez narzędzie
+    zostawia wiersz w `agent_tool_calls` ze stanem `empty`, więc po tygodniu
+    widać, o które jednostki ludzie pytają i czego brakuje w bazie.
+
+    ⚠️ `hours` bywa NULL i to jest STAN NORMALNY, nie brak do zasypania byle
+    czym: BIP podaje godziny pracy tylko dla urzędu. Narzędzie ma wtedy
+    powiedzieć wprost „nie mamy godzin, tu jest telefon" — zmyślona godzina
+    jest gorsza od jej braku.
+    """
+    __tablename__ = "gmina_institutions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # `slug` jest kluczem naturalnym — po nim scraper rozpoznaje wpis przy
+    # kolejnym przebiegu, a ręczne uzupełnienia (godziny!) przeżywają odświeżenie.
+    slug: str = Field(max_length=60, unique=True, index=True)
+    name: str = Field(max_length=250)
+    # urzad | gops | szkola | przedszkole | zlobek | biblioteka | osir | zoz
+    kind: str = Field(max_length=30, index=True)
+
+    address: Optional[str] = Field(default=None, max_length=250)
+    phone: Optional[str] = Field(default=None, max_length=60)
+    email: Optional[str] = Field(default=None, max_length=200)
+    website: Optional[str] = Field(default=None, max_length=300)
+    manager: Optional[str] = Field(default=None, max_length=150)
+
+    # Godziny pracy i zakres spraw — pola RĘCZNE. Scraper ich nie nadpisuje
+    # (BIP ich nie publikuje), więc raz uzupełnione zostają.
+    hours: Optional[str] = Field(default=None, max_length=250)
+    scope: Optional[str] = Field(default=None, max_length=600)
+
+    bip_url: Optional[str] = Field(default=None, max_length=500)
+    # Skrót danych z BIP — decyduje, czy wpis w ogóle wymagał zapisu.
+    content_hash: Optional[str] = Field(default=None, max_length=64)
+
+    active: bool = Field(default=True, index=True)
+    first_seen_at: datetime = Field(default_factory=datetime.utcnow)
+    last_checked_at: datetime = Field(default_factory=datetime.utcnow)
+    content_changed_at: Optional[datetime] = None
+
+
 class LegalAct(SQLModel, table=True):
     """
     Akt prawny gminy: uchwała Rady albo zarządzenie Wójta (moduł BIP `/akty/14/`).

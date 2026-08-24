@@ -9,9 +9,15 @@ nie było godzin, o które mieszkańcowi chodziło.
 
 **Czego brakowało w ogóle.** Tego samego dnia padły „Jak pracuje gops" i „Gops".
 Godziny urzędu i jednostek gminy nie istniały NIGDZIE: ani w karcie gminy, ani
-w `bip_documents`, ani w harmonogramach. Stąd `office_hours` — dane wpisane
-wprost, bo to informacja stała, którą sprawdza się raz w BIP, a nie taka,
-która zmienia się co godzinę.
+w `bip_documents`, ani w harmonogramach. Powstało wtedy `office_hours` — dane
+dwóch instytucji wpisane wprost w stałą.
+
+⚠️ **`office_hours` już tu nie ma (24.08.2026).** Ręcznie wpisana stała nie ma
+jak zdezaktualizować się głośno i obie jej pozycje okazały się błędne: urząd
+czynny 8:00–16:00 (w stałej 7:15–15:15), a GOPS miał wpisany adres i telefon
+Urzędu Gminy zamiast własnych. Zastąpiło ją `institution_info`
+(`ai/tools/institutions.py`) czytające tabelę `gmina_institutions`, którą
+napełnia scraper BIP — dwanaście jednostek zamiast dwóch.
 
 **Miejscowość rozpoznaje model, nie regex.** `TOWN_ALIASES` (24 nazwy × odmiany
 przypadków) zostaje w kodzie narzędzia jako DOPASOWANIE nazwy do harmonogramu,
@@ -48,27 +54,6 @@ DAY_NAMES_PL = ["poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sob
 # Godziny pracy urzędu i jednostek — stan na 22.08.2026 (BIP /19/, spgzozrybno.pl).
 # Wpisane wprost, bo to wiedza stała: zmienia się raz na kilka lat, a jej brak
 # kosztował trzy nieudane odpowiedzi jednego wieczoru.
-OFFICE_HOURS = {
-    "urzad_gminy": {
-        "nazwa": "Urząd Gminy Rybno",
-        "adres": "ul. Lubawska 15, 13-220 Rybno",
-        "telefon": "23 696 60 55",
-        "godziny": "poniedziałek–piątek 7:15–15:15",
-        "uwagi": "Kasa czynna do 14:30. ePUAP: /2803062/SkrytkaESP",
-    },
-    "gops": {
-        "nazwa": "Gminny Ośrodek Pomocy Społecznej w Rybnie",
-        "adres": "ul. Lubawska 15, 13-220 Rybno",
-        "telefon": "23 696 60 55",
-        "godziny": "poniedziałek–piątek 7:15–15:15",
-        "uwagi": (
-            "Zajmuje się pomocą społeczną, świadczeniami rodzinnymi, "
-            "dodatkiem mieszkaniowym, Kartą Dużej Rodziny i pracą socjalną."
-        ),
-    },
-}
-
-
 def _normalize(value: str) -> str:
     return (value or "").lower().translate(_PL_TRANSLATE)
 
@@ -291,27 +276,6 @@ async def pharmacy_duty(ctx: ToolContext) -> ToolResult:
     )
 
 
-async def office_hours(ctx: ToolContext, institution: Optional[str] = None) -> ToolResult:
-    """Godziny pracy i kontakt do urzędu gminy oraz GOPS."""
-    if institution and "gops" in _normalize(institution):
-        data = {"gops": OFFICE_HOURS["gops"]}
-    elif institution and ("urz" in _normalize(institution) or "gmin" in _normalize(institution)):
-        data = {"urzad_gminy": OFFICE_HOURS["urzad_gminy"]}
-    else:
-        data = OFFICE_HOURS
-
-    return ToolResult(
-        content={
-            "instytucje": data,
-            "uwaga": (
-                "Sprawy powiatowe (prawo jazdy, rejestracja pojazdów, pozwolenia "
-                "na budowę) załatwia Starostwo Powiatowe w Działdowie."
-            ),
-        },
-        summary=", ".join(v["nazwa"] for v in data.values()),
-    )
-
-
 register(Tool(
     name="waste_schedule",
     description=(
@@ -390,25 +354,3 @@ register(Tool(
     status_message="Sprawdzam dyżury aptek…",
 ))
 
-register(Tool(
-    name="office_hours",
-    description=(
-        "Godziny pracy, adres i telefon Urzędu Gminy Rybno oraz Gminnego Ośrodka "
-        "Pomocy Społecznej (GOPS), wraz z zakresem spraw. Użyj przy pytaniu: "
-        "kiedy czynny urząd, do której pracuje GOPS, gdzie złożyć wniosek, "
-        "jak pracuje GOPS, jaki telefon do urzędu."
-    ),
-    short="godziny pracy i kontakt: Urząd Gminy, GOPS",
-    parameters={
-        "type": "object",
-        "properties": {
-            "institution": {
-                "type": "string",
-                "description": "„urząd gminy” albo „GOPS”. Pomiń, żeby dostać obie.",
-            },
-        },
-        "required": [],
-    },
-    fn=office_hours,
-    status_message="Sprawdzam godziny pracy…",
-))

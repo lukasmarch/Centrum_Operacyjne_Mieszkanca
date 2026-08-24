@@ -594,8 +594,13 @@ async def run_live_tests():
         # Kontrolne: odpowiedź jest w karcie gminy, żadne narzędzie nie pomoże.
         (PrzewodnikAgent, "Kto jest wójtem gminy Rybno?", set(), "Węgrzynowski"),
         # Organizator — pytania, które przegrał 18.08.
-        (OrganizatorAgent, "Godziny pracy", {"office_hours"}, None),
-        (OrganizatorAgent, "Jak pracuje gops", {"office_hours"}, "GOPS"),
+        (OrganizatorAgent, "Godziny pracy", {"institution_info"}, None),
+        # GOPS — sonda ma sprawdzać także POPRAWNOŚĆ danych, nie samo wywołanie:
+        # do 24.08 agent podawał tu adres i telefon Urzędu Gminy, bo stała
+        # `OFFICE_HOURS` niosła je zamiast danych GOPS-u.
+        (OrganizatorAgent, "Jak pracuje gops", {"institution_info"}, "Zajeziorna"),
+        (OrganizatorAgent, "Jaki jest telefon do szkoły w Rumianie?",
+         {"institution_info"}, "696 60 01"),
         (OrganizatorAgent, "Kiedy wywóz śmieci w Hartowcu?", {"waste_schedule"}, None),
         # Strażnik — regresja z 7.08 i szablon „zapowiedziano brak przerw”.
         (StraznikAgent, "Czy dziś nie będzie prądu?", {"active_alerts"}, None),

@@ -287,7 +287,7 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
             summary=f"feed pusty ({hours} h)",
         )
 
-    wpisy, lokalne = [], 0
+    wpisy, lokalne, sources = [], 0, []
     for article, source_name in rows:
         summary = (article.summary or "").strip().replace("\n", " ")
         if len(summary) > FEED_SUMMARY_CHARS:
@@ -307,12 +307,29 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
             "kategoria": article.category or None,
         })
 
+        # Kafelki źródeł — tak samo jak w `search_news` i `search_legal_acts`.
+        # Do 24.08 to narzędzie ich NIE zwracało, więc odpowiedź na „co nowego"
+        # jako jedyna szła bez ani jednego odnośnika: mieszkaniec dostawał
+        # streszczenie wpisu i nie miał jak dojść do oryginału. `similarity`
+        # jest sztywne 1.0 — tu nie ma podobieństwa do mierzenia, wpis wybrała
+        # polityka feedu, a próg `source_display_threshold` na froncie musi go
+        # przepuścić.
+        if article.url:
+            sources.append({
+                "type": "article",
+                "id": article.id,
+                "title": (article.display_title or article.title or "")[:200],
+                "url": article.url,
+                "similarity": 1.0,
+            })
+
     return ToolResult(
         content={
             "okno_godzin": hours,
             "w_gminie_rybno": lokalne,
             "wpisy": wpisy,
         },
+        sources=sources,
         summary=f"{len(wpisy)} wpisów ({lokalne} z gminy)",
     )
 

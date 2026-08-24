@@ -61,7 +61,7 @@ class OrganizatorAgent(BaseAgent):
         "cinema_repertoire",
         "clinic_schedule",
         "pharmacy_duty",
-        "office_hours",
+        "institution_info",
     ]
 
     example_questions = [

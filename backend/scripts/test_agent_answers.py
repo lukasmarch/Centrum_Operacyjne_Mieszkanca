@@ -653,7 +653,102 @@ async def oracle_weather(session: AsyncSession) -> Expect:
 
 # --- przypadki ----------------------------------------------------------------
 
+async def oracle_gops(session: AsyncSession) -> Expect:
+    """Dane GOPS — sprawdzamy POPRAWNOŚĆ, nie samo udzielenie odpowiedzi.
+
+    Do 24.08.2026 agent odpowiadał na to pytanie płynnie i błędnie: stała
+    `OFFICE_HOURS` niosła dla GOPS-u adres i telefon URZĘDU GMINY. Odpowiedź
+    wyglądała wzorowo, mieszkaniec pojechałby pod zły adres. Dlatego wyrocznia
+    czyta bazę i wymaga tego, co w niej stoi.
+    """
+    row = (await session.execute(text(
+        "SELECT name, address, phone FROM gmina_institutions WHERE slug = 'gops'"
+    ))).first()
+    if row is None or not row.address:
+        return Expect(skip="brak GOPS w gmina_institutions "
+                           "(uruchom scripts.run_bip_institutions)")
+
+    # Nazwa ulicy z adresu — „ul. Zajeziorna 58, 13-220 Rybno" → „zajeziorna".
+    street = re.sub(r"^ul\.\s*", "", row.address).split(",")[0]
+    street_core = re.sub(r"\s*\d+\w*$", "", street).strip()
+    phone_tail = re.sub(r"\D", "", row.phone or "")[-6:]
+
+    must = [("adres GOPS z bazy", flat(street_core))]
+    if phone_tail:
+        # `\D*`, nie `\D`: numer bywa pisany „696 63 39" i „6966339", więc
+        # separator między cyframi jest opcjonalny. Wymaganie dokładnie jednego
+        # znaku odrzucało poprawną odpowiedź.
+        must.append(("telefon GOPS", r"\D*".join(phone_tail)))
+
+    # ⚠️ NO_KNOWLEDGE świadomie NIE jest tu zakazane. Godzin pracy GOPS nie ma
+    # w bazie (BIP ich nie publikuje) i agent MA to powiedzieć wprost — zakaz
+    # zdania, które jest prawdą, to ta sama chwiejność bramki, którą naprawiano
+    # 24.08. Gdyby agent nie znalazł nic, padnie wymaganie adresu.
+    return Expect(
+        fact=f"{row.address}, tel. {row.phone}",
+        must=must,
+        must_not=[
+            ("adres Urzędu Gminy podany jako adres GOPS", r"lubawska"),
+        ],
+        must_in_context=[("dane GOPS w materiale", flat(street_core))],
+    )
+
+
+async def oracle_kondycja(session: AsyncSession) -> Expect:
+    """Pytanie ze zrzutu z 24.08 — to, które dostało „nie mam możliwości".
+
+    Wyrocznia nie sprawdza konkretnej liczby, bo odpowiedź może sięgnąć po
+    dowolny wskaźnik. Sprawdza to, czego zabrakło: żeby w JEDNEJ odpowiedzi
+    spotkały się DWIE dziedziny — dane liczbowe GUS i to, co robi gmina
+    (uchwały, budżet, inwestycje). Jedna dziedzina to wynik, który mieliśmy
+    przed pętlą orkiestracji.
+    """
+    ludnosc = (await session.execute(text(
+        "SELECT value, year FROM gus_gmina_stats "
+        "WHERE category = 'demografia' AND var_name ILIKE '%ludno%' "
+        "AND unit_id = '042815403062' AND value IS NOT NULL "
+        "ORDER BY year DESC LIMIT 1"
+    ))).first()
+    akty = (await session.execute(text("SELECT count(*) FROM legal_acts"))).scalar()
+
+    if ludnosc is None or not akty:
+        return Expect(skip=f"za mało materiału (GUS: {bool(ludnosc)}, akty: {akty})")
+
+    return Expect(
+        fact=f"ludność {int(ludnosc.value)} ({ludnosc.year}), {akty} aktów w rejestrze",
+        must=[
+            ("dane liczbowe", r"\d{3,}"),
+            ("wątek demograficzny", r"(mieszkan|ludnos|demograf|migracj)"),
+            ("wątek działań gminy", r"(uchwal|budzet|inwestyc|strategi|rada gminy)"),
+        ],
+        must_not=[
+            ("odmowa analizy", NO_KNOWLEDGE),
+            ("„nie mam możliwości”", r"nie mam mozliwosci"),
+        ],
+        # Materiał powstaje z delegacji do innych agentów, nie z jednego
+        # zapytania — sondy nie da się zbudować bez powtórzenia całej pracy.
+        must_in_context=[],
+        min_len=400,
+    )
+
+
 CASES: list[Case] = [
+    Case(
+        id="gops-godziny",
+        question="Do której pracuje GOPS i gdzie się mieści?",
+        agent="organizator",
+        oracle=oracle_gops,
+        why="dane z ręcznie wpisanej stałej były BŁĘDNE — agent podawał adres urzędu",
+    ),
+    Case(
+        id="kondycja-gminy",
+        question=("Czy jesteś w stanie sprawdzić kondycję Rybna, podsumować jego "
+                  "mocne i słabe strony? Masz informacje bieżące i historyczne?"),
+        agent="koordynator",
+        oracle=oracle_kondycja,
+        why="pytanie ze zrzutu 24.08 — „nie mam możliwości” przy pełnej bazie",
+    ),
+
     Case(
         id="replay-07-08",
         question="Czy dziś nie będzie prądu? (odtworzenie 7.08.2026, 8:21)",
@@ -838,13 +933,14 @@ _INSTANCES: dict = {}
 def _agent_instances() -> dict:
     if not _INSTANCES:
         from src.ai.agents import (
-            GUSAnalitykAgent, OrganizatorAgent, PrzewodnikAgent,
-            RedaktorAgent, StraznikAgent, UrzednikAgent,
+            GUSAnalitykAgent, KoordynatorAgent, OrganizatorAgent,
+            PrzewodnikAgent, RedaktorAgent, StraznikAgent, UrzednikAgent,
         )
         from src.ai.agents.orchestrator import orchestrator
 
         for cls in (RedaktorAgent, UrzednikAgent, GUSAnalitykAgent,
-                    PrzewodnikAgent, StraznikAgent, OrganizatorAgent):
+                    PrzewodnikAgent, StraznikAgent, OrganizatorAgent,
+                    KoordynatorAgent):
             instance = cls()
             _INSTANCES[instance.name] = instance
             orchestrator.register_agent(instance)  # router waliduje nazwę po rejestrze

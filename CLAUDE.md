@@ -316,6 +316,24 @@ mieści się w tym z definicji. Redaktor odmówił zgodnie z instrukcją bloku
   agenta). Backend robi to samo przy zapisie do bazy
 - Test: `python -m scripts.test_agent_tools` (sekcja „Pętla orkiestracji")
 
+## Dane jednostek: stała w kodzie kłamała (2026-08-24)
+**`OFFICE_HOURS` w `ai/tools/daily.py` miała dwie instytucje i BŁĘDY W OBU.**
+Urząd: 7:15–15:15 w kodzie, **8:00–16:00** naprawdę. GOPS: adres i telefon
+**Urzędu Gminy** zamiast własnych (naprawdę ul. Zajeziorna 58, tel. 23 696 63 39).
+Agent podawał to płynnie — ręcznie wpisana stała nie ma jak zestarzeć się głośno.
+- `gmina_institutions` (migracja `add_gmina_institutions`) — 12 jednostek:
+  urząd, GOPS, ZOZ, biblioteka, OSiR, 5 szkół, przedszkole, żłobek
+- `scrapers/bip_institutions.py` + `python -m scripts.run_bip_institutions [--dry]`
+- `ai/tools/institutions.py::institution_info` — **zastąpiło `office_hours`**
+  (usunięte, nie zostawione obok). Ma je Organizator
+- ⚠️ **`hours` i `scope` są RĘCZNE** — scraper ich nie nadpisuje. BIP publikuje
+  godziny tylko dla urzędu; dla 11 jednostek narzędzie mówi wprost, że ich nie ma
+- ⚠️ **Scraper tylko LOKALNIE** — serwer dostaje z BIP 403
+- ⚠️ Nie przenosić tych danych do karty gminy: limit 2 kB, a wiedza w prompcie
+  nie zostawia śladu w `agent_tool_calls`
+- Test: `test_agent_answers`, przypadek `gops-godziny` (sprawdza POPRAWNOŚĆ
+  adresu, nie samo udzielenie odpowiedzi)
+
 ## Walidator odpowiedzi agentów (2026-08-09)
 `backend/scripts/test_agent_answers.py` — 11 pytań mieszkańca sprawdzanych **kontra stan bazy**.
 Oczekiwania liczy wyrocznia (własne zapytanie SQL, niezależne od kodu agenta), nie sztywna
@@ -376,7 +394,7 @@ dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykr
 | Strażnik | ✅ działa | RAG artykuły |
 | Przewodnik | ⚠️ częściowo | RAG eventy/artykuły, pogoda/śmieci brak |
 | GUS-Analityk | ✅ działa | Direct SQL do gus_gmina_stats + gus_national_averages (zweryfikowane na prodzie 2026-07-19) |
-| Organizator | ✅ działa | Direct SQL do waste_schedule |
+| Organizator | ✅ działa | Direct SQL do waste_schedule + `institution_info` |
 | Koordynator | ✅ działa | narzędziami są inni agenci (etap 7) |
 
 ## Ważne reguły techniczne
@@ -553,9 +571,10 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
       przy okazji dostanie `przekaz_dalej` — dziś jako jedyny odsyła słowami
 - [ ] Front: obsłużyć `discard_text` w kroku pracy (kasowanie tekstu porzuconego
       agenta) — bez tego przy handoffie mignie początek odmowy
-- [ ] `gmina_institutions` + `institution_info` (etap 7 pkt 5): dane instytucji
-      z bazy zamiast stałej `OFFICE_HOURS`; wygasza `office_hours`
-- [ ] `test_agent_answers`: przypadki `kondycja-gminy` i `gops-godziny` (etap 7 pkt 7)
+- [ ] Uruchomić na PRODUKCJI: `add_gmina_institutions` + `run_bip_institutions`
+      (migracja PRZED kodem!). Scraper tylko lokalnie — serwer dostaje z BIP 403
+- [ ] Uzupełnić `gmina_institutions.hours` dla 11 jednostek (BIP ich nie ma):
+      biblioteka, OSiR, szkoły, przedszkole, żłobek, GOPS, ZOZ
 
 Uwaga: ~1065 historycznych artykułów poza RAG — **celowo** (decyzja 2026-07-19), embedded=True jako marker.
 

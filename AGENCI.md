@@ -428,12 +428,47 @@ sklejona z odpowiedzią.
 
 ---
 
+### 4.11 Dane jednostek z bazy, nie ze stałej (etap 7 pkt 5, 24.08.2026)
+
+**Stała w kodzie nie ma jak zdezaktualizować się głośno.** `OFFICE_HOURS`
+w `ai/tools/daily.py` niosła dwie instytucje i obie miały błędy:
+
+| | w kodzie | naprawdę |
+|---|---|---|
+| Urząd Gminy | 7:15–15:15 | **8:00–16:00** (gminarybno.pl) |
+| GOPS | ul. Lubawska 15, tel. 696 60 55 | **ul. Zajeziorna 58, tel. 696 63 39** |
+
+Adres i telefon GOPS to były dane Urzędu Gminy. Agent podawał je płynnie
+i z przekonaniem — mieszkaniec pojechałby pod zły adres, a pod urząd trafiłby
+godzinę przed otwarciem.
+
+Dziś: tabela `gmina_institutions` (12 jednostek), scraper
+`scrapers/bip_institutions.py`, narzędzie `institution_info`. `office_hours`
+usunięte, nie zostawione obok.
+
+**Dlaczego nie do karty gminy** — pytanie wracało kilka razy, więc na piśmie:
+karta ma limit 2 kB pilnowany testem, bo wchodzi do promptu KAŻDEGO agenta przy
+KAŻDYM pytaniu; dwanaście adresów zjadłoby ją w całości, a płaciłby też ktoś
+pytający o śmieci. Do tego wiedza w prompcie **nie zostawia śladu** — nie
+wiadomo, czy model jej użył. Odczyt narzędziem zapisuje wiersz
+w `agent_tool_calls`, więc widać, o co ludzie pytają i czego brakuje.
+
+⚠️ **`hours` puste dla 11 z 12 jednostek i to jest stan poprawny** — BIP
+publikuje godziny tylko dla urzędu. Narzędzie mówi wprost „NIE MAMY tej
+informacji — podaj telefon". To pola RĘCZNE: scraper ich nie nadpisuje, więc
+uzupełnienie przeżywa niedzielny przebieg. Zmyślona godzina otwarcia szkoły
+byłaby gorsza od jej braku.
+
+⚠️ Scraper **musi chodzić lokalnie** — serwerownia dostaje z BIP 403 (6.4).
+
+---
+
 ## 5. Kto ma jakie narzędzia (stan 24.08.2026)
 
 | Agent | Narzędzia | Uwagi |
 |---|---|---|
 | **Przewodnik** | `weather_forecast`, `current_weather`, `air_quality`, `upcoming_events`, `local_places` | pierwszy przeniesiony; zniknęły `PLACE_KEYWORDS`, `_is_place_query`, `_detect_place_category` |
-| **Organizator** | `waste_schedule`, `cinema_repertoire`, `clinic_schedule`, `pharmacy_duty`, `office_hours` | zniknął `INTENT_KEYWORDS`; `office_hours` to **nowe dane**, nie było ich nigdzie |
+| **Organizator** | `waste_schedule`, `cinema_repertoire`, `clinic_schedule`, `pharmacy_duty`, `institution_info` | zniknął `INTENT_KEYWORDS`; `office_hours` **zastąpione** przez `institution_info` (4.11) |
 | **Strażnik** | `active_alerts`, `citizen_reports` | ⚠️ `active_alerts` to **jedyne** źródło jego wiedzy o awariach — nie używa RAG |
 | **Redaktor** | `latest_local_news`, `search_news` | zniknął regex `_GENERIC_QUESTION` i blok „ŚWIEŻY FEED" z `extra_context` |
 | **Urzędnik** | `search_legal_acts`, `council_sessions`, `search_documents` | zniknął retrieval przed każdym pytaniem; cztery poziomy odpowiedzi zostają |

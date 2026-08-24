@@ -225,6 +225,16 @@ export function useChat(options: UseChatOptions = {}) {
                   state: data.state || 'info',
                   detail: data.detail || undefined,
                 };
+                // Pytanie przejmuje inny agent (etap 7). `discard_text` znaczy,
+                // że poprzedni agent zdążył coś napisać, zanim się wycofał —
+                // najczęściej początek odmowy („Niestety nie mam…”). Odpowiedź
+                // napisze teraz ktoś inny, więc bufor musi pójść do kosza:
+                // inaczej mieszkaniec czyta odmowę sklejoną z odpowiedzią.
+                // Backend robi dokładnie to samo przy zapisie do bazy.
+                if (data.handoff) {
+                  const cleared = data.discard_text ? '' : m.content;
+                  return { ...m, content: cleared, steps: [...steps, incoming] };
+                }
                 if (data.tool && data.state && data.state !== 'running') {
                   const idx = steps.map(s => s.tool === data.tool && s.state === 'running')
                                    .lastIndexOf(true);
