@@ -30,7 +30,9 @@ from src.ai.chunker import chunker
 from src.ai.embeddings import embedding_service
 from src.config import settings
 from src.database.schema import LegalAct
-from src.scrapers.legal_acts import DEFAULT_SINCE, LegalActsScraper, content_hash
+from src.scrapers.legal_acts import (
+    DEFAULT_SINCE, LegalActsScraper, ScraperBlocked, content_hash,
+)
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 
@@ -170,7 +172,15 @@ async def run_legal_acts_async(since: date = DEFAULT_SINCE, dry: bool = False) -
         known = await _known_ids(session)
 
         async with LegalActsScraper() as scraper:
-            listed = await scraper.list_acts(since=since)
+            try:
+                listed = await scraper.list_acts(since=since)
+            except ScraperBlocked as e:
+                # Log na poziomie ERROR, nie WARNING: „0 nowych aktów" i „BIP
+                # nas nie wpuszcza" to dwie różne wiadomości, a tylko druga
+                # wymaga czyjejś reakcji.
+                logger.error(f"PRZEBIEG PRZERWANY — {e}")
+                await engine.dispose()
+                return {"blad": str(e), "nowe": 0, "embedded": 0}
             fresh = [a for a in listed if a["bip_id"] not in known]
             logger.info(
                 f"Na liście {len(listed)} aktów, nowych {len(fresh)}, "

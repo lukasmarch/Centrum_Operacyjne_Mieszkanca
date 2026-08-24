@@ -52,6 +52,15 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger("LegalActsScraper")
 
+
+class ScraperBlocked(RuntimeError):
+    """Źródło jest nieosiągalne — to NIE jest to samo co „nic nowego".
+
+    Osobny wyjątek, bo te dwie sytuacje wyglądają w bazie identycznie (zero
+    nowych wierszy), a naprawia się je gdzie indziej: pustka to stan normalny
+    rejestru, niedostępność to problem sieci albo blokada IP.
+    """
+
 # Skany urzędowe mają połamane profile kolorów; pdfminer krzyczy o tym raz na
 # stronę. Przy kilkuset plikach to setki linii przykrywających realne błędy.
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
@@ -80,6 +89,12 @@ DEFAULT_SINCE = date(2024, 1, 1)
 # Bezpiecznik na wypadek, gdyby warunek daty przestał przerywać pętlę.
 # 60 stron = 600 aktów, czyli grubo ponad zakres 2024–2026 (~440).
 MAX_PAGES = 60
+
+# Po ilu NIEUDANYCH stronach pod rząd uznajemy, że problem jest po stronie
+# dostępu, a nie treści. Trzy, bo pojedynczy timeout zdarza się normalnie,
+# a trzy z rzędu to już blokada albo padnięty serwis — i w obu przypadkach
+# przebieg MUSI zgłosić błąd zamiast zameldować „0 nowych aktów".
+UNREACHABLE_PAGES = 3
 
 # Ile stron POD RZĄD bez aktu w zakresie kończy skan. Dwie, bo lista nie jest
 # ułożona ściśle po dacie (patrz docstring modułu) — jedna strona bez trafienia
@@ -175,15 +190,30 @@ class LegalActsScraper:
         found: list[dict] = []
         seen_ids: set[int] = set()
         empty_pages = 0
+        failed_pages = 0
 
         for page in range(1, MAX_PAGES + 1):
             resp = await self._get(self._list_url(page))
             if resp is None:
                 # Pojedyncza strona potrafi nie odpowiedzieć; przerwanie całego
                 # przebiegu przez jeden timeout byłoby przesadą.
+                failed_pages += 1
                 logger.warning(f"strona {page} nie odpowiedziała — pomijam")
+                if failed_pages >= UNREACHABLE_PAGES:
+                    # ⚠️ Cisza z tego miejsca wygląda dokładnie jak „brak nowych
+                    # aktów": job kończy się sukcesem, w bazie nic nie przybywa,
+                    # nikt nie patrzy. 24.08.2026 BIP zaczął odrzucać adres
+                    # serwera produkcyjnego (403 nawet dla gołego curl-a, przy
+                    # 200 z łącza domowego), a przebieg zameldowałby „0 nowych".
+                    raise ScraperBlocked(
+                        f"BIP nie odpowiedział na {failed_pages} kolejnych stron "
+                        f"({BIP_BASE}). Najczęstsza przyczyna: blokada adresu IP "
+                        f"(HTTP 403) — sprawdź `curl -I {BIP_BASE}{ACTS_PATH}/typ/` "
+                        f"z tej maszyny."
+                    )
                 await asyncio.sleep(REQUEST_DELAY_S)
                 continue
+            failed_pages = 0
 
             rows = self._parse_list(resp.text)
             if not rows:
