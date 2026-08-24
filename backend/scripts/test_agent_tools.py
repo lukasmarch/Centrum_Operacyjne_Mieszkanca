@@ -59,12 +59,33 @@ for name, tool in TOOL_REGISTRY.items():
         check(False, f"{name}: schemat serializuje się do JSON", str(e))
 
 print("\n== Blok świadomości ==")
-block = describe_for(list(TOOL_REGISTRY))
+# Mierzymy NAJWIĘKSZY REALNY zestaw, nie sumę rejestru: listy są per agent,
+# więc nikt nigdy nie dostaje wszystkich narzędzi naraz i suma mierzyłaby
+# sytuację, która nie istnieje. Limit ma łapać agenta rozdętego do kilkunastu
+# narzędzi — a taki pojawi się w zestawie jednego agenta, nie w rejestrze.
+def _widest_block() -> str:
+    from src.ai.agents import (GUSAnalitykAgent, KoordynatorAgent, OrganizatorAgent,
+                               PrzewodnikAgent, RedaktorAgent, StraznikAgent,
+                               UrzednikAgent)
+    blocks = [describe_for(cls()._effective_tools(True))
+              for cls in (RedaktorAgent, UrzednikAgent, PrzewodnikAgent,
+                          StraznikAgent, OrganizatorAgent, KoordynatorAgent)]
+    return max(blocks, key=lambda b: len(b.encode("utf-8")))
+
+
+block = _widest_block()
 check("TWOJE NARZĘDZIA" in block, "blok ma nagłówek")
+# Zakończenie bloku zależy od tego, czy agent ma dokąd oddać pytanie (etap 7):
+# z `przekaz_dalej` odmowa jest szkodą, bez niego — jedynym uczciwym wyjściem.
 check(
-    "WPROST" in block,
-    "blok każe przyznać się do granic wiedzy",
-    "bez tego agent zgaduje zamiast powiedzieć, czego nie ma",
+    "przekaz_dalej" in block and "NIE ODMAWIAJ" in block,
+    "agent z handoffem jest kierowany do przekazania, nie do odmowy",
+    "bez tego blok każe mu odmówić, choć dane ma kolega obok",
+)
+check(
+    "WPROST" in describe_for(["latest_local_news"]),
+    "agent BEZ handoffu nadal ma przyznać się do granic wiedzy",
+    "bez tego zgaduje zamiast powiedzieć, czego nie ma",
 )
 check(
     len(block.encode("utf-8")) < 2048,
@@ -649,11 +670,182 @@ async def run_live_tests():
           "log nie zbiera — migracja `add_agent_tool_calls` przeszła?")
 
 
+async def run_handoff_tests():
+    """Pętla orkiestracji — przekazywanie pytania między agentami (etap 7).
+
+    Sprawdzamy tu jedną własność, bez której cała reszta jest niebezpieczna:
+    pętla MUSI się kończyć. Agent, który mówi „nie ja", oddaje pytanie dalej —
+    ale nikt nie odpowiada dwa razy, przeskoków jest najwyżej `MAX_HANDOFFS`,
+    a gdy zabraknie chętnych, mieszkaniec dostaje zdanie napisane przez KOD,
+    nie kolejną odmowę od modelu bez danych.
+    """
+    from src.ai.agents.orchestrator import MAX_HANDOFFS, Orchestrator
+    from src.ai.tools.handoff import HANDOFF_TARGETS
+
+    print("\n== Pętla orkiestracji (handoff) ==")
+
+    def _handoff_script(to, reason="brak narzędzi"):
+        return [("tools", [("przekaz_dalej",
+                            json.dumps({"czego_brakuje": reason,
+                                        "sugerowany_agent": to}, ensure_ascii=False))])]
+
+    class _HandoffAgent(_StubAgent):
+        """Stub, który da się zarejestrować pod dowolną nazwą."""
+        def __init__(self, name, script, display=None):
+            super().__init__(script)
+            self.name = name
+            self.display_name = display or name
+
+    # 1. Sygnał zatrzymuje pętlę agenta: bez odpowiedzi, z handoffem.
+    agent = _HandoffAgent("stub_a", _handoff_script("stub_b"))
+    out = await agent._agentic_complete([{"role": "user", "content": "?"}],
+                                        ToolContext(session=None),
+                                        ["przekaz_dalej"])
+    check(out.get("handoff") is not None, "`przekaz_dalej` zwraca sygnał handoffu")
+    check(out["handoff"]["to"] == "stub_b", "sygnał niesie wskazanego agenta")
+    check(out["answer"] == "", "agent oddający pytanie NIE pisze odpowiedzi")
+    check(len(agent.client.chat.completions.calls_seen) == 1,
+          "pętla agenta kończy się na handoffie, nie dobija rund")
+
+    # 2. Przekazanie działa: A oddaje, B odpowiada.
+    orch = Orchestrator()
+    orch.register_agent(_HandoffAgent("stub_a", _handoff_script("stub_b")))
+    orch.register_agent(_HandoffAgent("stub_b", [("text", "odpowiedź od B")]))
+    out = await orch._run_complete(None, "?", "stub_a", None, None)
+    check(out["answer"] == "odpowiedź od B", "pytanie przejmuje wskazany agent")
+    check(out["agent_name"] == "stub_b", "odpowiada TEN agent, który napisał tekst")
+    check(out["handoff_path"] == ["stub_a", "stub_b"], "ścieżka przekazań jest zapisana")
+
+    # 3. Odbijanie w kółko: B odsyła do A, który już odpowiadał.
+    #    To jedyny scenariusz, w którym pętla mogłaby kosztować bez końca.
+    orch = Orchestrator()
+    orch.register_agent(_HandoffAgent("stub_a", _handoff_script("stub_b")))
+    orch.register_agent(_HandoffAgent("stub_b", _handoff_script("stub_a")))
+    out = await orch._run_complete(None, "?", "stub_a", None, None)
+    check("Nie mam danych" in out["answer"], "odbicie do agenta, który już był, kończy pętlę")
+    check(out["handoff_path"] == ["stub_a", "stub_b"], "nikt nie odpowiada dwa razy")
+
+    # 4. Limit przeskoków — łańcuch dłuższy niż MAX_HANDOFFS.
+    orch = Orchestrator()
+    chain = ["stub_a", "stub_b", "stub_c", "stub_d", "stub_e"]
+    for i, nm in enumerate(chain[:-1]):
+        orch.register_agent(_HandoffAgent(nm, _handoff_script(chain[i + 1])))
+    orch.register_agent(_HandoffAgent(chain[-1], [("text", "dotarłem")]))
+    out = await orch._run_complete(None, "?", "stub_a", None, None)
+    check(len(out["handoff_path"]) == MAX_HANDOFFS + 1,
+          f"najwyżej {MAX_HANDOFFS} przeskoki", f"ścieżka: {out['handoff_path']}")
+    check(out["answer"] != "dotarłem", "łańcuch dłuższy niż limit NIE dochodzi do końca")
+
+    # 5. Cel spoza rejestru nie wywraca rozmowy.
+    orch = Orchestrator()
+    orch.register_agent(_HandoffAgent("stub_a", _handoff_script("nie_ma_takiego")))
+    out = await orch._run_complete(None, "?", "stub_a", None, None)
+    check("Nie mam danych" in out["answer"], "handoff do nieznanego agenta kończy się zdaniem od kodu")
+    check("23 696 60 55" in out["answer"], "ślepy zaułek wskazuje mieszkańcowi urząd")
+
+    # 6. Rekurencja delegacji — koordynator nie może wołać sam siebie.
+    from src.ai.agents.koordynator import KoordynatorAgent
+    from src.ai.tools.delegation import DELEGATES
+    k = KoordynatorAgent()
+    check("koordynator" not in DELEGATES, "koordynator nie jest celem delegacji")
+    check("zapytaj_koordynator" not in TOOL_REGISTRY, "narzędzie `zapytaj_koordynator` nie istnieje")
+    check(k.can_handoff is False, "koordynator nie oddaje pytań dalej")
+    check("przekaz_dalej" not in k._effective_tools(True),
+          "koordynator nie dostaje handoffu nawet przy allow_handoff=True")
+
+    # 7. Delegowany agent nie ma czym odbić pytania.
+    stub = _StubAgent([("text", "x")])
+    check("przekaz_dalej" in stub._effective_tools(True), "zwykły agent dostaje handoff")
+    check("przekaz_dalej" not in stub._effective_tools(False),
+          "agent wywołany w delegacji NIE dostaje handoffu")
+
+    # 7b. Strumień — najbardziej ryzykowna ścieżka, bo tekst leci do przeglądarki
+    #     NA BIEŻĄCO. Gdy model zdąży napisać pół odmowy, zanim zawoła
+    #     `przekaz_dalej`, mieszkaniec zobaczyłby odmowę sklejoną z odpowiedzią —
+    #     czyli dokładnie to, co ten etap naprawia.
+    #
+    #     Stub emituje gotowe zdarzenia SSE zamiast udawać klienta OpenAI:
+    #     sprawdzamy tu ORKIESTRACJĘ strumienia (co przechodzi, co jest wycinane,
+    #     czym się kończy), a nie pętlę agenta — tę mierzą testy wyżej.
+    class _StreamAgent:
+        def __init__(self, name, events, display=None):
+            self.name = name
+            self.display_name = display or name
+            self._events = events
+
+        async def respond(self, **kwargs):
+            async def gen():
+                for e in self._events:
+                    yield json.dumps(e) + "\n"
+            return gen()
+
+    def _handoff_event(to, text_before=False):
+        return {"type": "handoff", "from": "stub_a", "to": to,
+                "reason": "brak narzędzi", "discard_text": text_before,
+                "tokens_used": 7}
+
+    orch = Orchestrator()
+    orch.register_agent(_StreamAgent("stub_a", [
+        {"type": "chunk", "content": "Niestety nie mam"},   # model bywa rozmowny
+        _handoff_event("stub_b", text_before=True),
+    ]))
+    orch.register_agent(_StreamAgent("stub_b", [
+        {"type": "chunk", "content": "odpowiedź od B"},
+        {"type": "sources", "sources": []},
+        {"type": "done", "full_content": "odpowiedź od B",
+         "model": "m", "agent_name": "stub_b", "tokens_used": 11},
+    ], "Agent B"))
+
+    events = [json.loads(line) async for line
+              in orch._run_stream(None, "?", "stub_a", None, None)]
+    kinds = [e["type"] for e in events]
+    check(kinds.count("done") == 1, "strumień kończy się DOKŁADNIE jednym `done`", str(kinds))
+    check(kinds.count("handoff") == 0, "surowe zdarzenie handoffu NIE wychodzi na zewnątrz")
+    done = events[-1]
+    check(done["agent_name"] == "stub_b", "`done` niesie agenta, który odpowiedział")
+    check(done["full_content"] == "odpowiedź od B", "treść pochodzi od agenta przejmującego")
+    check(done["tokens_used"] == 18, "tokeny obu agentów są zsumowane", str(done["tokens_used"]))
+    check(done.get("handoff_path") == ["stub_a", "stub_b"], "ścieżka wraca w `done`")
+
+    marks = [e for e in events if e.get("handoff")]
+    check(len(marks) == 1, "przekazanie jest widoczne jako krok pracy")
+    check("Agent B" in marks[0]["message"], "krok pracy nazywa agenta po ludzku",
+          marks[0].get("message", ""))
+    check(marks[0]["discard_text"] is True,
+          "front dostaje polecenie skasowania tekstu porzuconego agenta")
+
+    # 7c. Ślepy zaułek w strumieniu też musi domknąć SSE — inaczej przeglądarka
+    #     wisi na otwartym połączeniu.
+    orch = Orchestrator()
+    orch.register_agent(_StreamAgent("stub_a", [_handoff_event("nie_ma_takiego")]))
+    events = [json.loads(line) async for line
+              in orch._run_stream(None, "?", "stub_a", None, None)]
+    check(events[-1]["type"] == "done", "ślepy zaułek zamyka strumień")
+    check("Nie mam danych" in events[-1]["full_content"],
+          "mieszkaniec dostaje zdanie, nie ciszę")
+
+    # 8. Cele handoffu muszą istnieć w rejestrze agentów — rozjazd tej listy
+    #    z rzeczywistością oznacza model wskazujący agenta, którego nie ma.
+    from src.ai.agents import (GUSAnalitykAgent, OrganizatorAgent, PrzewodnikAgent,
+                               RedaktorAgent, StraznikAgent, UrzednikAgent)
+    real = {a.name for a in (RedaktorAgent, UrzednikAgent, GUSAnalitykAgent,
+                             PrzewodnikAgent, StraznikAgent, OrganizatorAgent,
+                             KoordynatorAgent)}
+    check(set(HANDOFF_TARGETS) == real,
+          "lista celów handoffu pokrywa się z agentami",
+          f"różnica: {set(HANDOFF_TARGETS) ^ real}")
+    check(all(f"zapytaj_{n}" in TOOL_REGISTRY for n in DELEGATES),
+          "każdy delegat ma zarejestrowane narzędzie")
+    check(set(k.tools) == {f"zapytaj_{n}" for n in DELEGATES},
+          "koordynator wymienia dokładnie te narzędzia, które istnieją")
+
+
 async def main():
     run_forecast_unit_tests()
     run_scope_tests()
     run_alert_kind_tests()
     await run_loop_tests()
+    await run_handoff_tests()
     # Po pętli, bo korzysta z atrap zarejestrowanych w `run_loop_tests`.
     await run_telemetry_tests()
     if "--db" in sys.argv or "--live" in sys.argv:

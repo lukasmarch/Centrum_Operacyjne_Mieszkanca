@@ -86,9 +86,18 @@ ZASADY:
         user_message: str,
         conversation_history: list[dict] = None,
         stream: bool = False,
-        user=None
+        user=None,
+        allow_handoff: bool = True,
     ) -> Union[dict, AsyncGenerator]:
-        """Generate response using GUS DB data — no RAG, no embed_text call"""
+        """Generate response using GUS DB data — no RAG, no embed_text call
+
+        ⚠️ `allow_handoff` jest przyjmowane i IGNOROWANE. Ten agent nie ma pętli
+        narzędziowej (własny `respond()` z wykresami), więc nie ma jak zawołać
+        `przekaz_dalej` — jego prompt kieruje dalej słowami. Parametr istnieje,
+        bo delegacja woła wszystkich agentów tą samą sygnaturą; usunięcie go
+        wywróciłoby `zapytaj_gus_analityk` na `TypeError`. Zniknie razem
+        z `_classify_gus_query`, gdy GUS przejdzie na narzędzia.
+        """
         from src.ai.agents.base_agent import base_context_messages
         # 1. Classify query to GUS category
         category = await self._classify_gus_query(user_message)

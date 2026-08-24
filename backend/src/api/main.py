@@ -47,7 +47,8 @@ from src.api.endpoints.social import router as social_router
 from src.api.endpoints.chat import router as chat_router
 from src.ai.agents import (
     orchestrator, RedaktorAgent, UrzednikAgent,
-    GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent, OrganizatorAgent
+    GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent, OrganizatorAgent,
+    KoordynatorAgent,
 )
 
 logger = setup_logger("API")
@@ -144,7 +145,8 @@ async def startup_event():
             "(scraping, AI, alerty push i newslettery są wyłączone)"
         )
     # Register all AI agents with the orchestrator
-    for agent_cls in [RedaktorAgent, UrzednikAgent, GUSAnalitykAgent, PrzewodnikAgent, StraznikAgent, OrganizatorAgent]:
+    for agent_cls in [RedaktorAgent, UrzednikAgent, GUSAnalitykAgent, PrzewodnikAgent,
+                      StraznikAgent, OrganizatorAgent, KoordynatorAgent]:
         orchestrator.register_agent(agent_cls())
 
 @app.get("/health")

@@ -278,7 +278,9 @@ async def send_message(
                 yield f"data: {json.dumps({'type': 'start', 'conversation_id': conversation.id})}\n\n"
                 yield f"data: {json.dumps({'type': 'status', 'message': 'Analizuję pytanie i wybieram agenta…'})}\n\n"
 
-                result = await orchestrator.handle(
+                # `run()`, nie `handle()`: agent, któremu brakuje narzędzi,
+                # oddaje pytanie następnemu zamiast odmawiać (etap 7).
+                result = await orchestrator.run(
                     session=session,
                     user_message=request.message,
                     agent_name=request.agent_name,
@@ -299,6 +301,12 @@ async def send_message(
                         full_content += data["content"]
                         yield f"data: {line}\n\n"
                     elif data["type"] == "status":
+                        # Przekazanie pytania: tekst poprzedniego agenta idzie
+                        # do kosza także TUTAJ, nie tylko na ekranie. Bez tego
+                        # w bazie zostałaby odmowa sklejona z odpowiedzią —
+                        # i to ona wróciłaby do rozmowy jako historia.
+                        if data.get("discard_text"):
+                            full_content = ""
                         yield f"data: {line}\n\n"
                     elif data["type"] == "sources":
                         sources = data["sources"]
@@ -358,7 +366,7 @@ async def send_message(
         )
 
     # Non-streaming response
-    result = await orchestrator.handle(
+    result = await orchestrator.run(
         session=session,
         user_message=request.message,
         agent_name=request.agent_name,
@@ -368,17 +376,23 @@ async def send_message(
         last_agent=last_agent
     )
 
+    # Agent ROZSTRZYGNIĘTY, nie żądany: przy trybie Auto `request.agent_name`
+    # jest pusty, a po przekazaniu pytania (etap 7) odpowiada ktoś inny niż ten,
+    # kogo wybrał router. Zapisanie żądania zamiast wyniku gubiło `last_agent`,
+    # więc pytanie kontynuacyjne („a w zeszłym roku?") traciło wątek.
+    resolved_agent = result.get("agent_name") or request.agent_name
+
     # Save assistant message
     assistant_msg = ChatMessage(
         conversation_id=conversation.id,
         role="assistant",
         content=result["answer"],
         sources=result["sources"],
-        agent_name=request.agent_name,
+        agent_name=resolved_agent,
         tokens_used=result["tokens_used"]
     )
     session.add(assistant_msg)
-    _log_chat_cost(session, result["tokens_used"], request.agent_name,
+    _log_chat_cost(session, result["tokens_used"], resolved_agent,
                    user.id if user else None)
     await session.commit()
 
@@ -387,7 +401,7 @@ async def send_message(
         sources=result["sources"],
         conversation_id=conversation.id,
         tokens_used=result["tokens_used"],
-        agent_name=request.agent_name,
+        agent_name=resolved_agent,
         chart_data=result.get("chart_data")
     )
 

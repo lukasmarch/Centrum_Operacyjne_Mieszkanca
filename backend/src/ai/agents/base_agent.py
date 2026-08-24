@@ -107,6 +107,12 @@ class BaseAgent:
     # runda leci BEZ narzędzi, więc pętla nie ma jak się zapętlić.
     max_tool_rounds: int = 3
 
+    # Czy agent może oddać pytanie innemu (`tools/handoff.py`). Domyślnie tak —
+    # wyłącza to koordynator (on deleguje, nie przekazuje) oraz KAŻDY agent
+    # wywołany w ramach delegacji, przez `allow_handoff=False`. Bez tego
+    # drugiego pytanie odbijałoby się między agentami po okręgu.
+    can_handoff: bool = True
+
     def __init__(self):
         self.client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -116,7 +122,8 @@ class BaseAgent:
         user_message: str,
         conversation_history: list[dict] = None,
         stream: bool = False,
-        user=None
+        user=None,
+        allow_handoff: bool = True,
     ) -> Union[dict, AsyncGenerator]:
         """Generate a response using RAG context (albo pętlę narzędziową)"""
         # Agent z narzędziami nie robi retrievalu na zapas — o materiał prosi
@@ -124,7 +131,8 @@ class BaseAgent:
         # z narzędzi, a nie podatkiem doliczanym do każdego pytania.
         if self.tools:
             return await self._respond_with_tools(
-                session, user_message, conversation_history, stream, user
+                session, user_message, conversation_history, stream, user,
+                allow_handoff,
             )
 
         # Agent BEZ narzędzi nie ma dziś czego robić: wszyscy sześciu albo mają
@@ -148,13 +156,15 @@ class BaseAgent:
         conversation_history: Optional[list[dict]],
         stream: bool,
         user,
+        allow_handoff: bool = True,
     ) -> Union[dict, AsyncGenerator]:
         """Rozmowa, w której o dane prosi model, a nie wzorzec słów kluczowych."""
+        tool_names = self._effective_tools(allow_handoff)
         messages = [
             {"role": "system", "content": self.system_prompt},
             *base_context_messages(),
         ]
-        tools_block = agent_tools.describe_for(self.tools)
+        tools_block = agent_tools.describe_for(tool_names)
         if tools_block:
             messages.append({"role": "system", "content": tools_block})
 
@@ -176,8 +186,19 @@ class BaseAgent:
         )
 
         if stream:
-            return await self._agentic_stream(messages, ctx)
-        return await self._agentic_complete(messages, ctx)
+            return await self._agentic_stream(messages, ctx, tool_names)
+        return await self._agentic_complete(messages, ctx, tool_names)
+
+    def _effective_tools(self, allow_handoff: bool) -> list[str]:
+        """Narzędzia tej rozmowy = własne agenta + ewentualnie `przekaz_dalej`.
+
+        Handoff dopisujemy TU, a nie do `tools` w każdej klasie agenta, bo
+        inaczej sześć list trzeba by pamiętać przy każdej zmianie, a jedna
+        zapomniana oznaczałaby agenta, który jako jedyny nadal odmawia.
+        """
+        if allow_handoff and self.can_handoff:
+            return [*self.tools, "przekaz_dalej"]
+        return list(self.tools)
 
     async def _call_tool(self, ctx: ToolContext, name: str, raw_args: str) -> ToolResult:
         """Wywołanie narzędzia opakowane pomiarem.
@@ -234,15 +255,16 @@ class BaseAgent:
             return ToolResult(content={"blad": f"Nieprawidłowe argumenty: {e}"},
                               error="bad_arguments")
 
+        timeout = tool.timeout_s or TOOL_TIMEOUT_S
         try:
-            result = await asyncio.wait_for(tool.fn(ctx, **args), timeout=TOOL_TIMEOUT_S)
+            result = await asyncio.wait_for(tool.fn(ctx, **args), timeout=timeout)
             logger.info(
                 f"Tool[{self.name}:{name}] args={args} "
                 f"{'PUSTO' if result.empty else 'ok'}"
             )
             return result
         except asyncio.TimeoutError:
-            logger.error(f"Tool[{name}] przekroczyło {TOOL_TIMEOUT_S}s")
+            logger.error(f"Tool[{name}] przekroczyło {timeout}s")
             return ToolResult(content={"blad": "Narzędzie nie odpowiedziało na czas."},
                               error="timeout")
         except TypeError as e:
@@ -310,13 +332,21 @@ class BaseAgent:
         wtedy — i tylko wtedy — warto dać mu własne połączenie.
         """
         tool_messages, sources, charts = [], [], []
+        handoff = None
         for call in calls:
             result = await self._call_tool(ctx, call["name"], call["arguments"])
             tool_messages.append(self._tool_message(call, result))
             sources.extend(result.sources)
             charts.extend(result.charts)
+            # Pierwszy handoff wygrywa i reszta rundy i tak przestaje mieć
+            # znaczenie — pytanie przejmuje inny agent. Nie przerywamy jednak
+            # pętli: wywołania z tej samej rundy mają się domknąć i zostawić
+            # ślad w telemetrii, inaczej mierzylibyśmy tylko część prawdy.
+            if result.handoff and handoff is None:
+                handoff = result.handoff
 
-        return {"messages": tool_messages, "sources": sources, "charts": charts}
+        return {"messages": tool_messages, "sources": sources, "charts": charts,
+                "handoff": handoff}
 
     @staticmethod
     def _accumulate_tool_calls(acc: dict, deltas) -> None:
@@ -335,7 +365,8 @@ class BaseAgent:
                 if tc.function.arguments:
                     slot["arguments"] += tc.function.arguments
 
-    def _round_kwargs(self, messages: list[dict], allow_tools: bool) -> dict:
+    def _round_kwargs(self, messages: list[dict], allow_tools: bool,
+                      tool_names: Optional[list[str]] = None) -> dict:
         """Argumenty jednej rundy. Ostatnia leci bez `tools` — model nie ma
         wtedy wyjścia poza napisaniem odpowiedzi, więc pętla zawsze się kończy."""
         kwargs = {
@@ -345,13 +376,16 @@ class BaseAgent:
             "max_tokens": self.max_tokens,
         }
         if allow_tools:
-            schemas = agent_tools.schemas_for(self.tools)
+            schemas = agent_tools.schemas_for(
+                self.tools if tool_names is None else tool_names
+            )
             if schemas:
                 kwargs["tools"] = schemas
                 kwargs["tool_choice"] = "auto"
         return kwargs
 
-    async def _agentic_complete(self, messages: list[dict], ctx: ToolContext) -> dict:
+    async def _agentic_complete(self, messages: list[dict], ctx: ToolContext,
+                                tool_names: Optional[list[str]] = None) -> dict:
         """Wariant bez streamu — używany przez testy i wywołania non-stream."""
         messages = list(messages)
         sources, charts, tokens = [], [], 0
@@ -359,7 +393,7 @@ class BaseAgent:
         for round_idx in range(self.max_tool_rounds):
             allow_tools = round_idx < self.max_tool_rounds - 1
             response = await self.client.chat.completions.create(
-                **self._round_kwargs(messages, allow_tools)
+                **self._round_kwargs(messages, allow_tools, tool_names)
             )
             tokens += response.usage.total_tokens if response.usage else 0
             choice = response.choices[0].message
@@ -394,12 +428,23 @@ class BaseAgent:
             if ctx.telemetry is not None:
                 await ctx.telemetry.flush()
 
+            # Agent oddał pytanie — dalsze rundy byłyby pisaniem odpowiedzi,
+            # której nie ma z czego napisać. Decyzję, kto przejmuje, podejmuje
+            # `Orchestrator.run()`; tu tylko meldujemy fakt.
+            if executed["handoff"]:
+                return {
+                    "answer": "", "sources": sources, "chart_data": charts,
+                    "tokens_used": tokens, "model": self.model,
+                    "agent_name": self.name, "handoff": executed["handoff"],
+                }
+
         return {
             "answer": "", "sources": sources, "chart_data": charts,
             "tokens_used": tokens, "model": self.model, "agent_name": self.name,
         }
 
-    async def _agentic_stream(self, messages: list[dict], ctx: ToolContext) -> AsyncGenerator:
+    async def _agentic_stream(self, messages: list[dict], ctx: ToolContext,
+                              tool_names: Optional[list[str]] = None) -> AsyncGenerator:
         """Pętla narzędziowa ze strumieniem — bez dopłaty, gdy narzędzia nie są potrzebne.
 
         Strumień rusza OD RAZU z definicjami narzędzi. Gdy model postanawia
@@ -418,7 +463,7 @@ class BaseAgent:
             for round_idx in range(agent_self.max_tool_rounds):
                 allow_tools = round_idx < agent_self.max_tool_rounds - 1
                 stream = await agent_self.client.chat.completions.create(
-                    **agent_self._round_kwargs(messages, allow_tools),
+                    **agent_self._round_kwargs(messages, allow_tools, tool_names),
                     stream=True,
                     stream_options={"include_usage": True},
                 )
@@ -467,6 +512,7 @@ class BaseAgent:
                 # o Rybno, wie od razu, że został źle zrozumiany — i poprawia
                 # pytanie, zamiast czytać odpowiedź nie na temat.
                 empty_count = 0
+                handoff = None
                 for call in calls:
                     tool = agent_tools.get(call["name"])
                     try:
@@ -486,6 +532,8 @@ class BaseAgent:
 
                     if result.empty or result.error:
                         empty_count += 1
+                    if result.handoff and handoff is None:
+                        handoff = result.handoff
                     messages.append(agent_self._tool_message(call, result))
                     sources.extend(result.sources)
                     charts.extend(result.charts)
@@ -496,6 +544,25 @@ class BaseAgent:
                 # (`GeneratorExit`). Rundy jest najwyżej trzy.
                 if ctx.telemetry is not None:
                     await ctx.telemetry.flush()
+
+                # Agent oddaje pytanie. Strumień kończy się TU — odpowiedź
+                # napisze następny agent, a ten nie ma z czego jej napisać.
+                #
+                # `discard_text` mówi frontowi, żeby skasował to, co już
+                # pokazał. Prompt zabrania pisać cokolwiek przed wywołaniem
+                # `przekaz_dalej`, ale model bywa rozmowny: gdyby zdążył
+                # wypuścić „Niestety nie mam…", mieszkaniec zobaczyłby odmowę
+                # sklejoną z odpowiedzią, czyli dokładnie to, co naprawiamy.
+                if handoff:
+                    yield json.dumps({
+                        "type": "handoff",
+                        "from": agent_self.name,
+                        "to": handoff.get("to"),
+                        "reason": handoff.get("reason"),
+                        "discard_text": bool(text_buf.strip()),
+                        "tokens_used": tokens,
+                    }) + "\n"
+                    return
 
                 # Wszystko puste = odpowiedź powstanie mimo braku materiału.
                 # Lepiej uprzedzić, niż zostawić użytkownika z wrażeniem, że

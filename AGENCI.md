@@ -347,6 +347,87 @@ wiedzieć, że pytanie o obrady potrzebuje numerów uchwał.
 
 ---
 
+### 4.10 Pętla orkiestracji: agent może zmienić zdanie (etap 7, 24.08.2026)
+
+**Skąd.** Pytanie „czy jesteś w stanie sprawdzić kondycję Rybna, podsumować
+mocne i słabe strony, masz informacje bieżące i historyczne" dostało odpowiedź
+*„Nie mam możliwości przeszukiwania historycznych danych ani analizy kondycji
+gminy"* — przy 9123 rekordach GUS, 430 uchwałach i świeżym feedzie w bazie.
+
+Nikt tu nie zawinił po stronie promptu. Router (`route()`) wybiera JEDNEGO
+agenta, raz, na podstawie samego brzmienia pytania, zanim ktokolwiek zajrzy
+do danych — a pytanie wielodziedzinowe z definicji nie mieści się w jednej
+dziedzinie. Wybrał Redaktora, bo „bieżące" brzmi najgłośniej. Redaktor ma dwa
+narzędzia i blok świadomości, który każe mu przyznać się do granic (4.3).
+Zrobił dokładnie to. **Decyzja o agencie była nieodwoływalna — to był ten błąd.**
+
+**Trzy elementy.**
+
+1. **`przekaz_dalej`** (`tools/handoff.py`) — rezygnacja jako sygnał
+   strukturalny. Agent bez zasięgu woła narzędzie z `czego_brakuje`
+   i `sugerowany_agent`, zamiast pisać odmowę. Nie klasyfikator odmowy nad
+   gotowym tekstem: wyrzuciliśmy sześć heurystyk słownych i nie wracamy po
+   siódmą — tym razem na własnym tekście, gdzie „nie mam danych o Płośnicy,
+   ale mam o Rybnie" jest odpowiedzią, nie odmową. Skutek uboczny, cenny:
+   klasa porażki „agent poddał się, nie zawoławszy NICZEGO" była dla
+   telemetrii **niewidzialna** (wiersz powstaje w `_call_tool`, a wywołania
+   nie było). Teraz rezygnacja JEST wywołaniem i widać ją w raporcie.
+
+2. **`Orchestrator.run()`** — pętla nad agentem. `MAX_HANDOFFS = 2`,
+   a `_next_agent` nie wraca do agenta, który już odpowiadał: odbicie „to nie
+   ja" ↔ „ja też nie" kończy się samo, niezależnie od tego, co wymyśli model.
+   Ślepy zaułek pisze KOD, nie model (`_dead_end_message`) — model bez
+   materiału wyprodukowałby dokładnie tę odmowę, od której zaczęliśmy.
+
+3. **Koordynator** (`agents/koordynator.py`) — agent, którego narzędziami są
+   inni agenci (`tools/delegation.py`). Nowej pętli nie budowaliśmy: to
+   `max_tool_rounds`, które działa od 22.08, podniesione do 5. Router dostał
+   siódmą opcję dla pytań wielodziedzinowych.
+
+**Dlaczego delegacja woła AGENTA, a nie jego narzędzia.** Kusiło, żeby dać
+koordynatorowi wszystkie 17 naraz. Przepadłaby wiedza z promptów specjalistów —
+okna czasowe Strażnika, zakaz „nie mam wiadomości" u Redaktora, numery uchwał
+u Urzędnika. To wnioski z awarii 7.08, 9.08 i 24.08, nie da się ich przenieść
+do opisu narzędzia. Do tego GUS jako zbiór narzędzi nie istnieje w ogóle.
+
+**Głębokość jeden, dwa zamki**: koordynatora nie ma wśród celów delegacji,
+a delegowany agent dostaje `allow_handoff=False`.
+
+⚠️ **Blok świadomości zmienił zakończenie** (4.3). Do etapu 7 brzmiało
+bezwarunkowo „powiedz WPROST, czego nie masz" — i działało za dobrze. Gdy agent
+ma `przekaz_dalej`, uczciwym wyjściem jest przekazanie, a odmowa staje się
+szkodą. Agent bez handoffu ma stare brzmienie.
+
+⚠️ **Timeout narzędzia to nie timeout delegacji.** Wspólne `TOOL_TIMEOUT_S = 15`
+jest skalibrowane dla zapytania do bazy. Delegacja uruchamia całą pętlę innego
+agenta z jego wywołaniami gpt-4o — pierwszy przebieg 24.08 uciął Urzędnika po
+15 s i koordynator napisał o kondycji gminy **bez ani jednego zdania
+o finansach**. Stąd `Tool.timeout_s` i 45 s dla delegacji (pomiar: 6–20 s).
+
+⚠️ **Etykieta zasięgu ginie w syntezie.** Pierwszy przebieg podał piknik
+w Żurominie i blok w Działdowie jako *mocne strony gminy Rybno*. Redaktor
+oznaczał je poprawnie (`article_scope`) — to koordynator zgubił rozróżnienie
+przy sklejaniu. Reguła jest dziś w jego prompcie; to ta sama pułapka, co przy
+`is_local_article` (4.7).
+
+⚠️ **GUS-Analityk nie umie przekazać pytania** — nie ma pętli narzędziowej,
+więc odsyła słowami („skontaktuj się z Organizatorem"). Zniknie razem
+z `_classify_gus_query`. Dotyczy tylko ręcznego wyboru GUS-a na froncie; router
+kieruje takie pytania poprawnie.
+
+**Koszt.** Pytanie bez handoffu kosztuje tyle co wcześniej — pętla nie ma się
+od czego uruchomić. Jedyny stały wzrost to definicja `przekaz_dalej` w każdym
+wywołaniu (~80 tokenów). Pomiar 24.08 na żywej bazie: pełna analiza kondycji
+gminy = 8949 tokenów i 37,6 s (trzy delegacje), handoff przy prostym pytaniu =
+4,2 s.
+
+**Front**: zdarzenie kroku pracy niesie `handoff: true` i `discard_text` —
+przeglądarka ma skasować tekst porzuconego agenta. Backend robi to samo dla
+zapisu w bazie (`chat.py`), inaczej w historii rozmowy zostałaby odmowa
+sklejona z odpowiedzią.
+
+---
+
 ## 5. Kto ma jakie narzędzia (stan 24.08.2026)
 
 | Agent | Narzędzia | Uwagi |
@@ -356,7 +437,11 @@ wiedzieć, że pytanie o obrady potrzebuje numerów uchwał.
 | **Strażnik** | `active_alerts`, `citizen_reports` | ⚠️ `active_alerts` to **jedyne** źródło jego wiedzy o awariach — nie używa RAG |
 | **Redaktor** | `latest_local_news`, `search_news` | zniknął regex `_GENERIC_QUESTION` i blok „ŚWIEŻY FEED" z `extra_context` |
 | **Urzędnik** | `search_legal_acts`, `council_sessions`, `search_documents` | zniknął retrieval przed każdym pytaniem; cztery poziomy odpowiedzi zostają |
-| GUS-Analityk | — (własny SQL + `chart_data`) | `_classify_gus_query` czeka na swoją kolej |
+| GUS-Analityk | — (własny SQL + `chart_data`) | `_classify_gus_query` czeka na swoją kolej; **jedyny bez `przekaz_dalej`** |
+| **Koordynator** | `zapytaj_*` × 6 (etap 7) | narzędziami są inni agenci; `can_handoff = False`, nie jest celem delegacji |
+
+Do tego **każdy agent poza GUS-em i Koordynatorem** dostaje `przekaz_dalej` — dopisywane
+w `_effective_tools`, nie w `tools` klasy, żeby nie pilnować sześciu list (4.10).
 
 ---
 

@@ -261,7 +261,8 @@ oraz `visible_event_conditions` dla wydarzeń.
 | Redaktor | `latest_local_news` + `search_news` | świeżość = zapytanie po dacie, NIE wektory |
 | Urzędnik | `search_legal_acts`, `council_sessions`, `search_documents` | korpus: `bip_static`,`bip`,`legal_act`,`article` |
 | Strażnik / Organizator / Przewodnik | **własny SQL przez narzędzia** | osadzenie wpisu nic tu nie gwarantuje |
-| GUS-Analityk | własny SQL + `chart_data` | jedyny z własnym `respond()` |
+| GUS-Analityk | własny SQL + `chart_data` | jedyny z własnym `respond()`; jedyny bez `przekaz_dalej` |
+| Koordynator | **inni agenci** (`zapytaj_*`) | pytania wielodziedzinowe; nie deleguje do siebie |
 
 ⚠️ **Klasyczna ścieżka RAG w `BaseAgent` NIE ISTNIEJE od 24.08.2026** — po
 przeniesieniu Redaktora i Urzędnika nie miała ani jednego użytkownika.
@@ -278,6 +279,42 @@ Przebieg: scraping 6:00/13:00 → AI 6:15/13:15 (`processed`) → embedding 6:50
 próg, recency) → rerank gpt-4o-mini → KONTEKST + karta gminy. Opóźnienie publikacja→RAG:
 max ~7 h rano, ~45 min po południu (wieczorne posty FB czekają do rana).
 ⚠️ **1095 chunków `event` nie czyta żaden agent** — Przewodnik bierze wydarzenia SQL-em.
+
+## Pętla orkiestracji: decyzja o agencie jest odwoływalna (2026-08-24)
+**„Sprawdź kondycję Rybna, mocne i słabe strony" → „nie mam możliwości"** przy
+9123 rekordach GUS, 430 uchwałach i świeżym feedzie. Router wybiera JEDNEGO
+agenta, raz, zanim ktokolwiek zajrzy do danych — pytanie wielodziedzinowe nie
+mieści się w tym z definicji. Redaktor odmówił zgodnie z instrukcją bloku
+świadomości; błędem była nieodwoływalność wyboru.
+- **`przekaz_dalej`** (`ai/tools/handoff.py`) — agent bez zasięgu woła narzędzie
+  zamiast pisać odmowę. NIE klasyfikator odmowy nad gotowym tekstem: siódma
+  heurystyka słowna po sześciu wyrzuconych, tyle że na własnym tekście.
+  Skutek uboczny: porażka „poddał się, nie zawoławszy niczego" była dla
+  telemetrii **niewidzialna** — teraz jest wywołaniem i widać ją w raporcie
+- **`Orchestrator.run()`** zastąpił `handle()` w `chat.py`. `MAX_HANDOFFS = 2`,
+  a `_next_agent` NIE wraca do agenta, który już odpowiadał — odbicie kończy
+  się samo. Ślepy zaułek pisze KOD (`_dead_end_message`), nie model: model bez
+  materiału wyprodukuje tę samą odmowę, od której zaczęliśmy
+- **Koordynator** (`ai/agents/koordynator.py`) — narzędziami są inni agenci
+  (`ai/tools/delegation.py`). Nowej pętli nie ma: to `max_tool_rounds` = 5.
+  Router ma siódmą opcję. Delegacja woła AGENTA, nie jego narzędzia — inaczej
+  przepada wiedza z promptów specjalistów (okna Strażnika, numery uchwał)
+- ⚠️ **Głębokość jeden, dwa zamki**: koordynatora nie ma wśród celów delegacji,
+  a delegowany agent dostaje `allow_handoff=False`
+- ⚠️ **`Tool.timeout_s`** — wspólne 15 s to limit dla zapytania do bazy.
+  Delegacja uruchamia pętlę innego agenta z gpt-4o: pierwszy przebieg uciął
+  Urzędnika i koordynator napisał o kondycji gminy bez zdania o finansach.
+  Delegacje mają 45 s (pomiar: 6–20 s)
+- ⚠️ **Zasięg ginie w syntezie** — pierwszy przebieg podał piknik w Żurominie
+  jako mocną stronę gminy Rybno. Redaktor oznaczał go poprawnie; zgubił to
+  koordynator. Reguła jest w jego prompcie
+- ⚠️ **GUS-Analityk jako jedyny nie przekaże pytania** (brak pętli narzędziowej)
+  — odsyła słowami. Zniknie z `_classify_gus_query`
+- Koszt: pytanie bez handoffu = tyle co wcześniej. Pomiar 24.08: pełna analiza
+  kondycji 8949 tok. / 37,6 s (3 delegacje), handoff prosty 4,2 s
+- Front: krok pracy niesie `handoff` + `discard_text` (skasuj tekst porzuconego
+  agenta). Backend robi to samo przy zapisie do bazy
+- Test: `python -m scripts.test_agent_tools` (sekcja „Pętla orkiestracji")
 
 ## Walidator odpowiedzi agentów (2026-08-09)
 `backend/scripts/test_agent_answers.py` — 11 pytań mieszkańca sprawdzanych **kontra stan bazy**.
@@ -340,6 +377,7 @@ dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykr
 | Przewodnik | ⚠️ częściowo | RAG eventy/artykuły, pogoda/śmieci brak |
 | GUS-Analityk | ✅ działa | Direct SQL do gus_gmina_stats + gus_national_averages (zweryfikowane na prodzie 2026-07-19) |
 | Organizator | ✅ działa | Direct SQL do waste_schedule |
+| Koordynator | ✅ działa | narzędziami są inni agenci (etap 7) |
 
 ## Ważne reguły techniczne
 - `VITE_API_URL = http://localhost:8000/api` → hooki NIE dodają `/api/` prefixu
@@ -511,7 +549,13 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
 - [ ] Uruchomić `add_locality_and_event_dedup` + `dedupe_events --apply` (prod i lokalnie)
 - [ ] Sesje rady: miejsce na froncie + decyzja, czy przepisać sesję XXIII na
       produkcji (~$0,59) — bez tego rejestr obrad jest pusty
-- [ ] GUS-Analityk: `_classify_gus_query` → narzędzie `gus_series` (ostatnia heurystyka)
+- [ ] GUS-Analityk: `_classify_gus_query` → narzędzie `gus_series` (ostatnia heurystyka);
+      przy okazji dostanie `przekaz_dalej` — dziś jako jedyny odsyła słowami
+- [ ] Front: obsłużyć `discard_text` w kroku pracy (kasowanie tekstu porzuconego
+      agenta) — bez tego przy handoffie mignie początek odmowy
+- [ ] `gmina_institutions` + `institution_info` (etap 7 pkt 5): dane instytucji
+      z bazy zamiast stałej `OFFICE_HOURS`; wygasza `office_hours`
+- [ ] `test_agent_answers`: przypadki `kondycja-gminy` i `gops-godziny` (etap 7 pkt 7)
 
 Uwaga: ~1065 historycznych artykułów poza RAG — **celowo** (decyzja 2026-07-19), embedded=True jako marker.
 

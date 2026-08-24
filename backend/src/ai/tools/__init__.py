@@ -94,6 +94,12 @@ class ToolResult:
     # wywozu", „kalendarz pusty"). Idzie do interfejsu, nie do modelu — użytkownik
     # ma widzieć, na czym stoi odpowiedź, zanim ta odpowiedź powstanie.
     summary: Optional[str] = None
+    # Żądanie przekazania pytania innemu agentowi (`tools/handoff.py`).
+    # Wypełnia je WYŁĄCZNIE `przekaz_dalej`; dla każdego innego narzędzia
+    # zostaje `None`. Pętla agenta traktuje je jak stop: przerywa rundy
+    # i oddaje decyzję orkiestratorowi, bo agent bez zasięgu nie ma z czego
+    # napisać odpowiedzi — a to, co napisze mimo wszystko, będzie odmową.
+    handoff: Optional[dict] = None
 
 
 ToolFn = Callable[..., Awaitable[ToolResult]]
@@ -109,6 +115,13 @@ class Tool:
     # Jednozdaniowy opis do bloku „TWOJE NARZĘDZIA". Krótszy niż `description`,
     # bo tamten czyta model przy KAŻDYM wywołaniu, a ten trafia do promptu raz.
     short: str = ""
+    # Własny limit czasu; `None` = wspólny `TOOL_TIMEOUT_S` z `base_agent`.
+    # Ustawiają go WYŁĄCZNIE narzędzia, które nie są zapytaniem do bazy:
+    # delegacja (`tools/delegation.py`) uruchamia całą pętlę innego agenta wraz
+    # z jego wywołaniami modelu, więc mierzy się w dziesiątkach sekund, nie
+    # w milisekundach. Wspólne 15 s ucinało Urzędnika w połowie pracy —
+    # koordynator dostawał pustkę i pisał odpowiedź bez części o finansach.
+    timeout_s: Optional[float] = None
 
     def schema(self) -> dict:
         """Definicja w formacie OpenAI `tools`."""
@@ -200,16 +213,39 @@ def describe_for(names: list[str]) -> str:
         lines.append(f"- {tool.name} — {tool.short or tool.description}")
     if not lines:
         return ""
+
+    # Zakończenie zależy od tego, czy agent ma dokąd oddać pytanie. Do etapu 7
+    # brzmiało bezwarunkowo „powiedz WPROST, czego nie masz" — i działało aż
+    # za dobrze: Redaktor odmówił analizy kondycji gminy, choć dane leżały
+    # u GUS-Analityka i Urzędnika. Instrukcja była słuszna, dopóki odmowa była
+    # jedynym uczciwym wyjściem. Gdy agent ma `przekaz_dalej`, uczciwym
+    # wyjściem jest przekazanie pytania, a odmowa staje się szkodą.
+    if "przekaz_dalej" in names:
+        ending = (
+            "Gdy pytanie wykracza poza to, co potrafisz sprawdzić, NIE ODMAWIAJ "
+            "i nie pisz, czego nie potrafisz — zawołaj `przekaz_dalej`. Inny "
+            "agent ma te dane i to on odpowie mieszkańcowi. Odmowa jest "
+            "właściwa TYLKO wtedy, gdy nikt w systemie tego nie ma; wtedy "
+            "powiedz wprost, czego brakuje, i wskaż, gdzie to znaleźć. "
+            "Nie udawaj, że sprawdziłeś."
+        )
+    else:
+        ending = (
+            "Jeśli pytanie wykracza poza to, co potrafisz sprawdzić — powiedz "
+            "WPROST, czego nie masz, i wskaż, gdzie mieszkaniec to znajdzie. "
+            "Nie udawaj, że sprawdziłeś."
+        )
+
     return (
         "TWOJE NARZĘDZIA (wołaj je zamiast zgadywać; wynik narzędzia ma "
         "pierwszeństwo przed twoją wiedzą ogólną):\n"
         + "\n".join(lines)
-        + "\n\nJeśli pytanie wykracza poza to, co potrafisz sprawdzić — powiedz "
-        "WPROST, czego nie masz, i wskaż, gdzie mieszkaniec to znajdzie. "
-        "Nie udawaj, że sprawdziłeś."
+        + "\n\n" + ending
     )
 
 
 # Import modułów narzędziowych rejestruje je w `TOOL_REGISTRY`. Trzyma się tu,
 # na dole, bo moduły importują `register`/`Tool` z tego pliku.
-from src.ai.tools import alerts, council, daily, knowledge, places, weather  # noqa: E402,F401
+from src.ai.tools import (  # noqa: E402,F401
+    alerts, council, daily, delegation, handoff, knowledge, places, weather,
+)

@@ -1,9 +1,29 @@
 """
-Orchestrator - routes user queries to the appropriate specialized agent
-Uses GPT-4o-mini for fast, cheap classification
+Orchestrator — wybiera agenta i, gdy trzeba, zmienia zdanie (etap 7)
+
+Do 24.08.2026 była tu wyłącznie klasyfikacja: `route()` wskazywał jednego
+agenta, `handle()` go wołał i oddawał wynik. Decyzja zapadała RAZ, na podstawie
+samego brzmienia pytania, zanim ktokolwiek zajrzał do danych — i nie było jej
+jak cofnąć. Pytanie „sprawdź kondycję Rybna, mocne i słabe strony, bieżące
+i historyczne" trafiło do Redaktora (bo „bieżące" brzmi najgłośniej) i dostało
+„nie mam możliwości" przy bazie pełnej szeregów GUS i 430 uchwał.
+
+`run()` dokłada nad agentem to, co `BaseAgent` ma pod nim od 22.08: pętlę.
+Agent, któremu brakuje zasięgu, woła `przekaz_dalej` (`tools/handoff.py`),
+a orkiestrator oddaje pytanie następnemu. Najwyżej `MAX_HANDOFFS` razy.
+
+**Czego to NIE robi.** Nie ocenia gotowej odpowiedzi ani nie „poprawia" jej
+drugim modelem. Sygnał przychodzi od agenta, który właśnie czytał pytanie
+i zna swoje narzędzia — jest tańszy i uczciwszy niż klasyfikator zgadujący
+z prozy, czy „nie mam danych o wywozie w Płośnicy, ale mam w Rybnie" to odmowa.
+
+**Koszt.** Pytanie bez handoffu kosztuje dokładnie tyle co wcześniej — pętla
+nie ma się od czego uruchomić. Płacimy tylko tam, gdzie dziś i tak
+przegrywaliśmy: przy odmowie.
 """
+import json
 import openai
-from typing import Optional
+from typing import AsyncGenerator, Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.agents.base_agent import BaseAgent
@@ -11,6 +31,13 @@ from src.config import settings
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Orchestrator")
+
+# Ile razy pytanie może zmienić agenta. Dwa, bo tyle wystarcza na realny błąd
+# routingu (specjalista → właściwy specjalista) i na eskalację do koordynatora
+# (specjalista → koordynator → jego delegacje). Trzeci przeskok nie zdarza się
+# w scenariuszu, który potrafimy opisać — a zdarza się w pętli, która się
+# zapętliła. Do tego `_next_agent` nie wraca do agenta, który już odpowiadał.
+MAX_HANDOFFS = 2
 
 ROUTING_PROMPT = """Jestes routerem zapytan. Przeanalizuj INTENCJE pytania i zwroc TYLKO nazwe agenta.
 
@@ -47,10 +74,23 @@ Dostepni agenci i ich INTENCJE:
   Przykladowe pytania: "jest awaria wody na ulicy...", "gdzie zglasza sie usterke?",
   "czy sa jakies ostrzezenia?", "wypadek na drodze..."
 
-- organizator: pyta o HARMONOGRAMY ODBIORU SMIECI, REPERTUAR KINA lub ZDROWIE/LEKARZY
+- organizator: pyta o HARMONOGRAMY ODBIORU SMIECI, REPERTUAR KINA, ZDROWIE/LEKARZY
+  lub GODZINY PRACY URZEDU I GOPS
   Przykladowe pytania: "kiedy wywoz smieci?", "co gra w kinie?", "harmonogram odpadow dla...",
   "kiedy przyjmuje lekarz?", "godziny poradni stomatologicznej", "ktora apteka dzis dyzuruje?",
-  "dyzur apteki w weekend", "godziny POZ", "harmonogram poradni ginekologicznej"
+  "dyzur apteki w weekend", "godziny POZ", "harmonogram poradni ginekologicznej",
+  "do ktorej pracuje GOPS", "kiedy czynny urzad gminy", "telefon do urzedu"
+
+- koordynator: pytanie wymaga KILKU DZIEDZIN NARAZ albo prosi o OCENE/ANALIZE/POROWNANIE
+  Przykladowe pytania: "jaka jest kondycja gminy?", "mocne i slabe strony Rybna",
+  "czy gmina sie wyludnia i co z tym robi?", "podsumuj sytuacje w gminie",
+  "czy warto tu otworzyc firme?", "jak wypadamy na tle innych gmin?"
+  ROZPOZNASZ GO PO TYM, ze zadna pojedyncza dziedzina nie wystarczy: odpowiedz
+  potrzebuje i danych liczbowych, i dokumentow, i biezacych wiadomosci.
+  UWAGA: to NIE jest agent od pytan trudnych ani dlugich. "Jakie sa najnowsze
+  uchwaly" jest jednodziedzinowe (urzednik), choc brzmi powaznie. Pytanie
+  z JEDNEJ dziedziny kieruj do specjalisty - koordynator kosztuje wielokrotnie
+  wiecej i odpowiada wolniej.
 
 KONTYNUACJA ROZMOWY: jesli pytanie jest doprecyzowaniem lub kontynuacja
 poprzedniego watku (np. "a w zeszlym roku?", "a ile dokladnie?", "powiedz wiecej",
@@ -144,6 +184,211 @@ class Orchestrator:
             conversation_history=conversation_history,
             stream=stream,
             user=user
+        )
+
+    # ------------------------------------------------------------------
+    # Pętla orkiestracji
+    # ------------------------------------------------------------------
+
+    async def run(
+        self,
+        session: AsyncSession,
+        user_message: str,
+        agent_name: Optional[str] = None,
+        conversation_history: list[dict] = None,
+        stream: bool = False,
+        user=None,
+        last_agent: Optional[str] = None,
+    ) -> Union[dict, AsyncGenerator]:
+        """Jak `handle()`, ale z prawem do zmiany agenta w trakcie.
+
+        Wejście i wyjście są takie same jak w `handle()` — endpoint czatu nie
+        odróżnia jednej ścieżki od drugiej poza dodatkowym zdarzeniem `handoff`
+        w strumieniu.
+        """
+        if not agent_name:
+            agent_name = await self.route(user_message, conversation_history, last_agent)
+
+        if stream:
+            return self._run_stream(
+                session, user_message, agent_name, conversation_history, user
+            )
+        return await self._run_complete(
+            session, user_message, agent_name, conversation_history, user
+        )
+
+    def _next_agent(self, handoff: dict, visited: list[str]) -> Optional[str]:
+        """Kto przejmuje pytanie. `None` = nie ma dokąd, kończymy.
+
+        Agent raz odwiedzony nie wraca do gry: to jedyne miejsce, w którym
+        odbijanie pytania w kółko („to nie ja" ↔ „ja też nie") kończy się samo,
+        niezależnie od tego, co wymyśli model.
+        """
+        target = (handoff or {}).get("to")
+        if target and target in self.agents and target not in visited:
+            return target
+
+        if target and target in visited:
+            logger.warning(f"Handoff do '{target}', który już odpowiadał — pomijam")
+        elif target:
+            logger.warning(f"Handoff do nieznanego agenta '{target}'")
+        return None
+
+    async def _run_complete(
+        self,
+        session: AsyncSession,
+        user_message: str,
+        agent_name: str,
+        conversation_history: Optional[list[dict]],
+        user,
+    ) -> dict:
+        """Wariant bez streamu — używany przez testy i wywołania non-stream."""
+        visited: list[str] = []
+        sources, charts, tokens = [], [], 0
+        last_reason: Optional[str] = None
+
+        for _ in range(MAX_HANDOFFS + 1):
+            agent = self.agents.get(agent_name) or self.agents.get("redaktor")
+            visited.append(agent.name)
+
+            result = await agent.respond(
+                session=session,
+                user_message=user_message,
+                conversation_history=conversation_history,
+                stream=False,
+                user=user,
+            )
+            # Materiał zebrany po drodze zostaje, nawet jeśli agent oddał
+            # pytanie: Strażnik potrafi znaleźć awarię i dopiero potem uznać,
+            # że reszta pytania go przerasta.
+            sources.extend(result.get("sources") or [])
+            charts.extend(result.get("chart_data") or [])
+            tokens += result.get("tokens_used") or 0
+
+            handoff = result.get("handoff")
+            if not handoff:
+                result["sources"] = sources
+                result["chart_data"] = charts
+                result["tokens_used"] = tokens
+                result["handoff_path"] = visited
+                return result
+
+            last_reason = handoff.get("reason")
+            nxt = self._next_agent(handoff, visited)
+            if nxt is None:
+                break
+            logger.info(f"Handoff {agent.name} → {nxt}: {last_reason}")
+            agent_name = nxt
+
+        # Wyczerpane przeskoki albo brak celu. Mieszkaniec ma usłyszeć, czego
+        # zabrakło — cisza po dwóch przekazaniach jest gorsza od odmowy.
+        return {
+            "answer": self._dead_end_message(last_reason),
+            "sources": sources,
+            "chart_data": charts,
+            "tokens_used": tokens,
+            "model": "n/a",
+            "agent_name": visited[-1] if visited else "redaktor",
+            "handoff_path": visited,
+        }
+
+    async def _run_stream(
+        self,
+        session: AsyncSession,
+        user_message: str,
+        agent_name: str,
+        conversation_history: Optional[list[dict]],
+        user,
+    ) -> AsyncGenerator:
+        """Strumień, który potrafi przełączyć agenta w połowie.
+
+        Zdarzenia agenta lecą do przeglądarki bez zmian — poza `done`, które
+        przy przekazaniu pytania NIE MOŻE polecieć, bo zamknęłoby odpowiedź
+        w interfejsie. Zamiast niego idzie `handoff` z `discard_text`
+        (`base_agent`), na które front kasuje to, co zdążył pokazać.
+        """
+        visited: list[str] = []
+        tokens = 0
+        last_reason: Optional[str] = None
+        current = agent_name
+
+        for _ in range(MAX_HANDOFFS + 1):
+            agent = self.agents.get(current) or self.agents.get("redaktor")
+            visited.append(agent.name)
+
+            generator = await agent.respond(
+                session=session,
+                user_message=user_message,
+                conversation_history=conversation_history,
+                stream=True,
+                user=user,
+            )
+
+            handoff = None
+            async for line in generator:
+                data = json.loads(line)
+                if data.get("type") == "handoff":
+                    handoff = data
+                    tokens += data.get("tokens_used") or 0
+                    continue
+                if data.get("type") == "done":
+                    data["tokens_used"] = (data.get("tokens_used") or 0) + tokens
+                    data["handoff_path"] = visited
+                    yield json.dumps(data) + "\n"
+                    return
+                yield line
+
+            if handoff is None:
+                # Generator skończył się bez `done` — awaryjnie, ale strumień
+                # musi zostać domknięty, inaczej przeglądarka wisi na SSE.
+                logger.error(f"Agent[{agent.name}] zamknął strumień bez 'done'")
+                break
+
+            nxt = self._next_agent(handoff, visited)
+            last_reason = handoff.get("reason")
+            yield json.dumps({
+                "type": "status",
+                "state": "running" if nxt else "warning",
+                "message": (
+                    f"Pytanie przejmuje {self.agents[nxt].display_name}"
+                    if nxt else "Nie znalazłem agenta, który to obsłuży"
+                ),
+                "detail": last_reason or "",
+                # Front kasuje na to bufor tekstu — patrz `discard_text`.
+                "handoff": True,
+                "discard_text": bool(handoff.get("discard_text")),
+            }) + "\n"
+
+            if nxt is None:
+                break
+            logger.info(f"Handoff {agent.name} → {nxt}: {last_reason}")
+            current = nxt
+
+        message = self._dead_end_message(last_reason)
+        yield json.dumps({"type": "chunk", "content": message}) + "\n"
+        yield json.dumps({"type": "sources", "sources": []}) + "\n"
+        yield json.dumps({
+            "type": "done",
+            "full_content": message,
+            "model": "n/a",
+            "agent_name": visited[-1] if visited else "redaktor",
+            "tokens_used": tokens,
+            "handoff_path": visited,
+        }) + "\n"
+
+    @staticmethod
+    def _dead_end_message(reason: Optional[str]) -> str:
+        """Odpowiedź, gdy nikt nie przejął pytania.
+
+        Pisze ją KOD, nie model: w tym miejscu nie ma już materiału, a model
+        bez materiału produkuje dokładnie tę odmowę, od której zaczęliśmy.
+        Zdanie ma powiedzieć, czego zabrakło, i wskazać człowieka.
+        """
+        brak = f" Zabrakło: {reason}." if reason else ""
+        return (
+            "Nie mam danych, żeby odpowiedzieć na to pytanie w całości."
+            f"{brak} Spróbuj zapytać o mniejszy fragment — albo skontaktuj się "
+            "z Urzędem Gminy Rybno (tel. 23 696 60 55, ul. Lubawska 15)."
         )
 
     def get_agents(self) -> list[dict]:

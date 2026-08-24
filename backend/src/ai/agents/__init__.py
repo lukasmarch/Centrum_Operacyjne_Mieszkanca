@@ -6,6 +6,7 @@ from .gus_analityk import GUSAnalitykAgent
 from .przewodnik import PrzewodnikAgent
 from .straznik import StraznikAgent
 from .organizator import OrganizatorAgent
+from .koordynator import KoordynatorAgent
 
 __all__ = [
     "BaseAgent",
@@ -17,4 +18,5 @@ __all__ = [
     "PrzewodnikAgent",
     "StraznikAgent",
     "OrganizatorAgent",
+    "KoordynatorAgent",
 ]
