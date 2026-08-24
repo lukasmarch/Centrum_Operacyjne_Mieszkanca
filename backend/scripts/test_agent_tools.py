@@ -17,6 +17,7 @@ Trzy rzeczy, każda z innego powodu:
 import asyncio
 import json
 import sys
+from datetime import datetime, timedelta
 
 from src.ai.agents.base_agent import BaseAgent
 from src.ai.tools import TOOL_REGISTRY, Tool, ToolContext, ToolResult, describe_for, schemas_for
@@ -306,6 +307,81 @@ async def run_loop_tests():
         ba.TOOL_TIMEOUT_S = original
 
 
+async def run_telemetry_tests():
+    """Pomiar wywołań — etap 6.
+
+    Sedno: telemetria ma być NIEWIDOCZNA dla odpowiedzi. Wolno jej nie zapisać
+    wiersza; nie wolno jej przerwać rozmowy ani zmienić tego, co widzi model.
+    Dlatego sprawdzamy nie tylko „czy zapisuje", ale przede wszystkim „czy
+    milknie, gdy baza nie odpowiada".
+    """
+    from src.services import tool_telemetry as tt
+
+    print("\n== Telemetria narzędzi ==")
+
+    agent = _StubAgent([("text", "x")])
+    tel = tt.ToolTelemetry(agent_name="stub", question="pytanie mieszkańca", user_id=7)
+    ctx = ToolContext(session=None, telemetry=tel)
+
+    await agent._call_tool(ctx, "_t_echo", '{"value":"abc"}')
+    check(len(tel.pending) == 1, "udane wywołanie zostawia ślad")
+    rec = tel.pending[0]
+    check(rec.state == "done" and rec.error is None, "sukces ma stan `done`")
+    check(rec.args == {"value": "abc"},
+          "argumenty trafiają do logu — inaczej złe wywołanie wygląda jak dobre",
+          f"args={rec.args}")
+    check(rec.question == "pytanie mieszkańca" and rec.user_id == 7,
+          "pytanie i konto są przy wywołaniu")
+    check(rec.duration_ms >= 0, "czas trwania jest mierzony")
+
+    await agent._call_tool(ctx, "_t_empty", "{}")
+    check(tel.pending[-1].state == "empty",
+          "pustka ma własny stan — naprawia się ją w ŹRÓDLE, nie w kodzie")
+
+    await agent._call_tool(ctx, "_t_boom", "{}")
+    check(tel.pending[-1].state == "error" and tel.pending[-1].error == "exception",
+          "awaria niesie RODZAJ błędu, nie samo „nie wyszło”")
+
+    await agent._call_tool(ctx, "_t_echo", "{to nie jest json")
+    last = tel.pending[-1]
+    check(last.error == "bad_arguments", "niepoprawny JSON od modelu jest zapisany jako taki")
+    check("_surowe" in (last.args or {}),
+          "surowe argumenty zachowane — po nich widać, CO model wyprodukował")
+
+    # Wartości bywają długie (przepisane zapytanie do RAG). Log ma być
+    # czytelny, a nie kopią kontekstu.
+    trimmed = tt._trim_args({"query": "x" * 500})
+    check(len(trimmed["query"]) == tt.ARG_VALUE_LIMIT, "długi argument jest przycinany")
+
+    check(len(tel.pending) == 4,
+          f"bufor trzyma komplet czterech wywołań ({len(tel.pending)})")
+
+    # Najważniejszy test tej warstwy: padnięta baza nie może zabrać odpowiedzi.
+    class _DeadSession:
+        async def __aenter__(self):
+            raise RuntimeError("baza nie odpowiada")
+
+        async def __aexit__(self, *a):
+            return False
+
+    original = tt.async_session
+    tt.async_session = lambda: _DeadSession()
+    try:
+        written = await tel.flush()
+        check(written == 0, "flush przy padniętej bazie NIE rzuca wyjątkiem")
+        check(tel.pending == [],
+              "bufor jest czyszczony mimo błędu — inaczej rośnie w nieskończoność")
+    except Exception as e:
+        check(False, "flush przy padniętej bazie NIE rzuca wyjątkiem", str(e))
+    finally:
+        tt.async_session = original
+
+    # Brak telemetrii to stan normalny (testy, skrypty) — nie wolno się o niego wywrócić.
+    plain = ToolContext(session=None)
+    out = await agent._call_tool(plain, "_t_echo", '{"value":"bez pomiaru"}')
+    check(out.content == {"echo": "bez pomiaru"}, "kontekst bez telemetrii działa jak dotąd")
+
+
 # ------------------------------------------------------- składanie prognozy
 def run_forecast_unit_tests():
     """Bez bazy — te reguły muszą działać niezależnie od tego, co w niej stoi."""
@@ -412,13 +488,25 @@ async def run_live_tests():
     from src.ai.agents.przewodnik import PrzewodnikAgent
     from src.ai.agents.straznik import StraznikAgent
     from src.database.connection import async_session
+    from src.services.tool_telemetry import ToolTelemetry
+    from src.ai.agents.base_agent import _POLISH_MONTHS
+    from sqlalchemy import text as sql_text
 
     print("\n== Model na żywo (--live) ==")
+
+    # Data jutrzejsza liczona, nie wpisana. Pierwsza wersja miała tu „23"
+    # — jutro z dnia pisania testu (22.08) — więc od 24.08 test świecił na
+    # czerwono przy POPRAWNEJ odpowiedzi agenta. Test, który psuje się od
+    # upływu czasu, uczy ignorowania czerwonego wyniku.
+    tomorrow = datetime.utcnow() + timedelta(days=1)
 
     cases = [
         # „Jutro” musi objąć DWA dni (dziś + jutro) — przy days=1 model dostawał
         # resztkę dzisiejszego wieczoru i opisywał ją jako jutrzejszy dzień.
-        (PrzewodnikAgent, "Jak pogoda będzie jutro?", {"weather_forecast"}, "23"),
+        # Sprawdzamy dzień I miesiąc słownie: sam numer dnia trafiłby
+        # przypadkiem w stopień Celsjusza i przepuścił tę regresję.
+        (PrzewodnikAgent, "Jak pogoda będzie jutro?", {"weather_forecast"},
+         f"{tomorrow.day} {_POLISH_MONTHS[tomorrow.month - 1]}"),
         (PrzewodnikAgent, "Co robić w weekend w Rybnie?",
          {"weather_forecast", "upcoming_events"}, None),
         (PrzewodnikAgent, "Gdzie zjeść w okolicy?", {"local_places"}, None),
@@ -433,6 +521,11 @@ async def run_live_tests():
         (StraznikAgent, "Czy są planowane przerwy w dostawie prądu?",
          {"active_alerts"}, None),
     ]
+
+    # Znacznik czasu przed przebiegiem — po nim policzymy, czy telemetria
+    # faktycznie dopisała wiersze. Atrapa sprawdza, że bufor się wypełnia;
+    # dopiero tu widać, czy zapis do bazy przechodzi.
+    telemetry_since = datetime.utcnow()
 
     for agent_cls, question, expected_any, must_contain in cases:
         agent = agent_cls()
@@ -453,7 +546,10 @@ async def run_live_tests():
                     {"role": "system", "content": describe_for(agent.tools)},
                     {"role": "user", "content": question},
                 ],
-                ToolContext(session=session),
+                ToolContext(
+                    session=session,
+                    telemetry=ToolTelemetry(agent_name=agent.name, question=question),
+                ),
             )
 
         print(f"\n  „{question}”")
@@ -473,10 +569,23 @@ async def run_live_tests():
                   f"odpowiedź zawiera: {must_contain}")
         check(bool((out["answer"] or "").strip()), "odpowiedź nie jest pusta")
 
+    # Telemetria — etap 6. Sprawdzamy PO przebiegu, bo dopiero teraz wiadomo,
+    # ile wywołań faktycznie padło.
+    print("\n== Telemetria na żywej bazie ==")
+    async with async_session() as session:
+        written = (await session.execute(sql_text(
+            "SELECT COUNT(*) FROM agent_tool_calls WHERE created_at >= :since"
+        ), {"since": telemetry_since})).scalar()
+    check(written and written > 0,
+          f"wywołania trafiły do `agent_tool_calls` ({written})",
+          "log nie zbiera — migracja `add_agent_tool_calls` przeszła?")
+
 
 async def main():
     run_forecast_unit_tests()
     await run_loop_tests()
+    # Po pętli, bo korzysta z atrap zarejestrowanych w `run_loop_tests`.
+    await run_telemetry_tests()
     if "--db" in sys.argv or "--live" in sys.argv:
         await run_db_tests()
     else:

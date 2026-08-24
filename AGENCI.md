@@ -181,6 +181,56 @@ interfejsu **obok** tekstu modelu, tą samą drogą co wykresy GUS (`trend`, `kp
 
 ---
 
+### 4.6 Pomiar wywołań (etap 6, 24.08.2026)
+
+O dziurze z prognozą dowiedzieliśmy się dlatego, że ktoś przypadkiem kliknął
+podpowiedź. Po przejściu na narzędzia ta sama dziura ma **stały kształt** —
+narzędzie zawołane, `ToolResult.empty = True` — więc daje się policzyć zamiast
+zauważyć.
+
+Jeden wiersz w `agent_tool_calls` na jedno wywołanie: agent, narzędzie, stan,
+rodzaj błędu, argumenty, czas, skrót pytania. Zbiera `_call_tool` — jedyne
+przewężenie, przez które przechodzą obie ścieżki (strumień i non-stream)
+i **wszystkie** gałęzie błędów.
+
+Trzy rzeczy, które warto wiedzieć, zanim się to ruszy:
+
+* **`empty` ≠ `error`, i nie wolno ich zlewać.** „Nie ma dziś awarii" to
+  poprawna odpowiedź na poprawne wywołanie; naprawia się ją w ŹRÓDLE danych
+  albo wcale. `timeout` czy `bad_arguments` to nasz kod. Wrzucone do jednej
+  kolumny przestają się różnić — a to dwie różne naprawy;
+* **zapis idzie OSOBNĄ sesją i po każdej rundzie.** Osobną, bo sesja requestu
+  należy w tym momencie do pętli (`AsyncSession` nie znosi współbieżności —
+  ta sama pułapka co `gather`), a `commit()` na niej zatwierdziłby cudzą
+  transakcję. Po rundzie, a nie na końcu odpowiedzi, bo strumień kończy się też
+  przez rozłączenie przeglądarki, a `finally` generatora asynchronicznego nie
+  może wtedy bezpiecznie czekać na `await`;
+* **telemetria nie ma prawa wywrócić odpowiedzi.** `flush()` nigdy nie rzuca —
+  najgorsze, co się może stać, to brak wiersza w tabeli diagnostycznej.
+
+```bash
+cd backend && python -m scripts.tool_usage_report [--days 7] [--agent nazwa]
+```
+
+Raport ma cztery warstwy, bo to cztery różne naprawy: **użycie** (narzędzie
+z zerem wywołań = zły `description`, nie zły kod), **pustka** (brak danych —
+i tylko powtarzalna pustka na to samo pytanie coś znaczy), **awarie**
+(`bad_arguments` mówi o opisie parametru, nie o bazie) oraz **argumenty**,
+bo wywołanie `days=1` na pytanie o jutro wygląda w statystykach dokładnie
+jak poprawne.
+
+⚠️ **Czego ten pomiar NIE widzi:** pytań, przy których model nie zawołał
+żadnego narzędzia. Wiersz powstaje dopiero przy wywołaniu, więc „Przewodnik
+nie sprawdził pogody, choć powinien" nie zostawia tu śladu. To pomiar
+narzędzi, nie pomiar trafności routingu.
+
+**RODO:** `question` (200 zn.) i `user_id` znikają po 30 dniach, wiersz po 180
+(`scheduler/retention_job.py`, 3:30). Liczniki zostają — do analityki wystarczy
+nazwa narzędzia i stan. Pełna treść pytania i tak leży w `chat_messages`,
+więc druga kopia żyje tylko tyle, ile trwa jej użyteczność.
+
+---
+
 ## 5. Kto ma jakie narzędzia (stan 22.08.2026)
 
 | Agent | Narzędzia | Uwagi |
@@ -214,6 +264,12 @@ interfejsu **obok** tekstu modelu, tą samą drogą co wykresy GUS (`trend`, `kp
 - **Agent wołający narzędzia na wszystko jest tak samo zepsuty jak ten, który nie
   woła wcale — tylko drożej.** Stąd przypadek kontrolny w testach: „kto jest
   wójtem" musi wrócić **bez** wywołania narzędzia (odpowiedź jest w karcie gminy).
+- **Data wpisana w test na sztywno to bomba zegarowa.** `test_agent_tools --live`
+  wymagał, żeby odpowiedź o jutrzejszej pogodzie zawierała „23" — jutro z dnia
+  pisania testu. 24.08 test świecił na czerwono przy odpowiedzi **poprawnej**.
+  Test psujący się od upływu czasu uczy ignorowania czerwonego wyniku, czyli
+  jest gorszy niż jego brak. Dziś data liczy się z zegara (dzień + miesiąc
+  słownie — sam numer trafiłby przypadkiem w stopień Celsjusza).
 
 ---
 
@@ -242,6 +298,7 @@ python -m scripts.test_agent_tools            # rejestr, pętla, składanie prog
 python -m scripts.test_agent_tools --db       # + narzędzia na żywej bazie
 python -m scripts.test_agent_tools --live     # + prawdziwy model: czy woła WŁAŚCIWE narzędzia (~1 grosz)
 python -m scripts.test_agent_answers          # 11 pytań mieszkańca kontra stan bazy
+python -m scripts.tool_usage_report --days 7  # co narzędzia zastały (nie test — raport)
 ```
 
 `test_agent_answers` sonduje Strażnika przez narzędzia (`active_alerts`,
@@ -263,9 +320,8 @@ python -m scripts.test_agent_answers          # 11 pytań mieszkańca kontra sta
 - **Etap 5 — sesje rady.** 6 rekordów w statusie `new`, `transcript_chars = 0`.
   Pipeline gotowy (`council_job`, 4:30), bramka akceptacji przez człowieka zostaje.
   Do tego miejsce na froncie.
-- **Etap 6** — log wywołań narzędzi i raport pustych wyników. Dziś o dziurze
-  z pogodą dowiedzieliśmy się, bo ktoś kliknął podpowiedź i Łukasz to zauważył.
-  To nie jest metoda.
+- ~~**Etap 6** — log wywołań narzędzi i raport pustych wyników.~~ ✅ **24.08.2026**
+  — `agent_tool_calls` + `scripts/tool_usage_report.py`, patrz 4.6.
 
 ---
 

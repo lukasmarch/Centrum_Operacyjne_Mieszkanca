@@ -100,3 +100,37 @@ class APICostLog(SQLModel, table=True):
     user_id: Optional[int] = Field(default=None)
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AgentToolCall(SQLModel, table=True):
+    """Ślad po jednym wywołaniu narzędzia przez agenta (etap 6, 2026-08-24).
+
+    Powstała, bo o dziurze w danych dowiadywaliśmy się przypadkiem: 21.08
+    Przewodnik powiedział „nie mam prognozy", mając ją w bazie. Po przejściu
+    agentów na narzędzia dziura ma stały kształt — narzędzie zawołane, wynik
+    pusty — więc da się ją policzyć zamiast zauważać.
+
+    `state` i `error` to dwie różne informacje. `empty` znaczy „szukałem i nie
+    ma" i naprawia się je w ŹRÓDLE danych; `error` to nasza awaria i naprawia
+    się ją w kodzie. Wrzucone do jednej kolumny przestałyby się różnić.
+
+    `args` bywa jedynym miejscem, w którym widać błąd promptu: model wołający
+    `days=1` na pytanie o jutro (22.08) wygląda w statystykach jak poprawne
+    wywołanie zakończone sukcesem.
+
+    RODO: `question` i `user_id` czyści `retention_job` po 30 dniach, wiersz
+    znika po 180. Liczniki przeżywają — do analityki wystarczy nazwa i stan.
+    """
+    __tablename__ = "agent_tool_calls"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    agent_name: str = Field(max_length=50)
+    tool_name: str = Field(max_length=60)
+    state: str = Field(max_length=20)          # "done" | "empty" | "error"
+    error: Optional[str] = Field(default=None, max_length=30)  # timeout, bad_arguments…
+    args: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    duration_ms: int = Field(default=0)
+    question: Optional[str] = Field(default=None, max_length=200)
+    user_id: Optional[int] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)

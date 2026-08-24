@@ -400,6 +400,27 @@ Premium czyści to pole → klient, który ZAPŁACIŁ, tracił dostęp bez ostrz
   (bez `--apply` tylko podgląd; `conversations`/`subscriptions` mają `NO ACTION`, więc samo
   `DELETE FROM users` nie przejdzie, a `business_profiles` ma CASCADE i zabiera wizytówkę)
 
+## Pomiar narzędzi agentów (2026-08-24)
+**O dziurze w danych dowiadywaliśmy się przypadkiem** — 21.08 Przewodnik powiedział
+„nie mam prognozy", mając ją w bazie od godziny. Po przejściu agentów na narzędzia
+dziura ma stały kształt (`ToolResult.empty`), więc daje się policzyć.
+- `agent_tool_calls` (migracja `add_agent_tool_calls`) — wiersz na wywołanie:
+  agent, narzędzie, stan, rodzaj błędu, argumenty, czas, skrót pytania
+- Zbiera `base_agent._call_tool` — jedyne przewężenie obu ścieżek (strumień
+  i non-stream) i wszystkich gałęzi błędów. Bufor `services/tool_telemetry.py`
+- ⚠️ **zapis OSOBNĄ sesją, po każdej rundzie.** Osobną, bo sesja requestu należy
+  wtedy do pętli (`AsyncSession` nie znosi współbieżności — ta sama pułapka co
+  `gather` 22.08). Po rundzie, bo strumień kończy się też przez rozłączenie
+  przeglądarki, a `finally` generatora asynchronicznego nie poczeka wtedy na `await`
+- ⚠️ **`empty` ≠ `error`.** Pustka naprawia się w ŹRÓDLE danych, awaria w kodzie —
+  w jednej kolumnie przestają się różnić
+- ⚠️ **nie widzi pytań, przy których model NIE zawołał narzędzia** — wiersz powstaje
+  dopiero przy wywołaniu. To pomiar narzędzi, nie trafności routingu
+- Raport: `python -m scripts.tool_usage_report [--days 7] [--agent nazwa]`
+- RODO: `question`+`user_id` → NULL po 30 dniach, wiersz kasowany po 180
+  (`retention_job`, 3:30). Liczniki zostają
+- Pełny opis: `AGENCI.md` §4.6
+
 ## TODO (Kolejne priorytety)
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
@@ -425,4 +446,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-08-21*
+*Ostatnia aktualizacja: 2026-08-24*

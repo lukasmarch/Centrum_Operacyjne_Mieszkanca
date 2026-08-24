@@ -15,6 +15,7 @@ hurtem oznaczałoby powtórzenie tych awarii naraz.
 """
 import asyncio
 import json
+import time
 import openai
 from datetime import datetime, timezone
 from typing import Optional, AsyncGenerator, Union
@@ -26,6 +27,7 @@ from src.ai.tools import ToolContext, ToolResult
 from src.config import settings
 from src.services.gmina_facts import gmina_facts
 from src.services.search_synonyms import expand_query
+from src.services.tool_telemetry import ToolTelemetry
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BaseAgent")
@@ -276,13 +278,57 @@ class BaseAgent:
                 messages.append({"role": msg["role"], "content": msg["content"]})
         messages.append({"role": "user", "content": user_message})
 
-        ctx = ToolContext(session=session, user=user)
+        # Pomiar towarzyszy rozmowie od początku, bo interesują nas także
+        # wywołania, po których nie ma odpowiedzi (timeout, rozłączony klient).
+        ctx = ToolContext(
+            session=session,
+            user=user,
+            telemetry=ToolTelemetry(
+                agent_name=self.name,
+                question=user_message,
+                user_id=getattr(user, "id", None),
+            ),
+        )
 
         if stream:
             return await self._agentic_stream(messages, ctx)
         return await self._agentic_complete(messages, ctx)
 
     async def _call_tool(self, ctx: ToolContext, name: str, raw_args: str) -> ToolResult:
+        """Wywołanie narzędzia opakowane pomiarem.
+
+        Pomiar siedzi TU, a nie w każdej gałęzi `_run_tool`, bo interesuje nas
+        także wywołanie, które padło — timeout i złe argumenty są najcenniejszą
+        częścią tych danych, a to właśnie one wychodzą wcześniejszym `return`.
+        """
+        started = time.perf_counter()
+        result = await self._run_tool(ctx, name, raw_args)
+        duration_ms = int((time.perf_counter() - started) * 1000)
+
+        telemetry = getattr(ctx, "telemetry", None)
+        if telemetry is not None:
+            if result.error:
+                state = "error"
+            elif result.empty:
+                state = "empty"
+            else:
+                state = "done"
+            try:
+                parsed = json.loads(raw_args) if raw_args else {}
+            except Exception:
+                # Argumenty nie do sparsowania to sam w sobie wynik pomiaru:
+                # znaczy, że model produkuje niepoprawny JSON dla tego schematu.
+                parsed = {"_surowe": (raw_args or "")[:120]}
+            telemetry.record(
+                tool_name=name,
+                state=state,
+                error=result.error,
+                args=parsed if isinstance(parsed, dict) else {"_surowe": str(parsed)[:120]},
+                duration_ms=duration_ms,
+            )
+        return result
+
+    async def _run_tool(self, ctx: ToolContext, name: str, raw_args: str) -> ToolResult:
         """Jedno wywołanie narzędzia — z limitem czasu i bez prawa do wywrócenia rozmowy.
 
         Każdy błąd wraca do modelu jako treść wiadomości `tool`, a nie jako
@@ -460,6 +506,8 @@ class BaseAgent:
             messages.extend(executed["messages"])
             sources.extend(executed["sources"])
             charts.extend(executed["charts"])
+            if ctx.telemetry is not None:
+                await ctx.telemetry.flush()
 
         return {
             "answer": "", "sources": sources, "chart_data": charts,
@@ -556,6 +604,13 @@ class BaseAgent:
                     messages.append(agent_self._tool_message(call, result))
                     sources.extend(result.sources)
                     charts.extend(result.charts)
+
+                # Zapis PO RUNDZIE, nie na końcu odpowiedzi: strumień kończy się
+                # też przez rozłączenie przeglądarki, a `finally` generatora
+                # asynchronicznego nie może wtedy bezpiecznie czekać na `await`
+                # (`GeneratorExit`). Rundy jest najwyżej trzy.
+                if ctx.telemetry is not None:
+                    await ctx.telemetry.flush()
 
                 # Wszystko puste = odpowiedź powstanie mimo braku materiału.
                 # Lepiej uprzedzić, niż zostawić użytkownika z wrażeniem, że

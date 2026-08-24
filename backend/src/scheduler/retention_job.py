@@ -9,6 +9,8 @@ retencji w Polityce prywatności):
   - api_cost_log: wpisy z user_id starsze niż 90 dni są odpinane od konta
     (user_id -> NULL, koszty zostają do analityki)
   - reports rozwiązane > 12 mies.: anonimizacja danych autora (treść zostaje)
+  - agent_tool_calls: treść pytania i user_id znikają po 30 dniach,
+    cały wiersz po 180 (liczniki narzędzi zostają do analityki)
 """
 import asyncio
 from datetime import datetime, timedelta, date
@@ -20,7 +22,7 @@ from sqlmodel import select
 
 from src.config import settings
 from src.database.schema import AnonymousChatUsage, NewsletterLog, Report
-from src.database.vectors import Conversation, ChatMessage, APICostLog
+from src.database.vectors import Conversation, ChatMessage, APICostLog, AgentToolCall
 from src.utils.logger import setup_logger
 
 logger = setup_logger("RetentionJob")
@@ -30,6 +32,11 @@ RETENTION_ANON_CHAT_DAYS = 90
 RETENTION_NEWSLETTER_LOG_DAYS = 90
 RETENTION_COST_LOG_USER_DAYS = 90
 RETENTION_RESOLVED_REPORT_DAYS = 365
+# Log narzędzi jest DIAGNOSTYCZNY — raport pyta o ostatnie dni, nie miesiące.
+# Pytanie mieszkańca leży już w `chat_messages`, więc druga kopia ma żyć
+# tylko tak długo, jak trwa jej użyteczność (art. 5 ust. 1 lit. e RODO).
+RETENTION_TOOL_CALL_QUESTION_DAYS = 30
+RETENTION_TOOL_CALL_DAYS = 180
 
 
 async def run_retention_async():
@@ -97,6 +104,27 @@ async def run_retention_async():
             .values(author_name=None, author_email=None, author_phone=None, user_id=None)
         )
         logger.info(f"reports: zanonimizowano autora w {res.rowcount} zgłoszeniach")
+
+        # 6. Log narzędzi agentów — najpierw odpięcie od osoby, potem wiersz
+        cutoff_tool_q = now - timedelta(days=RETENTION_TOOL_CALL_QUESTION_DAYS)
+        res = await session.execute(
+            update(AgentToolCall)
+            .where(
+                AgentToolCall.created_at < cutoff_tool_q,
+                or_(
+                    AgentToolCall.question != None,  # noqa: E711
+                    AgentToolCall.user_id != None,   # noqa: E711
+                ),
+            )
+            .values(question=None, user_id=None)
+        )
+        logger.info(f"agent_tool_calls: odpięto pytanie/user_id z {res.rowcount} wpisów")
+
+        cutoff_tool = now - timedelta(days=RETENTION_TOOL_CALL_DAYS)
+        res = await session.execute(
+            delete(AgentToolCall).where(AgentToolCall.created_at < cutoff_tool)
+        )
+        logger.info(f"agent_tool_calls: usunięto {res.rowcount} wpisów")
 
         await session.commit()
 

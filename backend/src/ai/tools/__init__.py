@@ -65,6 +65,11 @@ class ToolContext:
     session: AsyncSession
     user: Optional[Any] = None
     now: datetime = field(default_factory=datetime.utcnow)
+    # Bufor telemetrii (`services/tool_telemetry.ToolTelemetry`). Wypełnia go
+    # PĘTLA w `base_agent`, nie narzędzie — narzędzie ma nie wiedzieć, że jest
+    # mierzone, bo inaczej każde nowe musiałoby o tym pamiętać. `None` przy
+    # wywołaniach z testów i skryptów: pomiar jest opcjonalny z założenia.
+    telemetry: Optional[Any] = None
 
 
 @dataclass
