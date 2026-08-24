@@ -51,9 +51,22 @@ ZASADY OGOLNE:
 - Unikaj interpretacji prawnych - podawaj fakty
 - Odpowiadaj po polsku, precyzyjnie"""
 
+    # ⚠️ Podpowiedź musi mieć pokrycie w danych, bo trafia do WSPÓLNEJ puli
+    # (`/chat/suggestions` bierze `[:2]` od każdego agenta) i mieszkaniec klika
+    # ją jako pierwszy kontakt z produktem.
+    #
+    # Do 24.08 stało tu „Jakie są najnowsze uchwały?" i „Jakie są aktualne
+    # przetargi?" — oba w ścianę. Uchwał nie mamy w ŻADNYM źródle (moduł BIP
+    # `/akty/14/typ/` to etap 4), a przetargi nie mają własnego działu
+    # w `DEFAULT_SECTIONS`; kanał aktualności BIP milczy od 16.07.2026.
+    #
+    # Każde z czterech sprawdzone na korpusie `bip_static` (24.08): odpowiedź
+    # merytoryczna, nie odesłanie do urzędu. Odrzucone przy okazji: stawki
+    # podatku od nieruchomości (Urzędnik znajduje uchwałę, ale samych stawek
+    # w niej nie ma — to pół ściany) i fundusz sołecki (zero źródeł).
     example_questions = [
-        "Jakie sa najnowsze uchwaly?",
-        "Kiedy odbior smieci?",
-        "Jakie sa aktualne przetargi?",
-        "Co mowi BIP o budowie drogi?"
+        "Czy gmina dofinansuje usunięcie azbestu?",
+        "Kiedy odbiór śmieci?",
+        "Gdzie znajdę bezpłatne porady prawne?",
+        "Co mówi BIP o budowie drogi?"
     ]
