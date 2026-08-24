@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
-from src.services import energa, weather_alert
+from src.services import alert_policy, energa, weather_alert
 from src.services.alert_policy import _flat, places_in
 from src.services.feed_policy import LOCAL_TZ
 from src.utils.cost_tracker import log_api_cost
@@ -392,6 +392,30 @@ class ArticleProcessor:
                     self.logger.info(
                         f"Event {article.id}: termin {start} (UTC) "
                         f"[{category_data.primary_category}]"
+                    )
+
+            # Ostatnia deska: same godziny w treści, bez daty. Model ich nie
+            # wpisuje, bo nie wie, którego dnia dotyczą — a to zawsze dzień
+            # ogłoszenia („W godzinach 16.00 - 19.00 nastąpi wyłączenie prądu").
+            # 24.08.2026 taki post kazał pushowi alarmować dobę po fakcie.
+            #
+            # Tylko dla awarii (`alert_policy.incident_of` — ta sama zamknięta
+            # lista, co push). Zapis „w godzinach 8:00–16:00" bywa godzinami
+            # urzędowania i wpisany jako termin zdarzenia przestawiłby wpis
+            # w rankingu feedu (`feed_policy._reference_time`) oraz w kalendarzu.
+            if (
+                article.event_at is None
+                and article.event_until is None
+                and alert_policy.incident_of(article.title, text_content)
+            ):
+                start, end = alert_policy.span_from_text(
+                    article.title, text_content, article.published_at
+                )
+                if end:
+                    article.event_at = start
+                    article.event_until = end
+                    self.logger.info(
+                        f"Awaria {article.id}: godziny z treści {start}–{end} (UTC)"
                     )
 
             usage = result.usage()

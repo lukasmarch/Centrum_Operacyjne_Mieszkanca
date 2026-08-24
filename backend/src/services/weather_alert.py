@@ -16,13 +16,10 @@ po kategoryzacji — i tak samo zapisujemy w `event_at` / `event_until`, żeby
 Funkcje są czyste (bez bazy i sieci) — `scripts/test_weather_alert.py`.
 """
 import re
-import unicodedata
 from datetime import datetime, timedelta
 from typing import Optional
-from zoneinfo import ZoneInfo
 
-# Komunikaty podają czas lokalny, baza trzyma naiwny UTC (jak reszta projektu).
-LOCAL_TZ = ZoneInfo("Europe/Warsaw")
+from src.services.time_span import flat as _flat, parse_span
 
 # Ostrzeżenie bez czytelnego terminu ważności. IMGW wydaje je na kilkanaście
 # godzin; doba to już relacja, nie ostrzeżenie.
@@ -31,24 +28,6 @@ DEFAULT_VALIDITY_H = 12
 # Ile godzin po wygaśnięciu wpis jeszcze coś mieszkańcowi mówi („czy to była ta
 # burza, o której pisali"). Później nie ma czego ostrzegać.
 KEEP_AFTER_END_H = 3
-
-
-def _to_utc(local_naive: datetime) -> datetime:
-    return local_naive.replace(tzinfo=LOCAL_TZ).astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
-
-
-def _to_local(utc_naive: datetime) -> datetime:
-    return utc_naive.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ).replace(tzinfo=None)
-
-
-def _flat(text: Optional[str]) -> str:
-    """
-    Tekst bez ogonków i wielkości liter. „ł" podmieniane ręcznie — jako jedyna
-    polska litera nie rozkłada się w NFKD (ta sama pułapka co w `alert_policy`).
-    """
-    lowered = (text or "").lower().replace("ł", "l")
-    stripped = unicodedata.normalize("NFKD", lowered)
-    return "".join(c for c in stripped if not unicodedata.combining(c))
 
 
 # --- rozpoznanie: czy to w ogóle ostrzeżenie pogodowe ------------------------
@@ -83,27 +62,6 @@ def is_weather_alert(title: Optional[str], content: Optional[str] = None) -> boo
 
 # --- ważność: od kiedy do kiedy ---------------------------------------------
 
-_SEP = r"[-–—]"          # zakres bywa myślnikiem, półpauzą albo pauzą
-_H = r"(\d{1,2}):(\d{2})"
-_D = r"(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?"
-
-# Format urzędowy IMGW: „od godz. 12:00 dnia 01.08.2026 do godz. 01:00 dnia 02.08.2026"
-_FULL_RE = re.compile(
-    rf"od\s+godz\w*\.?\s*{_H}\s+dnia\s+{_D}\s+do\s+godz\w*\.?\s*{_H}\s+dnia\s+{_D}"
-)
-
-# Przedruk na profilu: „Dziś, w godzinach 15:00–01:00" / „od 15:00 do 01:00”
-_SPAN_RE = re.compile(
-    rf"(?:w\s+godzinach|w\s+godz\w*\.?|od\s+godz\w*\.?|od)\s*{_H}\s*(?:{_SEP}|\s+do\s+(?:godz\w*\.?\s*)?){_H}"
-)
-
-# Sam koniec: „obowiązuje do godz. 01:00”, „ważne do 20:00”
-_UNTIL_RE = re.compile(rf"(?:do|obowiazuje\s+do|wazne\s+do)\s+(?:godz\w*\.?\s*)?{_H}")
-
-
-def _build(local_day: datetime, hour: int, minute: int) -> datetime:
-    return local_day.replace(hour=hour, minute=minute, second=0, microsecond=0)
-
 
 def parse_validity(
     text: Optional[str],
@@ -112,50 +70,11 @@ def parse_validity(
     """
     Okres obowiązywania ostrzeżenia → (początek, koniec) w UTC.
 
-    `published_at` (UTC) jest dniem odniesienia dla zapisów bez daty — „dziś,
-    w godzinach 15:00–01:00" znaczy tyle, co dzień publikacji. Zakres przez
-    północ kończy się nazajutrz; bez tego alert do 01:00 „wygasał" przed startem.
+    Sam odczyt godzin mieszka w `services/time_span.py` — 24.08.2026 okazało się,
+    że tego samego zapisu potrzebuje push o wyłączeniu prądu, a nie jest to
+    sprawa pogody.
     """
-    if not published_at:
-        return None, None
-
-    flat = _flat(text)
-    day = _to_local(published_at)
-
-    match = _FULL_RE.search(flat)
-    if match:
-        h1, m1, d1, mo1, y1, h2, m2, d2, mo2, y2 = match.groups()
-        try:
-            start = datetime(int(y1 or day.year), int(mo1), int(d1), int(h1), int(m1))
-            end = datetime(int(y2 or day.year), int(mo2), int(d2), int(h2), int(m2))
-        except ValueError:
-            return None, None
-        return _to_utc(start), _to_utc(end)
-
-    match = _SPAN_RE.search(flat)
-    if match:
-        h1, m1, h2, m2 = (int(g) for g in match.groups())
-        try:
-            start = _build(day, h1, m1)
-            end = _build(day, h2, m2)
-        except ValueError:
-            return None, None
-        if end <= start:
-            end += timedelta(days=1)
-        return _to_utc(start), _to_utc(end)
-
-    match = _UNTIL_RE.search(flat)
-    if match:
-        h2, m2 = int(match.group(1)), int(match.group(2))
-        try:
-            end = _build(day, h2, m2)
-        except ValueError:
-            return None, None
-        if end <= day:
-            end += timedelta(days=1)
-        return None, _to_utc(end)
-
-    return None, None
+    return parse_span(text, published_at)
 
 
 def validity_or_default(

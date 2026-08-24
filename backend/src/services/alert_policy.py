@@ -30,6 +30,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
+from src.services import time_span
+
 # Zdarzenie z terminem (zapowiedziane wyłączenie prądu) budzi telefon dopiero
 # wtedy, gdy da się coś z tym zrobić — naładować telefon, nabrać wody. Zapowiedź
 # na przyszły czwartek to sprawa feedu, nie powiadomienia.
@@ -250,7 +252,79 @@ def is_timely(
     return (now - reference).total_seconds() / 3600 <= MAX_AGE_H
 
 
+# --- termin wyczytany z treści ------------------------------------------------
+
+
+def span_from_text(
+    title: Optional[str],
+    content: Optional[str],
+    published_at: Optional[datetime],
+) -> tuple[Optional[datetime], Optional[datetime]]:
+    """
+    Godziny zdarzenia wyjęte z komunikatu, gdy kategoryzacja ich nie wpisała.
+
+    24.08.2026 o 6:08 push wysłał alarm o wyłączeniu prądu, które skończyło się
+    poprzedniego wieczoru. Post ZGK mówił „W godzinach 16.00 - 19.00", ale bez
+    daty — model nie zaryzykował `event_at`, więc `is_timely` mierzyła wiek od
+    publikacji (24 h) i o świcie wpis wciąż był „na czasie". Bramka „po
+    zdarzeniu" istniała; brakowało jej wyłącznie `event_until`.
+
+    Liczymy TUTAJ, a nie w `is_timely`, bo zapis „w godzinach 8:00–16:00" bywa
+    godzinami urzędowania. Zanim tu dojdziemy, wpis przeszedł już bramkę rodzaju
+    i miejsca — mówi więc o awarii w gminie Rybno, nie o biurze.
+
+    Drugi bezpiecznik: zakres kończący się PRZED publikacją odrzucamy. Awarię
+    ogłasza się przed nią albo w trakcie; „awaria trwała od 8:00 do 15:00"
+    w poście z 18:00 to relacja, a relacji nie wysyłamy pushem.
+    """
+    start, end = time_span.parse_span(f"{title or ''}\n{content or ''}", published_at)
+    if end is not None and published_at is not None and end < published_at:
+        return None, None
+    return start, end
+
+
 # --- decyzja -----------------------------------------------------------------
+
+
+def signature(
+    title: Optional[str],
+    content: Optional[str] = None,
+    published_at: Optional[datetime] = None,
+    event_at: Optional[datetime] = None,
+    event_until: Optional[datetime] = None,
+) -> Optional[tuple]:
+    """
+    Klucz „to jest ten sam alert" — rodzaj, miejsca i termin zdarzenia.
+
+    24.08.2026 o 6:08 poszły dwa powiadomienia sekundę po sobie: komunikat ZGK
+    o wyłączeniu prądu i jego przedruk na profilu Syli. Zwijanie po tekście
+    (`feed_policy.collapse_duplicates`) tej pary nie łączy — kategoryzacja
+    napisała im różne nagłówki („Wyłączenie prądu w Rybnie" i „Przerwa
+    w dostawie prądu w Rybnie"), a to podobieństwo 0,43 przy progu 0,72.
+    Progi feedu są skalibrowane dla feedu i nie ma powodu ich pod push naginać.
+
+    Push i tak wie więcej niż wyszukiwarka podobieństw: dla mieszkańca liczy się
+    CO, GDZIE i KIEDY. Dwa wpisy o tym samym rodzaju zdarzenia, w tych samych
+    miejscowościach i o tym samym terminie to jedno powiadomienie, choćby
+    napisano je zupełnie innymi słowami.
+
+    Termin liczy się tak samo jak w `evaluate` — z treści, gdy w bazie go nie ma.
+    Bez tego przedruk z pustym `event_at` miałby inny klucz niż oryginał.
+
+    `None` = wpis nie jest alertem (nie ma czego zwijać).
+    """
+    incident = incident_of(title, content)
+    if incident is None:
+        return None
+
+    places = places_in(title, content)
+    if not places:
+        return None
+
+    if event_at is None and event_until is None:
+        event_at, _ = span_from_text(title, content, published_at)
+
+    return (incident[0], frozenset(places), event_at)
 
 
 def evaluate(
@@ -277,6 +351,9 @@ def evaluate(
 
     if is_foreign_region(title, content):
         return None  # cudze Rybno — patrz `is_foreign_region`
+
+    if event_at is None and event_until is None:
+        event_at, event_until = span_from_text(title, content, published_at)
 
     if not is_timely(published_at, scraped_at, event_at, event_until, now):
         return None

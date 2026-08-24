@@ -19,7 +19,7 @@ from typing import List, Optional, Tuple
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from src.services import alert_policy
+from src.services import alert_policy, feed_policy, time_span
 
 NOW = datetime(2026, 7, 27, 12, 0)
 HOUR_AGO = NOW - timedelta(hours=1)
@@ -151,6 +151,175 @@ CASES: List[Tuple[str, str, str, Optional[datetime], Optional[datetime], Optiona
 ]
 
 
+# ── Termin wyczytany z treści ────────────────────────────────────────────────
+# Osobna lista, bo tu liczy się DOKŁADNY moment publikacji i oceny — a `CASES`
+# ustawia je sztywno. Przypadek pierwszy poszedł naprawdę: 24.08.2026 o 6:08
+# push obudził sześć telefonów alarmem o wyłączeniu, które skończyło się
+# poprzedniego dnia o 19:00.
+ZGK_TITLE = "Zakład Gospodarki Komunalnej w Rybnie Sp z o o"
+ZGK_BODY = (
+    "Drodzy mieszkańcy! W godzinach 16.00 - 19.00 na terenie całego Rybna, "
+    "nastąpi wyłączenie prądu. Woda będzie dostarczana z hydroforni."
+)
+ZGK_PUB = datetime(2026, 8, 23, 11, 0)  # 13:00 czasu lokalnego
+
+# (opis, tytuł, treść, published_at, now, oczekiwany rodzaj)
+SPAN_CASES: List[Tuple[str, str, str, datetime, datetime, Optional[str]]] = [
+    (
+        "post ZGK nazajutrz o 6:08 — zdarzenie minęło ← TO POSZŁO 24.08",
+        ZGK_TITLE, ZGK_BODY, ZGK_PUB, datetime(2026, 8, 24, 6, 8), None,
+    ),
+    (
+        "ten sam post w trakcie wyłączenia (16:30 lokalnie)",
+        ZGK_TITLE, ZGK_BODY, ZGK_PUB, datetime(2026, 8, 23, 14, 30), "prad",
+    ),
+    (
+        "ten sam post dwie godziny przed wyłączeniem",
+        ZGK_TITLE, ZGK_BODY, ZGK_PUB, datetime(2026, 8, 23, 12, 0), "prad",
+    ),
+    (
+        # Bezpiecznik `span_from_text`: zakres kończący się przed publikacją nie
+        # jest terminem zdarzenia. Chroni godziny urzędowania w treści ogłoszenia
+        # — bez tego „zgłoszenia przyjmujemy 7:00–15:00" w poście z 16:00
+        # zamykałoby push o TRWAJĄCEJ awarii.
+        "awaria zgłoszona po 15:00, w treści godziny przyjmowania zgłoszeń",
+        "Awaria sieci wodociągowej w Rybnie",
+        "Trwa usuwanie awarii. Zgłoszenia przyjmujemy w godzinach 7:00 - 15:00.",
+        datetime(2026, 8, 23, 14, 0),  # 16:00 lokalnie, po „godzinach"
+        datetime(2026, 8, 23, 15, 0), "woda",
+    ),
+    (
+        # Regresja: awaria bez godzin w treści musi działać jak dotąd.
+        "awaria wody bez godzin — świeża, przechodzi jak dotąd",
+        "Awaria sieci wodociągowej w Koszelewach",
+        "ZGK informuje o braku wody do godzin wieczornych.",
+        datetime(2026, 8, 23, 11, 0), datetime(2026, 8, 23, 12, 0), "woda",
+    ),
+]
+
+# Zapisy godzin, które parser MUSI rozumieć (dzień odniesienia = publikacja).
+PARSE_CASES: List[Tuple[str, str, Optional[Tuple[int, int]]]] = [
+    ("W godzinach 16.00 - 19.00 nastąpi wyłączenie", "kropka i spacje wokół myślnika", (14, 17)),
+    ("Dziś, w godzinach 15:00–01:00", "dwukropek, półpauza, przez północ", (13, 23)),
+    ("od godz. 8:00 do 14:00", "od…do", (6, 12)),
+    ("Wyłączenie prądu w całym Rybnie", "brak godzin", None),
+]
+
+
+def run_span_cases() -> int:
+    print()
+    print("=" * 78)
+    print("Termin wyczytany z treści komunikatu")
+    print("=" * 78)
+
+    failures = 0
+    for text_in, label, expected in PARSE_CASES:
+        start, end = time_span.parse_span(text_in, ZGK_PUB)
+        got = (start.hour, end.hour) if start and end else None
+        ok = got == expected
+        failures += not ok
+        print(f"{'✓' if ok else '✗'} parse: {label:.<50} "
+              f"{got or '—'}{'' if ok else f' (oczekiwano {expected or chr(8212)})'}")
+
+    for label, title, content, published, now, expected in SPAN_CASES:
+        alert = alert_policy.evaluate(
+            title=title, content=content,
+            published_at=published, scraped_at=published,
+            now=now,
+        )
+        got = alert.kind if alert else None
+        ok = got == expected
+        failures += not ok
+        detail = f"{got or '—'}" + (f" (oczekiwano {expected or '—'})" if not ok else "")
+        print(f"{'✓' if ok else '✗'} {label:.<58} {detail}")
+
+    return failures
+
+
+# ── Jeden komunikat = jedno powiadomienie ────────────────────────────────────
+# 24.08.2026 o 6:08:30 i 6:08:31 poszły dwa pushe: post ZGK i jego przedruk
+# na profilu Syli. Rozstrzyga sygnatura alertu (rodzaj + miejsca + termin),
+# bo zwijanie po tekście tej pary nie łączy — kategoryzacja napisała im różne
+# nagłówki, a to podobieństwo 0,43 przy progu 0,72.
+
+# (opis, [(tytuł, treść, published_at)], ile RÓŻNYCH alertów)
+SIGNATURE_GROUPS: List[Tuple[str, List[Tuple[str, str, datetime]], int]] = [
+    (
+        "komunikat ZGK i jego przedruk u Syli ← przypadek z 24.08",
+        [
+            (ZGK_TITLE, ZGK_BODY, ZGK_PUB),
+            (
+                "Serwis informacyjny Syla",
+                "Zakład Gospodarki Komunalnej w Rybnie: w godzinach 16.00 - 19.00 "
+                "na terenie Rybna wystąpi przerwa w dostawie prądu.",
+                datetime(2026, 8, 23, 13, 8),
+            ),
+        ],
+        1,
+    ),
+    (
+        "dwa realne wyłączenia Energi w Rybnie na 25.08 — NIE zlewać",
+        [
+            (
+                "Wyłączenie planowane - Region Mława - Rybno gmina wiejska",
+                "Rybno gmina wiejska 25.08.2026 09:30-15:00 - Rybno ulica Wyzwolenia 90.",
+                datetime(2026, 8, 21, 10, 19),
+            ),
+            (
+                "Wyłączenie planowane - Region Mława - Rybno gmina wiejska",
+                "Rybno gmina wiejska 25.08.2026 10:00-15:00 - Rybno ulice Kościelna 1, 3, 5.",
+                datetime(2026, 8, 21, 10, 20),
+            ),
+        ],
+        2,
+    ),
+    (
+        "awaria prądu i awaria wody tego samego dnia — dwa różne alerty",
+        [
+            ("Wyłączenie prądu w Rybnie", "W godzinach 16.00 - 19.00 nie będzie prądu.", ZGK_PUB),
+            ("Awaria wodociągu w Rybnie", "W godzinach 16.00 - 19.00 nie będzie wody.", ZGK_PUB),
+        ],
+        2,
+    ),
+]
+
+# Wyłączenia Energi mają termin z bazy (parsuje go `services/energa.py` przy
+# scrapowaniu) — bez niego obie zapowiedzi na 25.08 miałyby ten sam klucz.
+ENERGA_EVENTS = {
+    "09:30-15:00": datetime(2026, 8, 25, 7, 30),
+    "10:00-15:00": datetime(2026, 8, 25, 8, 0),
+}
+
+
+def run_signature_cases() -> int:
+    print()
+    print("=" * 78)
+    print("Sygnatura alertu — co jest tym samym zdarzeniem")
+    print("=" * 78)
+
+    failures = 0
+    for label, entries, expected in SIGNATURE_GROUPS:
+        signatures = set()
+        for title, content, published in entries:
+            event_at = next(
+                (dt for marker, dt in ENERGA_EVENTS.items() if marker in content), None
+            )
+            sig = alert_policy.signature(
+                title=title, content=content,
+                published_at=published, event_at=event_at,
+            )
+            if sig:
+                signatures.add(sig)
+        ok = len(signatures) == expected
+        failures += not ok
+        detail = f"{len(signatures)} z {len(entries)}"
+        if not ok:
+            detail += f" (oczekiwano {expected})"
+        print(f"{'✓' if ok else '✗'} {label:.<58} {detail}")
+
+    return failures
+
+
 def run_cases() -> int:
     print("=" * 78)
     print("Przypadki brzegowe polityki alertów")
@@ -239,6 +408,8 @@ async def run_db():
 
 if __name__ == "__main__":
     failed = run_cases()
+    failed += run_span_cases()
+    failed += run_signature_cases()
     if "--db" in sys.argv:
         asyncio.run(run_db())
     sys.exit(1 if failed else 0)
