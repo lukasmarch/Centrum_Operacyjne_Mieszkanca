@@ -147,7 +147,14 @@ async def run_bip_knowledge_job_async():
     if not documents:
         # Pusty wynik przy działającym BIP oznacza zmianę struktury strony,
         # a nie brak treści — nie ma czego zapisywać, jest co zgłosić.
-        logger.error("Scraper nie zwrócił żadnego dokumentu — sprawdź strukturę BIP")
+        # Druga, od 24.08.2026 równie prawdopodobna przyczyna: BIP odrzuca
+        # adres IP tej maszyny (403 na wszystko, także na goły curl).
+        logger.error(
+            "Scraper nie zwrócił żadnego dokumentu. Dwie przyczyny warte "
+            "sprawdzenia w tej kolejności: (1) dostęp — "
+            "`curl -s -o /dev/null -w '%{http_code}' https://bip.gminarybno.pl/112/` "
+            "z TEJ maszyny; 403 znaczy blokadę IP, (2) zmiana struktury strony."
+        )
         return
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
