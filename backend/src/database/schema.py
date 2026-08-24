@@ -1031,6 +1031,54 @@ class BipDocument(SQLModel, table=True):
     content_changed_at: Optional[datetime] = None
 
 
+class LegalAct(SQLModel, table=True):
+    """
+    Akt prawny gminy: uchwała Rady albo zarządzenie Wójta (moduł BIP `/akty/14/`).
+
+    Osobna tabela, a nie `bip_documents`, bo akt ma metadane, których wiedza
+    stała nie ma i nie potrzebuje: NUMER, DATĘ PODJĘCIA, STATUS i GRUPĘ.
+    Najczęstsze pytanie o uchwały — „jakie są najnowsze" — to `ORDER BY
+    adopted_at DESC`, czyli dokładnie to, czego wyszukiwarka wektorowa nie umie:
+    pytanie nie ma słów wyróżniających, więc podobieństwo losuje. To ta sama
+    lekcja co przy świeżym feedzie Redaktora (9.08).
+
+    Osobna też od `articles`: BIP jest w `feed_policy.LOCAL_SOURCES`, więc
+    uchwała budżetowa z 2024 r. wjechałaby na Dashboard jako świeża wiadomość.
+
+    Zakres 2024–2026 (decyzja Łukasza). Moduł sięga 2003 r., ale akt sprzed
+    dekady odpowiada na pytania, których nikt nie zadaje, a rozcieńcza wyniki.
+    Agent ma mówić WPROST, od kiedy ma dane.
+
+    `content` pochodzi z załącznika PDF — te mają warstwę tekstową (sprawdzone
+    24.08). `content_hash` decyduje o ponownym osadzeniu.
+    """
+    __tablename__ = "legal_acts"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Numer w URL `/akty/14/{bip_id}/…` — jedyny stabilny identyfikator aktu.
+    # Tytuł bywa poprawiany, numer aktu potrafi się powtórzyć między latami.
+    bip_id: int = Field(unique=True, index=True)
+
+    act_number: Optional[str] = Field(default=None, max_length=60)   # „XXIII/178/2026"
+    act_group: str = Field(max_length=120)   # „Uchwały Rady Gminy" / „Zarządzenia Wójta Gminy"
+    title: str
+
+    adopted_at: Optional[date] = Field(default=None, index=True)
+    effective_from: Optional[date] = None
+    status: Optional[str] = Field(default=None, max_length=60)  # „Obowiązujący"
+
+    url: str
+    pdf_url: Optional[str] = None
+
+    content: Optional[str] = None
+    content_hash: Optional[str] = Field(default=None, max_length=64)
+
+    embedded: bool = Field(default=False, index=True)
+    first_seen_at: datetime = Field(default_factory=datetime.utcnow)
+    last_checked_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # ======================
 # Sesje Rady Gminy — transkrypcja obrad (2026-08-09)
 # ======================

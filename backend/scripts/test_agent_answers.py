@@ -212,6 +212,22 @@ async def _documents_probe(session: AsyncSession, question: str) -> str:
     return json.dumps(result.content, ensure_ascii=False, default=str)
 
 
+async def _legal_acts_probe(session: AsyncSession, question: str) -> str:
+    """Materiał Urzędnika o uchwałach — przez `search_legal_acts`.
+
+    Sonda idzie tą samą drogą co agent, bo to jedyny sposób, żeby czerwony
+    wynik mówił, CO zawiodło: rejestr (etap 4 nie napełniony, akt bez daty)
+    czy prompt (model ma numer w wyniku i go nie podał).
+    """
+    import json
+
+    from src.ai.tools import ToolContext
+    from src.ai.tools.knowledge import search_legal_acts
+
+    result = await search_legal_acts(ToolContext(session=session), rodzaj="uchwały", limit=5)
+    return json.dumps(result.content, ensure_ascii=False, default=str)
+
+
 async def _fresh_feed_probe(session: AsyncSession, question: str) -> str:
     """Materiał Redaktora na pytanie ogólne — przez `latest_local_news`.
 
@@ -553,6 +569,47 @@ async def oracle_fresh_news(session: AsyncSession) -> Expect:
     )
 
 
+async def oracle_latest_acts(session: AsyncSession) -> Expect:
+    """Najnowsza uchwała Rady wprost z rejestru — zapytanie NIEZALEŻNE od kodu agenta.
+
+    Pilnuje etapu 4 i jednej konkretnej rzeczy: **numeru**. Uchwała podana
+    bez numeru jest bezużyteczna (mieszkaniec idzie z nim do urzędu), a numer
+    wymyślony jest gorszy niż brak odpowiedzi.
+    """
+    rows = (await session.execute(
+        text("""
+            SELECT act_number FROM legal_acts
+            WHERE act_group ILIKE '%Uchwały%' AND act_number IS NOT NULL
+              AND adopted_at = (
+                  SELECT MAX(adopted_at) FROM legal_acts
+                  WHERE act_group ILIKE '%Uchwały%' AND act_number IS NOT NULL
+              )
+        """)
+    )).scalars().all()
+
+    if not rows:
+        return Expect(skip="rejestr aktów pusty — uruchom scripts.run_legal_acts")
+
+    # ⚠️ „Najnowsza uchwała" NIE jest jedną uchwałą. Jedna sesja Rady podejmuje
+    # ich kilkanaście tego samego dnia (24.06.2026 — osiem), więc wymaganie
+    # konkretnego numeru czyniło z tego przypadku loterię. Wystarczy DOWOLNY
+    # numer z najświeższej sesji: pilnujemy tego, że numer pochodzi z rejestru,
+    # a nie z pamięci modelu.
+    # ⚠️ Wzorzec musi przejść przez `flat()` tak jak przeszukiwany tekst —
+    # normalizator sprowadza wszystko do małych liter, więc „XXIII/180/2026”
+    # nie trafiłoby w „xxiii/180/2026”. Ten sam zabieg co przy nazwie apteki.
+    # Numer bywa też zapisany z odstępami („XXIII / 178 / 2026”).
+    wzorce = [re.escape(flat(n)).replace("/", r"\s*/\s*") for n in rows]
+    dowolny = "(" + "|".join(wzorce) + ")"
+
+    return Expect(
+        fact=f"najświeższa sesja dała {len(rows)} uchwał: {', '.join(rows[:4])}…",
+        must_any=[("numer uchwały z najświeższej sesji", dowolny)],
+        must_not=[("wyparcie się rejestru przy pełnej bazie", NO_KNOWLEDGE)],
+        must_in_context=[("numer w materiale agenta", dowolny)],
+    )
+
+
 async def oracle_azbest(session: AsyncSession) -> Expect:
     result = await session.execute(
         text("""
@@ -665,6 +722,14 @@ CASES: list[Case] = [
         oracle=oracle_azbest,
         probe=_documents_probe,
         why="mowa potoczna ('eternit') kontra język BIP ('azbest') — bramka synonimów",
+    ),
+    Case(
+        id="uchwaly",
+        question="Jakie są najnowsze uchwały Rady Gminy?",
+        agent="urzednik",
+        oracle=oracle_latest_acts,
+        probe=_legal_acts_probe,
+        why="etap 4 — podpowiedź z UI; numer uchwały MUSI pochodzić z rejestru, nie z pamięci",
     ),
     Case(
         id="co-nowego",

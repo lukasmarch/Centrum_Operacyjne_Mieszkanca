@@ -133,6 +133,57 @@ class SemanticChunker:
         ]
 
     @staticmethod
+    def chunk_legal_act(
+        title: str,
+        content: Optional[str],
+        act_number: Optional[str],
+        act_group: str,
+        adopted_at: Optional[str],
+    ) -> list[dict]:
+        """
+        Chunk uchwały Rady albo zarządzenia Wójta.
+
+        Nagłówek niesie NUMER i DATĘ, i to jest tu cała różnica wobec
+        `chunk_bip_static`. Przy akcie prawnym podanie złego numeru nie jest
+        drobną nieścisłością — mieszkaniec pójdzie z nim do urzędu. Numer musi
+        więc stać w KAŻDYM kawałku, bo model cytuje to, co widzi obok tekstu,
+        a nie to, co stało w kawałku pierwszym.
+
+        Data w nagłówku odróżnia też akty o identycznych tytułach: „zmian
+        w budżecie Gminy Rybno" to w 2026 r. kilkanaście osobnych zarządzeń.
+        """
+        stamp = f" z {adopted_at}" if adopted_at else ""
+        number = f" NR {act_number}" if act_number else ""
+        header = f"[{act_group}{number}{stamp}] {title}".strip()
+
+        if not content:
+            # Skan bez warstwy tekstowej — same metadane też są odpowiedzią
+            # na pytanie „czy jest uchwała o…".
+            return [{
+                "text": header,
+                "metadata": {
+                    "chunk_type": "legal_act_title_only",
+                    "act_number": act_number,
+                    "act_group": act_group,
+                },
+            }]
+
+        parts = SemanticChunker._split_text(content, max_chars=1800, overlap_chars=200)
+        return [
+            {
+                "text": f"{header}\n\n{part}",
+                "metadata": {
+                    "chunk_type": "legal_act",
+                    "chunk_part": i + 1,
+                    "chunk_total": len(parts),
+                    "act_number": act_number,
+                    "act_group": act_group,
+                },
+            }
+            for i, part in enumerate(parts)
+        ]
+
+    @staticmethod
     def chunk_event(
         title: str,
         description: Optional[str],

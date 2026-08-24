@@ -27,6 +27,7 @@ from src.scheduler.newsletter_job import run_weekly_newsletter, run_daily_newsle
 from src.scheduler.air_quality_job import run_air_quality_job
 from src.scheduler.ceidg_job import run_ceidg_job
 from src.scheduler.bip_knowledge_job import run_bip_knowledge_job
+from src.scheduler.legal_acts_job import run_legal_acts_job
 from src.scheduler.council_job import run_council_job
 from src.scheduler.embedding_job import run_embedding_job
 from src.scheduler.places_job import run_places_job
@@ -349,6 +350,19 @@ def start_scheduler():
         trigger=CronTrigger(day_of_week='sun', hour=4, minute=0),
         id='bip_knowledge',
         name='Wiedza stała z BIP (statut, procedury, podatki)',
+        replace_existing=True
+    )
+
+    # Akty prawne (uchwały Rady, zarządzenia Wójta) — niedziela 5:00.
+    # Godzinę PO wiedzy stałej, bo oba biją w ten sam mały serwer gminy i nie ma
+    # powodu, żeby robiły to jednocześnie. Tygodniowo wystarcza: sesja Rady jest
+    # raz w miesiącu, a akt prawny raz podjęty nie zmienia treści — przebieg
+    # dokłada nowe pozycje i odświeża STATUS (uchylona/zmieniona).
+    scheduler.add_job(
+        func=run_legal_acts_job,
+        trigger=CronTrigger(day_of_week='sun', hour=5, minute=0),
+        id='legal_acts',
+        name='Akty prawne z BIP (uchwały Rady, zarządzenia Wójta)',
         replace_existing=True
     )
 

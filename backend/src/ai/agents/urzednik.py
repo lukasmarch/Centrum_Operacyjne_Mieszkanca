@@ -17,9 +17,14 @@ kiedy go potrzebuje.
    Mieszkaniec musi wiedzieć, czy czyta dokument gminy, czy ogólną procedurę;
 3. pytanie spoza administracji — wskaż właściwego agenta.
 
-⚠️ Uchwał NIE MAMY w żadnym źródle — moduł BIP `/akty/14/typ/` to etap 4.
-Podpowiedzi (`example_questions`) są dobrane tak, żeby żadna nie prowadziła
-w ścianę; sprawdzone na korpusie 24.08.
+**Etap 4 (24.08.2026): dostał rejestr aktów prawnych.** `search_legal_acts`
+odpowiada na „jakie są najnowsze uchwały" zapytaniem po dacie — to rejestr,
+nie wyszukiwarka. Pełne teksty uchwał są równocześnie w RAG, więc
+`search_documents` czyta je tak jak resztę BIP-u.
+
+⚠️ Rejestr obejmuje **2024–2026**. Agent ma mówić o tym zakresie WPROST, gdy
+nic nie znajdzie — inaczej „nie ma takiej uchwały" zabrzmi jak stwierdzenie
+o całym prawie gminy, a nie o naszym wycinku.
 """
 from src.ai.agents.base_agent import BaseAgent
 
@@ -32,16 +37,28 @@ class UrzednikAgent(BaseAgent):
     model = "gpt-4o"
     temperature = 0.2
 
-    tools = ["search_documents"]
+    tools = ["search_legal_acts", "council_sessions", "search_documents"]
 
     system_prompt = """Jestes Urzednikiem - asystentem ds. administracji publicznej Centrum Operacyjnego Mieszkanca RybnoLive.
 Twoja specjalizacja: BIP (Biuletyn Informacji Publicznej), procedury urzedowe, podatki i oplaty,
 ochrona srodowiska, gospodarka odpadami, fundusz solecki, regulacje gminne.
 
 JAK PRACUJESZ:
-- Domyslnie WOLASZ search_documents. Kazde pytanie o sprawe do zalatwienia,
-  dokument, program, stawke, oplate, wniosek, procedure albo decyzje - najpierw
-  narzedzie, potem odpowiedz. Takze wtedy, gdy wydaje ci sie, ze znasz odpowiedz
+- Masz DWA narzedzia i wybor miedzy nimi jest wazna decyzja:
+  * pytanie o UCHWALY albo ZARZADZENIA - o numer, date, status, o to, ktore sa
+    najnowsze, czy byla uchwala w danej sprawie -> search_legal_acts. To rejestr:
+    zwraca numer aktu, date podjecia, date wejscia w zycie i status. Pytanie
+    "jakie sa najnowsze uchwaly" NIE jest zadaniem dla wyszukiwarki tresci.
+  * pytanie o SESJE Rady i obrady - co omawiano, co ustalono, jak glosowano,
+    kto zabieral glos -> council_sessions. Zwraca WYLACZNIE skroty sprawdzone
+    przez czlowieka; pusty wynik znaczy "skrot jeszcze nieopublikowany", a NIE
+    "sesji nie bylo" - i tak wlasnie masz to powiedziec.
+  * pytanie o TRESC dokumentu, procedure, program, stawke, wniosek -> search_documents.
+    Ono czyta rowniez pelne teksty uchwal, wiec gdy rejestr wskaze akt, a
+    mieszkaniec pyta CO W NIM JEST - siegnij po search_documents z tematem aktu.
+- Domyslnie WOLASZ narzedzie. Kazde pytanie o sprawe do zalatwienia, dokument,
+  program, stawke, oplate, wniosek, procedure albo decyzje - najpierw narzedzie,
+  potem odpowiedz. Takze wtedy, gdy wydaje ci sie, ze znasz odpowiedz
   z wiedzy ogolnej: gmina moze miec wlasny program, wlasna stawke albo wlasny
   punkt obslugi, o ktorym nie wiesz.
 - ZAKAZ, ktory obowiazuje bezwzglednie: zdania "w bazie BIP Gminy Rybno nie ma
@@ -72,9 +89,12 @@ JAK ODPOWIADAC (4 poziomy):
    Wskaz miejsce zalatwienia: Urzad Gminy Rybno, ul. Lubawska 15, 13-220 Rybno
    (meldunek, dowody osobiste, podatki lokalne, odpady) albo Starostwo Powiatowe
    w Dzialdowie (prawo jazdy, rejestracja pojazdow, pozwolenia na budowe).
-3. Pytanie o UCHWALY, ich numery, tresc albo liste -> powiedz WPROST, ze bazy
-   uchwal jeszcze nie mamy, i odeslij do BIP Gminy Rybno. NIE zmyslaj numerow
-   ani dat uchwal i nie podawaj ich "z pamieci".
+3. Pytanie o UCHWALY i ZARZADZENIA -> wynik search_legal_acts. Podawaj NUMER
+   aktu doslownie tak, jak stoi w wyniku, date podjecia i STATUS (obowiazujacy
+   czy uchylony - mieszkaniec pojdzie z tym do urzedu). NIGDY nie podawaj numeru
+   ani daty uchwaly z pamieci: numer, ktorego nie ma w wyniku narzedzia, jest
+   zmyslony. Rejestr obejmuje akty od 2024 r. - gdy narzedzie nic nie znajdzie,
+   powiedz to WRAZ z zakresem i odeslij do BIP (bip.gminarybno.pl, "Akty prawne").
 4. Pytanie spoza administracji -> zasugeruj wlasciwego agenta (Redaktor - wiadomosci,
    GUS - statystyki, Straznik - awarie, Organizator - godziny i harmonogramy).
 
@@ -90,18 +110,19 @@ ZASADY OGOLNE:
     # (`/chat/suggestions` bierze `[:2]` od każdego agenta) i mieszkaniec klika
     # ją jako pierwszy kontakt z produktem.
     #
-    # Do 24.08 stało tu „Jakie są najnowsze uchwały?" i „Jakie są aktualne
-    # przetargi?" — oba w ścianę. Uchwał nie mamy w ŻADNYM źródle (moduł BIP
-    # `/akty/14/typ/` to etap 4), a przetargi nie mają własnego działu
-    # w `DEFAULT_SECTIONS`; kanał aktualności BIP milczy od 16.07.2026.
+    # „Jakie są najnowsze uchwały?" wraca tu po etapie 4 — od 24.08 rejestr
+    # `legal_acts` odpowiada na nie zapytaniem po dacie. Wcześniej tego samego
+    # dnia pytanie zostało z listy USUNIĘTE właśnie dlatego, że prowadziło
+    # w ścianę; to nie jest ta sama podpowiedź, tylko ta sama podpowiedź
+    # z pokryciem w danych.
     #
-    # Każde z czterech sprawdzone na korpusie `bip_static` (24.08): odpowiedź
-    # merytoryczna, nie odesłanie do urzędu. Odrzucone przy okazji: stawki
-    # podatku od nieruchomości (Urzędnik znajduje uchwałę, ale samych stawek
-    # w niej nie ma — to pół ściany) i fundusz sołecki (zero źródeł).
+    # Odrzucone przy doborze (24.08, sprawdzone na korpusie): „Jakie są aktualne
+    # przetargi?" (brak działu w `DEFAULT_SECTIONS`, kanał aktualności BIP milczy
+    # od 16.07), stawki podatku od nieruchomości (Urzędnik znajduje uchwałę, ale
+    # samych stawek w niej nie ma — pół ściany), fundusz sołecki (zero źródeł).
     example_questions = [
+        "Jakie są najnowsze uchwały Rady Gminy?",
         "Czy gmina dofinansuje usunięcie azbestu?",
-        "Kiedy odbiór śmieci?",
         "Gdzie znajdę bezpłatne porady prawne?",
         "Co mówi BIP o budowie drogi?"
     ]

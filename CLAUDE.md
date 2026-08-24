@@ -117,6 +117,7 @@ Co 4h → Air Quality (Airly)
 8:00  → Cinema Repertoire
 Niedz 3:00 → CEIDG Sync
 Niedz 4:00 → Wiedza stała z BIP (statut, procedury, podatki, programy)
+Niedz 5:00 → Akty prawne z BIP (uchwały Rady, zarządzenia Wójta)
 Sob 10:00 → Newsletter Weekly
 Pn-Pt 7:15 → Newsletter Daily (Premium)
 1.01/04/07/10 → GUS Statistics
@@ -258,7 +259,7 @@ oraz `visible_event_conditions` dla wydarzeń.
 | Agent | Wiedza | Uwagi |
 |---|---|---|
 | Redaktor | `latest_local_news` + `search_news` | świeżość = zapytanie po dacie, NIE wektory |
-| Urzędnik | `search_documents` (`bip_static`,`bip`,`article`) | top_k 6, próg 0.40 |
+| Urzędnik | `search_legal_acts`, `council_sessions`, `search_documents` | korpus: `bip_static`,`bip`,`legal_act`,`article` |
 | Strażnik / Organizator / Przewodnik | **własny SQL przez narzędzia** | osadzenie wpisu nic tu nie gwarantuje |
 | GUS-Analityk | własny SQL + `chart_data` | jedyny z własnym `respond()` |
 
@@ -469,6 +470,32 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
   art. 5572 (awaria 08:12–12:15) dostał push o 9:08, a na stronie stanął dopiero o 13:15,
   godzinę po końcu wyłączenia. Dla ostrzeżeń meteo rozwiązano to czytaniem treści
 
+## Rejestr aktów prawnych i skróty obrad (2026-08-24)
+**430 aktów 2024–2026** (200 uchwał Rady, 230 zarządzeń Wójta) z modułu BIP
+`/akty/14/` — INNY moduł niż `DEFAULT_SECTIONS` wiedzy stałej.
+- `legal_acts` (migracja `add_legal_acts`) + `scrapers/legal_acts.py` +
+  `legal_acts_job` (**niedziela 5:00**, godzinę po wiedzy stałej — ten sam serwer)
+- Napełnienie: `python -m scripts.run_legal_acts [--dry] [--since RRRR-MM-DD]`
+- `search_legal_acts` — metadane SQL-em. „Jakie są najnowsze uchwały" to
+  `ORDER BY adopted_at DESC`, NIE zadanie dla wyszukiwarki wektorowej
+- ⚠️ **Lista BIP nie jest sortowana po dacie podjęcia**, tylko kolejnością
+  wprowadzenia — wśród aktów z IV 2025 siedzi zarządzenie z XI 2023. Przerwanie
+  skanu na pierwszym starym akcie dało 229 zamiast 430. Dziś: 2 strony pod rząd
+  bez trafienia
+- ⚠️ **Komórki tabeli niosą etykietę w treści** („Data podjęcia 2026-06-24") —
+  układ responsywny. Bez obcięcia data nie parsuje się wcale
+- ⚠️ **`ORDER BY adopted_at` przy remisie losuje** — jedna sesja to kilkanaście
+  uchwał tego samego dnia. Druga oś: `bip_id DESC`
+- Treść w PDF (`/system/pobierz.php`), ma warstwę tekstową; 31/430 to skany.
+  Eksport „Pobierz dane XML" jest ślepy — zwraca stronę główną
+- **Sesje rady**: `council_sessions` czyta WYŁĄCZNIE `published` — bramka
+  akceptacji obowiązuje też agenta. Numery uchwał doklejane z rejestru po dacie
+  sesji (z nagrania nie padają — numer nadaje się po głosowaniu)
+- ⚠️ **6 sesji stoi w `new` NIE z powodu awarii**: funkcja weszła 12.08, a sesja
+  XXIII jest z 24.06 — 49 dni przy progu 45 (`MAX_SESSION_AGE_DAYS`, bezpiecznik
+  rachunku). Nadrobienie ręczne: `run_council_session --url … --save` (~$0,59)
+- Testy: `python -m scripts.test_legal_acts [--db] [--live]`
+
 ## TODO (Kolejne priorytety)
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
@@ -482,6 +509,9 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
 - [ ] Widget ruchu: zdarzenie chwilowe (spadłe bele, kolizja) musi WYGASAĆ — 21.08 trasa
       do Iławy pokazywała utrudnienie z 19.08; `road_context` nie odróżnia incydentu od prac
 - [ ] Uruchomić `add_locality_and_event_dedup` + `dedupe_events --apply` (prod i lokalnie)
+- [ ] Sesje rady: miejsce na froncie + decyzja, czy przepisać sesję XXIII na
+      produkcji (~$0,59) — bez tego rejestr obrad jest pusty
+- [ ] GUS-Analityk: `_classify_gus_query` → narzędzie `gus_series` (ostatnia heurystyka)
 
 Uwaga: ~1065 historycznych artykułów poza RAG — **celowo** (decyzja 2026-07-19), embedded=True jako marker.
 

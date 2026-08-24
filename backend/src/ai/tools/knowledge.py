@@ -54,7 +54,7 @@ from sqlalchemy import func, or_, select
 from src.ai.embeddings import embedding_service
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.config import settings
-from src.database.schema import Article, Source
+from src.database.schema import Article, LegalAct, Source
 from src.services.feed_policy import (
     article_score,
     article_scope,
@@ -235,7 +235,7 @@ async def search_documents(ctx: ToolContext, query: str) -> ToolResult:
     """Wyszukiwarka po dokumentach BIP i urzędowych."""
     return await _search(
         ctx, query,
-        source_types=["bip_static", "bip", "article"],
+        source_types=["bip_static", "bip", "legal_act", "article"],
         top_k=6, threshold=0.40, semantic_weight=0.55, recency_boost=0.0,
         czego_szukam="fragmentów dokumentów",
     )
@@ -314,6 +314,133 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
             "wpisy": wpisy,
         },
         summary=f"{len(wpisy)} wpisów ({lokalne} z gminy)",
+    )
+
+
+# Zakres rejestru aktów. Mówimy o nim WPROST w każdej odpowiedzi z pustką —
+# mieszkaniec pytający o uchwałę z 2019 r. musi wiedzieć, że jej u nas nie ma,
+# a nie że jej nie ma w ogóle.
+ACTS_SINCE_LABEL = "2024"
+
+# Ile aktów naraz. Dziesięć to tyle, ile człowiek przeczyta w odpowiedzi czatu;
+# przy większej liczbie i tak wybierze z pierwszych kilku.
+ACTS_DEFAULT_LIMIT = 5
+ACTS_MAX_LIMIT = 15
+
+
+async def search_legal_acts(
+    ctx: ToolContext,
+    query: Optional[str] = None,
+    rodzaj: Optional[str] = None,
+    rok: Optional[int] = None,
+    limit: int = ACTS_DEFAULT_LIMIT,
+) -> ToolResult:
+    """Rejestr uchwał Rady i zarządzeń Wójta — po METADANYCH, nie po wektorach.
+
+    **To jest cała racja bytu tego narzędzia.** „Jakie są najnowsze uchwały"
+    nie ma słów wyróżniających, więc wyszukiwarka podobieństwa zwróciłaby
+    przypadkowe akty sprzed lat — dokładnie ta sama porażka co przy pytaniu
+    „co nowego" (9.08). Najnowsze uchwały to `ORDER BY adopted_at DESC`.
+
+    `query` zawęża po tytule i treści zwykłym LIKE. Świadomie prymitywnie:
+    do szukania „po sensie" jest `search_documents`, który czyta te same akty
+    przez RAG. Tutaj chodzi o rejestr — numer, data, status.
+    """
+    limit = max(1, min(int(limit or ACTS_DEFAULT_LIMIT), ACTS_MAX_LIMIT))
+
+    stmt = select(LegalAct)
+    opis = []
+
+    # Rodzaj to nie ozdoba: uchwała Rady i zarządzenie Wójta to dwa różne
+    # rodzaje decyzji, o różnej mocy i różnym autorze. Mieszkaniec pytający
+    # o uchwały nie chce dostać zarządzeń budżetowych.
+    if rodzaj:
+        low = rodzaj.strip().lower()
+        if low.startswith("uchwal") or low.startswith("uchwał"):
+            stmt = stmt.where(LegalAct.act_group.ilike("%Uchwały%"))
+            opis.append("uchwały Rady")
+        elif low.startswith("zarzadz") or low.startswith("zarządz"):
+            stmt = stmt.where(LegalAct.act_group.ilike("%Zarządzenia%"))
+            opis.append("zarządzenia Wójta")
+
+    if rok:
+        stmt = stmt.where(func.extract("year", LegalAct.adopted_at) == int(rok))
+        opis.append(f"rok {rok}")
+
+    if query and query.strip():
+        # KAŻDE słowo musi wystąpić, ale niekoniecznie obok siebie. Dosłowne
+        # dopasowanie frazy przegrywało z językiem urzędowym: „usuwanie azbestu”
+        # nie trafia w „unieszkodliwianie wyrobów zawierających azbest”, choć
+        # oba słowa w akcie są.
+        for word in [w for w in query.strip().split() if len(w) > 2][:4]:
+            like = f"%{word}%"
+            stmt = stmt.where(or_(LegalAct.title.ilike(like),
+                                  LegalAct.content.ilike(like),
+                                  LegalAct.act_number.ilike(like)))
+        opis.append(f"„{query.strip()}”")
+
+    # Druga oś sortowania nie jest ozdobą: jedna sesja Rady podejmuje kilkanaście
+    # uchwał TEGO SAMEGO DNIA (24.06.2026 — osiem), a sam `adopted_at DESC`
+    # zwraca je wtedy w kolejności losowej. „Najnowsze uchwały” przestawały być
+    # powtarzalne między dwoma wywołaniami tego samego pytania.
+    # `bip_id` rośnie z kolejnością wprowadzania do rejestru, więc przybliża
+    # kolejność podejmowania w obrębie dnia.
+    stmt = stmt.order_by(
+        LegalAct.adopted_at.desc().nullslast(), LegalAct.bip_id.desc()
+    ).limit(limit)
+    acts = (await ctx.session.execute(stmt)).scalars().all()
+
+    czego = " · ".join(opis) if opis else "najnowsze"
+
+    if not acts:
+        return ToolResult(
+            content={
+                "info": f"Brak aktów pasujących do: {czego}.",
+                "zakres_rejestru": f"od {ACTS_SINCE_LABEL} r.",
+                "co_powiedziec": (
+                    f"UWAGA: pusty wynik dotyczy WYŁĄCZNIE tego zawężenia "
+                    f"({czego}). Jeśli WCZEŚNIEJSZE wywołanie tego narzędzia coś "
+                    f"zwróciło, odpowiedz z TAMTEGO wyniku — nie przedstawiaj "
+                    f"własnego zawężenia jako braku aktu.\n"
+                    f"Jeśli nic nie znalazłeś w żadnym wywołaniu: powiedz to WPROST "
+                    f"i dodaj, że rejestr obejmuje akty od {ACTS_SINCE_LABEL} r. — "
+                    f"starsze są w BIP Gminy Rybno (bip.gminarybno.pl, dział "
+                    f"„Akty prawne”). NIE podawaj numeru ani daty uchwały z pamięci."
+                ),
+            },
+            empty=True,
+            summary=f"brak aktów: {czego}",
+        )
+
+    pozycje, sources = [], []
+    for act in acts:
+        pozycje.append({
+            "numer": act.act_number,
+            "rodzaj": act.act_group,
+            "data_podjecia": act.adopted_at.isoformat() if act.adopted_at else None,
+            "wchodzi_w_zycie": act.effective_from.isoformat() if act.effective_from else None,
+            "status": act.status,
+            "tytul": act.title,
+            # Treść tylko zajawką: pełny akt bywa 20 tys. znaków, a do czytania
+            # go „po sensie" jest search_documents.
+            "poczatek_tresci": (act.content or "")[:400] or None,
+        })
+        sources.append({
+            "type": "legal_act",
+            "id": act.id,
+            "title": f"{act.act_number or ''} — {act.title}".strip(" —")[:200],
+            "url": act.url,
+            "similarity": 1.0,
+        })
+
+    return ToolResult(
+        content={
+            "zakres_rejestru": f"akty od {ACTS_SINCE_LABEL} r.",
+            "czego_szukano": czego,
+            "akty": pozycje,
+        },
+        sources=sources,
+        summary=f"{len(pozycje)} aktów ({czego})",
     )
 
 
@@ -400,4 +527,59 @@ register(Tool(
     fn=latest_local_news,
     status_message="Sprawdzam najnowsze wpisy…",
     short="świeże wpisy serwisu po dacie (do pytań „co nowego”)",
+))
+
+
+register(Tool(
+    name="search_legal_acts",
+    description=(
+        "Rejestr aktów prawnych gminy: uchwały Rady Gminy i zarządzenia Wójta — "
+        "numer, data podjęcia, data wejścia w życie, status (Obowiązujący / "
+        "Uchylony) i tytuł. TO JEST WŁAŚCIWE NARZĘDZIE do pytań „jakie są "
+        "najnowsze uchwały”, „czy była uchwała o…”, „jaki numer ma uchwała "
+        "o podatku od nieruchomości”. Bez argumentów zwraca NAJNOWSZE akty. "
+        "Rejestr obejmuje akty od 2024 r. — starsze są tylko w BIP i musisz "
+        "o tym powiedzieć, gdy nic nie znajdziesz. Pełnej treści aktu szukaj "
+        "przez search_documents; tutaj dostajesz metadane i początek tekstu."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": (
+                    "Zawężenie po tytule, treści lub numerze aktu. Dopasowanie "
+                    "jest DOSŁOWNE, więc podaj jedno–dwa słowa klucza sprawy "
+                    "(„azbest”, „podatek”, „budżet”), nie całe pytanie. "
+                    "Pomiń, gdy pytanie brzmi „jakie są najnowsze”."
+                ),
+            },
+            "rodzaj": {
+                "type": "string",
+                "enum": ["uchwały", "zarządzenia"],
+                "description": (
+                    "Uchwały Rady Gminy albo zarządzenia Wójta. To dwa różne "
+                    "rodzaje decyzji — nie mieszaj ich, gdy mieszkaniec pyta "
+                    "wyraźnie o jeden z nich."
+                ),
+            },
+            "rok": {
+                "type": "integer",
+                "description": (
+                    "Rok podjęcia aktu (2024–2026). Podawaj WYŁĄCZNIE wtedy, gdy "
+                    "mieszkaniec sam wskazał rok. Dokładanie roku na własną rękę "
+                    "zamienia trafny wynik w pustkę: uchwała o azbeście jest "
+                    "z 2025 r., więc zawężenie do 2026 nie znajdzie nic."
+                ),
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Ile aktów zwrócić, domyślnie 5, maksymalnie 15.",
+            },
+        },
+        "required": [],
+    },
+    fn=search_legal_acts,
+    status_message="Przeglądam rejestr uchwał…",
+    short="rejestr uchwał Rady i zarządzeń Wójta od 2024 r. (numer, data, status)",
 ))

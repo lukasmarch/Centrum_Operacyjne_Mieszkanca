@@ -275,6 +275,78 @@ przez narzędzia, a `co-nowego` dostał etap KONTEKST, którego nigdy nie miał.
 
 ---
 
+### 4.8 Rejestr aktów prawnych (etap 4, 24.08.2026)
+
+Moduł BIP `/akty/14/` — **inny niż `DEFAULT_SECTIONS`** wiedzy stałej: własna
+paginacja, własna tabela metadanych, inna strona szczegółowa. Stąd osobny
+scraper, nie parametr w tamtym.
+
+Zakres **2024–2026**: 430 aktów (200 uchwał Rady, 230 zarządzeń Wójta),
+2844 chunki w RAG, 14 minut pełnego przebiegu.
+
+**Dlaczego osobna tabela, a nie `bip_documents`.** Akt ma NUMER, DATĘ PODJĘCIA,
+STATUS i GRUPĘ — a najczęstsze pytanie („jakie są najnowsze uchwały") to
+`ORDER BY adopted_at DESC`. Wyszukiwarka podobieństwa nie umie tego z tego
+samego powodu, dla którego nie umiała „co nowego" (9.08): pytanie nie ma słów
+wyróżniających, więc podobieństwo losuje.
+
+**Trzy pułapki, każda kosztowała przebieg:**
+
+* **lista NIE jest sortowana po dacie podjęcia**, tylko kolejnością wprowadzenia
+  do BIP. Wśród aktów z kwietnia 2025 siedzi zarządzenie z listopada 2023
+  (wprowadzone z opóźnieniem). Pierwsza wersja przerywała skan na pierwszym
+  akcie sprzed progu i przez ten jeden wpis wciągnęła 229 aktów zamiast 430.
+  Dziś przerywa po dwóch stronach POD RZĄD bez trafienia;
+* **komórki tabeli niosą etykietę w treści** („Data podjęcia 2026-06-24") —
+  układ responsywny, nie błąd parsowania. Bez obcięcia data nie parsuje się
+  wcale, a akt wypada z „najnowszych";
+* **`ORDER BY adopted_at` przy remisie losuje.** Jedna sesja podejmuje kilkanaście
+  uchwał tego samego dnia (24.06.2026 — osiem), więc „najnowsze uchwały" nie
+  były powtarzalne między dwoma wywołaniami. Druga oś: `bip_id DESC`.
+
+**Treść aktu jest w PDF-ie** (`/system/pobierz.php?plik=…`) i ma warstwę
+tekstową. 31 aktów na 430 to skany bez tekstu — ich metadane i tak odpowiadają
+na pytanie „jakie są najnowsze". Eksport „Pobierz dane XML" jest ślepy: zwraca
+stronę główną.
+
+**Nagłówek chunku niesie NUMER i DATĘ** (`chunk_legal_act`), bo model cytuje to,
+co widzi obok tekstu. Zły numer uchwały to nie nieścisłość — mieszkaniec pójdzie
+z nim do urzędu.
+
+⚠️ **Zakres mówimy WPROST.** Pusty wynik tłumaczy, że rejestr obejmuje akty od
+2024 r. — inaczej „nie ma takiej uchwały" brzmi jak sąd o całym prawie gminy.
+
+---
+
+### 4.9 Skróty obrad Rady (etap 5, 24.08.2026)
+
+**Diagnoza: nic nie było zepsute.** Sześć sesji stało w stanie `new` z zerem
+prób, bo funkcja weszła na produkcję **12.08**, a najnowsza sesja (XXIII) była
+z **24.06** — czyli 49 dni wcześniej, przy progu świeżości 45 dni
+(`MAX_SESSION_AGE_DAYS`, bezpiecznik rachunku: Whisper to ~$0,59 za sesję).
+Job utworzył wiersze i poprawnie pominął wszystkie. Funkcja wdrożyła się cztery
+dni za późno, żeby złapać ostatnie obrady, a nowej sesji od tego czasu nie było
+(przerwa wakacyjna).
+
+**Bramka akceptacji obowiązuje także agenta.** `council_sessions` czyta
+WYŁĄCZNIE `published`. Skrót w stanie `pending` nie istnieje dla czatu tak samo,
+jak nie istnieje dla strony — bo cytat da się sprawdzić twardo, a `description`
+punktu już nie (na sesji pilotażowej model dopisał tam cel zagospodarowania
+działki, którego nikt nie wypowiedział). Wpuszczenie `pending` do rozmowy
+obeszłoby jedyne zabezpieczenie tej funkcji, i to po cichu.
+
+**Numery uchwał doklejamy z rejestru.** Model streszczający obrady zapisuje
+`resolutions[].number = null` — na sesji XXIII wszystkie siedem. Nic dziwnego:
+przewodniczący czyta tytuł uchwały, bo numer nadaje się po głosowaniu.
+`legal_acts` zna numer i datę podjęcia, a ta jest równa dacie sesji — jedno
+zapytanie zamienia „przyjęto uchwałę o kredycie dla OSP" w „XXIII/176/2026".
+
+To jest ta klasa odpowiedzi, dla której powstały narzędzia: żadna heurystyka
+słów kluczowych nie połączyłaby nagrania z rejestrem aktów, bo musiałaby z góry
+wiedzieć, że pytanie o obrady potrzebuje numerów uchwał.
+
+---
+
 ## 5. Kto ma jakie narzędzia (stan 24.08.2026)
 
 | Agent | Narzędzia | Uwagi |
@@ -283,7 +355,7 @@ przez narzędzia, a `co-nowego` dostał etap KONTEKST, którego nigdy nie miał.
 | **Organizator** | `waste_schedule`, `cinema_repertoire`, `clinic_schedule`, `pharmacy_duty`, `office_hours` | zniknął `INTENT_KEYWORDS`; `office_hours` to **nowe dane**, nie było ich nigdzie |
 | **Strażnik** | `active_alerts`, `citizen_reports` | ⚠️ `active_alerts` to **jedyne** źródło jego wiedzy o awariach — nie używa RAG |
 | **Redaktor** | `latest_local_news`, `search_news` | zniknął regex `_GENERIC_QUESTION` i blok „ŚWIEŻY FEED" z `extra_context` |
-| **Urzędnik** | `search_documents` | zniknął retrieval przed każdym pytaniem; cztery poziomy odpowiedzi zostają |
+| **Urzędnik** | `search_legal_acts`, `council_sessions`, `search_documents` | zniknął retrieval przed każdym pytaniem; cztery poziomy odpowiedzi zostają |
 | GUS-Analityk | — (własny SQL + `chart_data`) | `_classify_gus_query` czeka na swoją kolej |
 
 ---
@@ -368,14 +440,14 @@ python -m scripts.tool_usage_report --days 7  # co narzędzia zastały (nie test
   `search_documents`, `latest_local_news`; Redaktor i Urzędnik przeniesieni,
   klasyczna ścieżka RAG usunięta (patrz 4.7). Zostaje `_classify_gus_query`
   w GUS-Analityku.
-- **Etap 4 — uchwały.** Moduł BIP `/akty/14/typ/` (**inny** niż `DEFAULT_SECTIONS`),
-  286 stron, pola: data podjęcia, grupa tematyczna, tytuł, nr aktu, status.
-  Zakres **2024–2026** (decyzja Łukasza; zakres tłumaczymy użytkownikowi).
-  Metadane SQL-em (`search_legal_acts`) — „jakie są najnowsze uchwały" to zwykły
-  `ORDER BY date DESC`, nie zadanie dla wyszukiwarki wektorowej. Treść do RAG.
-- **Etap 5 — sesje rady.** 6 rekordów w statusie `new`, `transcript_chars = 0`.
-  Pipeline gotowy (`council_job`, 4:30), bramka akceptacji przez człowieka zostaje.
-  Do tego miejsce na froncie.
+- ~~**Etap 4 — uchwały.**~~ ✅ **24.08.2026** — 430 aktów 2024–2026,
+  `search_legal_acts` + treść w RAG (patrz 4.8).
+- **Etap 5 — sesje rady.** ✅ diagnoza (funkcja weszła 4 dni za późno, nic nie
+  jest zepsute) + narzędzie `council_sessions` z bramką akceptacji (patrz 4.9).
+  ⏳ **Zostaje**: miejsce na froncie oraz DECYZJA Łukasza — czy przepisać sesję
+  XXIII ręcznie na produkcji (`run_council_session --url … --save`, ~$0,59)
+  i zaakceptować skrót. Bez tego rejestr obrad jest pusty i front pokazywałby
+  pustkę.
 - ~~**Etap 6** — log wywołań narzędzi i raport pustych wyników.~~ ✅ **24.08.2026**
   — `agent_tool_calls` + `scripts/tool_usage_report.py`, patrz 4.6.
 
