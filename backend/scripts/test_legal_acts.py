@@ -61,6 +61,29 @@ check(_bip_id("https://bip.gminarybno.pl/akty/14/2/typ/16/") is None,
       "inaczej strona listy trafiłaby do bazy jako akt")
 check(_bip_id("/akty/szukaj/126/") is None, "adres wyszukiwarki nie jest aktem")
 
+print("\n== Twardy limit fragmentu ==")
+# Uchwała o Wieloletniej Prognozie Finansowej to wielostronicowa tabela —
+# PDF oddaje ją bez akapitów i bez zdań. Podział semantyczny nie ma się czego
+# złapać, więc bez twardego limitu wychodził fragment 21 202 znaków, który
+# OpenAI odrzucało (8192 tokeny). Osadzenie padało po cichu: jeden akt na 430
+# zostawał poza RAG.
+from src.ai.chunker import chunker  # noqa: E402
+
+_tabela = "egEEgE 1,00 2 345,00 0,00 " * 900          # bez kropek i akapitów
+_zdanie = "a" * 9000                                   # jedno „zdanie" bez spacji
+
+for nazwa, tresc in (("tabela z PDF", _tabela), ("zdanie bez spacji", _zdanie)):
+    czesci = chunker.chunk_legal_act(
+        "Uchwała testowa", tresc, "I/1/2026", "Uchwały Rady Gminy", "2026-01-01"
+    )
+    najdluzszy = max(len(c["text"]) for c in czesci)
+    check(najdluzszy <= 2200, f"{nazwa}: żaden fragment nie przekracza limitu",
+          f"najdłuższy ma {najdluzszy} znaków — API odrzuci go jako za długi")
+    # Nic nie ginie: obcinanie `sent[:max_chars]` gubiło resztę bezpowrotnie.
+    zlepek = "".join(c["text"] for c in czesci)
+    check(tresc[-40:] in zlepek, f"{nazwa}: koniec treści przetrwał podział",
+          "fragment był obcinany zamiast dzielony")
+
 print("\n== Próg zakresu ==")
 check(EMPTY_PAGES_TO_STOP >= 2,
       f"skan przerywa się po {EMPTY_PAGES_TO_STOP} stronach bez trafień",

@@ -209,7 +209,23 @@ class SemanticChunker:
 
     @staticmethod
     def _split_text(text: str, max_chars: int = 1800, overlap_chars: int = 200) -> list[str]:
-        """Split text into chunks, preferring paragraph/sentence boundaries"""
+        """Tnie tekst, trzymając się granic akapitów i zdań.
+
+        ⚠️ Preferencja granic to PREFERENCJA, nie gwarancja — i to była tu
+        dziura. Akapit dłuższy niż `max_chars`, który trafiał na niepusty
+        bufor, szedł do wyniku W CAŁOŚCI (gałąź dzielenia po zdaniach działa
+        wyłącznie przy pustym buforze). Uchwała o Wieloletniej Prognozie
+        Finansowej (XVIII/137/2025) to wielostronicowa tabela, z której PDF
+        oddaje tekst bez akapitów — wyszedł z tego fragment 21 202 znaków przy
+        celu 1800 i OpenAI odrzuciło go jako przekraczający 8192 tokeny.
+        Osadzenie padało po cichu: jeden akt na 430 zostawał poza RAG.
+
+        Drugi błąd w tej samej funkcji: `sent[:max_chars]` przy bardzo długim
+        zdaniu OBCINAŁO resztę zamiast ją pociąć. Tekst znikał bez śladu.
+
+        Dlatego na końcu idzie twardy podział: żaden fragment nie przekracza
+        `max_chars`, a nic nie ginie.
+        """
         if len(text) <= max_chars:
             return [text]
 
@@ -240,12 +256,37 @@ class SemanticChunker:
                         else:
                             if current_chunk:
                                 chunks.append(current_chunk)
-                            current_chunk = sent[:max_chars]
+                            # Całe zdanie, nie `sent[:max_chars]` — obcięcie
+                            # gubiło resztę bezpowrotnie. Nadmiar potnie
+                            # `_enforce_limit`.
+                            current_chunk = sent
 
         if current_chunk:
             chunks.append(current_chunk)
 
-        return chunks
+        return SemanticChunker._enforce_limit(chunks, max_chars, overlap_chars)
+
+    @staticmethod
+    def _enforce_limit(chunks: list[str], max_chars: int, overlap_chars: int) -> list[str]:
+        """Twardy limit długości — ostatnia linia obrony przed odrzuceniem przez API.
+
+        Dzieli wyłącznie to, czego podział semantyczny nie dał rady rozciąć
+        (tabele z PDF, tekst bez spacji i akapitów). Zachodzenie fragmentów
+        zostaje, żeby zdanie przecięte w połowie dało się odczytać w obu.
+        """
+        out: list[str] = []
+        for chunk in chunks:
+            if len(chunk) <= max_chars:
+                out.append(chunk)
+                continue
+            step = max(max_chars - overlap_chars, max_chars // 2)
+            for start in range(0, len(chunk), step):
+                part = chunk[start:start + max_chars]
+                if part:
+                    out.append(part)
+                if start + max_chars >= len(chunk):
+                    break
+        return out
 
 
 # Singleton
