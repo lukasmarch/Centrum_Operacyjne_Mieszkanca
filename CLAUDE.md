@@ -440,7 +440,18 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
   w dostawie prądu w Rybnie", czyli podobieństwo **0,43** przy progu 0,72. Progów feedu nie
   naginamy pod push. Pominięty przedruk i tak dostaje `alert_pushed_at`, inaczej wracałby
   do oceny co kwadrans; pamięć wysłanych sygnatur: `RECENT_PUSH_MEMORY_H = 24`
-- Test: `python -m scripts.test_alert_policy [--db]` (18 + 9 + 3 sprawdzenia).
+- **Push trafia do wsi, której dotyczy** (24.08): `push_subscriptions.location` +
+  `places` w `send_to_category`. ⚠️ Miejscowość na **subskrypcji, nie na koncie** —
+  z 6 aktywnych subskrypcji 5 nie ma `user_id` (zgody wydane w przeglądarce bez
+  rejestracji), więc filtr po `users.location` objąłby jedną osobę. Puste = cała
+  gmina. Przy okazji: dla kategorii `alerty` nie działał nawet filtr kategorii
+  wybranych przez użytkownika. Lista wsi dla frontu: **`/api/business/gmina-localities`**
+  (istniejący endpoint — nie budować drugiego)
+- **Sygnatura liczy dobę LOKALNĄ**, nie minutę: Energa zapowiada jeden dzień kilkoma
+  wpisami (23.08 dwa powiadomienia o wyłączeniach 25.08 w Rybnie, 09:30 i 10:00).
+  Miejscowości zostają w kluczu. ⚠️ Cena: awaria poranna i wieczorna w tej samej wsi
+  mają jeden klucz
+- Test: `python -m scripts.test_alert_policy [--db]` (18 + 9 + 4 sprawdzenia).
   Backfill: `python -u -m scripts.production.backfill_incident_spans [--days 14] [--apply]`
 - ⚠️ **`is_pinned_alert` wciąż wymaga kategorii z „awari"**, a ta powstaje 6:15/13:15 —
   art. 5572 (awaria 08:12–12:15) dostał push o 9:08, a na stronie stanął dopiero o 13:15,
