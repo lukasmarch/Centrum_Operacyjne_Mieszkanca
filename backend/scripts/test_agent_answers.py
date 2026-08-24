@@ -72,8 +72,19 @@ DENIAL = (
 )
 # „Nie mam aktualnych artykułów, ale ogólnie w gminie…" to ta sama porażka co
 # „nie posiadam danych", tylko lepiej ubrana — wzorzec musi łapać oba.
+# Wyparcie się wiedzy — agent MA materiał i mimo to mówi, że nie ma.
+#
+# ⚠️ NIE MA tu „skontaktuj się z urzędem”, choć było do 24.08. Ten zwrot bywa
+# odmową („nie posiadam danych, skontaktuj się z urzędem” — regresja z 3.08),
+# ale bywa też najlepszą częścią dobrej odpowiedzi: prompt Urzędnika WYMAGA
+# podania konkretnego następnego kroku (gdzie, jak, z czym). Odpowiedź
+# o azbeście — z kwotą, terminem i numerem pokoju w urzędzie — raz przechodziła,
+# raz nie, zależnie od tego, jak model zakończył zdanie. Test, który losowo
+# świeci na czerwono, uczy ignorowania czerwonego.
+# Prawdziwą odmowę i tak łapią pozostałe warianty, a każdy przypadek używający
+# tego wzorca ma własne `must` (liczba sołectw, nazwisko wójta, temat azbestu).
 NO_KNOWLEDGE = (
-    r"(nie posiadam|nie dysponuje|skontaktuj sie z urzedem"
+    r"(nie posiadam|nie dysponuje"
     r"|nie mam[^.]{0,30}(dan|informacj|artykul|wiadomosc|dostepu)"
     r"|brak[^.]{0,20}(informacj|artykul|danych))"
 )
@@ -179,31 +190,42 @@ async def _straznik_context_at_incident(session: AsyncSession, question: str) ->
     return json.dumps(result.content, ensure_ascii=False, default=str)
 
 
-def _rag_probe(agent_name: str) -> Callable[[AsyncSession, str], Awaitable[str]]:
+async def _documents_probe(session: AsyncSession, question: str) -> str:
+    """Materiał Urzędnika — przez NARZĘDZIE, nie przez własną kopię retrievalu.
+
+    Do 24.08 sonda powtarzała retrieval agenta ręcznie (`hybrid_search`
+    z jego progami). Po przeniesieniu Urzędnika na narzędzia mierzyłaby coś,
+    czego agent już nie robi — a świeciłaby na zielono, bo atrybuty `rag_*`
+    dalej stoją w klasie. Dokładnie ten sam błąd, przez który 22.08 sondy
+    Strażnika przechodziły na usuniętej metodzie.
+
+    Pytanie idzie tu DOSŁOWNIE, bez ręcznego tłumaczenia na język urzędowy:
+    całą wartością tego przypadku jest sprawdzenie, czy „eternit" dociera
+    do dokumentu o azbeście.
     """
-    Materiał z RAG dla agentów, które go używają (Redaktor, Urzędnik).
-    Powtarza retrieval agenta 1:1 — łącznie z synonimami, bo to właśnie tam
-    „eternit" gubił dokument o azbeście. Bez reranku: sprawdzamy, czy fakt
-    W OGÓLE jest w zasięgu wyszukiwarki.
+    import json
+
+    from src.ai.tools import ToolContext
+    from src.ai.tools.knowledge import search_documents
+
+    result = await search_documents(ToolContext(session=session), query=question)
+    return json.dumps(result.content, ensure_ascii=False, default=str)
+
+
+async def _fresh_feed_probe(session: AsyncSession, question: str) -> str:
+    """Materiał Redaktora na pytanie ogólne — przez `latest_local_news`.
+
+    Przypadek `co-nowego` sprawdzał do 24.08 wyłącznie ODPOWIEDŹ, więc czerwony
+    wynik nie mówił, czy zawiódł prompt, czy zapytanie. A to jest ten przypadek,
+    w którym rozróżnienie kosztowało już jedno śledztwo (9.08).
     """
+    import json
 
-    async def probe(session: AsyncSession, question: str) -> str:
-        from src.ai.embeddings import embedding_service
-        from src.services.search_synonyms import expand_query
+    from src.ai.tools import ToolContext
+    from src.ai.tools.knowledge import latest_local_news
 
-        agent = _agent_instances()[agent_name]
-        docs = await embedding_service.hybrid_search(
-            session=session,
-            query=expand_query(question),
-            top_k=max(agent.rag_top_k * 2, 12),
-            source_types=agent.source_types or None,
-            similarity_threshold=agent.rag_threshold,
-            semantic_weight=agent.rag_semantic_weight,
-            recency_boost=agent.rag_recency_boost,
-        )
-        return "\n---\n".join(d["chunk_text"] for d in docs)
-
-    return probe
+    result = await latest_local_news(ToolContext(session=session))
+    return json.dumps(result.content, ensure_ascii=False, default=str)
 
 
 # --- wyrocznie ----------------------------------------------------------------
@@ -477,9 +499,21 @@ async def oracle_wojt(session: AsyncSession) -> Expect:
 
 
 async def oracle_fresh_news(session: AsyncSession) -> Expect:
+    """Ile świeżego materiału jest — i ile z niego dotyczy SAMEJ gminy.
+
+    Rozróżnienie kupione 24.08. „W gminie Rybno nie pojawiły się nowe
+    wiadomości, oto aktualności z okolic" wygląda jak porażka z 9.08
+    („nie mam aktualnych artykułów"), a jest jej przeciwieństwem: to prawda,
+    powiedziana wprost, po czym agent i tak dowozi materiał. Zakaz wypierania
+    się wiedzy ma sens WYŁĄCZNIE wtedy, gdy wpisy z gminy naprawdę są.
+
+    `locality >= 3` to ocena z kategoryzacji AI, liczona niezależnie od kodu
+    agenta — wyrocznia nie może dzielić zapytania z tym, co sprawdza.
+    """
     result = await session.execute(
         text("""
-            SELECT count(*)
+            SELECT count(*) AS wszystkie,
+                   count(*) FILTER (WHERE a.locality >= 3) AS z_gminy
             FROM articles a
             JOIN sources s ON a.source_id = s.id
             WHERE a.published_at >= now() - INTERVAL '3 days'
@@ -487,16 +521,35 @@ async def oracle_fresh_news(session: AsyncSession) -> Expect:
               AND a.is_filler = false AND a.is_promotional = false
         """)
     )
-    count = result.scalar_one()
+    count, z_gminy = result.one()
     if count < 3:
         return Expect(skip=f"tylko {count} świeżych wpisów — za mało, żeby czegokolwiek wymagać")
 
+    if not z_gminy:
+        # Materiał jest, ale żaden wpis nie jest z samej gminy (tak wygląda baza
+        # lokalna bez Facebooka — profil gminy chodzi przez płatne Apify).
+        # Wymagamy wtedy, żeby agent MIMO TO dowiózł treść, a nie zbył pytania.
+        return Expect(
+            fact=f"{count} wpisów z ostatnich 3 dni, w tym 0 z samej gminy",
+            must=[],
+            must_not=[("zbycie pytania mimo materiału z okolic",
+                       r"nie mam[^.]{0,30}(artykul|wiadomosc)|brak[^.]{0,20}artykul")],
+            min_len=200,
+            must_in_context=[("materiał ze świeżego feedu", r"wpisy")],
+        )
+
     return Expect(
-        fact=f"{count} wpisów z ostatnich 3 dni",
+        fact=f"{count} wpisów z ostatnich 3 dni, w tym {z_gminy} z gminy",
         must=[],
         must_not=[("wyparcie się wiedzy przy pełnej bazie", NO_KNOWLEDGE)],
         min_len=200,
-        must_in_context=[],
+        # Wymóg celowo słaby, ale NIE pusty: sprawdza, że `latest_local_news`
+        # w ogóle dowiozło materiał (klucz „wpisy”, a nie gałąź pustego wyniku).
+        # Bez tego czerwony wynik tego przypadku nie mówił, czy zawiodło
+        # zapytanie, czy prompt — a rozróżnienie kosztowało już śledztwo (9.08).
+        # Nie wiążemy go z KONKRETNYM artykułem, bo `article_score` może
+        # przestawić kolejność i test stałby się chwiejny bez powodu.
+        must_in_context=[("materiał ze świeżego feedu", r"wpisy")],
     )
 
 
@@ -610,7 +663,7 @@ CASES: list[Case] = [
         question="Czy gmina dofinansuje wywóz eternitu z dachu?",
         agent="urzednik",
         oracle=oracle_azbest,
-        probe=_rag_probe("urzednik"),
+        probe=_documents_probe,
         why="mowa potoczna ('eternit') kontra język BIP ('azbest') — bramka synonimów",
     ),
     Case(
@@ -618,6 +671,7 @@ CASES: list[Case] = [
         question="Co nowego w gminie?",
         agent="redaktor",
         oracle=oracle_fresh_news,
+        probe=_fresh_feed_probe,
         why="przy pełnej bazie odpowiedź 'brak informacji' jest zawsze błędem",
     ),
     Case(

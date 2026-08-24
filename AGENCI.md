@@ -231,16 +231,60 @@ więc druga kopia żyje tylko tyle, ile trwa jej użyteczność.
 
 ---
 
-## 5. Kto ma jakie narzędzia (stan 22.08.2026)
+### 4.7 Wyszukiwarka jako narzędzie (etap 3, 24.08.2026)
+
+Retrieval był **podatkiem**: każde pytanie do Redaktora i Urzędnika płaciło za
+przepisanie zapytania, wyszukiwanie hybrydowe i rerank, ZANIM ktokolwiek
+wiedział, czy materiał z bazy jest potrzebny. „Kto jest wójtem" przechodziło
+przez pełny retrieval, żeby odpowiedź i tak wzięła się z karty gminy.
+
+Trzy narzędzia w `ai/tools/knowledge.py`. Podział na `search_news`
+i `search_documents` zamiast jednego `search_knowledge_base` z parametrem, bo
+progi (0,35/0,90/recency 0,25 kontra 0,40/0,55/0,0) kalibrowano osobno na
+osobnych korpusach — jedno narzędzie musiałoby wybrać jeden zestaw i popsuć drugi.
+Dodatkowo model MUSI wiedzieć, w czym szuka; sama nazwa mu to mówi.
+
+**Najważniejsze: `latest_local_news` to nie wyszukiwarka.** Świeżość jest
+zapytaniem po dacie, nie zadaniem dla podobieństwa wektorów — patrz porażka
+z 9.08 w rozdziale 1. Do 24.08 wybierał między nimi regex `_GENERIC_QUESTION`,
+który działał, ale tylko dla sformułowań przewidzianych przez autora („a co tam
+u was ostatnio?" nie trafiało w żaden wzorzec). Dziś wybiera model, a reguła
+przeniosła się z kodu do OPISU narzędzia — czyli tam, gdzie czyta ją ten, kto
+podejmuje decyzję. Sprawdzone na żywym modelu (`test_agent_tools --live`).
+
+**Co zniknęło:** przepisywanie pytania (`_rewrite_query`). Jego zadaniem było
+zrobić z „a w zeszłym roku?" samodzielne zapytanie — a tutaj zapytanie układa
+model, który historię rozmowy ma przed sobą. Jedno wywołanie gpt-4o-mini mniej
+na każde pytanie.
+
+**Co zostało:** rerank i synonimy. Oba kupione pomiarem i oba przeniesione
+do narzędzia.
+
+**Klasyczna ścieżka RAG w `BaseAgent` została USUNIĘTA.** Po przeniesieniu
+Redaktora i Urzędnika nie miała ani jednego użytkownika — a wyglądała na żywą,
+więc następna osoba naprawiałaby kod, którego nikt nie wywołuje i którego nic
+nie sprawdza. `respond()` bez `tools` rzuca teraz `NotImplementedError` z
+podpowiedzią. `_stream` zostaje: używa go GUS-Analityk.
+
+⚠️ **Sondy w bramce trzeba było przepisać razem z agentem.** `test_agent_answers`
+powtarzał retrieval Urzędnika ręcznie (`hybrid_search` z jego progami) i po
+migracji mierzyłby coś, czego agent już nie robi — świecąc na zielono, bo
+atrybuty `rag_*` dalej stały w klasie. Dokładnie ten sam błąd, przez który
+22.08 sondy Strażnika przechodziły na usuniętej metodzie. Dziś obie sondy idą
+przez narzędzia, a `co-nowego` dostał etap KONTEKST, którego nigdy nie miał.
+
+---
+
+## 5. Kto ma jakie narzędzia (stan 24.08.2026)
 
 | Agent | Narzędzia | Uwagi |
 |---|---|---|
 | **Przewodnik** | `weather_forecast`, `current_weather`, `air_quality`, `upcoming_events`, `local_places` | pierwszy przeniesiony; zniknęły `PLACE_KEYWORDS`, `_is_place_query`, `_detect_place_category` |
 | **Organizator** | `waste_schedule`, `cinema_repertoire`, `clinic_schedule`, `pharmacy_duty`, `office_hours` | zniknął `INTENT_KEYWORDS`; `office_hours` to **nowe dane**, nie było ich nigdzie |
 | **Strażnik** | `active_alerts`, `citizen_reports` | ⚠️ `active_alerts` to **jedyne** źródło jego wiedzy o awariach — nie używa RAG |
-| Redaktor | — (RAG `["article"]` + blok świeżego feedu) | Etap 3 |
-| Urzędnik | — (RAG `["bip_static","bip","article"]`) | Etap 3 |
-| GUS-Analityk | — (własny SQL + `chart_data`) | Etap 3 |
+| **Redaktor** | `latest_local_news`, `search_news` | zniknął regex `_GENERIC_QUESTION` i blok „ŚWIEŻY FEED" z `extra_context` |
+| **Urzędnik** | `search_documents` | zniknął retrieval przed każdym pytaniem; cztery poziomy odpowiedzi zostają |
+| GUS-Analityk | — (własny SQL + `chart_data`) | `_classify_gus_query` czeka na swoją kolej |
 
 ---
 
@@ -264,6 +308,18 @@ więc druga kopia żyje tylko tyle, ile trwa jej użyteczność.
 - **Agent wołający narzędzia na wszystko jest tak samo zepsuty jak ten, który nie
   woła wcale — tylko drożej.** Stąd przypadek kontrolny w testach: „kto jest
   wójtem" musi wrócić **bez** wywołania narzędzia (odpowiedź jest w karcie gminy).
+- **Etykieta miejsca to nie to samo co bramka rankingu.** `is_local_article`
+  mówi „czy to nasz region" i jest celowo szeroka (lepiej pokazać sąsiednią
+  gminę niż zgubić naszą sprawę). Użyta jako ETYKIETA kłamie: 24.08 Redaktor
+  podał „budowa bloku komunalnego w Działdowie (**gmina Rybno**)", bo całe
+  źródło „Powiat Działdowski (RSS)" przechodzi przez tę funkcję bez patrzenia
+  na treść. Stąd `feed_policy.article_scope` — osobna funkcja na osobne pytanie.
+- **Test, który losowo świeci na czerwono, uczy ignorowania czerwonego.**
+  Wzorzec zakazany w bramce zawierał „skontaktuj się z urzędem", a prompt
+  Urzędnika WYMAGA podania konkretnego następnego kroku. Ta sama, dobra
+  odpowiedź o azbeście raz przechodziła, raz nie — zależnie od tego, jak model
+  zakończył zdanie. Sprzeczność między promptem a wyrocznią rozstrzyga się
+  na rzecz produktu, nie testu.
 - **Data wpisana w test na sztywno to bomba zegarowa.** `test_agent_tools --live`
   wymagał, żeby odpowiedź o jutrzejszej pogodzie zawierała „23" — jutro z dnia
   pisania testu. 24.08 test świecił na czerwono przy odpowiedzi **poprawnej**.
@@ -308,10 +364,10 @@ python -m scripts.tool_usage_report --days 7  # co narzędzia zastały (nie test
 
 ## 9. Co zostało
 
-- **Etap 3** — RAG jako narzędzie (`search_knowledge_base`) dla Redaktora
-  i Urzędnika. ⚠️ Bramka `_GENERIC_QUESTION` została kupiona porażką z 9.08
-  („co nowego" → „nie mam artykułów" przy 16 świeżych wpisach). Zdejmować tylko
-  z zielonym `test_agent_answers`.
+- ~~**Etap 3** — RAG jako narzędzie.~~ ✅ **24.08.2026** — `search_news`,
+  `search_documents`, `latest_local_news`; Redaktor i Urzędnik przeniesieni,
+  klasyczna ścieżka RAG usunięta (patrz 4.7). Zostaje `_classify_gus_query`
+  w GUS-Analityku.
 - **Etap 4 — uchwały.** Moduł BIP `/akty/14/typ/` (**inny** niż `DEFAULT_SECTIONS`),
   286 stron, pola: data podjęcia, grupa tematyczna, tytuł, nr aktu, status.
   Zakres **2024–2026** (decyzja Łukasza; zakres tłumaczymy użytkownikowi).

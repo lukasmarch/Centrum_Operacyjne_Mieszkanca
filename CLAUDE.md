@@ -253,12 +253,24 @@ oraz `visible_event_conditions` dla wydarzeń.
 - „Dziś w okolicy" ma okno **jednodniowe**; wcześniej dwudniowe, więc jutrzejszy festyn
   czytało się jako dzisiejszy
 
-## Kto czyta RAG (stan 2026-08-09)
+## Kto czyta RAG (stan 2026-08-24)
+**Wyszukiwarka jest NARZĘDZIEM, nie podatkiem doliczanym do każdego pytania.**
 | Agent | Wiedza | Uwagi |
 |---|---|---|
-| Redaktor | RAG `["article"]` + blok świeżego feedu | top_k 8, próg 0.35, recency 0.25 |
-| Urzędnik | RAG `["bip_static","bip","article"]` | top_k 6, próg 0.40 |
-| Strażnik / Organizator / Przewodnik / GUS | **własny SQL, zero RAG** | osadzenie wpisu nic tu nie gwarantuje |
+| Redaktor | `latest_local_news` + `search_news` | świeżość = zapytanie po dacie, NIE wektory |
+| Urzędnik | `search_documents` (`bip_static`,`bip`,`article`) | top_k 6, próg 0.40 |
+| Strażnik / Organizator / Przewodnik | **własny SQL przez narzędzia** | osadzenie wpisu nic tu nie gwarantuje |
+| GUS-Analityk | własny SQL + `chart_data` | jedyny z własnym `respond()` |
+
+⚠️ **Klasyczna ścieżka RAG w `BaseAgent` NIE ISTNIEJE od 24.08.2026** — po
+przeniesieniu Redaktora i Urzędnika nie miała ani jednego użytkownika.
+`respond()` bez `tools` rzuca `NotImplementedError`. Zniknęło też
+`_rewrite_query` (zapytanie układa model, który ma historię rozmowy).
+⚠️ **Etykieta miejsca: `feed_policy.article_scope`, NIE `is_local_article`.**
+Ta druga steruje rankingiem i jest celowo szeroka — przepuszcza całe źródło
+„Powiat Działdowski (RSS)" jako nasze, więc jako etykieta kłamie („budowa bloku
+w Działdowie (gmina Rybno)", 24.08). Nie podmieniać jednej pod drugą:
+`is_local_article` wchodzi w `article_score`, nagłówek briefingu i newsletter.
 
 Przebieg: scraping 6:00/13:00 → AI 6:15/13:15 (`processed`) → embedding 6:50/13:45 →
 `document_embeddings`. Zapytanie: przepisanie pytania → synonimy → hybrid_search (wektor+BM25,

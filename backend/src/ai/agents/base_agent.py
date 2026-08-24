@@ -1,17 +1,22 @@
 """
-BaseAgent - abstract base for all specialized AI agents
+BaseAgent — wspólna pętla narzędziowa wszystkich agentów
 
-Dwie ścieżki odpowiedzi, świadomie obie utrzymywane:
+Model sam decyduje, czego mu trzeba, widzi wynik i może dobrać następne
+narzędzie (`ai/tools/__init__.py`). Migracja szła agentem po agencie, bo każdy
+niósł własne wnioski z awarii (okna czasowe Strażnika, blok świeżego feedu
+Redaktora), a przenoszenie ich hurtem oznaczałoby powtórzenie tych awarii naraz.
 
-* **`tools` puste** → dotychczasowa ścieżka RAG: retrieval przed rozmową,
-  rerank, jeden strzał do modelu. Tak działają agenci, których jeszcze nie
-  przeniesiono;
-* **`tools` niepuste** → pętla narzędziowa: model sam decyduje, czego mu trzeba,
-  widzi wynik i może dobrać następne narzędzie (`ai/tools/__init__.py`).
+**Klasyczna ścieżka RAG zniknęła 24.08.2026** — retrieval przed pytaniem,
+rerank, jeden strzał do modelu. Przez dwa dni była „ścieżką dla agentów jeszcze
+nieprzeniesionych"; po Redaktorze i Urzędniku takich agentów nie ma. Kod bez
+użytkowników, który wygląda na żywy, jest gorszy od jego braku: następna osoba
+naprawiałaby ścieżkę, której nikt nie wywołuje i której nic nie sprawdza.
 
-Migracja idzie agentem po agencie, bo każdy niesie własne wnioski z awarii
-(okna czasowe Strażnika, blok świeżego feedu Redaktora) i przenoszenie ich
-hurtem oznaczałoby powtórzenie tych awarii naraz.
+Wyszukiwarka nie zniknęła — stała się narzędziem (`ai/tools/knowledge.py`),
+razem z rerankiem i synonimami. Zniknęło przepisywanie pytania: w tej ścieżce
+zapytanie układa model, który ma przed sobą historię rozmowy.
+
+`_stream` zostaje, bo używa go GUS-Analityk (własne `respond()` z wykresami).
 """
 import asyncio
 import json
@@ -22,11 +27,9 @@ from typing import Optional, AsyncGenerator, Union
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai import tools as agent_tools
-from src.ai.embeddings import embedding_service
 from src.ai.tools import ToolContext, ToolResult
 from src.config import settings
 from src.services.gmina_facts import gmina_facts
-from src.services.search_synonyms import expand_query
 from src.services.tool_telemetry import ToolTelemetry
 from src.utils.logger import setup_logger
 
@@ -91,12 +94,11 @@ class BaseAgent:
     temperature: float = 0.3
     max_tokens: int = 1500
     system_prompt: str = ""
-    source_types: list[str] = []  # RAG filter
     example_questions: list[str] = []
 
-    # Nazwy narzędzi z `ai.tools.TOOL_REGISTRY`. Puste = dotychczasowa ścieżka RAG.
-    # Lista jest per agent, nie globalna: definicje narzędzi wchodzą do KAŻDEGO
-    # wywołania (~80 tokenów sztuka), a Urzędnik i GUS chodzą na gpt-4o.
+    # Nazwy narzędzi z `ai.tools.TOOL_REGISTRY`. Lista jest per agent, nie
+    # globalna: definicje narzędzi wchodzą do KAŻDEGO wywołania (~80 tokenów
+    # sztuka), a Urzędnik i GUS chodzą na gpt-4o.
     tools: list[str] = []
 
     # Ile razy model może sięgnąć po narzędzia, zanim musi odpowiedzieć.
@@ -104,16 +106,6 @@ class BaseAgent:
     # dokument, zobaczyć czego w nim brakuje, dobrać dane liczbowe. Ostatnia
     # runda leci BEZ narzędzi, więc pętla nie ma jak się zapętlić.
     max_tool_rounds: int = 3
-
-    # RAG parameters (per-agent overrides)
-    # Progi skalibrowane na realnym korpusie (07.2026): trafne wyniki mają
-    # kosinus 0.43-0.63, więc 0.50 odcinało połowę trafień.
-    rag_top_k: int = 5
-    rag_threshold: float = 0.35
-    rag_semantic_weight: float = 0.70
-    rag_recency_boost: float = 0.0
-    # Minimum similarity to show source chip in UI (higher than rag_threshold)
-    source_display_threshold: float = 0.50
 
     def __init__(self):
         self.client = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
@@ -135,123 +127,16 @@ class BaseAgent:
                 session, user_message, conversation_history, stream, user
             )
 
-        # 0. Pytania kontynuacyjne ("a w zeszłym roku?") są bezużyteczne jako
-        # zapytanie do wyszukiwarki — przepisz na samodzielne z kontekstem rozmowy
-        search_query = user_message
-        if conversation_history:
-            search_query = await self._rewrite_query(user_message, conversation_history)
-
-        # 0b. Mieszkaniec mówi „eternit", BIP pisze „azbest" — embedding tych
-        # dwóch nie łączy (0,674 dla „azbest", zero trafień dla „eternit").
-        # Zapytanie musi zostać poprawione TU, przed retrievalem: model dostaje
-        # już tylko to, co wyszukiwarka znalazła.
-        search_query = expand_query(search_query)
-
-        # 1. Retrieve candidates (szerzej niż top_k — reranker zawęzi)
-        candidates = await embedding_service.hybrid_search(
-            session=session,
-            query=search_query,
-            top_k=max(self.rag_top_k * 2, 12),
-            source_types=self.source_types or None,
-            similarity_threshold=self.rag_threshold,
-            semantic_weight=self.rag_semantic_weight,
-            recency_boost=self.rag_recency_boost
+        # Agent BEZ narzędzi nie ma dziś czego robić: wszyscy sześciu albo mają
+        # `tools`, albo własne `respond()` (GUS). Klasyczna ścieżka RAG —
+        # retrieval przed pytaniem, rerank, jeden strzał — została usunięta
+        # 24.08.2026 wraz z przeniesieniem Redaktora i Urzędnika, bo od tej
+        # chwili nie miała ANI JEDNEGO użytkownika, a wyglądała na żywą.
+        # Wyszukiwarka żyje dalej jako narzędzie: `ai/tools/knowledge.py`.
+        raise NotImplementedError(
+            f"Agent {self.name} nie ma narzędzi ani własnego respond(). "
+            "Dodaj `tools = [...]` — patrz ai/tools/knowledge.py."
         )
-
-        # 1b. Rerank: GPT-4o-mini odrzuca kandydatów niezwiązanych z pytaniem.
-        # To on decyduje, czy odpowiadamy "z bazy" czy z wiedzy ogólnej —
-        # kosinus ~0.5 przepuszczał szum (np. ogłoszenia sesji rady przy
-        # pytaniu o dowód osobisty).
-        context_docs = await self._rerank(search_query, candidates, keep=self.rag_top_k)
-
-        # Log RAG metrics
-        if context_docs:
-            scores = [d['similarity'] for d in context_docs]
-            logger.info(
-                f"RAG[{self.name}] docs={len(context_docs)} "
-                f"sim: min={min(scores):.3f} max={max(scores):.3f} avg={sum(scores)/len(scores):.3f}"
-            )
-        else:
-            logger.warning(f"RAG[{self.name}] NO RESULTS for query='{user_message[:60]}'")
-
-        # 2. Build context
-        context_parts = []
-        sources = []
-        seen = set()
-
-        for doc in context_docs:
-            meta = doc['metadata']
-            published_raw = meta.get('published_at', '') or meta.get('event_date', '')
-            date_str = ""
-            if published_raw:
-                try:
-                    dt = datetime.fromisoformat(published_raw.replace('Z', '+00:00'))
-                    date_str = f" | Data: {dt.strftime('%d.%m.%Y')}"
-                except Exception:
-                    date_str = f" | Data: {published_raw[:10]}"
-
-            context_parts.append(
-                f"---\n{doc['chunk_text']}\n"
-                f"[Zrodlo: {meta.get('source_name', doc['source_type'])}"
-                f"{date_str} | Trafnosc: {doc['similarity']:.2f}]"
-            )
-            key = f"{doc['source_type']}:{doc['source_id']}"
-            if key not in seen and doc["similarity"] >= self.source_display_threshold:
-                seen.add(key)
-                sources.append({
-                    "type": doc["source_type"],
-                    "id": doc["source_id"],
-                    "title": meta.get("title", ""),
-                    "url": meta.get("url", ""),
-                    "similarity": doc["similarity"]
-                })
-
-        context = "\n\n".join(context_parts) if context_parts else "Brak kontekstu."
-
-        # 2b. Materiał, którego wyszukiwarka z definicji nie znajdzie. Pytanie
-        # „co nowego" nie ma słów, które cokolwiek wyróżniają — najbliższymi
-        # sąsiadami wektora są wpisy zawierające „nowe" i „gmina", więc Redaktor
-        # dostawał inwestycje w Stawigudzie sprzed pół roku i odpowiadał
-        # „nie mam aktualnych artykułów" przy pełnej bazie. Agent, który tego
-        # potrzebuje, dopisuje własny blok; reszta nie płaci nic.
-        extra = await self.extra_context(
-            session, user_message, {d["source_id"] for d in context_docs}
-        )
-
-        # 3. Build messages
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            *base_context_messages(),
-            {"role": "system", "content": f"KONTEKST:\n{context}\n\nNIE pisz [Zrodlo: ...] ani [Źródło: ...] w treści odpowiedzi — źródła są podawane automatycznie przez system."}
-        ]
-        if extra:
-            messages.append({"role": "system", "content": extra})
-
-        if conversation_history:
-            for msg in conversation_history[-10:]:
-                messages.append({"role": msg["role"], "content": msg["content"]})
-
-        messages.append({"role": "user", "content": user_message})
-
-        # 4. Generate
-        if stream:
-            return await self._stream(messages, sources, context_count=len(context_docs))
-
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens
-        )
-
-        return {
-            "answer": response.choices[0].message.content,
-            "sources": sources,
-            "tokens_used": response.usage.total_tokens if response.usage else 0,
-            "model": self.model,
-            "agent_name": self.name
-        }
-
     # ------------------------------------------------------------------
     # Ścieżka narzędziowa
     # ------------------------------------------------------------------
@@ -632,87 +517,6 @@ class BaseAgent:
             }) + "\n"
 
         return generate()
-
-    async def extra_context(
-        self,
-        session: AsyncSession,
-        user_message: str,
-        retrieved_ids: set,
-    ) -> Optional[str]:
-        """
-        Dodatkowy blok `system` poza RAG-iem — pusty, dopóki agent go nie nadpisze.
-
-        `retrieved_ids` to ID wpisów, które już weszły przez retrieval; agent ma
-        ich NIE powtarzać, żeby ten sam artykuł nie zajmował miejsca dwa razy.
-        """
-        return None
-
-    async def _rewrite_query(self, user_message: str, conversation_history: list[dict]) -> str:
-        """Przepisuje pytanie kontynuacyjne na samodzielne zapytanie do wyszukiwarki."""
-        recent = conversation_history[-4:]
-        convo = "\n".join(
-            f"{'Użytkownik' if m['role'] == 'user' else 'Asystent'}: {m['content'][:300]}"
-            for m in recent
-        )
-        try:
-            resp = await self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": (
-                        "Przekształć ostatnie pytanie użytkownika w samodzielne zapytanie "
-                        "do wyszukiwarki (po polsku), uzupełniając brakujący kontekst z rozmowy. "
-                        "Jeśli pytanie jest już samodzielne — zwróć je bez zmian. "
-                        "Zwróć TYLKO treść zapytania, nic więcej."
-                    )},
-                    {"role": "user", "content": f"ROZMOWA:\n{convo}\n\nOSTATNIE PYTANIE: {user_message}"},
-                ],
-                temperature=0,
-                max_tokens=80,
-            )
-            rewritten = (resp.choices[0].message.content or "").strip().strip('"')
-            if rewritten:
-                if rewritten != user_message:
-                    logger.info(f"Query rewrite: '{user_message[:40]}' -> '{rewritten[:60]}'")
-                return rewritten
-        except Exception as e:
-            logger.warning(f"Query rewrite failed: {e}")
-        return user_message
-
-    async def _rerank(self, query: str, docs: list[dict], keep: int) -> list[dict]:
-        """Listwise rerank przez GPT-4o-mini: zostawia tylko fragmenty, które
-        faktycznie pomagają odpowiedzieć. Pusta lista = odpowiedź z wiedzy ogólnej.
-        Przy błędzie API zachowuje oryginalną kolejność (graceful fallback)."""
-        if len(docs) <= 1:
-            return docs
-        items = "\n".join(
-            f"[{i}] {d['metadata'].get('title', '')} — {d['chunk_text'][:200]}"
-            for i, d in enumerate(docs)
-        )
-        try:
-            resp = await self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": (
-                        "Oceń, które fragmenty FAKTYCZNIE pomagają odpowiedzieć na pytanie. "
-                        "Zwróć TYLKO JSON: listę indeksów trafnych fragmentów od najtrafniejszego, "
-                        "np. [3,0,5]. Pomiń fragmenty niezwiązane z pytaniem (podobny temat to za mało "
-                        "— fragment musi zawierać informację przydatną do odpowiedzi). "
-                        "Jeśli żaden nie pasuje, zwróć []."
-                    )},
-                    {"role": "user", "content": f"PYTANIE: {query}\n\nFRAGMENTY:\n{items}"},
-                ],
-                temperature=0,
-                max_tokens=60,
-            )
-            raw = (resp.choices[0].message.content or "").strip()
-            start, end = raw.find("["), raw.rfind("]")
-            indices = json.loads(raw[start:end + 1]) if start != -1 and end > start else []
-            picked = [docs[i] for i in indices if isinstance(i, int) and 0 <= i < len(docs)]
-            logger.info(f"Rerank[{self.name}]: {len(docs)} kandydatów -> {len(picked)} trafnych")
-            return picked[:keep]
-        except Exception as e:
-            logger.warning(f"Rerank failed, keeping original order: {e}")
-            return docs[:keep]
 
     async def _stream(
         self,
