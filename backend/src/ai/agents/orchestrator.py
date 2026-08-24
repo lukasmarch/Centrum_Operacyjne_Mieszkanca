@@ -217,6 +217,29 @@ class Orchestrator:
             session, user_message, agent_name, conversation_history, user
         )
 
+    def _agent_or_fallback(self, name: Optional[str]):
+        """Agent o tej nazwie albo Redaktor. `None`, gdy rejestr jest PUSTY.
+
+        `self.agents.get(x) or self.agents.get("redaktor")` wyglądało na
+        bezpieczne i takie nie było: przy pustym rejestrze oddaje `None`,
+        a linijkę niżej `agent.name` wywracało rozmowę na `AttributeError`
+        zamiast powiedzieć, co się stało. Rejestr bywa pusty poza serwerem —
+        wypełnia go start FastAPI, więc każdy skrypt, który zapomni
+        o `register_agent`, dostawał komunikat nie mówiący nic o przyczynie.
+        """
+        agent = self.agents.get(name) if name else None
+        if agent is not None:
+            return agent
+        fallback = self.agents.get("redaktor")
+        if fallback is None:
+            logger.error(
+                f"Rejestr agentów PUSTY — nie ma kogo zapytać o '{name}'. "
+                "Poza API trzeba wywołać orchestrator.register_agent() ręcznie."
+            )
+            return None
+        logger.warning(f"Agent '{name}' nieznany — odpowiada redaktor")
+        return fallback
+
     def _next_agent(self, handoff: dict, visited: list[str]) -> Optional[str]:
         """Kto przejmuje pytanie. `None` = nie ma dokąd, kończymy.
 
@@ -248,7 +271,13 @@ class Orchestrator:
         last_reason: Optional[str] = None
 
         for _ in range(MAX_HANDOFFS + 1):
-            agent = self.agents.get(agent_name) or self.agents.get("redaktor")
+            agent = self._agent_or_fallback(agent_name)
+            if agent is None:
+                return {
+                    "answer": self._dead_end_message(None), "sources": sources,
+                    "chart_data": charts, "tokens_used": tokens, "model": "n/a",
+                    "agent_name": agent_name, "handoff_path": visited,
+                }
             visited.append(agent.name)
 
             result = await agent.respond(
@@ -313,7 +342,9 @@ class Orchestrator:
         current = agent_name
 
         for _ in range(MAX_HANDOFFS + 1):
-            agent = self.agents.get(current) or self.agents.get("redaktor")
+            agent = self._agent_or_fallback(current)
+            if agent is None:
+                break
             visited.append(agent.name)
 
             generator = await agent.respond(
