@@ -209,6 +209,7 @@ async def run_alert_push_async():
                     body=body,
                     url="/",
                     icon="/icon-192.png",
+                    places=alert.places,
                 )
                 if sig:
                     announced.add(sig)

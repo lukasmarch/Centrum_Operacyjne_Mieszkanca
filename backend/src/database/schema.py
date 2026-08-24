@@ -804,6 +804,13 @@ class PushSubscription(SQLModel, table=True):
     # Kategorie powiadomień: alerty, powietrze, artykuly, wydarzenia
     categories: list = Field(default_factory=list, sa_column=Column(JSONB))
 
+    # Miejscowość, której dotyczą alerty o awariach. Trzymana na SUBSKRYPCJI,
+    # nie na koncie: 24.08.2026 pięć z sześciu aktywnych subskrypcji nie miało
+    # `user_id` — to zgody wydane w przeglądarce bez zakładania konta, więc
+    # `users.location` nie istniało dla nikogo poza jedną osobą.
+    # Puste = mieszkaniec nie wskazał wsi i dostaje alerty z całej gminy.
+    location: Optional[str] = Field(default=None, max_length=100, index=True)
+
     # Metadata urządzenia
     user_agent: Optional[str] = Field(default=None, max_length=500)
 

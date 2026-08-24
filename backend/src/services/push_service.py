@@ -10,8 +10,10 @@ Obsługuje cztery typy triggerów:
 """
 import json
 import asyncio
+import re
+import unicodedata
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Sequence
 
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +22,20 @@ from src.config import settings
 from src.utils.logger import setup_logger
 
 logger = setup_logger("PushService")
+
+
+def _norm_place(value: str) -> str:
+    """
+    Nazwa miejscowości do porównania: bez ogonków, wielkości liter i ogona
+    rejonu wywozu. Konto potrafi mieć zapisane „Rybno R1" (patrz
+    `AVAILABLE_LOCATIONS` — to lista rejonów odbioru odpadów, nie miejscowości),
+    a Energa mówi po prostu „Rybno".
+    """
+    lowered = (value or "").strip().lower().replace("ł", "l")
+    stripped = unicodedata.normalize("NFKD", lowered)
+    flat = "".join(c for c in stripped if not unicodedata.combining(c))
+    return re.sub(r"\s+r\d+$", "", flat)
+
 
 
 def _send_push_notification_sync(endpoint: str, p256dh: str, auth: str,
@@ -111,10 +127,21 @@ class PushService:
         body: str,
         url: str = "/",
         icon: str = "/icon-192.png",
+        places: Optional[Sequence[str]] = None,
     ) -> int:
         """
-        Wyślij push do wszystkich aktywnych subskrybentów danej kategorii.
+        Wyślij push do aktywnych subskrybentów danej kategorii.
         Zwraca liczbę wysłanych powiadomień.
+
+        `places` — miejscowości, których dotyczy zdarzenie. Podane, zawężają
+        wysyłkę do subskrypcji z pasującą lokalizacją: do 24.08.2026 alert
+        o wyłączeniu na ulicy Zajeziornej w Rybnie budził telefon mieszkańca
+        Koszelew, bo jedyną bramką miejsca było „czy padła jakakolwiek nazwa
+        z gminy".
+
+        Subskrypcja bez `location` dostaje wszystko. To nie jest wyjątek dla
+        starych wpisów, tylko domyślne zachowanie: wskazanie wsi jest dobrowolne,
+        a alert, który nie dotarł, jest gorszy niż alert o sąsiedniej wsi.
         """
         if not self._is_configured():
             logger.warning("VAPID keys not configured – skipping push broadcast")
@@ -134,6 +161,19 @@ class PushService:
                 s for s in subscriptions
                 if not s.categories or category in s.categories
             ]
+
+        if places:
+            wanted = {_norm_place(p) for p in places}
+            before = len(subscriptions)
+            subscriptions = [
+                s for s in subscriptions
+                if not s.location or _norm_place(s.location) in wanted
+            ]
+            skipped = before - len(subscriptions)
+            if skipped:
+                logger.info(
+                    f"Pominięto {skipped} subskrypcji spoza {', '.join(places)}"
+                )
 
         if not subscriptions:
             logger.info(f"No active push subscriptions for category '{category}'")

@@ -324,7 +324,21 @@ def signature(
     if event_at is None and event_until is None:
         event_at, _ = span_from_text(title, content, published_at)
 
-    return (incident[0], frozenset(places), event_at)
+    # Termin do DOBY, nie do minuty. Energa zapowiada jeden dzień kilkoma
+    # wpisami — 23.08 wieczorem poszły dwa powiadomienia o wyłączeniach 25.08
+    # w Rybnie (09:30 i 10:00, różne ulice). Dla mieszkańca to jedna wiadomość:
+    # „25 sierpnia nie będzie prądu, szczegóły w serwisie". Miejscowości zostają
+    # w kluczu, więc wyłączenie w Koszelewach tego samego dnia to nadal osobny
+    # alert.
+    #
+    # Doba LOKALNA, nie UTC: zdarzenie o 00:30 czasu polskiego wypada w bazie
+    # na dzień wcześniejszy i inaczej rozjechałoby się z sąsiednim wpisem.
+    #
+    # ⚠️ Cena tej decyzji: awaria poranna i wieczorna w tej samej wsi mają jeden
+    # klucz, więc druga nie obudzi telefonu (pamięć trwa RECENT_PUSH_MEMORY_H).
+    event_day = time_span.to_local(event_at).date() if event_at else None
+
+    return (incident[0], frozenset(places), event_day)
 
 
 def evaluate(

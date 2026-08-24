@@ -34,6 +34,8 @@ class PushSubscribeRequest(BaseModel):
     auth: str
     categories: List[str] = ["alerty", "powietrze", "artykuly"]
     user_agent: Optional[str] = None
+    # Miejscowość dla alertów o awariach. Puste = cała gmina.
+    location: Optional[str] = None
 
 
 class PushUnsubscribeRequest(BaseModel):
@@ -89,6 +91,8 @@ async def subscribe_push(
             existing.p256dh = payload.p256dh
             existing.auth = payload.auth
             existing.categories = payload.categories
+            if payload.location is not None:
+                existing.location = payload.location or None
             existing.active = True
             existing.last_used_at = datetime.utcnow()
             if current_user:
@@ -108,6 +112,7 @@ async def subscribe_push(
             p256dh=payload.p256dh,
             auth=payload.auth,
             categories=payload.categories,
+            location=payload.location or (current_user.location if current_user else None),
             user_agent=user_agent[:500] if user_agent else None,
             active=True,
         )

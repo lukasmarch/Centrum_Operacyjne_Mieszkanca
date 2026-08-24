@@ -258,7 +258,9 @@ SIGNATURE_GROUPS: List[Tuple[str, List[Tuple[str, str, datetime]], int]] = [
         1,
     ),
     (
-        "dwa realne wyłączenia Energi w Rybnie na 25.08 — NIE zlewać",
+        # 23.08 poszły o nich dwa powiadomienia (21:38 i 22:08). Ten sam dzień,
+        # ta sama wieś, różne ulice — dla mieszkańca jedna wiadomość.
+        "dwie zapowiedzi Energi na 25.08 w Rybnie — jeden alert",
         [
             (
                 "Wyłączenie planowane - Region Mława - Rybno gmina wiejska",
@@ -269,6 +271,23 @@ SIGNATURE_GROUPS: List[Tuple[str, List[Tuple[str, str, datetime]], int]] = [
                 "Wyłączenie planowane - Region Mława - Rybno gmina wiejska",
                 "Rybno gmina wiejska 25.08.2026 10:00-15:00 - Rybno ulice Kościelna 1, 3, 5.",
                 datetime(2026, 8, 21, 10, 20),
+            ),
+        ],
+        1,
+    ),
+    (
+        # Miejscowość zostaje w kluczu — sąsiednia wieś to osobna sprawa.
+        "wyłączenie w Rybnie i w Koszelewach tego samego dnia — dwa alerty",
+        [
+            (
+                "Wyłączenie planowane - Region Mława - Rybno gmina wiejska",
+                "Rybno gmina wiejska 25.08.2026 09:30-15:00 - Rybno ulica Wyzwolenia 90.",
+                datetime(2026, 8, 21, 10, 19),
+            ),
+            (
+                "Wyłączenie planowane - Region Mława - Rybno gmina wiejska",
+                "Rybno gmina wiejska 25.08.2026 09:30-15:00 - Koszelewy, Koszelewki.",
+                datetime(2026, 8, 21, 10, 21),
             ),
         ],
         2,
