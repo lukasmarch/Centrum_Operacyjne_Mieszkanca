@@ -3,6 +3,7 @@ from datetime import datetime
 import httpx
 import re
 
+from src.config import settings
 from src.scrapers.base import BaseScraper
 
 # Model "pointer" dla treści z social mediów (prawo autorskie + RODO):
@@ -34,12 +35,11 @@ class ApifyFacebookScraper(BaseScraper):
     3. Wybierz Facebook Posts Scraper actor:
        https://apify.com/apify/facebook-posts-scraper
 
-    4. Dodaj do .env:
+    4. Dodaj do .env (JEDYNE miejsce na token — do bazy NIE trafia):
        APIFY_API_KEY=apify_api_***********
 
-    5. Utwórz source w bazie z konfiguracją:
+    5. Utwórz source w bazie z konfiguracją — bez sekretu, same parametry:
        {
-         "apify_api_key": "apify_api_***",
          "facebook_page_url": "https://www.facebook.com/serwis.informacyjny.syla",
          "results_limit": 20,
          "caption_text": false,
@@ -53,7 +53,6 @@ class ApifyFacebookScraper(BaseScraper):
         type="social_media",
         url="https://www.facebook.com/serwis.informacyjny.syla",
         scraping_config={
-            "apify_api_key": "...",
             "facebook_page_url": "https://www.facebook.com/serwis.informacyjny.syla",
             "results_limit": 20,
             "caption_text": false
@@ -74,8 +73,17 @@ class ApifyFacebookScraper(BaseScraper):
     def __init__(self, source_id: int, config: Optional[Dict] = None):
         super().__init__(source_id, config)
 
-        # Sprawdź czy mamy wymagane klucze konfiguracji
-        self.apify_api_key = self.config.get('apify_api_key')
+        # Sprawdź czy mamy wymagane klucze konfiguracji.
+        #
+        # Token bierzemy ze ŚRODOWISKA, nie z bazy (24.08.2026). Do tej pory leżał
+        # jawnym tekstem w `sources.scraping_config` — w pięciu wierszach, ten sam —
+        # więc wypływał przy każdym `select * from sources`, w zrzucie bazy i w każdym
+        # podglądzie tabeli przez Adminera. Sekret ma jedno miejsce: `.env`.
+        #
+        # Odczyt z bazy zostaje jako zejście awaryjne, żeby wdrożenie kodu nie musiało
+        # być zsynchronizowane co do minuty z migracją czyszczącą. Po przebiegu
+        # `scripts.migrations.strip_apify_key_from_sources` ta gałąź nie ma już danych.
+        self.apify_api_key = settings.APIFY_API_KEY or self.config.get('apify_api_key')
         self.facebook_page_url = self.config.get('facebook_page_url')
         self.results_limit = self.config.get('results_limit', 20)
         self.caption_text = self.config.get('caption_text', False)
@@ -87,7 +95,12 @@ class ApifyFacebookScraper(BaseScraper):
         self.exclude_keywords = [k.lower() for k in self.config.get('exclude_keywords', [])]
 
         if not self.apify_api_key:
-            raise ValueError("Missing 'apify_api_key' in scraper config")
+            raise ValueError(
+                "Brak tokenu Apify — ustaw APIFY_API_KEY w backend/.env "
+                "(na produkcji: backend/.env.production, potem "
+                "`docker compose -f docker-compose.prod.yml up -d --force-recreate backend`, "
+                "bo samo `up -d` nie przeładowuje środowiska)"
+            )
         if not self.facebook_page_url:
             raise ValueError("Missing 'facebook_page_url' in scraper config")
 
