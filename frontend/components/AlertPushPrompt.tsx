@@ -11,6 +11,13 @@
  * w gminie Rybno) i dokładnie tyle wysyła `alert_push_job` — subskrypcja idzie
  * z kategorią „alerty", więc zapis tutaj NIE zapisuje na dzienne podsumowanie.
  *
+ * 24.08.2026 doszedł wybór miejscowości. Alert szedł do wszystkich, jeśli tylko
+ * w komunikacie padła jakakolwiek nazwa z gminy — mieszkaniec Koszelew dostawał
+ * powiadomienie o wyłączeniu na ulicy Zajeziornej w Rybnie. Wieś zapisujemy na
+ * SUBSKRYPCJI, nie na koncie: pięć z sześciu zgód wydano bez rejestracji.
+ * Wybór jest dobrowolny — „cała gmina" zostaje domyślną odpowiedzią, bo alert,
+ * który nie dotarł, jest gorszy niż alert o sąsiedniej wsi.
+ *
  * 28.07.2026 doszedł drugi punkt wejścia: `campaignOnly`. Reels kampanijny kończy
  * się obietnicą „Włącz powiadomienia. Za darmo, bez zakładania konta", a widz
  * lądował na widoku, gdzie tego włącznika NIE BYŁO — jedyny stały siedzi
@@ -24,9 +31,11 @@
  * na push nie pokazywała się w ogóle. W dniu z awarią prosi o nią głośniej
  * `AlertOfTheDay`, więc na stronie zawsze jest dokładnie jedno takie wezwanie.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BellRing, X } from 'lucide-react';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
+
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const DISMISS_KEY = 'rl_push_prompt_dismissed_at';
 
@@ -91,6 +100,19 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
   const [fresh] = useState(justRegistered);
   const [busy, setBusy] = useState(false);
   const [justEnabled, setJustEnabled] = useState(false);
+  const [places, setPlaces] = useState<string[]>([]);
+  const [place, setPlace] = useState('');
+
+  // Lista miejscowości pochodzi z backendu (`alert_policy.GMINA_RYBNO_PLACES`),
+  // nie z `AVAILABLE_LOCATIONS` — tamto to 24 pozycje harmonogramu odpadów
+  // („Rybno R1", „Domki letniskowe"), a nie nazwy wsi. Gdy zapytanie padnie,
+  // wybór po prostu się nie pokaże i baner działa jak dotąd.
+  useEffect(() => {
+    fetch(`${API_URL}/business/gmina-localities`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => Array.isArray(data) && setPlaces(data))
+      .catch(() => setPlaces([]));
+  }, []);
 
   const hide =
     (campaignOnly && !cameFromCampaign() && !fresh) ||
@@ -104,7 +126,7 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
     return (
       <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-950/30 border border-emerald-800/30 text-sm text-emerald-300">
         <BellRing size={15} className="flex-shrink-0" />
-        Gotowe — o kolejnej awarii w gminie Rybno dowiesz się od razu.
+        Gotowe — o kolejnej awarii {place ? `w miejscowości ${place}` : 'w gminie Rybno'} dowiesz się od razu.
       </div>
     );
   }
@@ -124,7 +146,7 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
     setBusy(true);
     // Sama kategoria „alerty": obiecujemy awarie, więc nie dopisujemy nikogo
     // przy okazji do porannego podsumowania ani do alertów smogowych.
-    const ok = await subscribe(['alerty']);
+    const ok = await subscribe(['alerty'], place || undefined);
     setBusy(false);
     if (ok) setJustEnabled(true);
   };
@@ -153,15 +175,33 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
         </div>
       </div>
 
-      <button
-        onClick={enable}
-        disabled={busy}
-        className={`flex-shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors disabled:opacity-50 ${
-          calm ? 'bg-blue-600 hover:bg-blue-500' : 'bg-red-600 hover:bg-red-500'
-        }`}
-      >
-        {busy ? 'Włączam…' : 'Włącz alerty'}
-      </button>
+      <div className="flex flex-shrink-0 items-center gap-2">
+        {places.length > 0 && (
+          <select
+            value={place}
+            onChange={(e) => setPlace(e.target.value)}
+            aria-label="Miejscowość, której mają dotyczyć alerty"
+            className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium bg-white/[0.04] border border-white/10 text-neutral-300 focus:outline-none focus:border-white/25"
+          >
+            <option value="">cała gmina</option>
+            {places.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button
+          onClick={enable}
+          disabled={busy}
+          className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors disabled:opacity-50 ${
+            calm ? 'bg-blue-600 hover:bg-blue-500' : 'bg-red-600 hover:bg-red-500'
+          }`}
+        >
+          {busy ? 'Włączam…' : 'Włącz alerty'}
+        </button>
+      </div>
 
       <button
         onClick={close}

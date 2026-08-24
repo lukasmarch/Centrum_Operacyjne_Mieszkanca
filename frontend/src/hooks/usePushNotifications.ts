@@ -17,7 +17,7 @@ interface PushSubscriptionState {
   status: PushStatus;
   isSubscribed: boolean;
   isSupported: boolean;
-  subscribe: (categories?: string[]) => Promise<boolean>;
+  subscribe: (categories?: string[], location?: string) => Promise<boolean>;
   unsubscribe: () => Promise<boolean>;
 }
 
@@ -41,7 +41,8 @@ async function getVapidPublicKey(): Promise<string | null> {
 
 async function sendSubscriptionToServer(
   subscription: PushSubscription,
-  categories: string[]
+  categories: string[],
+  location?: string
 ): Promise<boolean> {
   try {
     const key = subscription.getKey('p256dh');
@@ -63,6 +64,8 @@ async function sendSubscriptionToServer(
         p256dh: p256dh,
         auth: authStr,
         categories,
+        // Pusta wartość zostaje pusta: backend rozumie ją jako „cała gmina".
+        location: location || null,
         user_agent: navigator.userAgent,
       }),
     });
@@ -127,7 +130,10 @@ export function usePushNotifications(): PushSubscriptionState {
   }, [isSupported]);
 
   const subscribe = useCallback(
-    async (categories: string[] = ['alerty', 'powietrze', 'artykuly']): Promise<boolean> => {
+    async (
+      categories: string[] = ['alerty', 'powietrze', 'artykuly'],
+      location?: string
+    ): Promise<boolean> => {
       if (!isSupported) return false;
 
       setStatus('loading');
@@ -156,7 +162,7 @@ export function usePushNotifications(): PushSubscriptionState {
         });
 
         // Wyślij do backendu
-        const success = await sendSubscriptionToServer(subscription, categories);
+        const success = await sendSubscriptionToServer(subscription, categories, location);
         if (success) {
           setIsSubscribed(true);
           setStatus('subscribed');
