@@ -134,6 +134,54 @@ def is_local_source(source_name: Optional[str]) -> bool:
     return (source_name or "") in LOCAL_SOURCES
 
 
+# Źródła mówiące WYŁĄCZNIE o gminie Rybno. Wszystkie pozostałe „lokalne" —
+# Moje Działdowo, Powiat Działdowski, profil gminy Działdowo — mówią o SĄSIADACH
+# tak samo często jak o nas, więc dla nich nazwa miejscowości musi paść w treści.
+GMINA_SOURCES: frozenset[str] = frozenset({
+    "Gmina Rybno",
+    "BIP Gminy Rybno",
+    "Facebook - Rybno",
+    "Facebook - ZakladGospodarkiKomunalnej",
+    "Facebook - Syla",
+    "Łaciate Mazury MTB",
+})
+
+
+def article_scope(
+    source_name: Optional[str],
+    title: Optional[str] = None,
+    content: Optional[str] = None,
+) -> str:
+    """Etykieta miejsca DLA CZŁOWIEKA: „gmina Rybno" / „okolice" / „poza regionem".
+
+    Osobna od `is_local_article`, bo odpowiada na inne pytanie. Tamta mówi
+    „czy to nasz region" i steruje RANKINGIEM — jej próg jest celowo szeroki,
+    bo lepiej pokazać sąsiednią gminę niż zgubić naszą sprawę. Ta mówi
+    „co napisać mieszkańcowi", a tu szeroki próg KŁAMIE.
+
+    24.08.2026 Redaktor podał „Rozpoczęła się budowa bloku komunalnego
+    w Działdowie (gmina Rybno)". Wpis przyszedł z „Powiat Działdowski (RSS)",
+    które jest w `LOCAL_SOURCES`, ale nie w `COUNTY_WIDE_SOURCES` — więc
+    `is_local_article` przepuszczało je bez patrzenia na treść. Model niczego
+    nie zmyślił: dokładnie tak dostał to opisane.
+
+    ⚠️ NIE podmieniać jednej funkcji drugą. `is_local_article` wchodzi
+    w `article_score`, wybór nagłówka briefingu i newsletter; zwężenie jej
+    progu zmienia to, co widzi mieszkaniec na stronie głównej, i wymaga
+    przebiegu `scripts.test_summary_headline`.
+    """
+    if is_foreign_region(title, content):
+        return "poza regionem"  # cudze Rybno spod Sochaczewa
+    if source_name in GMINA_SOURCES:
+        return "gmina Rybno"
+    # Treść przed źródłem: Radio Olsztyn nie jest źródłem lokalnym, ale gdy pisze
+    # O RYBNIE, to jest wiadomość z gminy. Bramka źródła postawiona wyżej
+    # odcinałaby takie wpisy, zanim ktokolwiek spojrzy, o czym są.
+    if places_in(title, content):
+        return "gmina Rybno"
+    return "okolice" if is_local_source(source_name) else "poza regionem"
+
+
 def is_local_article(
     source_name: Optional[str],
     title: Optional[str] = None,

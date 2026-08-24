@@ -382,6 +382,39 @@ async def run_telemetry_tests():
     check(out.content == {"echo": "bez pomiaru"}, "kontekst bez telemetrii działa jak dotąd")
 
 
+# --------------------------------------------------------- etykieta miejsca
+def run_scope_tests():
+    """„gmina Rybno" / „okolice" / „poza regionem" — etykieta, którą czyta model.
+
+    24.08 Redaktor podał „budowa bloku komunalnego w Działdowie (gmina Rybno)".
+    Nie zmyślił: `is_local_article` przepuszcza CAŁE źródło „Powiat Działdowski
+    (RSS)" jako nasze, bo steruje rankingiem i jest celowo szerokie. Jako
+    etykieta to kłamstwo, więc etykietę liczy osobna funkcja.
+    """
+    from src.services.feed_policy import article_scope
+
+    print("\n== Etykieta miejsca ==")
+    cases = [
+        ("Powiat Działdowski (RSS)", "Blok komunalny w Działdowie", "okolice",
+         "sąsiednia gmina NIE jest naszą gminą"),
+        ("Powiat Działdowski (RSS)", "Remont drogi w Rybnie", "gmina Rybno",
+         "to samo źródło, gdy pisze o nas"),
+        ("Radio Olsztyn (RSS)", "Burze w regionie", "poza regionem",
+         "medium regionalne bez nazwy z gminy"),
+        ("Radio Olsztyn (RSS)", "Pożar w Hartowcu", "gmina Rybno",
+         "treść przed źródłem — regionalne medium piszące o nas"),
+        ("Gmina Rybno", "Cokolwiek", "gmina Rybno",
+         "źródło mówiące wyłącznie o gminie nie potrzebuje nazwy w treści"),
+        ("Energa - wyłączenia planowane (RSS)", "Wyłączenie w Płośnicy", "okolice",
+         "feed Energi obejmuje powiat — Płośnica to nie my"),
+        ("Energa - wyłączenia planowane (RSS)", "Wyłączenie w Żabinach", "gmina Rybno",
+         "sołectwo gminy rozpoznane w treści"),
+    ]
+    for source, title, expected, why in cases:
+        got = article_scope(source, title, "")
+        check(got == expected, f"{title[:34]} → {expected}", f"dostałem {got} ({why})")
+
+
 # ------------------------------------------------------ rodzaj zdarzenia
 def run_alert_kind_tests():
     """Zapowiedź, rzecz trwająca czy relacja — reguła czysta, bez bazy.
@@ -512,6 +545,7 @@ async def run_live_tests():
     """
     from src.ai.agents.organizator import OrganizatorAgent
     from src.ai.agents.przewodnik import PrzewodnikAgent
+    from src.ai.agents.redaktor import RedaktorAgent
     from src.ai.agents.straznik import StraznikAgent
     from src.database.connection import async_session
     from src.services.tool_telemetry import ToolTelemetry
@@ -546,6 +580,14 @@ async def run_live_tests():
         (StraznikAgent, "Czy dziś nie będzie prądu?", {"active_alerts"}, None),
         (StraznikAgent, "Czy są planowane przerwy w dostawie prądu?",
          {"active_alerts"}, None),
+        # Redaktor — sedno etapu 3. Do 24.08 o wyborze między świeżym feedem
+        # a wyszukiwarką decydował regex `_GENERIC_QUESTION`; teraz decyduje
+        # model. Pytanie ogólne MUSI iść do `latest_local_news`: wyszukiwarka
+        # podobieństwa zwraca na nie cudze gminy sprzed pół roku (9.08.2026).
+        (RedaktorAgent, "Co nowego w gminie?", {"latest_local_news"}, None),
+        (RedaktorAgent, "Co słychać?", {"latest_local_news"}, None),
+        # …a pytanie o konkret NIE ma iść do feedu z ostatnich 48 h.
+        (RedaktorAgent, "Co wiadomo o pikniku w Żurominie?", {"search_news"}, None),
     ]
 
     # Znacznik czasu przed przebiegiem — po nim policzymy, czy telemetria
@@ -609,6 +651,7 @@ async def run_live_tests():
 
 async def main():
     run_forecast_unit_tests()
+    run_scope_tests()
     run_alert_kind_tests()
     await run_loop_tests()
     # Po pętli, bo korzysta z atrap zarejestrowanych w `run_loop_tests`.

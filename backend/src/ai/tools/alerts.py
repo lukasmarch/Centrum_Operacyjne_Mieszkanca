@@ -13,8 +13,11 @@ tyle że ogłoszone 28.07 — a zapytanie filtrowało po DACIE OGŁOSZENIA. Stą
 Kolejność: najbliżej zdarzenia, nie najświeżej ogłoszone.
 
 **Zasięg jest częścią odpowiedzi, nie ozdobą.** Feed Energi obejmuje cały
-powiat, więc każdy wpis niesie `zasieg` z `feed_policy.is_local_article` —
+powiat, więc każdy wpis niesie `zasieg` z `feed_policy.article_scope` —
 bez tego wyłączenie w Płośnicy szło do mieszkańca Rybna jako jego awaria.
+⚠️ `article_scope`, NIE `is_local_article`: ta druga steruje rankingiem i jest
+celowo szeroka — przepuszczała cały „Powiat Działdowski (RSS)" jako naszą
+sprawę, więc awaria w Działdowie wyglądała na awarię w Rybnie.
 
 ⚠️ To zapytanie SQL jest JEDYNYM źródłem wiedzy Strażnika o awariach. Strażnik
 nie używa RAG (`source_types = []`), więc obecność wpisu w `document_embeddings`
@@ -30,7 +33,7 @@ from sqlalchemy import func, or_, select, text
 
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Article, Source
-from src.services.feed_policy import is_local_article, publishable_conditions, time_label
+from src.services.feed_policy import article_scope, publishable_conditions, time_label
 from src.utils.logger import setup_logger
 
 logger = setup_logger("AlertTools")
@@ -103,11 +106,10 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
                 published_prefix="zgłoszono ",
             ),
             "rodzaj": _kind(article.event_at, article.event_until, now),
-            "zasieg": (
-                "gmina Rybno"
-                if is_local_article(source_name, article.title, article.content)
-                else "poza gminą Rybno"
-            ),
+            # `article_scope`, nie `is_local_article` — patrz `feed_policy`.
+            # Ta druga przepuszcza cały „Powiat Działdowski (RSS)" jako nasz,
+            # więc awaria w Działdowie szła do mieszkańca Rybna jako jego.
+            "zasieg": article_scope(source_name, article.title, article.content),
             "ogloszono": (
                 f"{_local(article.published_at):%d.%m.%Y}"
                 if article.event_at and article.published_at else None
@@ -230,7 +232,10 @@ register(Tool(
         "prądu, przerwy w dostawie wody, ostrzeżenia meteo, utrudnienia drogowe, "
         "pożary. Obejmuje zdarzenia ZAPOWIEDZIANE (do 72 h w przód) niezależnie "
         "od tego, kiedy je ogłoszono, oraz awarie z ostatnich 7 dni. Każdy wpis "
-        "ma zasięg: „gmina Rybno” albo „poza gminą Rybno”. Użyj przy KAŻDYM "
+        "ma zasięg: „gmina Rybno”, „okolice” (sąsiednie gminy powiatu) albo "
+        "„poza regionem”. Wynik niesie też liczniki: `w_gminie_rybno`, "
+        "`zapowiedziane`, `trwajace` — one rozstrzygają brzmienie odpowiedzi. "
+        "Użyj przy KAŻDYM "
         "pytaniu o awarie, prąd, wodę, zagrożenia i bezpieczeństwo."
     ),
     short="awarie i zapowiedziane wyłączenia (7 dni wstecz, 72 h w przód)",
