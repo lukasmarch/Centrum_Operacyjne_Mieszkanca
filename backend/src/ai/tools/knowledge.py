@@ -49,7 +49,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import openai
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 
 from src.ai.embeddings import embedding_service
 from src.ai.tools import Tool, ToolContext, ToolResult, register
@@ -63,6 +63,7 @@ from src.services.feed_policy import (
     publishable_conditions,
     time_label,
 )
+from src.services.feed_policy import word_stem
 from src.services.search_synonyms import expand_query
 from src.utils.logger import setup_logger
 
@@ -404,7 +405,7 @@ async def search_legal_acts(
         # nie trafia w „unieszkodliwianie wyrobów zawierających azbest”, choć
         # oba słowa w akcie są.
         for word in [w for w in query.strip().split() if len(w) > 2][:4]:
-            like = f"%{word}%"
+            like = f"%{word_stem(word)}%"
             stmt = stmt.where(or_(LegalAct.title.ilike(like),
                                   LegalAct.content.ilike(like),
                                   LegalAct.act_number.ilike(like)))
@@ -416,8 +417,23 @@ async def search_legal_acts(
     # powtarzalne między dwoma wywołaniami tego samego pytania.
     # `bip_id` rośnie z kolejnością wprowadzania do rejestru, więc przybliża
     # kolejność podejmowania w obrębie dnia.
+    porzadek = []
+    if query and query.strip():
+        # Gdy mieszkaniec PYTA O TEMAT, sama data nie wystarcza: akt, który ma
+        # szukane słowa w TYTULE, jest o tym temacie; akt, który ma je gdzieś
+        # w treści, wspomina o nim mimochodem. 25.08.2026 pytanie „plan ogólny"
+        # zwracało pięć uchwał, wśród nich żadnej właściwej — jedyna uchwała
+        # o planie ogólnym (III/20/2024) jest NAJSTARSZA w rejestrze i wypadała
+        # poza limit, przepchnięta przez akty, które słowo „ogólny" mają
+        # w uzasadnieniu.
+        trafienia = sum(
+            case((LegalAct.title.ilike(f"%{word_stem(w)}%"), 1), else_=0)
+            for w in [w for w in query.strip().split() if len(w) > 2][:4]
+        )
+        porzadek.append(trafienia.desc())
+
     stmt = stmt.order_by(
-        LegalAct.adopted_at.desc().nullslast(), LegalAct.bip_id.desc()
+        *porzadek, LegalAct.adopted_at.desc().nullslast(), LegalAct.bip_id.desc()
     ).limit(limit)
     acts = (await ctx.session.execute(stmt)).scalars().all()
 

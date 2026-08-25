@@ -289,6 +289,37 @@ def still_relevant_event(article_model, now: Optional[datetime] = None):
 MIN_EVENT_LOCALITY = 2
 
 
+# Ile znaków słowa wchodzi do dopasowania. Polszczyzna jest fleksyjna, a akt
+# prawny mówi innym przypadkiem niż mieszkaniec: pytanie „plan ogólny" nie
+# trafiało w tytuł „przystąpienia do sporządzenia planu ogólnego", bo
+# `ILIKE '%ogólny%'` nie widzi formy „ogólnego".
+#
+# Skutek był gorszy od braku odpowiedzi. 25.08.2026 na pytanie „Czy Rada
+# uchwaliła już plan ogólny gminy Rybno?" rejestr zwrócił JEDEN akt — uchwałę
+# o Strategii Rozwoju, która ma słowo „ogólny" gdzieś w treści — a agent wiernie
+# o niej opowiedział. Odpowiedź brzmiała kompetentnie, cytowała prawdziwy numer
+# i dotyczyła zupełnie innego dokumentu; właściwa uchwała III/20/2024 nie miała
+# jak się pokazać.
+#
+# Obcinamy KOŃCÓWKĘ, nie dobieramy słownika form: „ogólny" → „ogóln",
+# „uchwały" → „uchwał", „drogi" → „drog". Ten sam zabieg, co `_places_re`
+# w testach i `_organ_key` w dedupie wydarzeń.
+#
+# ⚠️ Krótszy rdzeń przepuszcza więcej szumu — i to jest tu świadomy wybór:
+# rejestr ma 430 pozycji i sortowanie po dacie, więc lepiej mieć właściwy akt
+# wśród trzech niż nie mieć go wcale. Słów krótszych niż 5 znaków nie ruszamy,
+# bo z „droga" zostałoby „dro".
+STEM_MIN_LENGTH = 5
+STEM_CUT = 2
+
+
+def word_stem(word: str) -> str:
+    """Rdzeń słowa do dopasowania LIKE — bez końcówki fleksyjnej."""
+    if len(word) < STEM_MIN_LENGTH:
+        return word
+    return word[:-STEM_CUT]
+
+
 def visible_event_conditions(event_model):
     """
     Warunki SQL „to wydarzenie pokazujemy mieszkańcowi" — dla kalendarza,

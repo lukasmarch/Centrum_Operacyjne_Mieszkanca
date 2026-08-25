@@ -50,7 +50,7 @@ from src.database.schema import Article, Event
 from src.services.time_span import to_utc
 
 
-async def main(since: datetime, apply: bool) -> int:
+async def main(since: datetime, apply: bool, force: bool = False) -> int:
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
     factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -84,6 +84,28 @@ async def main(since: datetime, apply: bool) -> int:
                 pominiete += 1          # strefa bez przesunięcia (nie zdarza się w PL)
                 continue
             do_zmiany.append((ev, nowa, wzorzec))
+
+        # BEZPIECZNIK: czy baza NIE JEST już przeliczona.
+        #
+        # `created_at` nie wystarcza — wpisy sprzed wdrożenia mają je zawsze
+        # wcześniejsze niż `--since`, więc drugie uruchomienie przesunęłoby
+        # wszystko jeszcze raz i wydarzenia wjechałyby dwie godziny w tył.
+        # Pomiar na produkcji: PRZED backfillem 0 z 33 par zgadzało się
+        # z `articles.event_at`, PO nim 27 z 33. Ta liczba jest więc pewnym
+        # świadkiem stanu bazy — pewniejszym niż jakikolwiek znacznik, który
+        # trzeba pamiętać, żeby ustawić.
+        pary = [(e, event_at[e.source_article_id]) for e in events
+                if e.source_article_id in event_at and event_at[e.source_article_id]]
+        if pary:
+            juz_utc = sum(1 for e, w in pary if e.event_date == w)
+            if juz_utc * 2 >= len(pary):
+                print(f"Baza wygląda na PRZELICZONĄ: {juz_utc}/{len(pary)} wydarzeń "
+                      f"zgadza się z articles.event_at bez żadnej konwersji.")
+                print("Powtórne przesunięcie cofnęłoby wszystkie terminy o dwie "
+                      "godziny. Przerywam.")
+                print("Jeśli mimo to wiesz, co robisz — uruchom z --force.")
+                if not force:
+                    return 1
 
         print(f"Wydarzeń z datą: {len(events)}")
         print(f"Pominiętych (już w UTC albo nowsze niż --since): {pominiete}")
@@ -134,6 +156,8 @@ if __name__ == "__main__":
                         help="ISO: wydarzenia utworzone od tej chwili są pomijane "
                              "(domyślnie: teraz)")
     parser.add_argument("--apply", action="store_true", help="zapisz zmiany")
+    parser.add_argument("--force", action="store_true",
+                        help="pomiń bezpiecznik „baza już przeliczona”")
     args = parser.parse_args()
     granica = datetime.fromisoformat(args.since) if args.since else datetime.utcnow()
-    sys.exit(asyncio.run(main(granica, args.apply)))
+    sys.exit(asyncio.run(main(granica, args.apply, args.force)))

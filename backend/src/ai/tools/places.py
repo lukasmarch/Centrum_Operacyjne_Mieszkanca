@@ -27,7 +27,8 @@ from sqlalchemy import select, text
 
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Event
-from src.services.feed_policy import time_label, visible_event_conditions
+from src.services.feed_policy import time_label, visible_event_conditions, word_stem
+from src.services.time_span import to_local
 from src.utils.logger import setup_logger
 
 logger = setup_logger("PlaceTools")
@@ -51,28 +52,55 @@ async def upcoming_events(
     except (TypeError, ValueError):
         days = 14
 
+    # Pula kandydatów rośnie, gdy model o coś PYTA. Bez tego zawężenie było
+    # pozorne: 25.08.2026 na pytanie „czy gmina planuje spotkania z mieszkańcami
+    # w sprawie planu ogólnego" narzędzie dostało `query="spotkanie
+    # z mieszkańcami"` i okno 60 dni, po czym oddało dziesięć NAJBLIŻSZYCH
+    # wydarzeń. „Spotkanie w sprawie Planu Ogólnego" z 12 września stało
+    # w kalendarzu na pozycji trzynastej i nie miało jak się pokazać — agent
+    # odpowiedział, że takich spotkań nie ma.
+    pool = MAX_EVENTS * (8 if query else 2)
+
     stmt = (
         select(Event)
         .where(Event.event_date >= ctx.now)
         .where(Event.event_date <= ctx.now + timedelta(days=days))
         .where(*visible_event_conditions(Event))
         .order_by(Event.event_date.asc())
-        .limit(MAX_EVENTS * 2)
+        .limit(pool)
     )
     rows = list((await ctx.session.execute(stmt)).scalars().all())
 
     if query:
-        # Zawężenie po słowie kluczowym robimy PO pobraniu — kalendarz gminy
-        # liczy dziesiątki pozycji, nie tysiące, a filtr w SQL-u wymagałby
-        # decyzji, które pole jest ważniejsze.
-        needle = query.strip().lower()
-        narrowed = [
-            e for e in rows
-            if needle in (e.title or "").lower()
-            or needle in (e.description or "").lower()
-            or needle in (e.location or "").lower()
-        ]
-        rows = narrowed or rows
+        # Zawężenie po słowach robimy PO pobraniu — kalendarz gminy liczy
+        # dziesiątki pozycji, nie tysiące, a filtr w SQL-u wymagałby decyzji,
+        # które pole jest ważniejsze.
+        #
+        # ⚠️ Dopasowanie idzie po SŁOWACH i po ich RDZENIACH, nie po całej
+        # frazie. Model pyta językiem pytania („spotkanie z mieszkańcami”),
+        # a kalendarz nazywa rzecz po swojemu („Spotkanie w sprawie Planu
+        # Ogólnego”) — szukanie frazy jako podłańcucha nie trafia w NIC, a że
+        # pusty wynik wraca tu do pełnej listy, filtr wyglądał na działający.
+        # Ta sama lekcja, co w `search_legal_acts._stem`.
+        slowa = [word_stem(w) for w in query.strip().lower().split() if len(w) > 2]
+        if slowa:
+            narrowed = []
+            for e in rows:
+                haystack = " ".join(
+                    (e.title or "", e.description or "", e.location or "")
+                ).lower()
+                if any(s in haystack for s in slowa):
+                    narrowed.append(e)
+            # Kolejność zostaje chronologiczna, ale wpisy trafione WIĘKSZĄ
+            # liczbą słów idą pierwsze — przy dziesięciu miejscach w odpowiedzi
+            # to decyduje, czy właściwe wydarzenie w ogóle dojdzie do modelu.
+            narrowed.sort(key=lambda e: -sum(
+                1 for s in slowa
+                if s in " ".join(
+                    (e.title or "", e.description or "", e.location or "")
+                ).lower()
+            ))
+            rows = narrowed or rows
 
     if not rows:
         return ToolResult(
@@ -93,7 +121,11 @@ async def upcoming_events(
         wydarzenia.append({
             "tytul": ev.title,
             "kiedy": time_label(None, ev.event_date, None, ctx.now),
-            "data": ev.event_date.strftime("%d.%m.%Y %H:%M") if ev.event_date else None,
+            # Czas LOKALNY, jak w `kiedy`. Baza trzyma naiwny UTC, więc surowe
+            # `strftime` podawało modelowi drugą, sprzeczną godzinę tego samego
+            # wydarzenia — konsultacje o 19:00 jako 17:00. Jedna data w jednym
+            # wyniku, inaczej model wybiera losowo, którą przepisze.
+            "data": to_local(ev.event_date).strftime("%d.%m.%Y %H:%M") if ev.event_date else None,
             "miejsce": ev.location or "",
             "kategoria": ev.category or "",
             "organizator": ev.organizer or "",

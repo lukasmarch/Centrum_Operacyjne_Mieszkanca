@@ -309,6 +309,49 @@ i `upcoming_events` na dwa dni przed terminem; razem z nią Komisja Zdrowia.
   Osobna praca, patrz TODO
 - Test: `python -m scripts.test_event_dedup` (sekcje 5 i 6, podobieństwa ZMIERZONE)
 
+## Godziny wydarzeń: kalendarz spóźniał się o dwie godziny (2026-08-25)
+**Cały projekt trzyma naiwny UTC, `EventExtractor` jako jedyny zapisywał czas LOKALNY.**
+Ten sam termin z tego samego ogłoszenia stał w bazie dwa razy: `articles.event_at`
+= 27.08 08:00 (UTC, dobrze), `events.event_date` = 27.08 10:00 (lokalny). XXIV sesja
+Rady o 10:00 pokazywała się jako 12:00, dożynki o 11:00 jako 13:00.
+- **Wynik `upcoming_events` niósł DWIE sprzeczne godziny naraz**: `data` z surowego
+  `strftime` i `kiedy` z `time_label` (który konwertuje). Model wybierał losowo —
+  obie muszą być lokalne (`to_local`), bo model przepisuje jedną z nich
+- ⚠️ **Front nie był winny i pokazywał dobrze**: `/api/events` oddawało datę BEZ
+  znacznika strefy, a `new Date("2026-08-27T10:00:00")` czyta ją jako lokalną —
+  czyli przypadkiem zgodnie z bazą. Dlatego sama poprawka zapisu ZEPSUŁABY stronę.
+  API mówi teraz wprost `…Z`; front mapuje `event_date` w jednym miejscu
+  (`useEvents.ts`) i nie wymagał wdrożenia
+- ⚠️ **Kolejność odwrotna niż przy migracjach: KOD PRZED DANYMI.** Backfill przed
+  deployem pokazałby godziny o 2 h za wcześnie
+- **Dedup liczy dobę LOKALNĄ** — wpis całodniowy to w UTC 22:00 dnia poprzedniego,
+  więc `date(event_date)` odsunęłoby go od posiedzenia o 10:00 tego samego dnia
+- Backfill: `python -u -m scripts.production.backfill_event_timezone [--apply]`
+  (✅ wykonany na prodzie 25.08, 1165 wierszy). ⚠️ Ma **bezpiecznik**: gdy ≥50 %
+  par zgadza się z `articles.event_at` bez konwersji, odmawia — `created_at` nie
+  wystarcza, bo stare wpisy mają je zawsze przed granicą i drugi przebieg cofnąłby
+  wszystko o kolejne 2 h. Pomiar: przed backfillem 0/33 zgodnych, po nim 27/33
+
+## Narzędzia wiedzy przegrywały z polską odmianą (2026-08-25)
+**Dwa narzędzia, ten sam błąd, obie odpowiedzi FAŁSZYWE i brzmiące kompetentnie.**
+- **`search_legal_acts`**: „plan ogólny" nie trafiało w tytuł „przystąpienia do
+  sporządzenia planu **ogólnego**" — `ILIKE '%ogólny%'` nie widzi formy „ogólnego".
+  Zwracało JEDNĄ uchwałę: o Strategii Rozwoju (ma „ogólny" gdzieś w treści), a agent
+  wiernie o niej opowiadał, cytując prawdziwy numer NIE TEGO dokumentu
+- **`upcoming_events`**: filtr szukał całej FRAZY jako podłańcucha, więc „spotkanie
+  z mieszkańcami" nie trafiało w „Spotkanie w sprawie Planu Ogólnego". Pusty wynik
+  wracał do pełnej listy (`narrowed or rows`) i limit ucinał 10 NAJBLIŻSZYCH —
+  właściwe spotkanie stało trzynaste. Agent odpowiedział, że takich spotkań nie ma
+- **`feed_policy.word_stem`** — jedno miejsce na obcięcie końcówki (≥5 znaków → −2):
+  „ogólny"→„ogóln", „uchwały"→„uchwał". Ten sam zabieg co `_places_re` w testach
+  i `_organ_key` w dedupie. ⚠️ Krótszy rdzeń przepuszcza szum — to świadomy wybór
+- ⚠️ **Samo dopasowanie nie wystarcza, bo LIMIT ukrywa właściwą pozycję.**
+  Po naprawie rdzenia rejestr zwracał 5 aktów i nadal bez tego właściwego:
+  III/20/2024 jest NAJSTARSZA, a sortowanie szło po dacie. Przy podanym `query`
+  pierwsza oś to teraz **liczba trafień w TYTULE** (akt z tematem w tytule jest
+  o tym temacie; akt ze słowem w uzasadnieniu wspomina mimochodem).
+  Analogicznie `upcoming_events` przy `query` bierze 8× większą pulę kandydatów
+
 ## Kto czyta RAG (stan 2026-08-24)
 **Wyszukiwarka jest NARZĘDZIEM, nie podatkiem doliczanym do każdego pytania.**
 | Agent | Wiedza | Uwagi |
@@ -625,6 +668,9 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
       (konsultacje 25.08 Rumian + 26.08 Naguszewo — drugie wpisane ręcznie).
       Ekstraktor musi zwracać listę, unikat przejść na `(source_article_id,
       event_date)`, a ochronę przed re-scrapingiem przejąć znacznik na artykule
+- [ ] Wydarzenia z `locality IS NULL` (4 z 15 przyszłych) — ocena lokalności
+      istnieje od 21.08, starsze wpisy jej nie mają. `visible_event_conditions`
+      je przepuszcza (świadomie), ale nie da się ich odróżnić od lokalnych
 - [ ] Strażnik nazywa DZISIEJSZE wyłączenie „wczorajszym" (`test_agent_answers`:
       `prad-dzis`, `prad-planowane`, `awarie` — 3 czerwone 25.08, **stan zastany**,
       sprawdzone na czystym `HEAD`). Do rozstrzygnięcia też, czy wyłączenie
