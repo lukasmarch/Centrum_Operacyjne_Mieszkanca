@@ -254,6 +254,61 @@ oraz `visible_event_conditions` dla wydarzeń.
 - „Dziś w okolicy" ma okno **jednodniowe**; wcześniej dwudniowe, więc jutrzejszy festyn
   czytało się jako dzisiejszy
 
+## Pustka narzędzia nie kończy pracy agenta (2026-08-25)
+**„Kiedy w gminie Rybno posiedzenie rady i komisji?" → „skrótów obrad jeszcze nie
+opublikowano". Cztery razy, mimo próśb „poszukaj w RAG" i „nie pytam o streszczenie
+tylko datę".** Termin XXIV sesji (27.08, 10:00) leżał w bazie w DWÓCH miejscach:
+w kalendarzu i w ogłoszeniu BIP w RAG (`search_documents` zwracał salę, godzinę
+i porządek obrad).
+- **Winne było pole `co_powiedziec`** w pustym wyniku `council_sessions`: kończyło
+  się zdaniem „NIE streszczaj obrad z pamięci ani z innych źródeł". Reguła ogólna:
+  **wynik narzędzia jest ostatnią rzeczą, jaką model czyta przed pisaniem, więc bije
+  prompt agenta.** Pustka ma kończyć się KIERUNKIEM („szukaj dalej narzędziem X"),
+  nie zamknięciem — zawsze, gdy nie jest jeszcze odpowiedzią na pytanie. Ten sam
+  wzorzec porażki co odmowa Redaktora 24.08, przesunięty o poziom: tym razem sprawę
+  zamknęło NARZĘDZIE, nie prompt
+- Zakaz zawężony do tego, co chronił: nie wolno **streszczać PRZEBIEGU**
+  niezatwierdzonej sesji (bramka akceptacji). Podanie **terminu z ogłoszenia** nigdy
+  nie było tym samym
+- `council_sessions` w opisie mówi teraz wprost: obrady, które **JUŻ SIĘ ODBYŁY**.
+  Prompt Urzędnika rozdziela „co ustalono" od „kiedy się zbiera"
+- **Urzędnik dostał `upcoming_events`** (narzędzie Przewodnika — terminy posiedzeń
+  Rady to sprawa urzędowa). Kalendarz daje etykietę liczoną od TERAZ („jutro 14:00")
+- ⚠️ **„Zawołaj jeszcze raz z innym sformułowaniem" wymaga narzędzia z pytaniem.**
+  `council_sessions` ma jedyny parametr `limit`, więc druga próba modelu wyglądała
+  tak: `limit=2` → `limit=5`. Prompt mówi teraz, że wtedy zmienia się NARZĘDZIE
+  albo woła `przekaz_dalej`
+- ⚠️ Router kierował to pytanie raz do Urzędnika, raz do Redaktora — `ROUTING_PROMPT`
+  ma teraz zdanie o pracy Rady (posiedzenie to nie impreza ani wiadomość z mediów)
+- Test: `python -m scripts.test_agent_answers --only kiedy-sesja`
+
+## Dedup wydarzeń: weto organu, nie próg (2026-08-25)
+**Kalendarz stracił XXIV sesję Rady** — dedup uznał ją za powtórkę Komisji Budżetu
+(obie 27.08, ta sama sala). Zniknęła z kalendarza, briefingu, newslettera
+i `upcoming_events` na dwa dni przed terminem; razem z nią Komisja Zdrowia.
+- **Progu tu NIE MA.** Pomiar 25.08 na 8 parach z produkcji: „XXIV sesja" vs
+  „Komisja Budżetu" (różne) = **0,909**, „Msza dziękczynna" vs „Pożegnanie księdza"
+  (jedno) = **0,790**, „MTB Etap 6" vs „Zarybinek MTB" (jedno) = **0,846**. Dwa różne
+  posiedzenia są sobie BLIŻSZE niż dwa opisy tej samej imprezy — embedding mierzy
+  temat, a temat mają identyczny
+- `event_extractor._organ_key` + weto w `same_event`: **sesja ≠ komisja X ≠ komisja Y**,
+  niezależnie od podobieństwa. ⚠️ W odróżnieniu od weta miejsca pewność semantyczna
+  go NIE znosi — wysokie podobieństwo jest tu regułą, nie wyjątkiem
+- Klucz = pierwsze słowo po „Komisji" obcięte do 6 znaków (`rewizy|budzet|skarg|
+  zdrowi|rozwoj`), więc odmiana nie tworzy drugiego organu. **Zamkniętej listy nazw
+  celowo nie ma** — nowa komisja dostanie klucz sama
+- ⚠️ **Weto godziny ODRZUCONE po pomiarze**, choć było w planie: rozbijało trafne
+  scalenie MTB (09:20 vs 08:00) i nie łapało nic ponad weto organu
+- ⚠️ **Powtórki nie mają embeddingu**, więc przegląd tego, co już scalone, jest
+  TEKSTOWY i darmowy: `python -u -m scripts.production.unmerge_wrong_organ_events
+  [--apply]` (518 par na prodzie → 1 do rozscalenia). Rozscalony wpis dostaje
+  `embedded=False`, bo bez chunku jest niewidzialny dla RAG i przyszłego dedupu
+- ⚠️ **Jedno ogłoszenie z SERIĄ terminów wciąż gubi wszystkie poza pierwszym**:
+  art. 5342 zapowiadał konsultacje w Rumianie (25.08) i w Naguszewie (26.08),
+  a częściowy unikat na `source_article_id` przepuścił jeden — drugi wpisano ręcznie.
+  Osobna praca, patrz TODO
+- Test: `python -m scripts.test_event_dedup` (sekcje 5 i 6, podobieństwa ZMIERZONE)
+
 ## Kto czyta RAG (stan 2026-08-24)
 **Wyszukiwarka jest NARZĘDZIEM, nie podatkiem doliczanym do każdego pytania.**
 | Agent | Wiedza | Uwagi |
@@ -565,6 +620,15 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
 - [ ] Widget ruchu: zdarzenie chwilowe (spadłe bele, kolizja) musi WYGASAĆ — 21.08 trasa
       do Iławy pokazywała utrudnienie z 19.08; `road_context` nie odróżnia incydentu od prac
 - [ ] Uruchomić `add_locality_and_event_dedup` + `dedupe_events --apply` (prod i lokalnie)
+- [ ] **Jedno ogłoszenie = wiele terminów**: `events` ma częściowy unikat na
+      `source_article_id`, więc ogłoszenie z serią spotkań daje JEDNO wydarzenie
+      (konsultacje 25.08 Rumian + 26.08 Naguszewo — drugie wpisane ręcznie).
+      Ekstraktor musi zwracać listę, unikat przejść na `(source_article_id,
+      event_date)`, a ochronę przed re-scrapingiem przejąć znacznik na artykule
+- [ ] Strażnik nazywa DZISIEJSZE wyłączenie „wczorajszym" (`test_agent_answers`:
+      `prad-dzis`, `prad-planowane`, `awarie` — 3 czerwone 25.08, **stan zastany**,
+      sprawdzone na czystym `HEAD`). Do rozstrzygnięcia też, czy wyłączenie
+      zakończone dwie godziny temu ma jeszcze być „awarią" dla wyroczni
 - [ ] Sesje rady: miejsce na froncie + decyzja, czy przepisać sesję XXIII na
       produkcji (~$0,59) — bez tego rejestr obrad jest pusty
 - [ ] GUS-Analityk: `_classify_gus_query` → narzędzie `gus_series` (ostatnia heurystyka);
@@ -591,4 +655,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-08-24*
+*Ostatnia aktualizacja: 2026-08-25*

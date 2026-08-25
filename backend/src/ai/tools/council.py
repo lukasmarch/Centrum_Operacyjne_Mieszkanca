@@ -85,15 +85,37 @@ async def council_sessions(ctx: ToolContext, limit: int = DEFAULT_LIMIT) -> Tool
         # Rozróżnienie, które musi dotrzeć do mieszkańca: to nie jest „nie ma
         # obrad", tylko „nie ma jeszcze SPRAWDZONEGO skrótu". Nagrania są
         # publiczne i można ich posłuchać.
+        #
+        # ⚠️ Pustka NIE JEST końcem pracy — 25.08.2026 była. Mieszkaniec zapytał
+        # „kiedy w gminie Rybno posiedzenie rady i komisji", Urzędnik zawołał to
+        # narzędzie, dostał pustkę i cztery razy z rzędu odpowiedział „skrótów
+        # jeszcze nie opublikowano", mimo dwóch próśb o szukanie dalej. Termin
+        # XXIV sesji leżał w tym czasie i w kalendarzu (`upcoming_events`),
+        # i w ogłoszeniu BIP w RAG (`search_documents` zwracał salę, godzinę
+        # i porządek obrad). Zawinił TEN tekst: wynik narzędzia jest ostatnią
+        # rzeczą, jaką model czyta przed pisaniem, więc „odeślij do BIP" bije
+        # każdą instrukcję z promptu. Zakaz zostaje, ale zawężony do tego, co
+        # chronił: nie wolno STRESZCZAĆ PRZEBIEGU niezatwierdzonej sesji.
+        # Podanie terminu z ogłoszenia nigdy nie było tym samym.
         return ToolResult(
             content={
                 "info": "Żaden skrót obrad nie został jeszcze zatwierdzony do publikacji.",
                 "co_powiedziec": (
-                    "Powiedz, że skrótów obrad jeszcze nie publikujemy — każdy "
-                    "przechodzi sprawdzenie przez człowieka, zanim trafi na stronę. "
-                    "Odeślij po nagrania i protokoły do BIP Gminy Rybno "
-                    "(bip.gminarybno.pl, „Protokoły z sesji”). NIE streszczaj obrad "
-                    "z pamięci ani z innych źródeł."
+                    "To narzędzie zna tylko PRZEBIEG obrad, które już się odbyły, "
+                    "i nic takiego nie jest jeszcze zatwierdzone do publikacji.\n"
+                    "Jeśli pytanie dotyczy TERMINU posiedzenia — kiedy się zbiera "
+                    "Rada albo komisja, o której godzinie, co będzie w porządku "
+                    "obrad — to NIE JEST pytanie o skrót i masz szukać dalej: "
+                    "zawołaj upcoming_events (kalendarz zna datę i godzinę), "
+                    "a potem search_documents (ogłoszenia BIP o sesjach i "
+                    "posiedzeniach komisji). Dopiero gdy oba wrócą puste, "
+                    "powiedz, że terminu nie znasz.\n"
+                    "Jeśli pytanie dotyczy PRZEBIEGU obrad: powiedz, że skrótów "
+                    "jeszcze nie publikujemy — każdy przechodzi sprawdzenie przez "
+                    "człowieka, zanim trafi na stronę — i odeślij po nagrania "
+                    "i protokoły do BIP Gminy Rybno (bip.gminarybno.pl, "
+                    "„Protokoły z sesji”). Przebiegu NIE streszczaj z pamięci "
+                    "ani z innych źródeł."
                 ),
             },
             empty=True,
@@ -146,10 +168,15 @@ async def council_sessions(ctx: ToolContext, limit: int = DEFAULT_LIMIT) -> Tool
 register(Tool(
     name="council_sessions",
     description=(
-        "Skróty obrad Rady Gminy Rybno: co Rada omawiała, co ustaliła, jak "
-        "głosowała, kto zabierał głos, wraz z numerami podjętych uchwał. "
-        "Używaj przy pytaniach o SESJE i obrady („co było na ostatniej sesji”, "
-        "„co Rada uchwaliła w czerwcu”, „czy radni rozmawiali o drodze”). "
+        "PRZEBIEG obrad Rady Gminy Rybno, które JUŻ SIĘ ODBYŁY: co Rada "
+        "omawiała, co ustaliła, jak głosowała, kto zabierał głos, wraz "
+        "z numerami podjętych uchwał. Używaj przy pytaniach o to, CO BYŁO "
+        "(„co było na ostatniej sesji”, „co Rada uchwaliła w czerwcu”, „czy "
+        "radni rozmawiali o drodze”). "
+        "NIE UŻYWAJ do pytań o TERMIN — „kiedy jest sesja”, „kiedy zbiera się "
+        "komisja”, „co będzie w porządku obrad” dotyczą posiedzenia, które "
+        "dopiero nastąpi: to upcoming_events (data i godzina z kalendarza) "
+        "oraz search_documents (ogłoszenie BIP z salą i porządkiem obrad). "
         "Zwraca WYŁĄCZNIE skróty zatwierdzone przez człowieka — gdy nic nie "
         "wraca, znaczy to, że skrót jeszcze nie został sprawdzony, a NIE że "
         "sesji nie było. Pytania o sam akt prawny (numer, status, data wejścia "
@@ -167,5 +194,8 @@ register(Tool(
     },
     fn=council_sessions,
     status_message="Czytam skróty obrad Rady…",
-    short="skróty obrad Rady Gminy (tylko zatwierdzone przez człowieka)",
+    short=(
+        "przebieg obrad Rady, które już się odbyły (tylko skróty zatwierdzone "
+        "przez człowieka) — nie terminy przyszłych posiedzeń"
+    ),
 ))

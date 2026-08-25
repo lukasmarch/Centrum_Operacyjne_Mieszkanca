@@ -57,6 +57,10 @@ Dostepni agenci i ich INTENCJE:
   TU TEZ trafiaja pytania o to, JAK GMINA JEST ZBUDOWANA I KTO NIA KIERUJE:
   "ile gmina ma solectw", "jakie sa solectwa", "kto jest wojtem", "ilu jest radnych",
   "gdzie jest urzad gminy", "jakie sa jednostki organizacyjne", "jaki jest statut gminy"
+  TU TEZ trafia PRACA RADY GMINY - i te, ktore juz byly, i te dopiero zapowiedziane:
+  "kiedy jest sesja Rady", "kiedy zbiera sie komisja", "co bedzie w porzadku obrad",
+  "co ustalono na ostatniej sesji". Posiedzenie Rady nie jest impreza (przewodnik)
+  ani wiadomoscia z mediow (redaktor) - to praca organu gminy.
 
 - gus_analityk: chce STATYSTYK HISTORYCZNYCH I DANYCH LICZBOWYCH z GUS
   Przykladowe pytania: "ile wynosi bezrobocie w powiecie?", "jaki jest PKB gminy?",

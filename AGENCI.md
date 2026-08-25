@@ -463,7 +463,113 @@ byłaby gorsza od jej braku.
 
 ---
 
-## 5. Kto ma jakie narzędzia (stan 24.08.2026)
+### 4.12 Pustka narzędzia nie kończy pracy (etap 8, 25.08.2026)
+
+**„Kiedy w gminie Rybno posiedzenie rady i komisji?" → „skrótów obrad jeszcze
+nie opublikowano". Cztery razy z rzędu, mimo dwóch próśb o szukanie dalej
+(„poszukaj w RAG", „nie pytam o streszczenie tylko datę").** Termin XXIV sesji
+Rady leżał wtedy w bazie w dwóch miejscach: w kalendarzu (`upcoming_events`)
+i w ogłoszeniu BIP w RAG — `search_documents("kiedy sesja Rady Gminy Rybno")`
+zwracał salę, godzinę i pełny porządek obrad.
+
+**Zawiniło pole `co_powiedziec` w pustym wyniku `council_sessions`**, które
+kończyło się zdaniem „NIE streszczaj obrad z pamięci ani z innych źródeł".
+Model wykonał je co do joty — tak samo jak Redaktor 24.08 wykonał blok
+świadomości i odmówił nad pełną bazą (4.10). Wzorzec porażki jest ten sam,
+przesunięty o poziom: **tym razem to narzędzie zamknęło sprawę, zamiast oddać
+sterowanie pętli**.
+
+To jest reguła ogólna, nie ciekawostka o jednym polu: **wynik narzędzia jest
+ostatnią rzeczą, jaką model czyta przed pisaniem odpowiedzi, więc bije prompt
+agenta.** Instrukcja w `co_powiedziec` musi kończyć się kierunkiem („szukaj
+dalej narzędziem X"), a nie zamknięciem („odeślij do BIP"), za każdym razem,
+gdy pustka tego narzędzia nie jest jeszcze odpowiedzią na pytanie.
+
+Cztery zmiany, wszystkie w tę stronę:
+
+1. **`council_sessions` przy pustce kieruje dalej.** Zakaz zostaje, ale
+   zawężony do tego, co chronił: nie wolno **streszczać PRZEBIEGU**
+   niezatwierdzonej sesji (bramka akceptacji, 4.9). Podanie **terminu
+   z ogłoszenia** nigdy nie było tym samym.
+2. **Opis narzędzia mówi wprost: to obrady, które JUŻ SIĘ ODBYŁY.** Pytania
+   „kiedy jest sesja", „co będzie w porządku obrad" mają jawnie wskazany adres.
+3. **Prompt Urzędnika rozdziela „co ustalono" od „kiedy się zbiera".** Do 25.08
+   każde pytanie o sesje szło do `council_sessions`.
+4. **Urzędnik dostał `upcoming_events`** — narzędzie Przewodnika, ale terminy
+   posiedzeń Rady to sprawa urzędowa i mieszkaniec pyta o nie Urzędnika.
+   Kalendarz daje etykietę liczoną od TERAZ („jutro 14:00"), czego wyszukiwarka
+   dać nie może.
+
+⚠️ **„Zawołaj jeszcze raz z innym sformułowaniem" wymaga narzędzia z pytaniem.**
+`council_sessions` ma jedyny parametr `limit`, więc druga próba modelu wyglądała
+tak: `limit=2` → `limit=5`. Prompt Urzędnika mówi teraz wprost, że przy takim
+narzędziu przeformułowania NIE MA i trzeba zmienić narzędzie albo wywołać
+`przekaz_dalej`.
+
+⚠️ **Router też o tym nie wiedział** — „Kiedy w gminie Rybno posiedzenie rady
+i komisji?" trafiało raz do Urzędnika, raz do Redaktora. Posiedzenie Rady nie
+jest imprezą (przewodnik) ani wiadomością z mediów (redaktor); `ROUTING_PROMPT`
+ma teraz o tym zdanie.
+
+Test: `python -m scripts.test_agent_answers --only kiedy-sesja` — wyrocznia
+liczy najbliższe posiedzenia z kalendarza (ta sama bramka `canonical_id IS NULL`,
+przez którą patrzy narzędzie), więc przypadek zaświeci na czerwono także wtedy,
+gdy dedup znów zlepi sesję z komisją.
+
+---
+
+### 4.13 Dedup wydarzeń: weto organu (25.08.2026)
+
+**Kalendarz stracił XXIV sesję Rady** — dedup uznał ją za powtórkę Komisji
+Budżetu i Finansów, bo obie wypadły 27.08 w tej samej sali. Zniknęła
+z kalendarza, briefingu, newslettera i `upcoming_events` na dwa dni przed
+terminem. Razem z nią Komisja Zdrowia.
+
+**Progu tu nie ma i nie da się go dostroić.** Pomiar z 25.08 na ośmiu parach
+z produkcji:
+
+| ocena | podobieństwo | para |
+|---|---|---|
+| ❌ różne | **0,909** | XXIV sesja Rady vs Komisja Budżetu |
+| ❌ różne | 0,893 | Komisja Rozwoju vs Komisja Budżetu |
+| ✅ jedno | 0,846 | „MTB Etap 6" vs „Zarybinek MTB Classic" |
+| ❌ różne | 0,817 | Komisja Zdrowia vs Komisja Budżetu |
+| ✅ jedno | 0,790 | „Msza dziękczynna" vs „Pożegnanie księdza Tomasza" |
+
+Dwa różne posiedzenia są sobie **bliższe** niż dwa opisy tego samego wydarzenia.
+Embedding mierzy temat, a temat mają identyczny — różni je nazwa organu, czyli
+dokładnie ten fragment tytułu, który dla kosinusa jest szumem.
+
+Stąd `_organ_key(title)` i weto w `same_event`: **sesja ≠ komisja X ≠ komisja Y,
+niezależnie od podobieństwa.** W odróżnieniu od weta miejsca pewność semantyczna
+go NIE znosi (`PLACE_VETO_MAX_SIMILARITY` nie ma tu odpowiednika) — właśnie
+dlatego, że wysokie podobieństwo jest tu regułą, nie wyjątkiem.
+
+Klucz bierze pierwsze słowo po „Komisji" obcięte do 6 znaków, więc
+`rewizy|budzet|skarg|zdrowi|rozwoj` rozdzielają się same, a „Komisja Rewizyjna"
+i „Komisji Rewizyjnej" dają jeden klucz. **Zamkniętej listy nazw celowo nie ma**:
+nowa komisja dostanie swój klucz sama, zamiast po cichu wpaść do wspólnego worka.
+
+⚠️ **Weto godziny zostało ODRZUCONE po pomiarze**, choć było w planie. Obie
+godziny znane i różniące się > 30 min rozbijałoby jedno trafne scalenie (MTB,
+09:20 vs 08:00 — ta sama impreza z dwóch źródeł) i nie naprawiało nic ponad to,
+co łapie weto organu. Nie da się go uratować progiem zniesienia: MTB (0,846)
+leży PONIŻEJ sesji (0,909).
+
+⚠️ **Powtórki nie mają embeddingu** (ekstraktor zapisuje tylko wzorce), więc
+przegląd tego, co już się scaliło, musi być tekstowy. `_organ_key` czyta tytuły,
+więc przejrzenie 518 par kosztowało zero:
+`python -u -m scripts.production.unmerge_wrong_organ_events [--apply]`.
+Rozscalony wpis dostaje `embedded = False` — bez chunku jest niewidzialny dla
+przyszłego dedupu i dla RAG, a `_embed_events` nie ma okna czasowego i dobierze
+go przy najbliższym przebiegu.
+
+Test: `python -m scripts.test_event_dedup` (sekcje 5 i 6 — podobieństwa
+w przypadkach są ZMIERZONE, żeby nikt nie wrócił do strojenia progu).
+
+---
+
+## 5. Kto ma jakie narzędzia (stan 25.08.2026)
 
 | Agent | Narzędzia | Uwagi |
 |---|---|---|
@@ -471,7 +577,7 @@ byłaby gorsza od jej braku.
 | **Organizator** | `waste_schedule`, `cinema_repertoire`, `clinic_schedule`, `pharmacy_duty`, `institution_info` | zniknął `INTENT_KEYWORDS`; `office_hours` **zastąpione** przez `institution_info` (4.11) |
 | **Strażnik** | `active_alerts`, `citizen_reports` | ⚠️ `active_alerts` to **jedyne** źródło jego wiedzy o awariach — nie używa RAG |
 | **Redaktor** | `latest_local_news`, `search_news` | zniknął regex `_GENERIC_QUESTION` i blok „ŚWIEŻY FEED" z `extra_context` |
-| **Urzędnik** | `search_legal_acts`, `council_sessions`, `search_documents` | zniknął retrieval przed każdym pytaniem; cztery poziomy odpowiedzi zostają |
+| **Urzędnik** | `search_legal_acts`, `council_sessions`, `search_documents`, `upcoming_events` | zniknął retrieval przed każdym pytaniem; cztery poziomy odpowiedzi zostają. `upcoming_events` **dzielone z Przewodnikiem** — terminy posiedzeń Rady to sprawa urzędowa (4.12) |
 | GUS-Analityk | — (własny SQL + `chart_data`) | `_classify_gus_query` czeka na swoją kolej; **jedyny bez `przekaz_dalej`** |
 | **Koordynator** | `zapytaj_*` × 6 (etap 7) | narzędziami są inni agenci; `can_handoff = False`, nie jest celem delegacji |
 

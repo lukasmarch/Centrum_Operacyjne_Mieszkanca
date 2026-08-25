@@ -17,6 +17,14 @@ kiedy go potrzebuje.
    Mieszkaniec musi wiedzieć, czy czyta dokument gminy, czy ogólną procedurę;
 3. pytanie spoza administracji — wskaż właściwego agenta.
 
+**Etap 8 (25.08.2026): dostał kalendarz i rozdzielenie obrad od terminów.**
+„Kiedy w gminie Rybno posiedzenie rady i komisji" wracało czterokrotnie jako
+„skrótów obrad jeszcze nie opublikowano" — bo prompt kierował KAŻDE pytanie
+o sesje do `council_sessions`, a to narzędzie zna wyłącznie przebieg obrad,
+które już były. Termin XXIV sesji stał w tym czasie w kalendarzu i w ogłoszeniu
+BIP. Pytanie o TERMIN idzie teraz do `upcoming_events`, a po szczegóły
+(sala, porządek obrad) do `search_documents`.
+
 **Etap 4 (24.08.2026): dostał rejestr aktów prawnych.** `search_legal_acts`
 odpowiada na „jakie są najnowsze uchwały" zapytaniem po dacie — to rejestr,
 nie wyszukiwarka. Pełne teksty uchwał są równocześnie w RAG, więc
@@ -37,22 +45,38 @@ class UrzednikAgent(BaseAgent):
     model = "gpt-4o"
     temperature = 0.2
 
-    tools = ["search_legal_acts", "council_sessions", "search_documents"]
+    # `upcoming_events` to narzędzie Przewodnika, ale terminy posiedzeń Rady
+    # i komisji są sprawą urzędową i mieszkaniec pyta o nie Urzędnika (25.08.2026:
+    # „kiedy w gminie Rybno posiedzenie rady i komisji"). Kalendarz daje to,
+    # czego wyszukiwarka dać nie może — etykietę czasu liczoną od TERAZ
+    # („jutro 14:00”), więc agent nie musi porównywać dat samodzielnie.
+    tools = [
+        "search_legal_acts", "council_sessions", "search_documents",
+        "upcoming_events",
+    ]
 
     system_prompt = """Jestes Urzednikiem - asystentem ds. administracji publicznej Centrum Operacyjnego Mieszkanca RybnoLive.
 Twoja specjalizacja: BIP (Biuletyn Informacji Publicznej), procedury urzedowe, podatki i oplaty,
 ochrona srodowiska, gospodarka odpadami, fundusz solecki, regulacje gminne.
 
 JAK PRACUJESZ:
-- Masz DWA narzedzia i wybor miedzy nimi jest wazna decyzja:
+- Masz CZTERY narzedzia i wybor miedzy nimi jest wazna decyzja:
   * pytanie o UCHWALY albo ZARZADZENIA - o numer, date, status, o to, ktore sa
     najnowsze, czy byla uchwala w danej sprawie -> search_legal_acts. To rejestr:
     zwraca numer aktu, date podjecia, date wejscia w zycie i status. Pytanie
     "jakie sa najnowsze uchwaly" NIE jest zadaniem dla wyszukiwarki tresci.
-  * pytanie o SESJE Rady i obrady - co omawiano, co ustalono, jak glosowano,
-    kto zabieral glos -> council_sessions. Zwraca WYLACZNIE skroty sprawdzone
-    przez czlowieka; pusty wynik znaczy "skrot jeszcze nieopublikowany", a NIE
-    "sesji nie bylo" - i tak wlasnie masz to powiedziec.
+  * pytanie o PRZEBIEG obrad, ktore JUZ SIE ODBYLY - co omawiano, co ustalono,
+    jak glosowano, kto zabieral glos -> council_sessions. Zwraca WYLACZNIE
+    skroty sprawdzone przez czlowieka; pusty wynik znaczy "skrot jeszcze
+    nieopublikowany", a NIE "sesji nie bylo" - i tak wlasnie masz to powiedziec.
+  * pytanie o TERMIN posiedzenia - kiedy jest sesja Rady, kiedy zbiera sie
+    komisja, o ktorej godzinie, gdzie, co bedzie w porzadku obrad -> najpierw
+    upcoming_events (kalendarz zna date i godzine kazdego posiedzenia i podaje
+    je jako "jutro 14:00"), potem search_documents (ogloszenie BIP z sala
+    i pelnym porzadkiem obrad). To NIE jest zadanie dla council_sessions:
+    tamto narzedzie zna wylacznie obrady, ktore juz byly. Pusty wynik
+    council_sessions NIE JEST odpowiedzia na pytanie o termin - gdy go
+    dostaniesz przy takim pytaniu, szukaj dalej.
   * pytanie o TRESC dokumentu, procedure, program, stawke, wniosek -> search_documents.
     Ono czyta rowniez pelne teksty uchwal, wiec gdy rejestr wskaze akt, a
     mieszkaniec pyta CO W NIM JEST - siegnij po search_documents z tematem aktu.
@@ -70,6 +94,12 @@ JAK PRACUJESZ:
   "nieodplatna pomoc prawna".
 - Gdy pierwszy wynik jest pusty albo nie o tym - wolaj JESZCZE RAZ z innym
   sformulowaniem, zanim uznasz, ze nic nie ma. Masz na to miejsce.
+- Gdy puste narzedzie NIE MA parametru zapytania (council_sessions, gdzie
+  wybierasz tylko liczbe sesji), przeformulowanie nie istnieje - zmiana limitu
+  z 2 na 5 nie jest druga proba. Wtedy siegasz po INNE narzedzie albo, gdy
+  zadne twoje nie moze tego wiedziec, wolasz przekaz_dalej. Powtorzenie tego
+  samego wywolania i napisanie tej samej odpowiedzi drugi raz to nie jest
+  odpowiedz na dopytanie mieszkanca.
 - JEDYNY wyjatek od wolania narzedzia: pytanie o USTROJ GMINY (solectwa, wojt,
   radni, jednostki organizacyjne, adres i kontakt urzedu). To sa dane pewne
   z faktow o gminie, ktore masz w kontekscie - odpowiedz wprost, bez narzedzia

@@ -190,6 +190,35 @@ async def _straznik_context_at_incident(session: AsyncSession, question: str) ->
     return json.dumps(result.content, ensure_ascii=False, default=str)
 
 
+async def _session_date_probe(session: AsyncSession, question: str) -> str:
+    """Materiał na pytanie o TERMIN posiedzenia — z OBU narzędzi terminu.
+
+    Trzy narzędzia, trzy różne odpowiedzi na to samo pytanie, i o to tu chodzi:
+    `council_sessions` zna wyłącznie obrady, które JUŻ BYŁY (25.08 zwróciło
+    pustkę i Urzędnik na tym poprzestał — czterokrotnie), `upcoming_events`
+    ma datę i godzinę, `search_documents` ma ogłoszenie BIP z salą i porządkiem
+    obrad. Sonda bierze wszystkie trzy, żeby czerwony wynik mówił, KTÓRE
+    z nich zawiodło.
+    """
+    import json
+
+    from src.ai.tools import ToolContext
+    from src.ai.tools.council import council_sessions
+    from src.ai.tools.knowledge import search_documents
+    from src.ai.tools.places import upcoming_events
+
+    ctx = ToolContext(session=session)
+    obrady = await council_sessions(ctx)
+    kalendarz = await upcoming_events(ctx, days=30)
+    dokumenty = await search_documents(ctx, query=question)
+
+    return json.dumps({
+        "council_sessions": obrady.content,
+        "upcoming_events": kalendarz.content,
+        "search_documents": dokumenty.content,
+    }, ensure_ascii=False, default=str)
+
+
 async def _documents_probe(session: AsyncSession, question: str) -> str:
     """Materiał Urzędnika — przez NARZĘDZIE, nie przez własną kopię retrievalu.
 
@@ -610,6 +639,68 @@ async def oracle_latest_acts(session: AsyncSession) -> Expect:
     )
 
 
+async def oracle_next_session(session: AsyncSession) -> Expect:
+    """Najbliższe posiedzenie Rady albo komisji — z kalendarza, niezależnie od agenta.
+
+    Pytanie ze zrzutu z 25.08: „Kiedy w gminie Rybno posiedzenie rady i komisji".
+    Urzędnik odpowiedział „skrótów obrad jeszcze nie opublikowano" — cztery razy,
+    mimo dwóch próśb o szukanie dalej. Termin XXIV sesji (27.08, 10:00) leżał
+    wtedy i w kalendarzu, i w ogłoszeniu BIP w RAG.
+
+    ⚠️ Wyrocznia pyta o to, co widzi KALENDARZ (`canonical_id IS NULL`), bo to
+    ta sama bramka, przez którą patrzy narzędzie. Gdy dedup znów zlepi sesję
+    z komisją, przypadek ma zaświecić na czerwono — 24.08 zlepił i nikt tego
+    nie zauważył przez dwa dni.
+    """
+    rows = (await session.execute(
+        text("""
+            SELECT title, event_date FROM events
+            WHERE event_date >= now()
+              AND event_date <= now() + interval '30 days'
+              AND canonical_id IS NULL
+              AND locality >= :min_locality
+              AND (title ILIKE '%sesj%' OR title ILIKE '%komisj%')
+            ORDER BY event_date
+            LIMIT 5
+        """),
+        {"min_locality": feed_policy.MIN_EVENT_LOCALITY},
+    )).all()
+
+    if not rows:
+        return Expect(skip="w kalendarzu nie ma posiedzenia na najbliższe 30 dni")
+
+    # Baza trzyma naiwny UTC, a model pisze czasem lokalnym — posiedzenie
+    # o 22:30 UTC jest „jutro" dla mieszkańca. `_date_re` zna oba zapisy daty
+    # i sam dokłada „dziś"/„jutro", gdy termin na to zasługuje.
+    #
+    # ⚠️ Wymagamy DOWOLNEJ z najbliższych dat, nie akurat pierwszej. Pytanie
+    # brzmi „rady i komisji", a to są różne terminy w różne dni: 25.08 model
+    # podał sesję Rady (27.08), gdy pierwszym wpisem w kalendarzu była komisja
+    # (26.08) — odpowiedź prawdziwą i użyteczną. Testem jest to, czy agent
+    # podaje TERMIN Z KALENDARZA zamiast odmowy, a nie to, który z nich wybrał.
+    daty = {
+        r[1].replace(tzinfo=UTC).astimezone(LOCAL_TZ).date() for r in rows
+    }
+    wzorzec_daty = "|".join(f"(?:{_date_re(d)})" for d in sorted(daty))
+    najblizsze = rows[0]
+
+    return Expect(
+        fact=(f"najbliższe posiedzenie: {najblizsze[0][:52]} — "
+              f"{najblizsze[1].strftime('%d.%m.%Y %H:%M')}"
+              f" (w oknie 30 dni: {len(rows)})"),
+        must_any=[("data posiedzenia z kalendarza", wzorzec_daty)],
+        must_not=[
+            # Zdanie, którym agent zamknął sprawę 25.08. Jest PRAWDZIWE
+            # (skrótów faktycznie nie ma) i właśnie dlatego groźne: brzmi jak
+            # odpowiedź, a odpowiedzią na pytanie o termin nie jest.
+            ("odesłanie do skrótów obrad zamiast terminu",
+             r"skrot(y|ow)?\s+(ostatnich\s+)?posiedzen.{0,40}nie\s+(zostal|sa)"),
+            ("wyparcie się kalendarza przy pełnej bazie", NO_KNOWLEDGE),
+        ],
+        must_in_context=[("data posiedzenia w materiale agenta", wzorzec_daty)],
+    )
+
+
 async def oracle_azbest(session: AsyncSession) -> Expect:
     result = await session.execute(
         text("""
@@ -817,6 +908,14 @@ CASES: list[Case] = [
         oracle=oracle_azbest,
         probe=_documents_probe,
         why="mowa potoczna ('eternit') kontra język BIP ('azbest') — bramka synonimów",
+    ),
+    Case(
+        id="kiedy-sesja",
+        question="Kiedy w gminie Rybno posiedzenie rady i komisji?",
+        agent="urzednik",
+        probe=_session_date_probe,
+        oracle=oracle_next_session,
+        why="pytanie ze zrzutu 25.08 — cztery razy „skrótów obrad nie ma” zamiast terminu",
     ),
     Case(
         id="uchwaly",
