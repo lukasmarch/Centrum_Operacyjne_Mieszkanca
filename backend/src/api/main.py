@@ -508,6 +508,18 @@ async def get_upcoming_events(
     for event, source_name in rows:
         d = event.dict()
         d["source_name"] = source_name
+        # Znacznik strefy jest tu KONIECZNY, odkąd `event_date` trzyma naiwny UTC
+        # (jak reszta bazy). Bez „Z" przeglądarka czyta „2026-08-27T08:00:00" jako
+        # czas lokalny i pokazuje sesję Rady o 8:00 zamiast o 10:00 — a wpis
+        # całodniowy (22:00 dnia poprzedniego w UTC) wyglądałby na wieczór
+        # przeddzień i `isAllDay` przestałoby go rozpoznawać.
+        # Front mapuje `event_date` w jednym miejscu (`useEvents.ts`) i przepuszcza
+        # przez `new Date(...)`, więc oznaczona strefa wystarcza — bez niej ta sama
+        # data znaczyłaby co innego po obu stronach.
+        for pole in ("event_date", "end_date"):
+            wartosc = d.get(pole)
+            if isinstance(wartosc, datetime):
+                d[pole] = wartosc.isoformat() + "Z"
         output.append(d)
     return output
 

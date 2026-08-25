@@ -40,6 +40,7 @@ from src.config import settings
 from src.database.schema import Article, Event
 from src.services.alert_policy import places_in
 from src.services.feed_policy import MIN_EVENT_LOCALITY
+from src.services.time_span import to_local, to_utc
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 
@@ -316,7 +317,13 @@ async def find_duplicate(
     embedding stawiał je bliżej siebie niż dwa opisy jednej mszy. Bez tytułu
     (wywołanie ze starszego kodu) weto organu po prostu nie działa.
     """
-    day = event_date.date()
+    # Doba LOKALNA, nie UTC. Od chwili, gdy `event_date` trzyma naiwny UTC,
+    # wydarzenie całodniowe (00:00 czasu lokalnego) leży w bazie jako 22:00 dnia
+    # POPRZEDNIEGO — grupowanie po `date(event_date)` rozdzieliłoby je od
+    # posiedzenia o 10:00 tego samego dnia i dedup przestałby je widzieć.
+    # Ta sama poprawka co w `alert_policy.signature` (sygnatura liczy dobę
+    # lokalną, bo Energa zapowiada jeden dzień kilkoma wpisami).
+    day = to_local(event_date).date()
     embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
 
     # Wykluczenie wchodzi do zapytania jako FRAGMENT SQL, nie jako parametr
@@ -338,7 +345,7 @@ async def find_duplicate(
         FROM events e
         JOIN document_embeddings d
           ON d.source_type = 'event' AND d.source_id = e.id AND d.chunk_index = 0
-        WHERE date(e.event_date) = :day
+        WHERE date(e.event_date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Warsaw') = :day
           AND e.canonical_id IS NULL
           {exclude_clause}
         ORDER BY sim DESC
@@ -476,6 +483,22 @@ URL: {article.url}
                     f"Event '{event_data.title}' has no date - skipping (article {article.id})"
                 )
                 return None
+
+            # Model dostaje i zwraca czas LOKALNY (tak stoi w ogłoszeniu: „o godz.
+            # 12:00"), a baza trzyma naiwny UTC — jak cała reszta projektu.
+            # `article_processor._event_stamp` robiło tę konwersję od początku,
+            # ekstraktor wydarzeń jako jedyny jej nie robił: ten sam termin
+            # z tego samego ogłoszenia stał w `articles.event_at` jako 10:00 UTC,
+            # a w `events.event_date` jako 10:00 „UTC", czyli 12:00 lokalnego.
+            #
+            # Widać to było w wyniku `upcoming_events`, gdzie jedno wydarzenie
+            # niosło DWIE sprzeczne godziny naraz — `data` z surowego strftime
+            # (zgodna z ogłoszeniem) i `kiedy` z `time_label`, który dokładał
+            # przesunięcie strefy. XXIV sesja Rady z 27.08 o 10:00 pokazywała się
+            # mieszkańcowi jako 12:00.
+            event_data.event_date = to_utc(event_data.event_date)
+            if event_data.end_date:
+                event_data.end_date = to_utc(event_data.end_date)
 
             # Termin poza rozsądnym oknem to prawie zawsze pomyłka modelu (zwykle
             # zły rok) albo relacja przebrana za zapowiedź. Te same progi, co
