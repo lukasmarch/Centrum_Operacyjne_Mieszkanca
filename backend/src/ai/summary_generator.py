@@ -574,27 +574,40 @@ class SummaryGenerator:
             return float("inf")
         return abs((stamp - now).total_seconds()) / 3600
 
-    # Hierarchia ważności kategorii (niższy = ważniejszy)
+    # Hierarchia ważności kategorii (niższy = ważniejszy).
+    #
+    # Numeracja dziesiątkami, żeby wstawienie kategorii nie wymagało ułamka
+    # ani przestawienia całej tabeli. Kolejność względna nie zmieniła się od
+    # 25.08.2026 — doszły dwie pozycje.
+    #
+    # ⚠️ „Urząd" był workiem: 133 widoczne wpisy na 30 dni, czyli 28% całej
+    # treści, przy 84 w Kulturze i 72 w Awarii. Wchodziła tam kronika policyjna
+    # (45 wpisów KPP — prompt kierował ją tu wprost), zbiórki, zguby i sprawy
+    # parafii. Priorytet 30 znaczył więc, że „zatrzymano złodzieja roweru
+    # w Działdowie" i „zgubiono okulary w Hartowcu" konkurują o nagłówek dnia
+    # z sesją Rady Gminy. Stąd „Bezpieczeństwo" i „Społeczność".
     CATEGORY_PRIORITY = {
         "Awaria": 0,
-        "Zdrowie": 1,
-        "Transport": 2,
-        "Urząd": 3,
-        "Biznes": 4,
-        "Edukacja": 5,
-        "Kultura": 6,
-        "Sport": 7,
-        "Rekreacja": 8,
-        "Nieruchomości": 9,
+        "Zdrowie": 10,
+        "Transport": 20,
+        "Urząd": 30,
+        "Bezpieczeństwo": 40,
+        "Biznes": 50,
+        "Edukacja": 60,
+        "Kultura": 70,
+        "Społeczność": 80,
+        "Sport": 90,
+        "Rekreacja": 100,
+        "Nieruchomości": 110,
     }
 
     # Kategoria spoza tabeli — za wszystkim, co potrafimy nazwać
-    UNKNOWN_CATEGORY_PRIORITY = 10
+    UNKNOWN_CATEGORY_PRIORITY = 120
 
     # Awaria, która nie jest sprawą najbliższych godzin. Zapowiedź zostaje
     # w briefingu, ale przestaje być kandydatem na nagłówek — o remis z równie
     # odległą kategorią rozstrzyga bliskość w czasie.
-    DISTANT_ALERT_PRIORITY = 9
+    DISTANT_ALERT_PRIORITY = 110
 
     # Zapowiedziane wyłączenie planowe: dziś obowiązuje, ale nie dzieje się jeszcze.
     # Stoi za sprawami, po których mieszkaniec ma coś ZROBIĆ (Zdrowie, Transport,
@@ -610,10 +623,10 @@ class SummaryGenerator:
     # Awaria NIEPLANOWANA i wyłączenie TRWAJĄCE zostają na priorytecie 0 —
     # „nie mam prądu teraz" jest wiadomością dnia, „wyłączą mi prąd o 9:30"
     # jest informacją użytkową, którą i tak niesie karta alertu i push.
-    # Ułamek, bo miejsce jest MIĘDZY dwiema kategoriami, a nie na miejscu
-    # którejś z nich: remis z Edukacją oddawałby nagłówek wyłączeniu (bliżej
-    # w czasie), remis z Kulturą — koncertowi sprzed dwóch godzin.
-    PLANNED_OUTAGE_PRIORITY = 5.5
+    # Miejsce jest MIĘDZY dwiema kategoriami, nie na miejscu którejś z nich:
+    # remis z Edukacją oddawałby nagłówek wyłączeniu (bliżej w czasie),
+    # remis z Kulturą — koncertowi sprzed dwóch godzin.
+    PLANNED_OUTAGE_PRIORITY = 65
 
     def _headline_priority(self, category: str, article, now: datetime) -> int:
         """

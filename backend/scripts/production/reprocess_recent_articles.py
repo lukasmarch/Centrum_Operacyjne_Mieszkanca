@@ -11,6 +11,11 @@ Użycie:
 
 `--only-flagged` zawęża przebieg do artykułów oznaczonych jako Awaria lub filler —
 tylko te klasy mogą być fałszywie dodatnie po zaostrzeniu promptu.
+
+`--category NAZWA` zawęża do jednej kategorii. Dopisane 25.08.2026 przy rozbiciu
+„Urzędu": zmiana dotyczyła jednego worka, a przebieg po całym oknie przepisałby
+przy okazji `display_title` i `summary` wszystkim pozostałym wpisom — tym, których
+nikt nie prosił o zmianę. Przebieg jest tani, ale nie jest bez skutków.
 """
 import argparse
 import asyncio
@@ -28,7 +33,7 @@ from src.database.connection import async_session
 from src.database.schema import Article
 
 
-async def reprocess(days: int, only_flagged: bool = False):
+async def reprocess(days: int, only_flagged: bool = False, category: str = None):
     cutoff = datetime.utcnow() - timedelta(days=days)
     processor = ArticleProcessor()
 
@@ -43,6 +48,8 @@ async def reprocess(days: int, only_flagged: bool = False):
             stmt = stmt.where(
                 or_(Article.category == "Awaria", Article.is_filler == True)
             )
+        if category:
+            stmt = stmt.where(Article.category == category)
         result = await session.execute(
             stmt.order_by(Article.published_at.desc().nulls_last())
         )
@@ -75,5 +82,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=14)
     parser.add_argument("--only-flagged", action="store_true")
+    parser.add_argument("--category", help="tylko wpisy z tą kategorią, np. Urząd")
     args = parser.parse_args()
-    asyncio.run(reprocess(args.days, args.only_flagged))
+    asyncio.run(reprocess(args.days, args.only_flagged, args.category))

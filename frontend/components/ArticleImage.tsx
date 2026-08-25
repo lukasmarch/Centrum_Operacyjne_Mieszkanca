@@ -12,6 +12,9 @@ import {
   Waves,
   Shield,
   Megaphone,
+  HeartHandshake,
+  Store,
+  Home,
 } from 'lucide-react';
 
 interface ArticleImageProps {
@@ -39,6 +42,12 @@ export const CATEGORY_THEME: Record<
   zdrowie: { gradient: 'from-pink-500/80 to-rose-800', Icon: Heart, badge: 'text-pink-300 bg-pink-500/20 border-pink-400/30', dot: 'bg-pink-400' },
   sport: { gradient: 'from-orange-500/80 to-amber-800', Icon: Trophy, badge: 'text-orange-300 bg-orange-500/20 border-orange-400/30', dot: 'bg-orange-400' },
   bezpieczeństwo: { gradient: 'from-yellow-500/80 to-amber-900', Icon: Shield, badge: 'text-yellow-300 bg-yellow-500/20 border-yellow-400/30', dot: 'bg-yellow-400' },
+  // Kategorie dopisane 25.08.2026 przy rozbiciu „Urzędu" (28% całej treści:
+  // kronika policyjna, zbiórki, zguby i sesje rady w jednym worku).
+  // „bezpieczeństwo" czekało tu już wcześniej, bez kategorii po stronie backendu.
+  społeczność: { gradient: 'from-rose-500/80 to-pink-900', Icon: HeartHandshake, badge: 'text-rose-300 bg-rose-500/20 border-rose-400/30', dot: 'bg-rose-400' },
+  biznes: { gradient: 'from-slate-500/80 to-slate-900', Icon: Store, badge: 'text-slate-300 bg-slate-500/20 border-slate-400/30', dot: 'bg-slate-400' },
+  nieruchomości: { gradient: 'from-stone-500/80 to-stone-900', Icon: Home, badge: 'text-stone-300 bg-stone-500/20 border-stone-400/30', dot: 'bg-stone-400' },
   wiadomości: { gradient: 'from-indigo-600/80 to-indigo-900', Icon: Megaphone, badge: 'text-indigo-300 bg-indigo-500/20 border-indigo-400/30', dot: 'bg-indigo-400' },
   środowisko: { gradient: 'from-lime-600/80 to-green-900', Icon: Waves, badge: 'text-lime-300 bg-lime-500/20 border-lime-400/30', dot: 'bg-lime-400' },
 };

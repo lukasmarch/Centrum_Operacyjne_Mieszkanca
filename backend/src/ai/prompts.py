@@ -6,7 +6,7 @@ Definiuje zachowanie i zadania dla każdego typu AI agenta
 
 CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomości z Powiatu Działdowskiego (Polska).
 
-**10 modułów tematycznych:**
+**12 modułów tematycznych:**
 0. **Awaria** - NAJWYŻSZY PRIORYTET, ale TYLKO zdarzenia AKTYWNE TERAZ, wymagające działania lub ostrożności mieszkańców
    ✅ ZAWSZE TUTAJ (tylko gdy zagrożenie/utrudnienie TRWA lub dopiero nastąpi):
    - awaria wodociągu / przerwa w dostawie wody / odcięcie wody
@@ -23,27 +23,52 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    - zaplanowanych remontów DRÓG i utrudnień drogowych → to Transport!
      (reguła dotyczy wyłącznie dróg — planowe wyłączenia mediów zostają w Awarii)
    - ZAKOŃCZONYCH inwestycji i napraw ("zakończyliśmy", "oddano do użytku", "usunięto awarię") → to Urząd lub Biznes wg treści — to DOBRA wiadomość, nie alarm!
-   - sprawozdań i podziękowań OSP, zbiórek strażackich, jubileuszy → to Urząd; zawody strażackie → Sport
+   - sprawozdań i podziękowań OSP, ćwiczeń, jubileuszy → to Bezpieczeństwo; zawody strażackie → Sport;
+     zbiórki na rzecz OSP → Społeczność
    - zdarzeń kryminalnych i ich skutków prawnych (zatrzymanie, tymczasowy areszt, wyrok,
-     akt oskarżenia, ujęcie sprawcy, kradzież, oszustwo) → to Urząd; sprawa jest zamknięta,
-     nikomu już nie zagraża
+     akt oskarżenia, ujęcie sprawcy, kradzież, oszustwo) → to Bezpieczeństwo; sprawa jest
+     zamknięta, nikomu już nie zagraża
    - porad i apeli prewencyjnych policji (bezpieczeństwo na drodze, zabezpieczenie mienia,
-     ostrzeżenia przed oszustami) → to Urząd
+     ostrzeżenia przed oszustami) → to Bezpieczeństwo
    - TEST: jeśli mieszkaniec NIE musi dziś nic zrobić ani na nic uważać — to NIE jest Awaria
-1. **Urząd** - ogłoszenia urzędowe, BIP, zarządzenia, przetargi, terminy składania wniosków, akcje charytatywne organizowane przez urząd
-2. **Zdrowie** - służba zdrowia, apteki, szczepienia, komunikaty sanepidu, profilaktyka
-3. **Edukacja** - szkoły, przedszkola, zajęcia dodatkowe, rekrutacje, stypendia
-4. **Biznes** - lokalne firmy, oferty pracy, promocje, dotacje, nowe biznesy
-5. **Transport** - zaplanowane remonty dróg, PKS, utrudnienia komunikacyjne, parkingi, przepisy drogowe
-6. **Kultura** - koncerty, wystawy, kino, teatr, biblioteki, muzea, orkiestry, festiwale kulturalne
+1. **Urząd** - to, co robi URZĄD, RADA GMINY albo POWIAT, i co ma dla mieszkańca termin albo skutek
+   ✅ ZAWSZE TUTAJ: ogłoszenia i obwieszczenia urzędowe, BIP, zarządzenia wójta, uchwały rady,
+     sesje rady i posiedzenia komisji, zebrania wiejskie, konsultacje społeczne, przetargi,
+     nabory wniosków i terminy urzędowe, decyzje administracyjne i postępowania środowiskowe,
+     plan ogólny i studium, fundusz sołecki, budżet i sprawozdania gminy, rankingi samorządowe
+   ⚠️ NIE KLASYFIKUJ TUTAJ — „Urząd" NIE jest workiem na wszystko, co nie pasuje gdzie indziej:
+   - kroniki policyjnej, wyroków, kontroli, apeli służb → to Bezpieczeństwo!
+   - zbiórek, akcji charytatywnych, zgub i znalezisk, spraw parafii → to Społeczność!
+     (również wtedy, gdy współorganizuje je urząd — liczy się rzecz, nie organizator)
+   - turnieju charytatywnego → to Sport, festynu z programem → to Kultura
+   - TEST: czy da się wskazać dokument, termin albo decyzję urzędu? Jeśli nie — to nie Urząd
+2. **Bezpieczeństwo** - służby i porządek publiczny, gdy NIC JUŻ NIE TRWA (inaczej → Awaria)
+   ✅ ZAWSZE TUTAJ: kronika policyjna (zatrzymanie, kradzież, oszustwo, wyrok, akt oskarżenia,
+     poszukiwania), kontrole trzeźwości i prędkości, statystyki wypadków bez trwających utrudnień,
+     apele i porady prewencyjne policji, straży pożarnej, sanepidu, Lasów Państwowych,
+     działalność OSP (ćwiczenia, sprawozdania, podziękowania), ostrzeżenia przed oszustami
+   ⚠️ NIE KLASYFIKUJ TUTAJ: zdarzenia, które TRWA i wymaga reakcji dziś → to Awaria!
+     Zawody strażackie → Sport. Spotkanie profilaktyczne w szkole → Edukacja
+3. **Zdrowie** - służba zdrowia, apteki, szczepienia, komunikaty sanepidu, profilaktyka
+4. **Edukacja** - szkoły, przedszkola, zajęcia dodatkowe, rekrutacje, stypendia
+5. **Biznes** - lokalne firmy, oferty pracy, promocje, dotacje, nowe biznesy
+6. **Transport** - zaplanowane remonty dróg, PKS, utrudnienia komunikacyjne, parkingi, przepisy drogowe
+7. **Kultura** - koncerty, wystawy, kino, teatr, biblioteki, muzea, orkiestry, festiwale kulturalne
    ⚠️ NIE KLASYFIKUJ TUTAJ: sportu, turniejów, zawodów, gal sportowych → to Sport!
-7. **Sport** - zawody sportowe, turnieje, mecze, ligi, biegi, wyniki sportowe, plebiscyty sportowe, gale sportu, nagrody sportowe, sukcesy sportowców, drużyny, kluby sportowe, treningi, OSiR
+8. **Społeczność** - sprawy MIESZKAŃCÓW między sobą, poza urzędem i poza służbami
+   ✅ ZAWSZE TUTAJ: zbiórki i akcje charytatywne, licytacje, wsparcie dla chorych,
+     zguby i znaleziska (portfel, okulary, pies, paczka, dokumenty), sprawy parafii
+     i uroczystości religijne (pożegnanie księdza, remont kościoła, odpust),
+     inicjatywy sołectw, stowarzyszeń i kół gospodyń, apele sąsiedzkie z konkretem
+   ⚠️ NIE KLASYFIKUJ TUTAJ: życzeń i powitań bez konkretu (to is_filler=true),
+     imprezy z programem i godziną → Kultura, turnieju charytatywnego → Sport
+9. **Sport** - zawody sportowe, turnieje, mecze, ligi, biegi, wyniki sportowe, plebiscyty sportowe, gale sportu, nagrody sportowe, sukcesy sportowców, drużyny, kluby sportowe, treningi, OSiR
    ✅ ZAWSZE TUTAJ: wszelka aktywność sportowa i rywalizacja - piłka nożna, siatkówka, koszykówka, lekkoatletyka, pływanie, tenis, szachy, boks, zapasy, karate, biegi, zawody strażackie (sportowe), wędkarstwo zawodnicze
    ✅ ZAWSZE TUTAJ: plebiscyty "Sportowiec Roku", "Sportowa Osobowość", gale sportowe, nagrody dla sportowców
    ⚠️ NIE KLASYFIKUJ TUTAJ: turystyki, szlaków, ogólnego wypoczynku → to Rekreacja!
-8. **Rekreacja** - turystyka, szlaki piesze/rowerowe, jeziora, przyroda, wypoczynek, agroturystyka, parki
+10. **Rekreacja** - turystyka, szlaki piesze/rowerowe, jeziora, przyroda, wypoczynek, agroturystyka, parki
    ⚠️ NIE KLASYFIKUJ TUTAJ: sportu wyczynowego, zawodów → to Sport!
-9. **Nieruchomości** - ogłoszenia sprzedaży/wynajmu, przetargi na nieruchomości, plany zagospodarowania
+11. **Nieruchomości** - ogłoszenia sprzedaży/wynajmu, przetargi na nieruchomości, plany zagospodarowania
 
 **Lokalizacje w powiecie:**
 - Rybno, Działdowo, Lidzbark, Iłowo-Osada, Płośnica, Rzęgnowo, Napromek
@@ -148,7 +173,7 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
 - Podsumowanie w formie bezosobowej, obiektywne — lokalizację w podsumowaniu podawaj TYLKO jeśli jest wprost w tekście
 
 **KRYTYCZNE - dozwolone kategorie:**
-Używaj WYŁĄCZNIE jednej z tych 10 nazw: Awaria, Urząd, Zdrowie, Edukacja, Biznes, Transport, Kultura, Sport, Rekreacja, Nieruchomości
+Używaj WYŁĄCZNIE jednej z tych 12 nazw: Awaria, Urząd, Bezpieczeństwo, Zdrowie, Edukacja, Biznes, Transport, Kultura, Społeczność, Sport, Rekreacja, Nieruchomości
 NIE używaj: "Archiwum", "Stary", "Historia", "Turystyka", "Inne", "Brak" ani żadnej innej nazwy!
 Artykuły archiwalne/stare → kategoryzuj wg TEMATU treści (np. stara gala sportowa → Sport, stare ogłoszenie urzędu → Urząd)
 """

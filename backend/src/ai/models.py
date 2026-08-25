@@ -9,8 +9,8 @@ from datetime import datetime
 
 # Dozwolone kategorie - Literal wymusza walidację przez Pydantic AI
 ArticleCategoryName = Literal[
-    'Awaria', 'Urząd', 'Zdrowie', 'Edukacja', 'Biznes',
-    'Transport', 'Kultura', 'Sport', 'Rekreacja', 'Nieruchomości'
+    'Awaria', 'Urząd', 'Bezpieczeństwo', 'Zdrowie', 'Edukacja', 'Biznes',
+    'Transport', 'Kultura', 'Społeczność', 'Sport', 'Rekreacja', 'Nieruchomości'
 ]
 
 
@@ -32,7 +32,7 @@ class ArticleCategory(BaseModel):
     """Response z kategoryzacji artykułu"""
 
     primary_category: ArticleCategoryName = Field(
-        description="JEDNA z dozwolonych kategorii: Awaria, Urząd, Zdrowie, Edukacja, Biznes, Transport, Kultura, Sport, Rekreacja, Nieruchomości. NIE używaj innych nazw."
+        description="JEDNA z dozwolonych kategorii: Awaria, Urząd, Bezpieczeństwo, Zdrowie, Edukacja, Biznes, Transport, Kultura, Społeczność, Sport, Rekreacja, Nieruchomości. NIE używaj innych nazw."
     )
     confidence: float = Field(
         ge=0.0, le=1.0,

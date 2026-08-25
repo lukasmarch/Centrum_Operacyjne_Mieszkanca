@@ -209,6 +209,32 @@ CASES: List[Tuple[str, List[SimpleNamespace], List[str], int]] = [
     # Tytuł źródłowy Energi jest co dzień ten sam, więc dwie zapowiedzi pod rząd
     # `same_topic` widzi jako jedną sprawę. Do 25.08.2026 awaria była z tej reguły
     # zwolniona bez wyjątku i wygrywała nagłówek 4 dni z 6.
+    # 25.08.2026: „Urząd" trzymał 28% całej treści — kronikę policyjną, zbiórki
+    # i zguby — i konkurował z sesją rady o nagłówek dnia.
+    (
+        "kronika policyjna nie wygrywa z sesją Rady Gminy",
+        [article(1, "Bezpieczeństwo", "Zatrzymanie złodzieja roweru w Działdowie",
+                 KPP, published_h=2),
+         article(2, "Urząd", "XXIV sesja Rady Gminy Rybno zaplanowana na 27 sierpnia",
+                 published_h=8)],
+        [], 2,
+    ),
+    (
+        "zguba w Hartowcu nie wygrywa z posiedzeniem komisji",
+        [article(1, "Społeczność", "Zgubione okulary w Hartowcu", published_h=1),
+         article(2, "Urząd", "Posiedzenie Komisji Budżetu i Finansów w Rybnie",
+                 published_h=20)],
+        [], 2,
+    ),
+    (
+        "apel prewencyjny policji nadal bije relację sportową",
+        # KPP to źródło POWIATOWE — bez nazwy wsi wpis nie jest lokalny
+        # i przegrywa lokalnością, zanim ktokolwiek spojrzy na priorytet
+        [article(1, "Bezpieczeństwo", "Ostrzeżenie przed oszustami metodą na wnuczka w Rybnie",
+                 KPP, published_h=4),
+         article(2, "Sport", "Delfin Rybno przegrywa z MKS Działdowo", published_h=3)],
+        [], 1,
+    ),
     (
         "zapowiedziane wyłączenie drugi dzień z rzędu schodzi z nagłówka",
         [article(1, "Awaria", "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
