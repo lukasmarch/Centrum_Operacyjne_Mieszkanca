@@ -32,6 +32,11 @@ class ArticleOutput(BaseModel):
     # Awaria będąca sprawą najbliższych godzin (feed_policy.is_pinned_alert) —
     # frontend nie ma jak tego policzyć sam, bo progi czasu żyją w backendzie
     is_pinned: bool = False
+    # Miejscowości z gminy Rybno wymienione w komunikacie oraz odpowiedź na
+    # pytanie „czy to dotyczy MOJEJ wsi" (parametr `location` zapytania).
+    # Bez `location` zawsze True — patrz `alert_policy.concerns`.
+    alert_places: List[str] = []
+    concerns_location: bool = True
 
     class Config:
         from_attributes = True

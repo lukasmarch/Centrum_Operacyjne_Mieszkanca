@@ -65,7 +65,7 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
     const { user } = useAuth();
     const town = user?.location || 'Rybno';
 
-    const { articles } = useArticles({ limit: 12 });
+    const { articles } = useArticles({ limit: 12, location: user?.location });
     const { weather } = useWeather('Rybno');
     const wasteEvents = useWasteSchedule(town);
     const { events } = useEvents(30);
@@ -102,14 +102,35 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
             .catch(() => setBusStops([]));
     }, []);
 
+    /**
+     * Czerwoną ramkę dostaje awaria, która dotyczy WSI CZYTELNIKA.
+     *
+     * 25.08.2026 mieszkaniec Żabin zobaczył na stronie głównej „UWAGA — DZIŚ:
+     * 9:30–15:00 wyłączenie prądu w Rybnie" — cztery adresy przy ulicy
+     * Wyzwolenia, sześć kilometrów od niego. Push ma bramkę miejsca od 24.08
+     * (`push_subscriptions.location`), strona nie miała jej wcale.
+     *
+     * O dopasowaniu rozstrzyga backend (`alert_policy.concerns`), bo tam stoi
+     * lista wsi i normalizacja nazw („Rybno R1" na koncie, „Rybno" u Energi).
+     * Komunikat bez nazwy wsi — ostrzeżenie meteo dla powiatu — dotyczy
+     * każdego, tak samo jak dla push.
+     */
     const alertArticle = useMemo(
-        () => articles?.find(a => a.isPinnedAlert) ?? null,
+        () => articles?.find(a => a.isPinnedAlert && a.concernsLocation !== false) ?? null,
         [articles],
     );
 
+    /**
+     * Wiadomości bez WSZYSTKICH przypiętych alertów, nie tylko tego z karty.
+     *
+     * 25.08.2026 Energa zapowiedziała dwa różne wyłączenia w Rybnie na ten sam
+     * dzień. Oba są przypięte i słusznie — dotyczą innych ulic — ale karta
+     * alertu pokazuje jeden, a odfiltrowanie „tego jednego" wpuszczało drugi
+     * na szczyt kafla „Ostatnio w gminie". Ekran mówił trzy razy to samo.
+     */
     const newsArticles = useMemo(
-        () => (articles ?? []).filter(a => a.id !== alertArticle?.id).slice(0, 3),
-        [articles, alertArticle],
+        () => (articles ?? []).filter(a => !a.isPinnedAlert).slice(0, 3),
+        [articles],
     );
 
     /**

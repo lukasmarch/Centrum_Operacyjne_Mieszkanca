@@ -184,6 +184,46 @@ def places_in(title: Optional[str], content: Optional[str] = None) -> tuple[str,
     return tuple(place for place, pattern in _PLACE_RE if pattern.search(text))
 
 
+def norm_place(value: Optional[str]) -> str:
+    """
+    Nazwa miejscowości do porównania: bez ogonków, wielkości liter i ogona
+    rejonu wywozu. Konto potrafi mieć zapisane „Rybno R1" (patrz
+    `AVAILABLE_LOCATIONS` — to lista rejonów odbioru odpadów, nie miejscowości),
+    a Energa mówi po prostu „Rybno".
+
+    Mieszkało w `push_service`; przeniesione tutaj 25.08.2026, gdy tej samej
+    odpowiedzi zaczęła potrzebować karta alertu na stronie głównej. Lista
+    miejscowości i tak stoi w tym module — normalizacja należy do niej.
+    """
+    lowered = (value or "").strip().lower().replace("ł", "l")
+    stripped = unicodedata.normalize("NFKD", lowered)
+    flat = "".join(c for c in stripped if not unicodedata.combining(c))
+    return re.sub(r"\s+r\d+$", "", flat)
+
+
+def concerns(
+    location: Optional[str],
+    title: Optional[str],
+    content: Optional[str] = None,
+) -> bool:
+    """
+    Czy komunikat dotyczy miejscowości czytelnika.
+
+    Trzy razy „tak, dotyczy": gdy nie wiemy, gdzie mieszka (konto bez
+    lokalizacji, gość bez konta), gdy komunikat nie wymienia żadnej wsi
+    (ostrzeżenie meteo dla powiatu) i gdy jego wieś jest na liście.
+    Domyślne „tak" jest celowe — alert, który nie dotarł, jest gorszy
+    niż alert o sąsiedniej wsi. Tę samą regułę stosuje push
+    (`push_service.send_to_category`).
+    """
+    if not location:
+        return True
+    places = places_in(title, content)
+    if not places:
+        return True
+    return norm_place(location) in {norm_place(p) for p in places}
+
+
 # Energa opisuje wyłączenia REJONEM ENERGETYCZNYM, nie gminą, i wpisuje go
 # w tytuł: „Wyłączenie awaryjne - Region Mława - Rybno gmina wiejska". Powiat
 # działdowski leży w całości w Regionie Mława (22.08.2026: 35 wpisów Mława,

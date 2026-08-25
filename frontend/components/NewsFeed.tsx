@@ -29,18 +29,6 @@ const DATE_GROUP_LABELS: Record<string, { label: string; icon: React.ReactNode }
   older: { label: 'Starsze', icon: <Clock size={12} className="text-neutral-600" /> },
 };
 
-const getTimeAgo = (timestamp: string) => {
-  if (!timestamp) return '';
-  const d = new Date(timestamp);
-  if (isNaN(d.getTime())) return timestamp;
-  const diffMs = Date.now() - d.getTime();
-  const diffH = Math.floor(diffMs / 3600000);
-  if (diffH < 1) return 'przed chwilą';
-  if (diffH < 24) return `${diffH}h temu`;
-  const diffD = Math.floor(diffH / 24);
-  return `${diffD}d temu`;
-};
-
 const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
   const theme = getCategoryTheme(article.category);
   const isAwaria = (article.category || '').toLowerCase().includes('awari');
@@ -66,7 +54,9 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
         {/* Time badge */}
         <div className="absolute top-3 right-3">
           <span className="backdrop-blur-md bg-gray-950/70 text-neutral-300 px-2 py-1 rounded-lg text-[9px] font-medium border border-white/10">
-            {getTimeAgo(article.rawTimestamp || article.timestamp)}
+            {/* Etykietę składa `useArticles` przez `utils/articleTime` — dla
+                zapowiedzi liczy się TERMIN, nie wiek ogłoszenia */}
+            {article.timestamp}
           </span>
         </div>
       </div>

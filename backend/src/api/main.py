@@ -10,6 +10,7 @@ from src.scheduler.scheduler import start_scheduler
 from src.config import settings
 from src.utils.logger import setup_logger
 from datetime import datetime, timedelta
+from typing import Optional
 from src.api.endpoints import cinema
 from src.api.weather import router as weather_router
 
@@ -164,6 +165,7 @@ async def get_articles(
     limit: int = 50,
     per_source: int = 5,
     days: int = 2,
+    location: Optional[str] = None,
     session: AsyncSession = Depends(get_session)
 ):
     """
@@ -178,10 +180,17 @@ async def get_articles(
         limit: Maximum total articles to return (default: 50)
         per_source: Maximum articles per source (default: 5)
         days: Only return articles from the last N days (default: 2)
+        location: Miejscowość czytelnika. Nie filtruje i nie zmienia kolejności —
+            wypełnia `concerns_location`, czyli odpowiedź na pytanie „czy ta
+            awaria dotyczy MOJEJ wsi". 25.08.2026 mieszkaniec Żabin dostawał na
+            stronie głównej czerwoną ramkę o czterech adresach przy ulicy
+            Wyzwolenia w Rybnie. Push tę bramkę ma od 24.08
+            (`push_subscriptions.location`), strona nie miała jej wcale.
     """
     from datetime import timedelta
     from sqlalchemy import func, or_
 
+    from src.services import alert_policy
     from src.services.feed_policy import (
         MAX_PINNED,
         article_score,
@@ -309,6 +318,12 @@ async def get_articles(
         article_dict['source_name'] = source_name
         article_dict['source_label'] = source_label(source_name)
         article_dict['is_pinned'] = article.id in pinned_ids
+        article_dict['alert_places'] = list(
+            alert_policy.places_in(article.title, article.content)
+        )
+        article_dict['concerns_location'] = alert_policy.concerns(
+            location, article.title, article.content
+        )
         articles.append(ArticleOutput(**article_dict))
 
     return articles

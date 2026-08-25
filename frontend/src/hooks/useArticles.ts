@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Article } from '../../types';
+import { articleTimeLabel } from '../utils/articleTime';
 
 // Backend API response
 interface ArticleApiResponse {
@@ -20,6 +21,8 @@ interface ArticleApiResponse {
   event_at: string | null;
   event_until: string | null;
   is_pinned: boolean;
+  alert_places: string[];
+  concerns_location: boolean;
 }
 
 // Fallback musi zawierać /api — endpointy doklejają samą ścieżkę („/events").
@@ -29,35 +32,20 @@ interface ArticleApiResponse {
 // VITE_API_URL w linii poleceń.
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-/**
- * Format scraped_at timestamp to readable format
- * Example: "2026-01-08T10:53:05.577167" -> "2h temu"
- */
-function formatTimestamp(scrapedAt: string): string {
-  const now = new Date();
-  const scraped = new Date(scrapedAt);
-  const diffMs = now.getTime() - scraped.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-
-  if (diffMinutes < 60) {
-    return `${diffMinutes}m temu`;
-  } else if (diffHours < 24) {
-    return `${diffHours}h temu`;
-  } else {
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d temu`;
-  }
-}
-
 interface UseArticlesOptions {
   limit?: number;
   perSource?: number;
   days?: number;
+  /**
+   * Miejscowość czytelnika. Nie filtruje wyników i nie zmienia kolejności —
+   * backend odpowiada nią na pytanie „czy ta awaria dotyczy MOJEJ wsi"
+   * (`concerns_location`). Bez niej wszystko dotyczy wszystkich.
+   */
+  location?: string | null;
 }
 
 export function useArticles(options: UseArticlesOptions = {}) {
-  const { limit = 50, perSource = 5, days = 2 } = options;
+  const { limit = 50, perSource = 5, days = 2, location = null } = options;
 
   const [articles, setArticles] = useState<Article[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,9 +55,13 @@ export function useArticles(options: UseArticlesOptions = {}) {
     const fetchArticles = async () => {
       try {
         setLoading(true);
-        const response = await fetch(
-          `${API_URL}/articles?limit=${limit}&per_source=${perSource}&days=${days}`
-        );
+        const query = new URLSearchParams({
+          limit: String(limit),
+          per_source: String(perSource),
+          days: String(days),
+        });
+        if (location) query.set('location', location);
+        const response = await fetch(`${API_URL}/articles?${query}`);
 
         if (!response.ok) {
           throw new Error('Nie udało się pobrać artykułów');
@@ -89,7 +81,13 @@ export function useArticles(options: UseArticlesOptions = {}) {
           // atrybucją zostaje sam link „źródło ↗"
           sourceLabel: item.source_label ?? null,
           category: item.category || 'Wiadomości',
-          timestamp: formatTimestamp(item.published_at || item.scraped_at),
+          // Zapowiedź opisuje TERMIN, nie wiek ogłoszenia (`utils/articleTime`):
+          // wyłączenie prądu zapowiedziane 21.08 na dziś czytało się jako „3d temu"
+          timestamp: articleTimeLabel({
+            publishedAt: item.published_at || item.scraped_at,
+            eventAt: item.event_at,
+            eventUntil: item.event_until,
+          }),
           rawTimestamp: item.published_at || item.scraped_at,
           url: item.url,
           imageUrl: item.image_url || undefined,
@@ -97,6 +95,8 @@ export function useArticles(options: UseArticlesOptions = {}) {
           isPinnedAlert: item.is_pinned || false,
           eventAt: item.event_at || undefined,
           eventUntil: item.event_until || undefined,
+          alertPlaces: item.alert_places ?? [],
+          concernsLocation: item.concerns_location ?? true,
         }));
 
         setArticles(mappedArticles);
@@ -115,7 +115,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
     const interval = setInterval(fetchArticles, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [limit, perSource, days]);
+  }, [limit, perSource, days, location]);
 
   return { articles, loading, error };
 }

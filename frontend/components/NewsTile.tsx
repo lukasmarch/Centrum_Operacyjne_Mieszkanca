@@ -4,18 +4,6 @@ import { useArticles } from '../src/hooks/useArticles';
 import ArticleImage, { getCategoryTheme } from './ArticleImage';
 import { AppSection, Article } from '../types';
 
-const getTimeAgo = (timestamp: string) => {
-  if (!timestamp) return '';
-  const d = new Date(timestamp);
-  if (isNaN(d.getTime())) return timestamp;
-  const diffMs = Date.now() - d.getTime();
-  const diffH = Math.floor(diffMs / 3600000);
-  if (diffH < 1) return 'przed chwilą';
-  if (diffH < 24) return `${diffH}h temu`;
-  const diffD = Math.floor(diffH / 24);
-  return `${diffD}d temu`;
-};
-
 interface NewsTileProps {
   onNavigate?: (section: AppSection) => void;
 }
@@ -113,7 +101,7 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                     <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${theme.badge}`}>
                       {(featured.category || 'INFO').toUpperCase()}
                     </span>
-                    <span className="text-[10px] text-neutral-400">{getTimeAgo(featured.timestamp)}</span>
+                    <span className="text-[10px] text-neutral-400">{featured.timestamp}</span>
                   </div>
                   <h4 className="text-sm sm:text-base font-bold text-white leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">
                     {featured.title}
@@ -154,7 +142,7 @@ const NewsTile: React.FC<NewsTileProps> = ({ onNavigate }) => {
                         {(article.category || 'INFO').toUpperCase()}
                       </span>
                       <span className="text-[9px] text-neutral-400 whitespace-nowrap">
-                        {getTimeAgo(article.timestamp)}
+                        {article.timestamp}
                       </span>
                     </div>
                     <p className="text-xs sm:text-sm font-semibold text-neutral-200 leading-snug line-clamp-2 group-hover:text-blue-300 transition-colors">

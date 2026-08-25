@@ -339,6 +339,76 @@ def run_signature_cases() -> int:
     return failures
 
 
+# (opis, lokalizacja konta, tytuł, treść, czy ma dotyczyć)
+#
+# Bramka miejsca dla KARTY ALERTU na stronie głównej (25.08.2026). Push miał ją
+# od 24.08, strona nie miała jej wcale: mieszkaniec Żabin dostawał czerwoną ramkę
+# o czterech adresach przy ulicy Wyzwolenia w Rybnie.
+CONCERN_CASES = [
+    (
+        "wyłączenie w Rybnie a mieszkaniec Żabin",
+        "Żabiny",
+        "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+        "Rybno gmina wiejska 25.08.2026 09:30-15:00 - Rybno ulica Wyzwolenia 90.",
+        False,
+    ),
+    (
+        "wyłączenie w Rybnie a mieszkaniec Rybna",
+        "Rybno",
+        "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+        "Rybno gmina wiejska 25.08.2026 09:30-15:00 - Rybno ulica Wyzwolenia 90.",
+        True,
+    ),
+    (
+        'konto z rejonem wywozu „Rybno R2” to nadal Rybno',
+        "Rybno R2",
+        "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+        "Rybno gmina wiejska 25.08.2026 09:30-15:00 - Rybno ulica Wyzwolenia 90.",
+        True,
+    ),
+    (
+        "wyłączenie obejmujące kilka wsi — liczy się każda z nich",
+        "Truszczyny",
+        "Wyłączenie awaryjne - Region Mława - Rybno gmina wiejska",
+        "Rybno gmina wiejska 19.08.2026 05:42-08:15 - Dębień, Hartowiec, Truszczyny.",
+        True,
+    ),
+    (
+        "ostrzeżenie meteo bez nazwy wsi dotyczy wszystkich",
+        "Żabiny",
+        "Ostrzeżenie meteorologiczne — burze z gradem",
+        "IMGW-PIB wydał ostrzeżenie 1. stopnia dla powiatu działdowskiego.",
+        True,
+    ),
+    (
+        "gość bez konta widzi wszystko",
+        None,
+        "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+        "Rybno gmina wiejska 25.08.2026 09:30-15:00 - Rybno ulica Wyzwolenia 90.",
+        True,
+    ),
+]
+
+
+def run_concern_cases() -> int:
+    print()
+    print("=" * 78)
+    print("Bramka miejsca karty alertu — czy to dotyczy MOJEJ wsi")
+    print("=" * 78)
+
+    failures = 0
+    for label, location, title, content, expected in CONCERN_CASES:
+        got = alert_policy.concerns(location, title, content)
+        ok = got == expected
+        failures += not ok
+        detail = "dotyczy" if got else "nie dotyczy"
+        if not ok:
+            detail += f" (oczekiwano {'dotyczy' if expected else 'nie dotyczy'})"
+        print(f"{'✓' if ok else '✗'} {label:.<58} {detail}")
+
+    return failures
+
+
 def run_cases() -> int:
     print("=" * 78)
     print("Przypadki brzegowe polityki alertów")
@@ -429,6 +499,7 @@ if __name__ == "__main__":
     failed = run_cases()
     failed += run_span_cases()
     failed += run_signature_cases()
+    failed += run_concern_cases()
     if "--db" in sys.argv:
         asyncio.run(run_db())
     sys.exit(1 if failed else 0)

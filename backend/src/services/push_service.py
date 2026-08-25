@@ -10,8 +10,6 @@ Obsługuje cztery typy triggerów:
 """
 import json
 import asyncio
-import re
-import unicodedata
 from datetime import datetime
 from typing import Optional, List, Sequence
 
@@ -19,23 +17,15 @@ from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
+from src.services import alert_policy
 from src.utils.logger import setup_logger
 
 logger = setup_logger("PushService")
 
 
-def _norm_place(value: str) -> str:
-    """
-    Nazwa miejscowości do porównania: bez ogonków, wielkości liter i ogona
-    rejonu wywozu. Konto potrafi mieć zapisane „Rybno R1" (patrz
-    `AVAILABLE_LOCATIONS` — to lista rejonów odbioru odpadów, nie miejscowości),
-    a Energa mówi po prostu „Rybno".
-    """
-    lowered = (value or "").strip().lower().replace("ł", "l")
-    stripped = unicodedata.normalize("NFKD", lowered)
-    flat = "".join(c for c in stripped if not unicodedata.combining(c))
-    return re.sub(r"\s+r\d+$", "", flat)
-
+# Normalizacja nazwy miejscowości mieszka w `alert_policy` razem z listą wsi —
+# od 25.08.2026 potrzebuje jej także karta alertu na stronie głównej.
+_norm_place = alert_policy.norm_place
 
 
 def _send_push_notification_sync(endpoint: str, p256dh: str, auth: str,

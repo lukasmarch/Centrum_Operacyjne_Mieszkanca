@@ -18,6 +18,10 @@ export interface Article {
   /** Termin zdarzenia (np. wyłączenie prądu) — naiwny UTC z backendu */
   eventAt?: string;
   eventUntil?: string;
+  /** Miejscowości z gminy Rybno wymienione w komunikacie (backend: alert_policy.places_in) */
+  alertPlaces?: string[];
+  /** Czy komunikat dotyczy wsi czytelnika. Bez podanej lokalizacji zawsze true. */
+  concernsLocation?: boolean;
 }
 
 export interface WeatherData {
