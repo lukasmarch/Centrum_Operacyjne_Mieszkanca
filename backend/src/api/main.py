@@ -191,25 +191,39 @@ async def get_articles(
         is_pinned_alert,
         publishable_conditions,
         source_label,
+        still_relevant_event,
     )
 
     # Calculate cutoff date (2 days ago)
     cutoff_date = datetime.utcnow() - timedelta(days=days)
 
+    now = datetime.utcnow()
+
     # Use window function to rank articles per source
-    # ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY published_at DESC)
     # Limit per źródło liczony od momentu, który się liczy: dla zapowiedzi zdarzeń
-    # (wyłączenia prądu) jest nim termin, nie data ogłoszenia
+    # (wyłączenia prądu) jest nim termin, nie data ogłoszenia.
+    #
+    # ODLEGŁOŚĆ od teraz, nie „najdalej w przyszłość" — ta sama reguła, którą
+    # ranking stosuje w `feed_policy._reference_time`. Sortowanie malejące po
+    # `coalesce(event_at, published_at)` stawiało na czele okna zapowiedzi
+    # z najodleglejszym terminem: po dopuszczeniu do feedu zdarzeń bez godziny
+    # końca (`still_relevant_event`) zebranie wiejskie z 16 września zajęłoby
+    # miejsce w piątce Syli, czyli największego źródła lokalnych wpisów.
+    reference_distance = func.least(
+        func.abs(func.extract(
+            "epoch",
+            func.coalesce(Article.event_at, Article.published_at, Article.scraped_at) - now,
+        )),
+        func.abs(func.extract(
+            "epoch", func.coalesce(Article.published_at, Article.scraped_at) - now
+        )),
+    )
     row_number = func.row_number().over(
         partition_by=Article.source_id,
-        order_by=[
-            func.coalesce(Article.event_at, Article.published_at).desc().nulls_last(),
-            Article.scraped_at.desc()
-        ]
+        order_by=[reference_distance.asc(), Article.scraped_at.desc()],
     ).label('row_num')
 
     # Subquery with row numbers
-    now = datetime.utcnow()
 
     subquery = (
         select(Article.id, row_number)
@@ -218,8 +232,12 @@ async def get_articles(
                 Article.published_at >= cutoff_date,
                 Article.scraped_at >= cutoff_date,
                 # zapowiedziane zdarzenie zostaje w feedzie do swojego terminu,
-                # choćby ogłoszenie miało trzy tygodnie
-                Article.event_until >= now,
+                # choćby ogłoszenie miało trzy tygodnie. `still_relevant_event`,
+                # nie samo `event_until >= now`: godzinę końca zna Energa i alert
+                # meteo, nie zna jej zapowiedź czytana przez model, a wpis
+                # z terminem i bez końca wypadał z feedu w dniu, którego dotyczył
+                # (25.08.2026: konsultacje ws. kanalizacji tego dnia o 19:00).
+                still_relevant_event(Article, now),
             )
         )
         .where(*publishable_conditions(Article))  # filler i cudze reklamy poza feedem

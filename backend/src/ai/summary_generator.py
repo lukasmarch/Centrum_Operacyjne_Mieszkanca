@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.models import DailySummary as DailySummaryModel
 from src.ai.prompts import DAILY_SUMMARY_PROMPT
 from src.database.schema import Article, Event, AirQuality, DailySummary, Source, Weather
-from src.services import weather_alert
+from src.services import energa, weather_alert
 from src.services.feed_policy import (
     collapse_duplicates,
     dedup_text,
@@ -596,6 +596,25 @@ class SummaryGenerator:
     # odległą kategorią rozstrzyga bliskość w czasie.
     DISTANT_ALERT_PRIORITY = 9
 
+    # Zapowiedziane wyłączenie planowe: dziś obowiązuje, ale nie dzieje się jeszcze.
+    # Stoi za sprawami, po których mieszkaniec ma coś ZROBIĆ (Zdrowie, Transport,
+    # Urząd, Biznes, Edukacja), a przed rozrywką (Kultura, Sport, Rekreacja).
+    #
+    # 25.08.2026 briefing otworzył się pięciogodzinnym wyłączeniem na czterech
+    # adresach przy ulicy Wyzwolenia, a konsultacje w sprawie skanalizowania
+    # trzech wsi — tego samego dnia o 19:00 — trafiły do bloku „Edukacja".
+    # Czwarty raz w sześć dni: Energa wypuszcza wpis dotyczący gminy Rybno
+    # praktycznie codziennie (7 wpisów na 7 dni), a priorytet 0 znaczył, że
+    # nic w gminie nie ma jak wygrać z zapowiedzią wyłączenia.
+    #
+    # Awaria NIEPLANOWANA i wyłączenie TRWAJĄCE zostają na priorytecie 0 —
+    # „nie mam prądu teraz" jest wiadomością dnia, „wyłączą mi prąd o 9:30"
+    # jest informacją użytkową, którą i tak niesie karta alertu i push.
+    # Ułamek, bo miejsce jest MIĘDZY dwiema kategoriami, a nie na miejscu
+    # którejś z nich: remis z Edukacją oddawałby nagłówek wyłączeniu (bliżej
+    # w czasie), remis z Kulturą — koncertowi sprzed dwóch godzin.
+    PLANNED_OUTAGE_PRIORITY = 5.5
+
     def _headline_priority(self, category: str, article, now: datetime) -> int:
         """
         Waga kategorii przy wyborze nagłówka.
@@ -621,7 +640,22 @@ class SummaryGenerator:
             article.content,
             article.locality,
         )
-        return priority if is_now else self.DISTANT_ALERT_PRIORITY
+        if not is_now:
+            return self.DISTANT_ALERT_PRIORITY
+
+        # Kanał Energi rozstrzyga, czy prąd znika sam, czy zgodnie z zapowiedzią.
+        # Zapowiedziane wyłączenie odzyskuje priorytet 0 dopiero, gdy TRWA:
+        # wtedy „nie ma prądu" przestaje być zapowiedzią i staje się stanem gminy.
+        if energa.is_planned(article.title) and not self._is_ongoing(article, now):
+            return self.PLANNED_OUTAGE_PRIORITY
+
+        return priority
+
+    @staticmethod
+    def _is_ongoing(article, now: datetime) -> bool:
+        """Czy zdarzenie właśnie trwa — znany termin obejmujący tę chwilę."""
+        start, end = article.event_at, article.event_until
+        return bool(start and end and start <= now <= end)
 
     def _select_top_article(
         self,
@@ -647,6 +681,13 @@ class SummaryGenerator:
         na nagłówek regionalny. Wyjątkiem jest awaria, która wciąż trwa: przerwa
         w dostawie wody drugiego dnia jest nadal najważniejszą rzeczą w gminie
         i nie ustępuje miejsca wiadomości tylko dlatego, że była wczoraj.
+
+        ⚠️ Zwolnienie z punktu 2 przysługuje wyłącznie priorytetowi 0, czyli
+        awarii nieplanowanej albo trwającej. Zapowiedziane wyłączenie planowe
+        ma `PLANNED_OUTAGE_PRIORITY` i podlega regule powtórki jak każdy inny
+        temat — a podlega jej skutecznie, bo tytuł źródłowy Energi jest zawsze
+        ten sam („Wyłączenie planowe - Region Mława - Rybno gmina wiejska"),
+        więc dwie zapowiedzi pod rząd `same_topic` rozpoznaje jako jedną sprawę.
         """
         best = None
         best_key = (2, 2, 999, float("inf"))

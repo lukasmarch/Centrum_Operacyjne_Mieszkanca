@@ -75,7 +75,11 @@ def parse_window(text: Optional[str]) -> tuple[Optional[datetime], Optional[date
 PLACES_RE = re.compile(r"\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\s*-\s*(?P<gdzie>.+)")
 
 # „Rybno ulice Kościelna…", „Rybno ulica Wyzwolenia 90" — nazwa wsi, potem ulice.
-STREETS_RE = re.compile(r"^(?P<wies>.+?)\s+ulic[aey]\s+(?P<ulice>.+)$", re.DOTALL)
+# ⚠️ Nazwa wsi bez przecinka: komunikat bywa mieszany („Prusy od 1 do 5, 5A, …,
+# Rybno ulica Lubawska 604/s") i wzorzec z `.+?` brał za nazwę wsi całą listę
+# numerów aż do słowa „ulica". Bez przecinka taki wpis zostaje płaską listą
+# miejscowości, czyli tym, czym naprawdę jest.
+STREETS_RE = re.compile(r"^(?P<wies>[^,]+?)\s+ulic[aey]\s+(?P<ulice>.+)$", re.DOTALL)
 
 _MONTHS = (
     "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
@@ -85,16 +89,48 @@ _MONTHS = (
 # Ile nazw zmieści się w tytule, zanim przestanie być tytułem
 MAX_PLACES_IN_HEADLINE = 4
 
+# Kanał rozstrzyga się TYTUŁEM, nie treścią: prefiks w treści składa `_context_line`
+# na podstawie TERMINU („TRWA" / „zapowiedziane"), więc planowe wyłączenie w trakcie
+# trwania opisuje się tak samo jak awaria. Kanał mówi co innego — czy przerwa była
+# zapowiedziana, czy prąd zniknął sam.
+#
+# ⚠️ Rdzeń „planow", nie słowo „planowane”: feed w 14 na 15 przypadków pisze
+# „Wyłączenie planowe" (pomiar bazy produkcyjnej 25.08.2026), a poprzedni warunek
+# szukał wyłącznie formy „planowane" — czyli nie trafiał praktycznie nigdy
+# i każde zapowiedziane wyłączenie dostawało tytuł „Wyłączenie prądu…",
+# nieodróżnialny od awarii.
+_PLANNED_RE = re.compile(r"planow", re.IGNORECASE)
+
+
+def is_planned(title: Optional[str]) -> bool:
+    """Czy to wyłączenie ZAPOWIEDZIANE (kanał „planowane"), czy awaria."""
+    return bool(_PLANNED_RE.search(title or ""))
+
+
+# Słowa, na których nazwa się KOŃCZY. Energa zapisuje zakresy numerów słownie
+# („Prusy od 1 do 5", „Kopaniarze od 1 do 13") i dorzuca działki („dz. 174/12"),
+# a filtr „zostaw słowa zaczynające się literą" przepuszczał z tego „od" i „do":
+# 25.08.2026 backfill chciał wpisać do bazy „Filice od do, dz." i „Księży Dwór od do".
+# Marker ulicy stoi tu z tego samego powodu — w płaskiej liście bez prefiksu wsi
+# (patrz `STREETS_RE`) nazwą stawało się „Rybno ulica Lubawska".
+_STOP_WORDS = frozenset({"od", "do", "dz", "nr", "ul", "ulica", "ulice", "ulicy", "oraz"})
+
 
 def _names(raw: str) -> list[str]:
-    """Same nazwy ulic albo wsi — bez numerów domów, bez powtórzeń."""
+    """Same nazwy ulic albo wsi — bez numerów domów, bez zakresów, bez powtórzeń."""
     names: list[str] = []
     for part in raw.replace(";", ",").split(","):
         part = part.strip().rstrip(".").strip()
         if not part or not part[0].isalpha():
             continue  # „71", „90/c", „269/1" — numery po nazwie ulicy
-        # „Kościelna 1" → „Kościelna"; „Nowa Wieś" zostaje w całości
-        words = [w for w in part.split() if w[0].isalpha()]
+        # „Kościelna 1" → „Kościelna"; „Nowa Wieś" zostaje w całości;
+        # „Prusy od 1 do 5" → „Prusy" — nazwa kończy się na pierwszym słowie,
+        # które przestaje być jej częścią (numer albo słowo z `_STOP_WORDS`)
+        words: list[str] = []
+        for word in part.split():
+            if not word[0].isalpha() or word.lower().strip(".") in _STOP_WORDS:
+                break
+            words.append(word)
         name = " ".join(words).strip()
         if name and name not in names:
             names.append(name)
@@ -145,8 +181,7 @@ def headline(title: Optional[str], content: Optional[str]) -> Optional[str]:
 
     # „Planowane" tylko wtedy, gdy tak mówi kanał — dla mieszkańca to różnica
     # między „wyłączą mi prąd w poniedziałek" a „nie mam prądu teraz".
-    planned = "planowane" in (title or "").lower()
-    kind = "Planowane wyłączenie prądu" if planned else "Wyłączenie prądu"
+    kind = "Planowane wyłączenie prądu" if is_planned(title) else "Wyłączenie prądu"
 
     return (
         f"{kind} {start.day} {_MONTHS[start.month - 1]}, "
@@ -214,6 +249,19 @@ def enrich(articles: list[dict], now: Optional[datetime] = None) -> list[dict]:
         article["event_at"] = start
         article["event_until"] = end
         article["content"] = f"{_context_line(local_start, local_end, state)}\n\n{body}".strip()
+
+        # Tytuł składamy JUŻ TU, nie dopiero przy kategoryzacji. Energa odświeża
+        # ten sam guid w miarę usuwania awarii — okno się wydłuża, lista wsi
+        # topnieje — a `articles.processed` chodzi raz, więc `display_title`
+        # zamarzał na pierwszym odczycie. 25.08.2026 feed pokazywał
+        # „Wyłączenie prądu 22 sierpnia, 08:26–15:00 — Gródki, Przełęk"
+        # przy zdarzeniu, które w treści stało jako 24.08 11:53–16:00 (art. 5517),
+        # oraz cztery wsie w tytule przy jednej pozostałej w treści (art. 5531).
+        # `save_to_db` przepisuje na istniejący wiersz każdy niepusty klucz,
+        # więc odświeżenie wystarcza tutaj.
+        composed = headline(article.get("title"), article["content"])
+        if composed:
+            article["display_title"] = composed
 
         guid = canonical_id(article.get("url"))
         if guid:

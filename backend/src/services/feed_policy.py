@@ -16,11 +16,12 @@ Cztery mechanizmy:
 """
 import re
 import unicodedata
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Callable, Iterable, Optional, TypeVar
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_
+from sqlalchemy import and_, cast, or_
+from sqlalchemy.types import Time
 
 from src.services.alert_policy import is_foreign_region, places_in
 from src.services.weather_alert import expired as weather_alert_expired
@@ -47,6 +48,17 @@ PIN_LOOKAHEAD_H = 30
 # Twardy limit bloku przypiętego. Przy burzy Energa potrafi wypuścić kilkanaście
 # wyłączeń naraz — feed nie może się zamienić w listę awarii.
 MAX_PINNED = 3
+
+# Ile trwa zapowiedź, która nie podała godziny końca. Ta sama odpowiedź stoi
+# już w dwóch miejscach — `weather_alert.validity_or_default` (backend) i
+# `utils/eventTime.endOf` (front) — i mówi to samo: brak deklarowanego końca
+# nie znaczy ani „wiecznie", ani „natychmiast".
+#
+# 25.08.2026 konsultacje w sprawie skanalizowania Rumiana, Naguszewa i Groszek
+# (art. 5342, tego dnia o 19:00) NIE ISTNIAŁY w feedzie: ogłoszone 12.08,
+# `event_until` puste, więc żaden z trzech warunków okna ich nie przepuścił.
+# W rankingu wyszłyby drugie w całym feedzie (1,41 wobec 1,69 wyłączenia prądu).
+DEFAULT_EVENT_DURATION_H = 3
 
 DEFAULT_WEIGHT = 1.0
 
@@ -233,6 +245,39 @@ def publishable_conditions(article_model):
         article_model.is_filler == False,        # noqa: E712 — SQLAlchemy
         article_model.is_promotional == False,   # noqa: E712
     ]
+
+
+def still_relevant_event(article_model, now: Optional[datetime] = None):
+    """
+    Warunek SQL „termin tego wpisu jeszcze nie minął" — dla okna feedu.
+
+    `event_until` bywa puste: zna je Energa (z komunikatu) i alert meteo,
+    nie zna go zapowiedź czytana przez model, bo źródło podaje samą godzinę
+    rozpoczęcia. Bez domyślnego czasu trwania taka zapowiedź wypadała z feedu
+    w dniu, w którym była aktualna — patrz `DEFAULT_EVENT_DURATION_H`.
+
+    Wpis bez godziny (`event_at` o północy) trwa do końca swojego dnia, nie
+    trzy godziny: „Wielkie Otwarcie 22 sierpnia" nie kończy się o 3 nad ranem.
+    Ta sama reguła co `utils/eventTime.isAllDay` na froncie.
+
+    Odejmujemy od `now`, zamiast dodawać do kolumny: warunek zostaje wtedy
+    porównaniem kolumny ze stałą, więc indeks na `event_at` nadal działa.
+    """
+    now = now or datetime.utcnow()
+    return or_(
+        article_model.event_until >= now,
+        and_(
+            article_model.event_until.is_(None),
+            article_model.event_at.isnot(None),
+            or_(
+                article_model.event_at >= now - timedelta(hours=DEFAULT_EVENT_DURATION_H),
+                and_(
+                    cast(article_model.event_at, Time) == time(0, 0),
+                    article_model.event_at >= now - timedelta(days=1),
+                ),
+            ),
+        ),
+    )
 
 
 # Kalendarz mieszkańca gminy Rybno kończy się na sąsiednich gminach powiatu:

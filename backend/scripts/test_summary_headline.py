@@ -178,6 +178,44 @@ CASES: List[Tuple[str, List[SimpleNamespace], List[str], int]] = [
         ["Koncert w świetlicy",
          "Nabór wniosków na fundusz sołecki w Rybnie"], 2,
     ),
+    # 25.08.2026: briefing otworzył się zapowiedzianym wyłączeniem na czterech
+    # adresach przy ul. Wyzwolenia, a konsultacje w sprawie skanalizowania trzech
+    # wsi — tego samego dnia o 19:00 — wylądowały w bloku „Edukacja". Czwarty raz
+    # w sześć dni. Zapowiedź ma odtąd `PLANNED_OUTAGE_PRIORITY`.
+    (
+        "zapowiedziane wyłączenie ustępuje sprawie, na którą trzeba dziś przyjść",
+        [article(1, "Awaria", "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+                 ENERGA, 96, 4, 9),
+         article(2, "Edukacja", "Konsultacje ws. skanalizowania Rumiana i Naguszewa",
+                 published_h=300, event_h=12)],
+        [], 2,
+    ),
+    (
+        "wyłączenie AWARYJNE nie ustępuje niczemu — prąd zniknął sam",
+        [article(1, "Awaria", "Wyłączenie awaryjne - Region Mława - Rybno gmina wiejska",
+                 "Energa - wyłączenia bieżące (RSS)", 1, 4, 9),
+         article(2, "Edukacja", "Konsultacje ws. skanalizowania Rumiana i Naguszewa",
+                 published_h=300, event_h=12)],
+        [], 1,
+    ),
+    (
+        "zapowiedź, która właśnie TRWA, wraca na priorytet awarii",
+        [article(1, "Awaria", "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+                 ENERGA, 96, -2, 3),
+         article(2, "Edukacja", "Konsultacje ws. skanalizowania Rumiana i Naguszewa",
+                 published_h=300, event_h=12)],
+        [], 1,
+    ),
+    # Tytuł źródłowy Energi jest co dzień ten sam, więc dwie zapowiedzi pod rząd
+    # `same_topic` widzi jako jedną sprawę. Do 25.08.2026 awaria była z tej reguły
+    # zwolniona bez wyjątku i wygrywała nagłówek 4 dni z 6.
+    (
+        "zapowiedziane wyłączenie drugi dzień z rzędu schodzi z nagłówka",
+        [article(1, "Awaria", "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+                 ENERGA, 96, 4, 9),
+         article(2, "Kultura", "Dożynki w Rybnie z korowodem", published_h=6)],
+        ["Wyłączenie planowe - Region Mława - Rybno gmina wiejska"], 2,
+    ),
 ]
 
 
@@ -277,6 +315,10 @@ async def run_db():
                 generator._headline_priority(category, a, now),
                 generator._time_distance_h(a, now),
                 category,
+                # ID przed obiektem: dwa wyłączenia Energi o tym samym terminie
+                # dawały remis na wszystkich polach, a wtedy sortowanie próbowało
+                # porównać modele SQLModel i wywracało się na AttributeError
+                a.id,
                 a,
             )
             for category, arts in grouped.items()
@@ -285,7 +327,7 @@ async def run_db():
     )
 
     print("  lokalny powtórka priorytet  dystans  kategoria")
-    for locality, repeat, priority, distance, category, item in ranking[:8]:
+    for locality, repeat, priority, distance, category, _id, item in ranking[:8]:
         print(f"  {'lok' if not locality else 'reg':>7} {repeat:>9} {priority:>9} "
               f"{distance:>7.1f}h  {category:<12} ID:{item.id} {(item.title or '')[:44]}")
 

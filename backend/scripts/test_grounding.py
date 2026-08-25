@@ -347,6 +347,29 @@ def main() -> int:
             energa.headline("Zebranie wiejskie w Rybnie", "Zebranie 17 września.") is None,
             "None",
         ),
+        # Feed pisze „Wyłączenie planowe" w 14 na 15 wpisów w bazie (pomiar
+        # 25.08.2026), a warunek szukał wyłącznie formy „planowane" — czyli
+        # praktycznie każda zapowiedź dostawała tytuł nieodróżnialny od awarii.
+        # Energa zapisuje zakresy numerów słownie („Prusy od 1 do 5") i dorzuca
+        # działki („dz. 174/12"). 25.08.2026 backfill chciał z tego zrobić
+        # tytuły „Filice od do, dz." i „Księży Dwór od do".
+        (
+            "zakres numerów nie wchodzi do tytułu jako nazwa",
+            energa.headline(
+                "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+                "Rybno gmina wiejska 28.08.2026 09:00-14:00 - Prusy od 1 do 5, 5A, "
+                "od 10 do 14, 19, Rybno ulica Lubawska 604/s.",
+            ).endswith("— Prusy, Rybno"),
+            'Prusy, Rybno — bez zakresu numerów',
+        ),
+        (
+            'forma „planowe”, a nie „planowane”, też jest zapowiedzią',
+            energa.is_planned("Wyłączenie planowe - Region Mława - Rybno gmina wiejska")
+            and not energa.is_planned(
+                "Wyłączenie awaryjne - Region Mława - Rybno gmina wiejska"
+            ),
+            "planowe → tak, awaryjne → nie",
+        ),
     ]
 
     failures = 0
