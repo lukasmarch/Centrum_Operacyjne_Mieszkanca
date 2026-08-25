@@ -136,7 +136,8 @@ async def dedupe(days: int, apply: bool) -> None:
                     head = cluster[0]
                     sim = sims.get((min(row.id, head.id), max(row.id, head.id)), 0.0)
                     # Jedna reguła na projekt — ta sama, którą stosuje ekstraktor
-                    if same_event(sim, row.location, head.location):
+                    if same_event(sim, row.location, head.location,
+                                  row.title, head.title):
                         cluster.append(row)
                         break
                 else:

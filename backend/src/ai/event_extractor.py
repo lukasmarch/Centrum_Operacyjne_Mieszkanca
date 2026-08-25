@@ -16,6 +16,7 @@ Trzy bramki stoją MIĘDZY modelem a bazą, w tej kolejności — od najtańszej
 3. TOŻSAMOŚĆ — to samo wydarzenie opisane przez kilka źródeł zapisujemy raz.
               Rozstrzyga embedding, za który i tak płacimy (patrz `find_duplicate`).
 """
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -184,6 +185,65 @@ def _place_key(location: Optional[str]) -> str:
     return _flat(text).strip()
 
 
+# Organy Rady Gminy: sesja i pięć komisji. Klucz wyciągamy z TYTUŁU, bo dzień
+# sesji to zawsze komplet posiedzeń — komisje rano, sesja przed południem, ta
+# sama sala, ten sam porządek obrad w opisie.
+#
+# Dlaczego weto, a nie próg. Pomiar 25.08.2026 na ośmiu parach z produkcji
+# pokazał, że progu tu NIE MA: „XXIV sesja Rady" kontra „Komisja Budżetu"
+# (dwa różne posiedzenia) = 0,909, a „Msza dziękczynna" kontra „Pożegnanie
+# księdza Tomasza" (jedno wydarzenie) = 0,790 i „MTB Etap 6" kontra „Zarybinek
+# MTB Classic" (jedno) = 0,846. Różne posiedzenia są sobie BLIŻSZE niż dwa
+# opisy tej samej imprezy, więc każdy próg, który rozdziela pierwsze, rozbija
+# drugie. Embedding mierzy temat, a te wydarzenia mają temat identyczny —
+# różni je nazwa organu, czyli dokładnie ten fragment tytułu, który dla
+# kosinusa jest szumem.
+#
+# 24.08 kalendarz stracił przez to XXIV sesję Rady: wjechała jako powtórka
+# Komisji Budżetu i zniknęła mieszkańcom z kalendarza, briefingu i newslettera
+# na dwa dni przed terminem.
+_ORGAN_MARKER = re.compile(r"\bkomisj\w*", re.IGNORECASE)
+_SESSION_MARKER = re.compile(r"\bsesj", re.IGNORECASE)
+
+# Ile znaków nazwy komisji bierzemy do klucza. Sześć, bo tyle wystarcza, by
+# odróżnić wszystkie pięć komisji (rewizy|budzet|skarg|zdrowi|rozwoj), a przy
+# tym przetrwać odmianę: „Komisja Rewizyjna" i „Komisji Rewizyjnej" dają ten
+# sam klucz. Zamkniętej listy nazw celowo NIE ma — nowa komisja dostanie swój
+# klucz sama, zamiast po cichu wpaść do wspólnego worka.
+_ORGAN_STEM_CHARS = 6
+
+
+def _organ_key(title: Optional[str]) -> str:
+    """
+    Który organ Rady Gminy się zbiera — albo pusty łańcuch, gdy to nie posiedzenie.
+
+    Pusty klucz znaczy „nie wiem" i wyłącza weto: dożynki, mecz i koncert mają
+    być scalane tak jak dotąd, po samym podobieństwie.
+    """
+    from src.services.alert_policy import _flat
+
+    text = _flat(title or "")
+
+    match = _ORGAN_MARKER.search(text)
+    if match:
+        # Pierwsze słowo po „Komisji" niesie nazwę własną: „Budżetu i Finansów",
+        # „Zdrowia, Kultury, Oświaty…". Kolejność wyrazów jest ustalona uchwałą
+        # o składzie komisji, więc pierwszy człon jest stabilny między źródłami.
+        # ⚠️ Wzorzec MUSI objąć końcówkę („komisji", nie „komisj") — inaczej
+        # pierwszym słowem reszty zostaje sama końcówka i wszystkie komisje
+        # dostają jeden klucz „komisja:i".
+        reszta = text[match.end():]
+        slowa = re.findall(r"[a-z0-9]+", reszta)
+        if slowa:
+            return "komisja:" + slowa[0][:_ORGAN_STEM_CHARS]
+        return "komisja:"
+
+    if _SESSION_MARKER.search(text):
+        return "sesja"
+
+    return ""
+
+
 # Powyżej tego podobieństwa różnica miejsca przestaje wetować scalenie.
 # 22.08.2026 w kalendarzu stały dwa razy te same warsztaty (1.09, „Ziołowe
 # rzemiosło"): podobieństwo 0,96, ale lokalizacje zapisano jako „Zagroda
@@ -195,17 +255,35 @@ def _place_key(location: Optional[str]) -> str:
 PLACE_VETO_MAX_SIMILARITY = 0.90
 
 
-def same_event(similarity: float, location: Optional[str], other: Optional[str]) -> bool:
+def same_event(
+    similarity: float,
+    location: Optional[str],
+    other: Optional[str],
+    title: Optional[str] = None,
+    other_title: Optional[str] = None,
+) -> bool:
     """
-    Czy to jedno wydarzenie — jedyne miejsce, gdzie łączymy podobieństwo z miejscem.
+    Czy to jedno wydarzenie — jedyne miejsce, gdzie łączymy podobieństwo z resztą.
 
     Reguła miejsca celowo NIE scala w razie wątpliwości: dwie różne imprezy tego
     samego dnia w tej samej wsi kosztują mieszkańca więcej niż jedna powtórka.
     Ale wątpliwość kończy się tam, gdzie zaczyna się pewność semantyczna — patrz
     `PLACE_VETO_MAX_SIMILARITY`.
+
+    Weto organu jest INNEGO rodzaju i dlatego stoi wyżej: pewność semantyczna go
+    NIE znosi. Różnicy między sesją Rady a Komisją Budżetu embedding nie widzi
+    wcale (0,909 przy 0,790 dla dwóch opisów jednej mszy), więc „im podobniejsze,
+    tym pewniej to samo" akurat tutaj nie obowiązuje. Tytuły niosą nazwę organu
+    wprost i tanio — pytamy o nią, zamiast wnioskować z liczby, która tej
+    informacji nie zawiera.
     """
     if similarity < DUPLICATE_SIMILARITY:
         return False
+
+    organ, other_organ = _organ_key(title), _organ_key(other_title)
+    if organ and other_organ and organ != other_organ:
+        return False
+
     key, other_key = _place_key(location), _place_key(other)
     if key and other_key and key != other_key:
         return similarity >= PLACE_VETO_MAX_SIMILARITY
@@ -218,6 +296,7 @@ async def find_duplicate(
     event_date: datetime,
     location: Optional[str],
     exclude_id: Optional[int] = None,
+    title: Optional[str] = None,
 ) -> Optional[tuple[int, float]]:
     """
     Wydarzenie, którego to jest powtórzeniem — albo None.
@@ -231,6 +310,11 @@ async def find_duplicate(
     Miejscowość jest warunkiem WYKLUCZAJĄCYM, nie grupującym: gdy oba wpisy ją
     mają i jest różna, nie ma o czym mówić; gdy jednemu jej brakuje (model
     czasem jej nie poda), decyduje sam embedding.
+
+    `title` działa tak samo wykluczająco i po to samo pobieramy `e.title`
+    kandydata: sesja Rady nie jest posiedzeniem Komisji Budżetu, choćby
+    embedding stawiał je bliżej siebie niż dwa opisy jednej mszy. Bez tytułu
+    (wywołanie ze starszego kodu) weto organu po prostu nie działa.
     """
     day = event_date.date()
     embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
@@ -250,7 +334,7 @@ async def find_duplicate(
         params["exclude_id"] = exclude_id
 
     rows = (await session.execute(sql_text(f"""
-        SELECT e.id, e.location, 1 - (d.embedding <=> $emb${embedding_str}$emb$::vector) AS sim
+        SELECT e.id, e.location, e.title, 1 - (d.embedding <=> $emb${embedding_str}$emb$::vector) AS sim
         FROM events e
         JOIN document_embeddings d
           ON d.source_type = 'event' AND d.source_id = e.id AND d.chunk_index = 0
@@ -261,8 +345,8 @@ async def find_duplicate(
         LIMIT 10
     """), params)).all()
 
-    for event_id, other_location, sim in rows:
-        if same_event(float(sim), location, other_location):
+    for event_id, other_location, other_title, sim in rows:
+        if same_event(float(sim), location, other_location, title, other_title):
             return int(event_id), float(sim)
     return None
 
@@ -444,7 +528,8 @@ URL: {article.url}
             # rozpoznania powtórki, a potem trafia do bazy jako materiał RAG.
             chunk, embedding = await self._embed(session, event)
             duplicate = await find_duplicate(
-                session, embedding, event.event_date, event.location
+                session, embedding, event.event_date, event.location,
+                title=event.title,
             )
             if duplicate:
                 canonical_id, similarity = duplicate

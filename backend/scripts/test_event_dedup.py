@@ -34,6 +34,7 @@ from src.ai.event_extractor import (
     PLACE_VETO_MAX_SIMILARITY,
     ground_event,
     _place_key,
+    _organ_key,
     same_event,
 )
 from src.ai.models import ExtractedEvent
@@ -182,6 +183,57 @@ def run_cases() -> int:
         ok = same_event(sim, a, b) == expected
         failed += 0 if ok else 1
         print(f"  {'✓' if ok else '✗'} {sim:.2f}  {label}")
+
+    print()
+    print("=" * 72)
+    print("5. WETO ORGANU — dzień sesji to komplet posiedzeń, nie jedno")
+    print("=" * 72)
+    # Podobieństwa ZMIERZONE 25.08.2026 na produkcji (`text-embedding-3-small`,
+    # chunk taki jak w bazie). Progu tu nie ma: różne posiedzenia leżą WYŻEJ
+    # niż dwa opisy tej samej mszy (0,790) i tego samego wyścigu (0,846),
+    # więc te liczby są w teście po to, żeby nikt nie próbował wrócić do
+    # strojenia progu zamiast weta.
+    for sim, ta, tb, expected, label in [
+        (0.909, "XXIV sesja Rady Gminy Rybno",
+         "Posiedzenie Komisji Budżetu i Finansów Rady Gminy Rybno", False,
+         "sesja Rady ≠ Komisja Budżetu (0,909 — wyżej niż niejeden duplikat)"),
+        (0.817, "Posiedzenie Komisji Zdrowia, Kultury, Oświaty i Spraw Socjalnych",
+         "Posiedzenie Komisji Budżetu i Finansów Rady Gminy Rybno", False,
+         "dwie różne komisje tego samego ranka zostają osobno"),
+        (0.981, "Posiedzenie Komisji Skarg, Wniosków i Petycji",
+         "Posiedzenie Komisji Skarg, Wniosków i Petycji Rady Gminy Rybno", True,
+         "ta sama komisja z dwóch źródeł → nadal scalana"),
+        (0.984, "Posiedzenie wyjazdowe Komisji Rewizyjnej",
+         "Posiedzenie wyjazdowe Komisji Rewizyjnej Rady Gminy Rybno", True,
+         "„Komisji Rewizyjnej” w obu — odmiana nie tworzy drugiego organu"),
+        (0.846, "Łaciate Mazury MTB – Etap 6 Rybno",
+         "Zarybinek MTB Classic im. Wacława Wasieli", True,
+         "wydarzenia bez organu weta nie widzą (0,846 → scalone jak dotąd)"),
+        (0.790, "Msza Święta dziękczynna za posługę ks. Tomasza",
+         "Pożegnanie księdza Tomasza", True,
+         "to samo wydarzenie mimo zera wspólnych rdzeni → scalone"),
+    ]:
+        ok = same_event(sim, "Rybno", "Rybno", ta, tb) == expected
+        failed += 0 if ok else 1
+        print(f"  {'✓' if ok else '✗'} {sim:.3f}  {label}")
+
+    print()
+    print("=" * 72)
+    print("6. KLUCZ ORGANU — co jest posiedzeniem, a co imprezą")
+    print("=" * 72)
+    for title, expected, label in [
+        ("XXIV sesja Rady Gminy Rybno", "sesja", "sesja Rady"),
+        ("Posiedzenie Komisji Budżetu i Finansów", "komisja:budzet", "komisja budżetu"),
+        ("Posiedzenie Komisji Rewizyjnej", "komisja:rewizy", "komisja rewizyjna"),
+        ("Komisja Rewizyjna Rady Gminy", "komisja:rewizy",
+         "mianownik i dopełniacz dają JEDEN klucz"),
+        ("Posiedzenie Komisji Skarg, Wniosków i Petycji", "komisja:skarg", "komisja skarg"),
+        ("DOŻYNKI RYBNO 2026", "", "dożynki nie są organem — weto milczy"),
+        ("Turniej Charytatywny o Puchar Budmar", "", "turniej nie jest organem"),
+    ]:
+        ok = _organ_key(title) == expected
+        failed += 0 if ok else 1
+        print(f"  {'✓' if ok else '✗'} „{title[:46]}” → „{_organ_key(title)}” ({label})")
 
     print()
     print(f"{'✓ Wszystko zielone' if not failed else f'✗ Błędów: {failed}'}")
