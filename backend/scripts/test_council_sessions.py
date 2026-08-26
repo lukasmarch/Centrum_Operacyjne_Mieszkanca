@@ -82,6 +82,39 @@ def test_youtube() -> None:
           "https://www.youtube.com/watch?v=6h9iKlveTcs&t=754s")
 
 
+def test_bramka_transmisji() -> None:
+    """
+    Zapowiedziana transmisja to nie awaria nagrania.
+
+    26.08.2026 galeria gminy miała wpis o sesji XXIV z adresem YouTube, a sama
+    sesja zaczynała się dopiero nazajutrz o 10:00. Bez tej bramki `council_job`
+    wpisywał wiersz w `error` i zjadał próbę za każdym razem, gdy zaglądał do
+    zapowiedzi.
+    """
+    print("\n== Bramka transmisji ==")
+    from datetime import datetime, timezone
+
+    from src.services.council_transcript import not_ready_reason
+
+    start = datetime(2026, 8, 27, 8, 0, tzinfo=timezone.utc)
+    upcoming = not_ready_reason(
+        {"live_status": "is_upcoming", "release_at": start, "duration_s": 0.0}
+    )
+    check("zapowiedź wstrzymuje przebieg", bool(upcoming), True)
+    check("powód niesie termin startu", "27.08.2026" in (upcoming or ""), True)
+
+    check("trwająca transmisja czeka",
+          not_ready_reason({"live_status": "is_live", "release_at": start}) is not None,
+          True)
+    # `post_live` przechodzi świadomie: obrady się skończyły, a wartość skrótu
+    # bierze się z tego, że powstaje tego samego dnia.
+    check("nagranie po transmisji przechodzi",
+          not_ready_reason({"live_status": "post_live", "release_at": start}), None)
+    check("zwykłe nagranie przechodzi",
+          not_ready_reason({"live_status": "was_live", "duration_s": 5185.0}), None)
+    check("brak pola nie blokuje", not_ready_reason({}), None)
+
+
 async def test_live() -> None:
     print("\n== Odpytanie na żywo ==")
     from src.scrapers.council_sessions import fetch_recordings
@@ -105,6 +138,7 @@ def main() -> int:
     print("=" * 68)
     test_parsowanie()
     test_youtube()
+    test_bramka_transmisji()
     if args.live:
         asyncio.run(test_live())
 

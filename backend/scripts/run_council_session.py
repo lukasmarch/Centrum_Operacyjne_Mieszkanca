@@ -41,6 +41,7 @@ from src.services.council_transcript import (
     Transcript,
     TranscriptionError,
     download_audio,
+    not_ready_reason,
     transcribe_audio,
     video_metadata,
 )
@@ -204,9 +205,18 @@ async def main() -> int:
             name = args.name or f"sesja_{recording.page_id}"
         else:
             url = args.url
-            meta = video_metadata(url)
-            title = meta["title"]
             name = args.name or "sesja"
+
+        # Bramka transmisji dotyczy OBU ścieżek. Galeria dostaje adres nagrania
+        # przed obradami, więc `--latest` w dniu sesji trafia na zapowiedź —
+        # bez tego sprawdzenia yt-dlp próbowałby pobrać strumień, którego nie ma.
+        meta = video_metadata(url)
+        if not args.latest:
+            title = meta["title"]
+        waiting = not_ready_reason(meta)
+        if waiting:
+            print(f"Nagranie jeszcze nie do przepisania: {waiting}", file=sys.stderr)
+            return 1
 
         print(f"Nagranie: {title}\n{url}")
         audio = download_audio(url, work_dir, name=name)

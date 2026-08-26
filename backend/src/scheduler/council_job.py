@@ -42,6 +42,7 @@ from src.services.council_store import apply_result, summary_dict
 from src.services.council_transcript import (
     TranscriptionError,
     download_audio,
+    not_ready_reason,
     transcribe_audio,
     video_metadata,
 )
@@ -141,13 +142,28 @@ async def _process(session: AsyncSession, row: CouncilSession, work_dir: Path) -
     Zwraca True, gdy skrót czeka na akceptację.
     """
     url = f"https://www.youtube.com/watch?v={row.youtube_id}"
+
+    # Metadane PRZED podbiciem próby. Gmina wystawia adres nagrania w galerii
+    # z wyprzedzeniem — 26.08.2026 wpis o sesji XXIV prowadził do transmisji
+    # zaplanowanej na następny dzień. Zapowiedź nie jest awarią: wiersz zostaje
+    # w `new` i job wróci po niego jutro, zamiast wypalić trzy próby na obradach,
+    # które się jeszcze nie odbyły.
+    try:
+        meta = video_metadata(url)
+    except Exception as exc:  # noqa: BLE001 — nieczytelne metadane to już awaria
+        return await _fail(session, row, exc, counted=True)
+
+    waiting = not_ready_reason(meta)
+    if waiting:
+        logger.info("Sesja %s czeka: %s", row.external_id, waiting)
+        return False
+
     row.attempts += 1
     row.status = CouncilSessionStatus.PROCESSING.value
     session.add(row)
     await session.commit()
 
     try:
-        meta = video_metadata(url)
         minutes = meta["duration_s"] / 60
         if minutes > MAX_SESSION_MINUTES:
             raise TranscriptionError(
@@ -173,15 +189,27 @@ async def _process(session: AsyncSession, row: CouncilSession, work_dir: Path) -
         return True
 
     except Exception as exc:  # noqa: BLE001 — każdy błąd ma zostawić ślad w wierszu
-        row.status = CouncilSessionStatus.ERROR.value
-        row.last_error = str(exc)[:1000]
-        session.add(row)
-        await session.commit()
-        logger.error(
-            "Sesja %s nie przeszła (próba %d/%d): %s",
-            row.external_id, row.attempts, MAX_ATTEMPTS, exc,
-        )
-        return False
+        return await _fail(session, row, exc)
+
+
+async def _fail(
+    session: AsyncSession,
+    row: CouncilSession,
+    exc: Exception,
+    counted: bool = False,
+) -> bool:
+    """Wiersz w `error` ze śladem po awarii. `counted` podbija próbę za wołającego."""
+    if counted:
+        row.attempts += 1
+    row.status = CouncilSessionStatus.ERROR.value
+    row.last_error = str(exc)[:1000]
+    session.add(row)
+    await session.commit()
+    logger.error(
+        "Sesja %s nie przeszła (próba %d/%d): %s",
+        row.external_id, row.attempts, MAX_ATTEMPTS, exc,
+    )
+    return False
 
 
 def _scrub_token(text: str) -> str:

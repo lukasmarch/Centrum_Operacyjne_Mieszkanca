@@ -28,6 +28,7 @@ import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
@@ -269,11 +270,29 @@ def probe_duration(audio_path: Path) -> float:
 
 
 def video_metadata(video_url: str) -> dict:
-    """Tytuł, długość i data publikacji bez pobierania strumienia."""
+    """
+    Tytuł, długość, data publikacji i stan transmisji — bez pobierania strumienia.
+
+    **`--ignore-no-formats-error` jest tu konieczne, nie kosmetyczne.** Gmina
+    wystawia w galerii adres YouTube ZANIM sesja się zacznie: 26.08.2026 wpis
+    „XXIV Sesja … z dnia 27.08.2026" prowadził do zaplanowanej transmisji, którą
+    yt-dlp kwitował błędem („This live event will begin in 17 hours") i kończył
+    kodem ≠ 0. Dla `council_job` wyglądało to jak awaria nagrania — sesja szła
+    w `error` i traciła próbę, choć jedyną winą było to, że obrady jeszcze nie
+    trwały. Z tą flagą brak ścieżek audio jest ostrzeżeniem, a `live_status`
+    wraca normalnie i wołający ma czym odróżnić „jeszcze nie ma czego pobierać"
+    od „nagranie zepsute".
+
+    `live_status`: `is_upcoming` (zapowiedź), `is_live` (trwa), `post_live`
+    (skończyła się, VOD dopiero się przetwarza), `was_live`, `not_live`.
+    `release_at` niesie zapowiedzianą godzinę startu (UTC) — dla zapowiedzi
+    jest to jedyna informacja o tym, kiedy wracać.
+    """
     result = _run(
         [
             _tool("yt-dlp"), *_YTDLP_ARGS[:2], "--skip-download",
-            "--print", "%(title)s\t%(duration)s\t%(upload_date)s",
+            "--ignore-no-formats-error",
+            "--print", "%(title)s\t%(duration)s\t%(upload_date)s\t%(live_status)s\t%(release_timestamp)s",
             video_url,
         ],
         "Odczyt metadanych nagrania",
@@ -281,12 +300,42 @@ def video_metadata(video_url: str) -> dict:
     line = [ln for ln in result.stdout.splitlines() if "\t" in ln]
     if not line:
         raise TranscriptionError(f"Nagranie bez metadanych: {video_url}")
-    title, duration, upload_date = line[-1].split("\t")[:3]
+    parts = (line[-1].split("\t") + ["", "", "", "", ""])[:5]
+    title, duration, upload_date, live_status, release_ts = parts
+
+    def _number(raw: str) -> Optional[float]:
+        raw = raw.strip()
+        return float(raw) if raw not in ("", "NA", "None") else None
+
+    release_epoch = _number(release_ts)
     return {
         "title": title.strip(),
-        "duration_s": float(duration) if duration not in ("", "NA") else 0.0,
+        "duration_s": _number(duration) or 0.0,
         "upload_date": upload_date.strip(),
+        "live_status": live_status.strip() or "not_live",
+        "release_at": (
+            datetime.fromtimestamp(release_epoch, tz=timezone.utc)
+            if release_epoch else None
+        ),
     }
+
+
+# Stany, w których nagrania nie ma jeszcze czego pobierać. `post_live` NIE jest
+# na tej liście świadomie: transmisja się skończyła, VOD bywa gotowy w kilka
+# minut, a cała wartość skrótu leży w tym, że powstaje tego samego dnia.
+LIVE_NOT_READY = ("is_upcoming", "is_live")
+
+
+def not_ready_reason(meta: dict) -> Optional[str]:
+    """Czemu nagrania nie da się jeszcze przepisać — albo None, gdy da się."""
+    status = meta.get("live_status")
+    if status not in LIVE_NOT_READY:
+        return None
+    when = meta.get("release_at")
+    if status == "is_live":
+        return "transmisja trwa — wracamy po zakończeniu obrad"
+    stamp = when.astimezone().strftime("%d.%m.%Y %H:%M") if when else "termin nieznany"
+    return f"transmisja zapowiedziana na {stamp} — jeszcze się nie zaczęła"
 
 
 def download_audio(video_url: str, dest_dir: Path, name: str = "session") -> Path:
