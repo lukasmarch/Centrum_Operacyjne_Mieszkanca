@@ -22,6 +22,8 @@ za sesję i nadrabianie zaległości nie może wystawić rachunku bez ostrzeżen
 
 Przebieg ręczny (ten sam kod, natychmiast):
     cd backend && python -m scripts.run_council_session --latest --save
+
+Lista kontrolna dla człowieka przy akceptacji: `docs/AKCEPTACJA_SKROTU_SESJI.md`.
 """
 import asyncio
 import shutil
