@@ -49,6 +49,8 @@ export interface Event {
   isPromoted?: boolean;
   imageUrl?: string;
   description?: string;
+  /** Pełny opis ze źródła — `description` bywa skrótem i gubi porządek obrad. */
+  details?: string;
   externalUrl?: string;
   organizer?: string;
   sourceName?: string;
@@ -264,7 +266,7 @@ export interface ReportMapItem {
   created_at: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'cinema' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'cinema' | 'council' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies';
 
 export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'zgloszenia';
 

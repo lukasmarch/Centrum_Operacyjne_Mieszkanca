@@ -33,6 +33,10 @@
     "short": "Wydarzenia",
     "type": "CollectionPage"
   },
+  "/sesje": {
+    "title": "Sesje Rady Gminy Rybno — co uchwalili radni | RybnoLive",
+    "description": "Skróty obrad Rady Gminy Rybno: co ustalono, jak głosowano i w której minucie nagrania to padło. Cytaty sprawdzone z zapisem obrad."
+  },
   "/pogoda": {
     "title": "Pogoda i jakość powietrza — Gmina Rybno | RybnoLive",
     "description": "Aktualna pogoda, prognoza godzinowa i jakość powietrza dla Gminy Rybno. Ostrzeżenia meteo i indeks czystości powietrza na żywo.",

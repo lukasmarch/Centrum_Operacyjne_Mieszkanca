@@ -36,6 +36,7 @@ const TermsPage        = lazy(() => import('./src/pages/TermsPage'));
 const PrivacyPage      = lazy(() => import('./src/pages/PrivacyPage'));
 const CookiePolicyPage = lazy(() => import('./src/pages/CookiePolicyPage'));
 const CheckoutPage     = lazy(() => import('./src/pages/CheckoutPage'));
+const CouncilPage      = lazy(() => import('./src/pages/CouncilPage'));
 
 // Podmenu zakładki „Info". Odpady, autobus i kino dopisane razem z przebudową:
 // bez nich strony powstałe 11–12.08 były osiągalne WYŁĄCZNIE z kafla na stronie
@@ -45,6 +46,7 @@ const CheckoutPage     = lazy(() => import('./src/pages/CheckoutPage'));
 const MIASTO_ITEMS = [
     { id: 'news', label: 'Wiadomości' },
     { id: 'events', label: 'Wydarzenia' },
+    { id: 'council', label: 'Sesje Rady' },
     { id: 'weather', label: 'Pogoda' },
     { id: 'waste', label: 'Odpady' },
     { id: 'bus', label: 'Autobus' },
@@ -60,6 +62,7 @@ const SECTION_TO_TAB: Record<AppSection, TabId> = {
     assistant: 'assistant',
     news: 'miasto',
     events: 'miasto',
+    council: 'miasto',
     weather: 'miasto',
     waste: 'miasto',
     bus: 'miasto',
@@ -102,6 +105,7 @@ export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
     // Lustro tej listy trzyma backend/src/api/endpoints/seo.py (sitemap.xml).
     news: '/wiadomosci',
     events: '/wydarzenia',
+    council: '/sesje',
     weather: '/pogoda',
     waste: '/harmonogram-odpadow',
     bus: '/autobus',
@@ -294,6 +298,8 @@ const AppContent: React.FC = () => {
                 return <BusPage onNavigate={handleNavigate} />;
             case 'cinema':
                 return <CinemaPage />;
+            case 'council':
+                return <CouncilPage />;
             case 'assistant':
                 return <AssistantPage initialQuery={initialQuery} onNavigate={handleNavigate} />;
             case 'news':

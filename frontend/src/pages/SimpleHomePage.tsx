@@ -26,6 +26,7 @@ import AdBoard from '../../components/simple/AdBoard';
 import ReportsMini from '../../components/simple/ReportsMini';
 import NewsletterCta from '../../components/simple/NewsletterCta';
 import CinemaCard from '../../components/simple/CinemaCard';
+import CouncilCard from '../../components/simple/CouncilCard';
 import RoadStatusStrip from '../../components/simple/RoadStatusStrip';
 import HealthTodayCard from '../../components/simple/HealthTodayCard';
 import AskBar from '../../components/simple/AskBar';
@@ -316,6 +317,12 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
                     <RoadStatusStrip />
                 </div>
             </section>
+
+            {/* Rada Gminy — jedyna rubryka, w której serwis mówi o decyzjach,
+                a nie o zdarzeniach. Kafel sam wybiera, czy zapowiada najbliższą
+                sesję, czy pokazuje ostatni skrót; znika tylko, gdy nie ma ani
+                jednego, ani drugiego */}
+            <CouncilCard onClick={() => onNavigate('council')} />
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_1fr] lg:gap-5">
                 <KadrCard

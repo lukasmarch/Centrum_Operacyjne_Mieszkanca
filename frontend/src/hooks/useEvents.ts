@@ -39,6 +39,9 @@ export function useEvents(limit: number = 50) {
                     isPromoted: item.is_featured,
                     imageUrl: item.image_url || undefined,
                     description: item.short_description || item.description || undefined,
+                    // Pełny opis obok skróconego: kafel Rady wyciąga z niego
+                    // porządek obrad, którego `short_description` nie niesie
+                    details: item.description || undefined,
                     externalUrl: item.external_url || undefined,
                     organizer: item.organizer || undefined,
                     sourceName: item.source_name || undefined,

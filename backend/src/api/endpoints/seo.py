@@ -49,6 +49,10 @@ STATIC_PAGES = [
     {"loc": "/harmonogram-odpadow",   "priority": "0.9", "changefreq": "monthly"},
     {"loc": "/autobus",               "priority": "0.8", "changefreq": "monthly"},
     {"loc": "/wydarzenia",            "priority": "0.8", "changefreq": "daily"},
+    # Skróty obrad Rady — treść, której nie ma nikt inny w gminie. BIP wystawia
+    # protokoły PDF-em i tygodnie później, więc zapytanie „co uchwaliła Rada
+    # Gminy Rybno" nie ma dziś w wynikach żadnej sensownej odpowiedzi.
+    {"loc": "/sesje",                 "priority": "0.8", "changefreq": "monthly"},
     {"loc": "/asystent",              "priority": "0.7", "changefreq": "monthly"},
     # Repertuar zmienia się co tydzień, ale adres jest stały — dla kogoś, kto
     # szuka „kino Działdowo repertuar", to jedyna strona z gminy w wynikach
