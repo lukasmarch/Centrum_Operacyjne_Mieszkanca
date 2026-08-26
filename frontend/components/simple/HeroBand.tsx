@@ -27,7 +27,11 @@ import { getNameDays, getHoliday } from '../../src/utils/calendarUtils';
  * Zdjęcie gminy, gdy będzie: wystarczy wrzucić plik, układ się nie zmienia.
  * Kadr poziomy, raczej ciemny, z zapasem po lewej — tam stoi hasło.
  */
-const PHOTO_SRC = '/simple/rybno-hero.jpg';
+// ⚠️ Nazwa pliku niesie DATĘ i przy podmianie kadru musi się zmienić.
+// Caddy podaje `/simple/*` z `max-age=604800` (7 dni), a Vite kopiuje `public/`
+// bez skrótu w nazwie — nadpisanie tej samej nazwy oznacza, że każdy, kto był
+// na stronie w ostatnim tygodniu, przez kolejny tydzień widzi STARE zdjęcie.
+const PHOTO_SRC = '/simple/rybno-hero-2026-08-25.jpg';
 
 interface HeroBandProps {
     onOpenCalendar: () => void;
