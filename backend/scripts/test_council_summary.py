@@ -211,6 +211,46 @@ def test_brak_cytatow_jest_ok() -> None:
     check("skuteczność nieokreślona", report.quote_accuracy, None)
 
 
+
+def test_bramka_nazwisk() -> None:
+    """
+    Cytat potwierdzony NIE potwierdza mówcy.
+
+    Transkrypt nie ma diarizacji, więc przypisanie nazwiska jest domysłem modelu.
+    Prawdziwe zdanie przypisane niewłaściwemu radnemu przechodziło bramkę cytatów
+    na zielono — bo bramka sprawdzała tylko, czy słowa padły.
+    """
+    print("\n== Bramka nazwisk ==")
+    from src.ai.council_summary import _unsupported_name, _name_tokens
+
+    tr = Transcript(
+        segments=[
+            Segment(start=0.0, end=6.0, text="Pan Dariusz Tara, proszę bardzo."),
+            Segment(start=6.0, end=14.0, text="Ta działka jest dla nas kluczowa, apeluję o przyjęcie uchwały."),
+            Segment(start=900.0, end=908.0, text="Przechodzimy do punktu piątego, proszę o odczytanie projektu."),
+        ],
+        duration_s=1000.0,
+    )
+
+    check("nazwisko pada w oknie — zostaje",
+          _unsupported_name(tr, "Dariusz Tara", 8.0), None)
+    check("nazwisko z funkcją — zostaje",
+          _unsupported_name(tr, "Radny Dariusz Tara", 8.0), None)
+    check("nazwisko, którego nie ma — usuwane",
+          _unsupported_name(tr, "Jan Kowalski", 8.0), "Jan Kowalski")
+    # To samo nazwisko, ale kwadrans dalej: model przeniósł mówcę z innej sprawy
+    check("prawdziwe nazwisko poza oknem — usuwane",
+          _unsupported_name(tr, "Dariusz Tara", 904.0), "Dariusz Tara")
+
+    # Krótkie nazwisko dawało dwuliterowy rdzeń, który trafiał w „tak” i „ta”
+    # w dowolnym miejscu nagrania — próg `_MIN_STEM` to zamyka
+    check('krótkie nazwisko nie przechodzi przez rdzeń ta',
+          _unsupported_name(tr, "Tara", 904.0), "Tara")
+
+    check("sama funkcja nie jest nazwiskiem", _name_tokens("Przewodniczący Rady"), [])
+    check("puste pole przechodzi", _unsupported_name(tr, None, 8.0), None)
+
+
 def main() -> int:
     print("=" * 68)
     print("BRAMKA CYTATÓW — skrót sesji Rady Gminy")
@@ -223,6 +263,7 @@ def main() -> int:
     test_znacznik_poza_nagraniem()
     test_podzial_na_zdania()
     test_brak_cytatow_jest_ok()
+    test_bramka_nazwisk()
 
     print("\n" + "=" * 68)
     if FAILURES:

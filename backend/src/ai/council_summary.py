@@ -73,16 +73,26 @@ ZASADY BEZWZGLĘDNE:
 4. Pole `speaker` wypełniaj TYLKO, gdy z transkryptu jednoznacznie wynika, kto mówi
    (np. ktoś zwraca się do niego po nazwisku albo sam się przedstawia).
    W nagraniu obrad zwykle NIE da się tego ustalić — wtedy zostaw puste. To normalne.
+   Nazwisko wpisujesz WYŁĄCZNIE dla radnych, wójta, sołtysów i urzędników gminy —
+   czyli osób pełniących funkcje publiczne, wypowiadających się w ramach tych funkcji.
+   Wypowiedź mieszkańca, petenta albo gościa referujesz BEZ nazwiska, choćby padło
+   w nagraniu wyraźnie: napisz „mieszkaniec" albo „mieszkanka" i zostaw `speaker` pusty.
 5. Transkrypt jest automatyczny i bywa przekręcony. Gdy fragment jest niezrozumiały,
    nie zgaduj jego treści — pomiń.
 6. Każdy punkt MUSI mieć znacznik czasu `timestamp` skopiowany z najbliższego
    znacznika [HH:MM:SS] poprzedzającego omawianą sprawę.
+7. Sprawy prywatne osób spoza kręgu z punktu 4 pomijasz w całości, nawet gdy padły
+   na jawnych obradach: spory sąsiedzkie i graniczne, zaległości i zadłużenia,
+   sytuacja rodzinna, zdrowie, świadczenia socjalne, sprawy sądowe. Jeśli taka sprawa
+   ma znaczenie dla ogółu (np. Rada podejmuje w niej uchwałę), opisz SAMĄ DECYZJĘ
+   i jej skutek dla mieszkańców, bez okoliczności dotyczących konkretnej osoby.
 
 CZEGO SZUKASZ (w tej kolejności ważności dla mieszkańca):
 - decyzje, które zmieniają czyjeś pieniądze, obowiązki albo otoczenie
   (stawki podatków i opłat, inwestycje, drogi, wodociąg, odpady, szkoły, fundusz sołecki),
 - uchwały: numer, czego dotyczy, wynik głosowania — jeśli padł w nagraniu,
-- sprawy zgłoszone przez radnych i sołtysów w wolnych wnioskach,
+- sprawy zgłoszone przez radnych i sołtysów w wolnych wnioskach — samą sprawę
+  i to, czego dotyczy dla mieszkańców, z zachowaniem punktu 7,
 - terminy i zapowiedzi (co, kiedy).
 
 CZEGO NIE PISZESZ:
@@ -217,6 +227,8 @@ class QualityReport:
     quotes_dropped: List[str] = field(default_factory=list)
     timestamps_fixed: int = 0
     timestamps_out_of_range: int = 0
+    # Nazwiska zdjęte z pola `speaker`, bo nie padły w okolicy cytatu
+    speakers_dropped: List[str] = field(default_factory=list)
     # Zdania opisów bez pokrycia w nagraniu (druga bramka, `verify_descriptions`)
     claims_total: int = 0
     claims_flagged: List[str] = field(default_factory=list)
@@ -240,6 +252,7 @@ class QualityReport:
         return (
             not self.quotes_dropped
             and not self.claims_flagged
+            and not self.speakers_dropped
             and self.timestamps_out_of_range == 0
         )
 
@@ -251,6 +264,8 @@ class QualityReport:
         ]
         if self.quotes_dropped:
             parts.append(f"USUNIĘTE ZMYŚLONE CYTATY: {len(self.quotes_dropped)}")
+        if self.speakers_dropped:
+            parts.append(f"USUNIĘTE NAZWISKA BEZ POKRYCIA: {len(self.speakers_dropped)}")
         if self.claims_flagged:
             parts.append(f"ZDANIA DO SPRAWDZENIA: {len(self.claims_flagged)}")
         if self.timestamps_out_of_range:
@@ -325,6 +340,79 @@ def _condense(stamped: str) -> str:
     )
 
 
+# Ile sekund wokół cytatu przeszukujemy w poszukiwaniu nazwiska. Przewodniczący
+# udziela głosu przed wypowiedzią („Pan Dariusz Tara, proszę bardzo"), a mówca
+# bywa nazwany dopiero po niej, przy podziękowaniu — dlatego okno jest szerokie
+# i symetryczne. Trzy minuty w każdą stronę to ~pół strony transkryptu.
+SPEAKER_WINDOW_S = 180.0
+
+# Najkrótszy rdzeń nazwiska dopuszczony do porównania. Cztery znaki to próg,
+# poniżej którego dopasowanie przestaje cokolwiek znaczyć w polskim tekście.
+_MIN_STEM = 4
+
+# Słowa, które w polu `speaker` NIE są nazwiskiem, tylko funkcją. „Przewodniczący
+# Rady" bez nazwiska nikogo nie wskazuje imiennie, więc nie ma czego weryfikować
+# ani co usuwać — bramka dotyczy wyłącznie nazwisk.
+_ROLE_WORDS = {
+    "przewodniczący", "przewodnicząca", "wiceprzewodniczący", "wiceprzewodnicząca",
+    "wójt", "radny", "radna", "radni", "sołtys", "sołtyska", "skarbnik", "sekretarz",
+    "kierownik", "dyrektor", "mieszkaniec", "mieszkanka", "komisji", "komisja",
+    "rady", "gminy", "urzędu", "pan", "pani", "państwo",
+}
+
+
+def _name_tokens(speaker: Optional[str]) -> List[str]:
+    """Z pola `speaker` wyciąga to, co wygląda na nazwisko — bez nazw funkcji."""
+    if not speaker:
+        return []
+    return [
+        word for word in re.findall(r"[^\W\d_]{4,}", speaker, flags=re.UNICODE)
+        if word.lower() not in _ROLE_WORDS
+    ]
+
+
+def _unsupported_name(
+    transcript: Transcript, speaker: Optional[str], center_s: float
+) -> Optional[str]:
+    """
+    Nazwisko z pola `speaker`, którego NIE słychać w okolicy cytatu — albo None.
+
+    **Po co, skoro cytat jest już potwierdzony.** Transkrypt nie ma diarizacji:
+    Whisper zwraca ciąg słów bez informacji, kto je wypowiedział. Model przypisuje
+    mówcę z kontekstu, czyli zgaduje. Zgadnięcie bywa trafne, ale gdy nie jest,
+    powstaje najgorszy możliwy błąd tego mechanizmu: **prawdziwe zdanie przypisane
+    niewłaściwemu radnemu**, przepuszczone przez bramkę cytatów na zielono.
+
+    Sprawdzamy więc rzecz słabszą, ale twardą: czy nazwisko w ogóle pada w nagraniu
+    w okolicy cytatu. To nie dowodzi, że mówił właśnie on — dowodzi tylko, że model
+    miał się na czym oprzeć. Brak nazwiska w oknie znaczy, że nie miał, i wtedy
+    pole leci.
+
+    Odmiana: „Kornatowski" pada w nagraniu jako „Kornatowskiego" albo
+    „Kornatowskiemu", więc porównujemy rdzeń bez dwóch ostatnich liter — ale
+    **nigdy krótszy niż `_MIN_STEM`**. Bez tego progu „Tara" dawało rdzeń „ta",
+    który trafia w „tak", „tam" i „ta" w dowolnym miejscu nagrania, czyli bramka
+    przepuszczała każde krótkie nazwisko. Wyszło przy teście na sesji XXIII.
+
+    Porównanie idzie po SŁOWACH okna, nie po surowym podciągu: rdzeń „rada"
+    nie ma prawa trafić w środek „porady".
+    """
+    tokens = _name_tokens(speaker)
+    if not tokens:
+        return None
+
+    window_words = normalize_quote(
+        transcript.window(center_s, before_s=SPEAKER_WINDOW_S, after_s=SPEAKER_WINDOW_S)
+    ).split()
+
+    for token in tokens:
+        flat = normalize_quote(token)
+        stem = flat[:max(_MIN_STEM, len(flat) - 2)]
+        if any(word.startswith(stem) for word in window_words):
+            return None
+    return speaker
+
+
 def verify_against_transcript(
     summary: CouncilSummaryModel, transcript: Transcript
 ) -> QualityReport:
@@ -365,6 +453,19 @@ def verify_against_transcript(
                 if point.timestamp != located.stamp:
                     report.timestamps_fixed += 1
                 point.timestamp = located.stamp
+
+                # Cytat potwierdzony NIE potwierdza mówcy. Transkrypt nie ma
+                # diarizacji, więc przypisanie nazwiska jest domysłem modelu
+                # z kontekstu — a prawdziwe zdanie przypisane niewłaściwemu
+                # radnemu przechodziło dotąd bramkę cytatów na zielono.
+                unsupported = _unsupported_name(transcript, point.speaker, located.start)
+                if unsupported:
+                    report.speakers_dropped.append(f"{unsupported} @ {located.stamp}")
+                    logger.warning(
+                        "Nazwisko %r nie pada w okolicy cytatu (%s), usuwam mówcę",
+                        unsupported, located.stamp,
+                    )
+                    point.speaker = None
             else:
                 report.quotes_dropped.append(point.quote[:120])
                 logger.warning("Cytat nie występuje w nagraniu, usuwam: %r", point.quote[:120])

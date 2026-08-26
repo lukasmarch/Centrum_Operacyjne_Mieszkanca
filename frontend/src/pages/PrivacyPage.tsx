@@ -13,10 +13,10 @@ interface PrivacyPageProps {
   onNavigate: (section: AppSection) => void;
 }
 
-export const PRIVACY_VERSION = '2026-07-07';
+export const PRIVACY_VERSION = '2026-08-26';
 
 const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
-  <LegalLayout title="Polityka prywatności" updated="7 lipca 2026">
+  <LegalLayout title="Polityka prywatności" updated="26 sierpnia 2026">
 
     <h2>1. Administrator danych</h2>
     <p>Administratorem danych osobowych jest <strong>Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: Żabiny 96, 13-220 Rybno (dalej: „Administrator"). Kontakt we wszystkich sprawach dotyczących danych osobowych: <strong>biuro@lumargo.pl</strong>, tel. <strong>+48 501 081 723</strong>.</p>
@@ -67,14 +67,16 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
       <li><strong>Publiczne wpisy z serwisu Facebook</strong> (profile informacyjne o charakterze publicznym — lokalne media, instytucje): kategorie danych — imiona i nazwiska, wizerunek, treści wpisów. Cel: informowanie społeczności lokalnej (art. 6 ust. 1 lit. f). Prezentujemy skróty z odesłaniem do oryginału.</li>
       <li><strong>CEIDG</strong> (Centralna Ewidencja i Informacja o Działalności Gospodarczej): dane przedsiębiorców — nazwa firmy, imię i nazwisko, adres wykonywania działalności (ulica i numer budynku, miejscowość, kod pocztowy), NIP, REGON, kody PKD i branża, status wpisu oraz data rozpoczęcia działalności. Cel: prowadzenie katalogu lokalnych firm (art. 6 ust. 1 lit. f). Źródło: rejestr publiczny CEIDG. Nie pobieramy ani nie przechowujemy danych kontaktowych z rejestru (adresu e-mail, telefonu, strony www) — telefon, e-mail i adres strony pojawiają się w katalogu wyłącznie wtedy, gdy firma poda je samodzielnie, przejmując swoją wizytówkę.</li>
       <li><strong>Lokalne portale informacyjne, strony urzędowe i BIP</strong>: dane zawarte w publikowanych tam materiałach prasowych i urzędowych.</li>
+      <li><strong>Nagrania obrad Rady Gminy Rybno</strong> (galeria nagrań na gminarybno.pl): kategorie danych — imiona i nazwiska radnych, Wójta, sołtysów i urzędników, treść ich wypowiedzi na jawnych obradach. Cel: informowanie mieszkańców o działalności organu władzy publicznej (art. 6 ust. 1 lit. f). Podstawa jawności: art. 11b ust. 1 oraz art. 20 ust. 1b ustawy o samorządzie gminnym — obrady rady gminy są jawne, a gmina ma obowiązek je transmitować, utrwalać i udostępniać nagranie publicznie. Nagranie przepisujemy automatycznie (transkrypcja mowy na tekst — <strong>bez rozpoznawania głosu i bez identyfikacji mówcy po barwie głosu</strong>, nie przetwarzamy danych biometrycznych), a na podstawie zapisu powstaje skrót obrad. <strong>Transkrypt nie jest publikowany</strong> — służy wyłącznie sprawdzeniu, czy cytat w skrócie naprawdę padł. Publikujemy sam skrót, i to dopiero po sprawdzeniu i zatwierdzeniu przez człowieka. Wypowiedzi osób niepełniących funkcji publicznych (mieszkańców, gości) referujemy <strong>bez podawania nazwiska</strong>, a spraw prywatnych nie opisujemy w ogóle.</li>
     </ul>
+    <p><strong>Skąd wiesz, że tu jesteś:</strong> art. 14 ust. 5 lit. b RODO zwalnia nas z zawiadamiania każdej osoby z osobna, gdy dane pochodzą ze źródła publicznego, a poinformowanie wszystkich wymagałoby niewspółmiernie dużego wysiłku — w zamian nakazuje podać te informacje publicznie. Ten akapit jest właśnie takim powiadomieniem.</p>
     <p><strong>Prawo sprzeciwu:</strong> każda osoba, której dane pojawiają się w agregowanych treściach, może wnieść sprzeciw lub zażądać usunięcia danych, pisząc na biuro@lumargo.pl. Żądania rozpatrujemy niezwłocznie, nie później niż w 7 dni.</p>
 
     <h2>4. Odbiorcy danych (podmioty przetwarzające)</h2>
     <p>Dane powierzamy wyłącznie w zakresie niezbędnym do działania Serwisu:</p>
     <ul>
       <li><strong>Hetzner Online GmbH</strong> (Niemcy, UE) — hosting serwera i bazy danych,</li>
-      <li><strong>OpenAI</strong> oraz <strong>Google (Gemini)</strong> — przetwarzanie zapytań do Asystenta AI i automatyczna kategoryzacja treści,</li>
+      <li><strong>OpenAI</strong> oraz <strong>Google (Gemini)</strong> — przetwarzanie zapytań do Asystenta AI, automatyczna kategoryzacja treści oraz transkrypcja i streszczanie nagrań obrad Rady Gminy (ścieżka dźwiękowa nagrania i powstały z niej tekst),</li>
       <li><strong>PayPro S.A. (Przelewy24)</strong> — obsługa płatności (odrębny administrator danych transakcyjnych),</li>
       <li><strong>Resend</strong> — wysyłka wiadomości e-mail,</li>
       <li>dostawcy danych pogodowych i jakości powietrza (Airly i in.) — bez przekazywania danych osobowych.</li>
@@ -94,6 +96,8 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
         <tr><td>Rozmowy anonimowe i dane o limitach (IP)</td><td>do 90 dni</td></tr>
         <tr><td>Zgłoszenia mieszkańców</td><td>do 12 miesięcy od rozwiązania sprawy (dane autora — anonimizowane)</td></tr>
         <tr><td>Dane rozliczeniowe</td><td>5 lat od końca roku podatkowego (obowiązek ustawowy)</td></tr>
+        <tr><td>Transkrypt nagrania obrad Rady Gminy (niepublikowany)</td><td>przez okres publikowania skrótu danej sesji — transkrypt jest jedynym materiałem pozwalającym sprawdzić, czy zacytowane zdanie naprawdę padło; usuwany razem ze skrótem</td></tr>
+        <tr><td>Skrót obrad Rady Gminy (publikowany)</td><td>bezterminowo — pełni funkcję archiwum działalności organu władzy publicznej; usuwany na uzasadniony sprzeciw</td></tr>
         <tr><td>Logi techniczne</td><td>do 90 dni</td></tr>
       </tbody>
     </table>
