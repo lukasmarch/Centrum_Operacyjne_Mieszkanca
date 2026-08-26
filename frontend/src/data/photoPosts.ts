@@ -34,15 +34,10 @@ export interface PhotoPost {
 }
 
 export const PHOTO_POSTS: PhotoPost[] = [
-    // ⚠️ WPIS TYMCZASOWY — podmień na pierwszy własny kadr z drona.
-    // Korzysta ze zdjęcia, które już leży w repozytorium (to samo, co w tle
-    // pasma powitalnego), więc karta ma co pokazać przed pierwszym lotem.
     {
-        image: '/simple/rybno-hero.jpg',
-        title: 'Rybno z lotu ptaka',
-        description: 'Zdjęcie z drona wykonane 31 lipca 2026 roku nad Rybnem. '
-            + 'W tym miejscu będą pojawiać się kolejne kadry z gminy — z opisem tego, '
-            + 'co widać: postępu prac drogowych, inwestycji, zmian w krajobrazie.',
-        date: '2026-07-31',
+        image: '/simple/kadr/rybno-lot-2026-08-25.jpg',
+        title: 'Lot nad Rybnem',
+        description: 'Rybno w sierpniowy wieczór.',
+        date: '2026-08-25',
     },
 ];
