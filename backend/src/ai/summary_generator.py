@@ -74,11 +74,46 @@ def _day_word(day_offset: int) -> Optional[str]:
     return {0: "dziś", 1: "jutro", -1: "wczoraj"}.get(day_offset)
 
 
+def _event_is_over(article, now: datetime) -> bool:
+    """
+    Czy termin, którym wpis konkuruje, jest już za mieszkańcem.
+
+    Trzy przypadki, bo `articles.event_at` niesie trzy różne rzeczy:
+      • znany koniec (`event_until`) — rozstrzyga on,
+      • zapowiedź bez godziny (`event_at` o lokalnej PÓŁNOCY, tak zapisuje ją
+        kategoryzacja) — trwa do końca swojej doby, inaczej dożynki byłyby
+        „po" już o 00:01 w dniu dożynek,
+      • termin z godziną bez końca — zamyka się z chwilą startu.
+
+    Ostatni punkt jest surowy świadomie: nagłówek dnia ma być rzeczą, na którą
+    mieszkaniec może jeszcze zdążyć, a briefing z 13:30 wisi na stronie do
+    wieczora. 26.08.2026 odświeżenie o 13:30 otworzyło się zdaniem „Posiedzenie
+    Komisji Rozwoju Gospodarczego — już dziś o 12:00", czyli półtorej godziny
+    po fakcie, mając w materiale sesję Rady nazajutrz.
+    """
+    start = getattr(article, "event_at", None)
+    if start is None:
+        return False
+
+    end = getattr(article, "event_until", None)
+    if end is not None:
+        return end < now
+
+    local_start = _local(start)
+    if (local_start.hour, local_start.minute) == (0, 0):
+        return _local(now).date() > local_start.date()
+    return start < now
+
+
 def _time_label(article, now: datetime) -> str:
     """
     Znacznik czasu przy artykule w prompcie. Bez niego model nie odróżniał
     wpisu sprzed godziny od wpisu sprzed doby i przepisywał „dziś o 17:00"
     z wczorajszego zaproszenia na koncert, który już się odbył.
+
+    „JUŻ PO" jest tu z tego samego powodu: sama data nie mówi modelowi, że
+    zapowiedź straciła ważność między porannym przebiegiem a popołudniowym,
+    a etykieta jest ostatnią rzeczą, jaką czyta przy wpisie.
     """
     today = _local(now).date()
 
@@ -91,8 +126,11 @@ def _time_label(article, now: datetime) -> str:
             span += f"–{_local(end):%H:%M}"
         word = _day_word((start.date() - today).days)
         when = f"{word} {span}" if word else f"{start:%d.%m} {span}"
-        ongoing = end and event_at <= now <= end
-        return f"[ZDARZENIE {when}{' — TRWA TERAZ' if ongoing else ''}]"
+        if end and event_at <= now <= end:
+            return f"[ZDARZENIE {when} — TRWA TERAZ]"
+        if _event_is_over(article, now):
+            return f"[ZDARZENIE {when} — JUŻ PO]"
+        return f"[ZDARZENIE {when}]"
 
     if not article.published_at:
         return "[bez daty]"
@@ -680,9 +718,19 @@ class SummaryGenerator:
 
         Kolejność rozstrzygania:
         1. lokalny przed regionalnym — regionalny wygrywa tylko przy braku lokalnych,
-        2. temat ostatnich briefingów na końcu swojej grupy,
-        3. ważność kategorii (`_headline_priority`),
-        4. bliskość w czasie.
+        2. zdarzenie po terminie na końcu swojej grupy (`_event_is_over`),
+        3. temat ostatnich briefingów na końcu swojej grupy,
+        4. ważność kategorii (`_headline_priority`),
+        5. bliskość w czasie.
+
+        Punkt 2 istnieje, bo punkt 5 liczy odległość BEZ kierunku — co jest
+        słuszne przy zapowiedziach („wyłączenie jutro bije wyłączenie za
+        dziewięć dni"), ale po terminie obraca się przeciw mieszkańcowi:
+        posiedzenie sprzed półtorej godziny było 26.08.2026 najbliższym
+        punktem w całym materiale i wygrało nagłówek z sesją Rady nazajutrz.
+        Bramka „czy to jeszcze sprawa najbliższych godzin" istniała dotąd
+        wyłącznie dla kategorii Awaria (`_headline_priority`) — reszta
+        kategorii nie miała żadnej.
 
         Punkt 2 porównuje TEMAT (`same_topic`), nie identyfikator: kolejne
         odświeżenie tego samego wyłączenia prądu ma nowe ID i wracało jako
@@ -703,17 +751,23 @@ class SummaryGenerator:
         więc dwie zapowiedzi pod rząd `same_topic` rozpoznaje jako jedną sprawę.
         """
         best = None
-        best_key = (2, 2, 999, float("inf"))
+        best_key = (2, 2, 2, 999, float("inf"))
 
         for category, arts in articles_by_category.items():
             for article in arts:
                 priority = self._headline_priority(category, article, now)
+                # Awaria, która JEST sprawą teraz, jest zwolniona z obu
+                # degradacji z tego samego powodu: „nie ma prądu" opisuje stan
+                # gminy, a nie zaproszenie, na które można było zdążyć.
+                alert_now = priority == self.CATEGORY_PRIORITY["Awaria"]
+                over = not alert_now and _event_is_over(article, now)
                 repeats = (
-                    priority != self.CATEGORY_PRIORITY["Awaria"]
+                    not alert_now
                     and self._repeats_recent_headline(article, recent_topics)
                 )
                 key = (
                     0 if self._is_local(article) else 1,
+                    1 if over else 0,
                     1 if repeats else 0,
                     priority,
                     self._time_distance_h(article, now),

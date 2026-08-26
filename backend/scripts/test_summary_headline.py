@@ -25,7 +25,7 @@ from typing import List, Optional, Tuple
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from src.ai.summary_generator import SummaryGenerator
+from src.ai.summary_generator import SummaryGenerator, _event_is_over, _time_label
 from src.services.feed_policy import is_local_article, topic_signature
 
 NOW = datetime(2026, 7, 29, 12, 0)
@@ -242,6 +242,77 @@ CASES: List[Tuple[str, List[SimpleNamespace], List[str], int]] = [
          article(2, "Kultura", "Dożynki w Rybnie z korowodem", published_h=6)],
         ["Wyłączenie planowe - Region Mława - Rybno gmina wiejska"], 2,
     ),
+    # 26.08.2026: odświeżenie o 13:30 otworzyło briefing zdaniem „Posiedzenie
+    # Komisji Rozwoju Gospodarczego — już dziś o 12:00" (art. 5488, termin
+    # półtorej godziny wcześniej), mając w materiale XXIV sesję Rady nazajutrz.
+    # Dystans liczony bez kierunku robił z minionego terminu najbliższy punkt dnia.
+    (
+        "posiedzenie sprzed półtorej godziny ustępuje jutrzejszej sesji Rady",
+        [article(1, "Urząd", "Posiedzenie Komisji Rozwoju Gospodarczego w Rybnie",
+                 published_h=120, event_h=-1.5),
+         article(2, "Urząd", "XXIV sesja Rady Gminy Rybno", published_h=120, event_h=20)],
+        [], 2,
+    ),
+    (
+        "minione posiedzenie ustępuje nawet lżejszej kategorii, byle nadchodzącej",
+        [article(1, "Urząd", "Posiedzenie Komisji Rozwoju Gospodarczego w Rybnie",
+                 published_h=120, event_h=-1.5),
+         article(2, "Kultura", "Dożynki w Rybnie z korowodem",
+                 published_h=48, event_h=80)],
+        [], 2,
+    ),
+    (
+        "minione posiedzenie wraca na nagłówek, gdy nic nie zostało przed nami",
+        [article(1, "Urząd", "Posiedzenie Komisji Rozwoju Gospodarczego w Rybnie",
+                 published_h=120, event_h=-1.5)],
+        [], 1,
+    ),
+    # Oba przypadki celowo w JEDNEJ kategorii: inaczej o wyniku rozstrzyga
+    # priorytet, a sprawdzamy tu wyłącznie, czy wpis dostał degradację „po terminie”.
+    (
+        "impreza trwająca (znany koniec) nie jest jeszcze „po”",
+        [article(1, "Kultura", "Dożynki w Rybnie z korowodem",
+                 published_h=48, event_h=-2, until_h=4),
+         article(2, "Kultura", "Kiermasz w Rumianie", published_h=48, event_h=30)],
+        [], 1,
+    ),
+    (
+        "zapowiedź całodniowa trwa do końca swojej doby",
+        # NOW to 29.07 12:00 UTC = 14:00 lokalnie; wpis bez godziny stoi w bazie
+        # jako 28.07 22:00 UTC, czyli lokalna północ dnia dzisiejszego (−14 h).
+        # Start jest za nami, ale dożynki dopiero trwają.
+        [article(1, "Kultura", "Dożynki Gminne w Rybnie", published_h=48, event_h=-14),
+         article(2, "Kultura", "Kiermasz w Rumianie", published_h=48, event_h=30)],
+        [], 1,
+    ),
+    (
+        "zapowiedź całodniowa z wczoraj jest już „po”",
+        [article(1, "Kultura", "Dożynki Gminne w Rybnie", published_h=72, event_h=-38),
+         article(2, "Kultura", "Kiermasz w Rumianie", published_h=48, event_h=90)],
+        [], 2,
+    ),
+    (
+        "trwające wyłączenie nie schodzi z nagłówka mimo minionego startu",
+        [article(1, "Awaria", "Wyłączenie awaryjne - Region Mława - Rybno gmina wiejska",
+                 "Energa - wyłączenia bieżące (RSS)", 3, -2, 3),
+         article(2, "Urząd", "XXIV sesja Rady Gminy Rybno", published_h=120, event_h=20)],
+        [], 1,
+    ),
+]
+
+
+# (opis, artykuł, oczekiwana etykieta) — model czyta znacznik czasu przy wpisie
+# i to on decyduje o czasie gramatycznym w briefingu
+LABEL_CASES = [
+    ("termin minął — model musi to wiedzieć",
+     article(1, "Urząd", "Posiedzenie komisji", published_h=120, event_h=-1.5),
+     "[ZDARZENIE dziś 12:30 — JUŻ PO]"),
+    ("zdarzenie trwa",
+     article(2, "Awaria", "Wyłączenie", ENERGA, 3, -2, 3),
+     "[ZDARZENIE dziś 12:00–17:00 — TRWA TERAZ]"),
+    ("zdarzenie przed nami",
+     article(3, "Urząd", "Sesja Rady", published_h=120, event_h=20),
+     "[ZDARZENIE jutro 10:00]"),
 ]
 
 
@@ -293,6 +364,18 @@ def run_cases() -> int:
 
     print("-" * 78)
     print(f"{len(CASES) - failures}/{len(CASES)} zgodnych z oczekiwaniem")
+
+    print()
+    print("=" * 78)
+    print("Znacznik czasu, który dostaje model")
+    print("=" * 78)
+    for label, item, expected in LABEL_CASES:
+        got = _time_label(item, NOW)
+        ok = got == expected
+        failures += not ok
+        detail = got + (f" (oczekiwano {expected})" if not ok else "")
+        print(f"{'✓' if ok else '✗'} {label:.<48} {detail}")
+
     return failures
 
 
@@ -337,6 +420,7 @@ async def run_db():
         (
             (
                 0 if generator._is_local(a) else 1,
+                1 if _event_is_over(a, now) else 0,
                 1 if generator._repeats_recent_headline(a, recent_topics) else 0,
                 generator._headline_priority(category, a, now),
                 generator._time_distance_h(a, now),
@@ -352,9 +436,9 @@ async def run_db():
         )
     )
 
-    print("  lokalny powtórka priorytet  dystans  kategoria")
-    for locality, repeat, priority, distance, category, _id, item in ranking[:8]:
-        print(f"  {'lok' if not locality else 'reg':>7} {repeat:>9} {priority:>9} "
+    print("  lokalny po_terminie powtórka priorytet  dystans  kategoria")
+    for locality, over, repeat, priority, distance, category, _id, item in ranking[:8]:
+        print(f"  {'lok' if not locality else 'reg':>7} {over:>11} {repeat:>8} {priority:>9} "
               f"{distance:>7.1f}h  {category:<12} ID:{item.id} {(item.title or '')[:44]}")
 
     top = generator._select_top_article(grouped, now, recent_topics)
