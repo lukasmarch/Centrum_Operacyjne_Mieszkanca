@@ -159,6 +159,20 @@ do WSZYSTKICH subskrybentów (kategoria `alerty` — plan Dla Każdego, nie Prem
   szło do briefingu jako lokalna awaria
 - **Bliskość, nie „najdalej w przyszłość"**: `_time_distance_h` liczy odległość od teraz
   w obie strony — wyłączenie jutro bije wyłączenie za dziewięć dni
+- ⚠️ **Brak kierunku obraca się przeciw mieszkańcowi PO terminie** (26.08.2026): refresh
+  o 13:30 otworzył briefing zdaniem „Posiedzenie Komisji Rozwoju Gospodarczego — już dziś
+  o 12:00", bo posiedzenie sprzed półtorej godziny było najbliższym punktem w całym
+  materiale — przy jutrzejszej sesji Rady w tym samym materiale. Bramka „czy to jeszcze
+  sprawa najbliższych godzin" istniała **wyłącznie dla kategorii Awaria**; reszta nie miała
+  żadnej. `_event_is_over` + druga oś klucza (zaraz po lokalności) spycha zdarzenie po
+  terminie na koniec grupy — degradacja, nie wykluczenie: gdy przed nami nie ma nic, minione
+  wraca. Awaria będąca sprawą TERAZ jest zwolniona, jak z reguły powtórki
+- ⚠️ **Zapowiedź bez godziny stoi w bazie jako lokalna PÓŁNOC** (`event_at` 22:00 UTC dnia
+  poprzedniego) i trwa do końca swojej doby — inaczej dożynki byłyby „po" o 00:01 w dniu
+  dożynek. Termin z godziną, ale bez `event_until`, zamyka się ze startem: briefing z 13:30
+  wisi na stronie do wieczora, więc nagłówkiem ma być rzecz, na którą da się jeszcze zdążyć
+- `_time_label` mówi „— JUŻ PO": model dostawał samą datę i pisał o minionym terminie
+  w czasie przyszłym
 - **Pamięć poprzedniego dnia**: `_previous_headline_id` odsuwa wczorajszy nagłówek na koniec
   jego grupy (nie wyklucza — przy chudym dniu wraca, bo to lepsze niż nagłówek regionalny).
   Refresh o 13:30 patrzy na dzień wcześniejszy, więc nagłówek jest stabilny w ciągu dnia
@@ -658,6 +672,11 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
 - [ ] Wybór rejonu wywozu dla kont z zapisem „Rybno” (dziś dostają oba terminy)
 - [ ] `is_pinned_alert` bez czekania na kategorię — awaria ma trafiać na szczyt feedu
       od razu po scrapingu, tak jak ostrzeżenia meteo (dziś czeka na 6:15/13:15)
+- [ ] **Nagłówek briefingu nie zna rangi organu**: 26.08 jutrzejsze posiedzenia
+      stały tak — Komisja Zdrowia 08:30, Komisja Budżetu 08:45, **XXIV sesja Rady
+      10:00**. Wszystkie lokalne, wszystkie „Urząd", więc rozstrzygnął dystans
+      i sesja Rady przegrała o półtorej godziny z komisją. `event_extractor._organ_key`
+      już odróżnia sesję od komisji (weto dedupu) — brakuje osi w `_select_top_article`
 - [ ] Zgłoszenia 24: przypomnienie o sprawach stojących > 24 h w jednym statusie,
       starzenie kart awaryjnych, przycisk „już działa" dla mieszkańców (odłożone 24.08)
 - [ ] Widget ruchu: zdarzenie chwilowe (spadłe bele, kolizja) musi WYGASAĆ — 21.08 trasa
@@ -701,4 +720,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-08-25*
+*Ostatnia aktualizacja: 2026-08-26*
