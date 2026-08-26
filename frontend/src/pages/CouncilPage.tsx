@@ -237,8 +237,7 @@ const CouncilPage: React.FC = () => {
 
                                     {detail && (
                                         <p className="mt-5 text-xs leading-relaxed text-neutral-500">
-                                            Skrót powstał z zapisu całego nagrania obrad. Cytaty sprawdzamy
-                                            słowo w słowo z nagraniem, a przed publikacją skrót czyta człowiek.
+                                            Skrót powstał z zapisu całego nagrania obrad.
                                             {' '}
                                             <a
                                                 href={session.page_url}
