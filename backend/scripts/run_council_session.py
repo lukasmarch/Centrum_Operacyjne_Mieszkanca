@@ -116,6 +116,20 @@ async def save_to_queue(
             select(CouncilSession).where(CouncilSession.external_id == external_id)
         )).scalars().first()
 
+        # Ten sam film to ta sama sesja — nawet gdy identyfikatory się nie zgadzają.
+        # `--transcript` nie zna `page_id` z galerii, więc identyfikatorem zostaje
+        # `yt:<id>`; bez tego dopasowania nadrobienie sesji z gotowego transkryptu
+        # zakładało DRUGI wiersz obok tego, który job wpisał z galerii, a job wracał
+        # potem po ten pierwszy i przepisywał nagranie po raz kolejny. Ścieżka przez
+        # transkrypt jest regułą, dopóki produkcja nie ma dostępu do YouTube
+        # (bot-check na IP serwera, 27.08.2026).
+        if row is None and youtube_id:
+            row = (await session.execute(
+                select(CouncilSession).where(CouncilSession.youtube_id == youtube_id)
+            )).scalars().first()
+            if row:
+                print(f"Dopasowano po nagraniu do sesji {row.external_id} ({row.status}).")
+
         if row is None:
             row = CouncilSession(external_id=external_id, title=title, page_url=page_url)
             row.session_number = number
