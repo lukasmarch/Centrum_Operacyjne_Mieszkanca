@@ -125,7 +125,12 @@ async def review_page(token: str, request: Request):
             f"Stan przetwarzania: {row.status}. Spróbuj po następnym przebiegu joba.",
         ))
 
-    return HTMLResponse(render_review_page(row, action_url=str(request.url)))
+    # Ścieżka, nie pełny adres. `str(request.url)` daje za Caddym `http://…`,
+    # bo uvicorn nie ufa nagłówkom proxy — a strona jest serwowana po HTTPS, więc
+    # przeglądarka blokowała wysyłkę formularza jako mixed content i przycisk
+    # „Publikuj skrót" nie robił nic (27.08.2026, pierwsze użycie bramki na żywo).
+    # Adres względny nie ma tego problemu: schemat i host bierze przeglądarka.
+    return HTMLResponse(render_review_page(row, action_url=request.url.path))
 
 
 @router.post("/review/{token}", response_class=HTMLResponse)
