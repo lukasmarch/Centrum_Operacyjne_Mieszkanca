@@ -101,7 +101,7 @@ Kolumna, której stary kod nie używa, nie szkodzi nikomu — kod bez kolumny to
 na każdym zapytaniu. GitHub Actions **nie uruchamia migracji**: robi tylko
 `git pull && build && up -d`.
 
-## Scheduler Timeline (13 jobów)
+## Scheduler Timeline (14 jobów)
 ```
 6:00  → Article Scraping
 6:15  → AI Processing (batch=100, kategoryzacja)
@@ -118,6 +118,8 @@ Co 4h → Air Quality (Airly)
 Niedz 3:00 → CEIDG Sync
 Niedz 4:00 → Wiedza stała z BIP (statut, procedury, podatki, programy)
 Niedz 5:00 → Akty prawne z BIP (uchwały Rady, zarządzenia Wójta)
+14:00 i 20:00 → Skróty sesji Rady (do akceptacji; obrady startują 10:00,
+                20:00 to dogrywka — do 27.08 job chodził o 4:30)
 Sob 10:00 → Newsletter Weekly
 Pn-Pt 7:15 → Newsletter Daily (Premium)
 1.01/04/07/10 → GUS Statistics

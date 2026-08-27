@@ -366,14 +366,23 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # Sesje Rady Gminy — codziennie 4:30, przed porannym przebiegiem scrapingu.
-    # Sesja zdarza się ~raz w miesiącu, więc job zwykle nic nie znajdzie i to jest
-    # stan normalny. Godzina jest martwa celowo: transkrypcja trzygodzinnego
-    # nagrania zajmuje kilka minut i nie ma konkurować o CPU z pipeline'em 6:00.
+    # Sesje Rady Gminy — 14:00 i 20:00, tego samego dnia co obrady (2026-08-27).
+    #
+    # **Do 27.08 job chodził o 4:30 i to była zła godzina.** Uzasadniała ją troska
+    # o CPU — transkrypcja nie miała konkurować z pipeline'em 6:00 — czyli argument
+    # o zasobach, nie o mieszkańcu. Sesja zaczyna się o 10:00 i trwa 1,5–3 h
+    # (XXIII: 86 min), więc przy przebiegu nad ranem skrót z wtorkowych obrad
+    # trafiał na stronę w środę. Cała wartość tej funkcji leży w tym, że powstaje
+    # w dniu obrad — BIP publikuje protokoły PDF-em tygodnie później.
+    #
+    # 14:00 bierze typowy przypadek (koniec ~11:30–13:00 + kwadrans, aż YouTube
+    # domknie VOD), 20:00 jest dogrywką na obrady przeciągnięte i sesje
+    # nadzwyczajne popołudniowe. Przebieg bez nowego nagrania kosztuje jedno
+    # zapytanie do galerii, a `MAX_SESSIONS_PER_RUN` pilnuje rachunku za Whisper.
     # Skrót kończy w stanie `pending` — publikuje człowiek, patrz council_job.
     scheduler.add_job(
         func=run_council_job,
-        trigger=CronTrigger(hour=4, minute=30),
+        trigger=CronTrigger(hour='14,20', minute=0),
         id='council_sessions',
         name='Skróty sesji Rady Gminy (do akceptacji)',
         replace_existing=True

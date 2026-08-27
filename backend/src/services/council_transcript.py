@@ -313,6 +313,7 @@ def video_metadata(video_url: str) -> dict:
         "duration_s": _number(duration) or 0.0,
         "upload_date": upload_date.strip(),
         "live_status": live_status.strip() or "not_live",
+        "blocked": _access_blocked(result.stderr or ""),
         "release_at": (
             datetime.fromtimestamp(release_epoch, tz=timezone.utc)
             if release_epoch else None
@@ -325,17 +326,44 @@ def video_metadata(video_url: str) -> dict:
 # minut, a cała wartość skrótu leży w tym, że powstaje tego samego dnia.
 LIVE_NOT_READY = ("is_upcoming", "is_live")
 
+# Czym YouTube kwituje odmowę dostępu. Zdanie przychodzi z krzywym apostrofem
+# (U+2019), więc dopasowanie idzie po fragmencie bez niego.
+_BLOCKED_MARKERS = ("Sign in to confirm", "not a bot", "age-restricted", "Private video")
+
+
+def _access_blocked(stderr: str) -> bool:
+    """Czy YouTube odmówił dostępu temu adresowi IP, zamiast zwrócić nagranie."""
+    return any(marker in stderr for marker in _BLOCKED_MARKERS)
+
 
 def not_ready_reason(meta: dict) -> Optional[str]:
-    """Czemu nagrania nie da się jeszcze przepisać — albo None, gdy da się."""
+    """
+    Czemu nagrania nie da się jeszcze przepisać — albo None, gdy da się.
+
+    ⚠️ **Brak długości to osobny przypadek i nie wolno go mylić z awarią.**
+    27.08.2026 job wypalił próbę na sesji XXIV, bo z IP serwera YouTube nie
+    oddaje ani metadanych, ani ścieżek („Sign in to confirm you're not a bot" —
+    Hetzner jest oflagowany jako datacenter). `live_status` wracał wtedy jako
+    `NA`, czyli poza `LIVE_NOT_READY`, więc bramka przepuszczała blokadę jak
+    gotowe nagranie i dopiero `download_audio` się wywracał — po podbiciu próby.
+    Nagranie gotowe do pobrania ZAWSZE ma długość; jej brak znaczy, że yt-dlp
+    nie dostał ścieżek, a to nigdy nie jest wina nagrania.
+    """
     status = meta.get("live_status")
-    if status not in LIVE_NOT_READY:
-        return None
-    when = meta.get("release_at")
     if status == "is_live":
         return "transmisja trwa — wracamy po zakończeniu obrad"
-    stamp = when.astimezone().strftime("%d.%m.%Y %H:%M") if when else "termin nieznany"
-    return f"transmisja zapowiedziana na {stamp} — jeszcze się nie zaczęła"
+    if status == "is_upcoming":
+        when = meta.get("release_at")
+        stamp = when.astimezone().strftime("%d.%m.%Y %H:%M") if when else "termin nieznany"
+        return f"transmisja zapowiedziana na {stamp} — jeszcze się nie zaczęła"
+    if not meta.get("duration_s"):
+        if meta.get("blocked"):
+            return (
+                "YouTube nie wpuszcza tego adresu IP (bot-check) — nagrania nie ma "
+                "jak pobrać z serwera; potrzebne proxy"
+            )
+        return "nagranie bez ścieżek audio — VOD jeszcze się przetwarza"
+    return None
 
 
 def download_audio(video_url: str, dest_dir: Path, name: str = "session") -> Path:

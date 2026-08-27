@@ -1,5 +1,5 @@
 """
-Job sesji Rady Gminy — codziennie 4:30 (2026-08-09)
+Job sesji Rady Gminy — 14:00 i 20:00 (2026-08-09, godziny zmienione 27.08)
 
 Sprawdza galerię nagrań gminy, a gdy pojawi się nowa sesja: pobiera audio,
 przepisuje je Whisperem, robi skrót i **zostawia go w stanie `pending`**.
@@ -17,6 +17,8 @@ przypisane radnemu, którego nie powiedział.
 
 **Rytm i koszt.** Sesja zdarza się ~raz w miesiącu, z przerwą wakacyjną — przez
 większość dni job nie znajduje nic nowego i to jest stan normalny, nie awaria.
+Obrady zaczynają się o 10:00, więc przebieg o 14:00 zdąża jeszcze tego samego
+dnia, a 20:00 jest dogrywką (patrz `scheduler.py`).
 Jedno nagranie na przebieg (`MAX_SESSIONS_PER_RUN`), bo Whisper kosztuje ~$0,52
 za sesję i nadrabianie zaległości nie może wystawić rachunku bez ostrzeżenia.
 

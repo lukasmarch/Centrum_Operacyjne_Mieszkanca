@@ -107,12 +107,27 @@ def test_bramka_transmisji() -> None:
           not_ready_reason({"live_status": "is_live", "release_at": start}) is not None,
           True)
     # `post_live` przechodzi świadomie: obrady się skończyły, a wartość skrótu
-    # bierze się z tego, że powstaje tego samego dnia.
+    # bierze się z tego, że powstaje tego samego dnia — ale dopiero gdy YouTube
+    # domknie VOD i poda jego długość.
     check("nagranie po transmisji przechodzi",
-          not_ready_reason({"live_status": "post_live", "release_at": start}), None)
+          not_ready_reason(
+              {"live_status": "post_live", "release_at": start, "duration_s": 5185.0}
+          ), None)
     check("zwykłe nagranie przechodzi",
           not_ready_reason({"live_status": "was_live", "duration_s": 5185.0}), None)
-    check("brak pola nie blokuje", not_ready_reason({}), None)
+
+    # 27.08.2026: z IP serwera YouTube nie oddaje ani metadanych, ani ścieżek,
+    # a `live_status` wraca jako `NA` — czyli poza `LIVE_NOT_READY`. Stara bramka
+    # przepuszczała to jak gotowe nagranie i próba przepadała na `download_audio`.
+    blocked = not_ready_reason(
+        {"live_status": "NA", "duration_s": 0.0, "blocked": True}
+    )
+    check("blokada IP wstrzymuje przebieg", bool(blocked), True)
+    check("powód nazywa blokadę", "bot-check" in (blocked or ""), True)
+    check("VOD bez ścieżek czeka, nie wybucha",
+          bool(not_ready_reason({"live_status": "post_live", "duration_s": 0.0})), True)
+    check("brak pola wstrzymuje (nie ma czego pobierać)",
+          bool(not_ready_reason({})), True)
 
 
 async def test_live() -> None:
