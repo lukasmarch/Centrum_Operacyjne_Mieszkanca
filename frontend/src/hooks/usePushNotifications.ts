@@ -9,6 +9,8 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 
+import { track, sessionId } from '../services/analytics';
+
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
 
 type PushStatus = 'unsupported' | 'denied' | 'granted' | 'default' | 'subscribed' | 'loading';
@@ -67,6 +69,9 @@ async function sendSubscriptionToServer(
         // Pusta wartość zostaje pusta: backend rozumie ją jako „cała gmina".
         location: location || null,
         user_agent: navigator.userAgent,
+        // Wizyta, w trakcie której padła zgoda. Pięć z sześciu aktywnych
+        // subskrypcji nie ma konta, więc to jedyne, co wiąże zgodę z kampanią.
+        session_id: sessionId(),
       }),
     });
     return res.ok;
@@ -150,9 +155,11 @@ export function usePushNotifications(): PushSubscriptionState {
         // Poproś o pozwolenie
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
+          track('push_denied');
           setStatus(permission as PushStatus);
           return false;
         }
+        track('push_granted');
 
         // Zarejestruj subskrypcję
         const reg = await navigator.serviceWorker.ready;

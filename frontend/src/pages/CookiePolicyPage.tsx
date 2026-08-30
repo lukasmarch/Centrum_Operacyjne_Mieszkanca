@@ -51,9 +51,21 @@ const CookiePolicyPage: React.FC<CookiePolicyPageProps> = ({ onNavigate }) => (
           <td>preferencje wyglądu i układu (np. układ dashboardu)</td>
           <td>do usunięcia przez Użytkownika</td>
         </tr>
+        <tr>
+          <td>rl_sid</td>
+          <td>niezbędny (sessionStorage)</td>
+          <td>losowy identyfikator jednej wizyty; pozwala policzyć, ile podstron obejrzano w ramach jednego wejścia</td>
+          <td>do zamknięcia karty przeglądarki</td>
+        </tr>
+        <tr>
+          <td>rl_acq</td>
+          <td>funkcjonalny (localStorage)</td>
+          <td>adres, z którego Użytkownik trafił do Serwisu (znaczniki kampanii), aby ocenić skuteczność własnych publikacji</td>
+          <td>do usunięcia przez Użytkownika</td>
+        </tr>
       </tbody>
     </table>
-    <p><strong>Serwis nie stosuje obecnie cookies analitycznych ani marketingowych</strong> i nie osadza zewnętrznych skryptów śledzących. Jeżeli to się zmieni, zostaną one uruchomione wyłącznie po uzyskaniu zgody poprzez baner cookies, a niniejsza polityka zostanie zaktualizowana.</p>
+    <p><strong>Serwis nie stosuje obecnie cookies analitycznych ani marketingowych</strong> i nie osadza zewnętrznych skryptów śledzących — statystyki odwiedzin prowadzimy wyłącznie we własnej infrastrukturze, bez profilowania i bez przekazywania danych podmiotom trzecim. Nie zapisujemy przy tym adresu IP ani pełnego identyfikatora przeglądarki (User-Agent); identyfikator wizyty <code>rl_sid</code> jest usuwany po 90 dniach, a cały zapis zdarzenia po 180 dniach. Jeżeli kiedykolwiek uruchomimy narzędzia zewnętrzne, nastąpi to wyłącznie po uzyskaniu zgody poprzez baner cookies, a niniejsza polityka zostanie zaktualizowana.</p>
 
     <h2>3. Cookies niezbędne — bez zgody</h2>
     <p>Cookies niezbędne do świadczenia usługi (sesja zalogowanego Użytkownika, zapamiętanie decyzji o zgodzie) nie wymagają zgody — ich stosowanie jest konieczne do wykonania usługi, której żąda Użytkownik.</p>

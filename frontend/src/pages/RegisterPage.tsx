@@ -2,8 +2,9 @@
  * Register Page
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { track } from '../services/analytics';
 import { AVAILABLE_LOCATIONS } from '../../types';
 
 interface RegisterPageProps {
@@ -12,6 +13,10 @@ interface RegisterPageProps {
 
 const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
   const { register, isLoading, error, clearError } = useAuth();
+
+  // Górny stopień lejka: ilu ludzi w ogóle otworzyło formularz. Bez tego
+  // „zero rejestracji" nie odróżnia się od „nikt tu nie doszedł".
+  useEffect(() => { track('register_open', { section: 'register' }); }, []);
 
   const [formData, setFormData] = useState({
     email: '',

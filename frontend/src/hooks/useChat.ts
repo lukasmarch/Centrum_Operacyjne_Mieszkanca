@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { getAccessToken, refreshAccessToken } from '../services/authApi';
+import { track } from '../services/analytics';
 
 /** Returns a fresh access token, refreshing if near expiry or expired. */
 async function getFreshToken(): Promise<string | null> {
@@ -136,6 +137,10 @@ export function useChat(options: UseChatOptions = {}) {
   const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(async (text: string) => {
+    // Sama liczba pytań, bez treści — ta leży w `chat_messages` i ma własną
+    // retencję. Cztery sierpniowe konta zadały łącznie jedno pytanie, więc to
+    // ten licznik ma pokazać, czy asystent w ogóle jest używany.
+    track('assistant_question', { section: 'assistant' });
     if (!text.trim() || isLoading || limitReached) return;
 
     const userMsg: ChatMessageData = {

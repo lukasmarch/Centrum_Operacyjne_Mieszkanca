@@ -8,6 +8,7 @@ import NewsFeed from './components/NewsFeed';
 import EventsFeed from './components/EventsFeed';
 import { AppSection, TabId } from './types';
 import { applySeo } from './src/seo';
+import { track } from './src/services/analytics';
 import SimpleHomePage from './src/pages/SimpleHomePage';
 import WastePage from './src/pages/WastePage';
 import BusPage from './src/pages/BusPage';
@@ -237,6 +238,14 @@ const AppContent: React.FC = () => {
     // Meta per sekcja (title/description/canonical) — patrz frontend/src/seo.ts
     useEffect(() => {
         applySeo(activeSection, SECTION_TO_PATH[activeSection]);
+    }, [activeSection]);
+
+    // Pomiar wejść do sekcji. To JEDYNE miejsce, które trzeba podpiąć: `activeSection`
+    // jest źródłem prawdy dla całej nawigacji, więc efekt łapie i pierwsze wejście,
+    // i każde kliknięcie w menu, i przycisk wstecz. Log serwera widzi wyłącznie
+    // pierwsze żądanie HTML, bo to SPA bez react-routera.
+    useEffect(() => {
+        track('view', { section: activeSection, path: SECTION_TO_PATH[activeSection] ?? '/' });
     }, [activeSection]);
 
     // Przycisk wstecz/dalej w przeglądarce

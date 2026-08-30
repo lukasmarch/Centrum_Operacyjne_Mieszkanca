@@ -32,6 +32,7 @@
  * `AlertOfTheDay`, więc na stronie zawsze jest dokładnie jedno takie wezwanie.
  */
 import React, { useEffect, useState } from 'react';
+import { track } from '../src/services/analytics';
 import { BellRing, X } from 'lucide-react';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 
@@ -121,6 +122,14 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
     isSubscribed ||
     status === 'denied' ||
     status === 'loading';
+
+  // Prośba faktycznie trafiła na ekran. Bez tego licznika zgody nie mają się do
+  // czego odnieść: nie wiadomo, czy push ma zero zgód dlatego, że ludzie odmawiają,
+  // czy dlatego, że pytania nigdy nie zobaczyli.
+  // ⚠️ W efekcie, nie w ciele komponentu — w ciele strzelałoby przy KAŻDYM renderze.
+  useEffect(() => {
+    if (!hide && !justEnabled) track('push_prompt');
+  }, [hide, justEnabled]);
 
   if (justEnabled) {
     return (

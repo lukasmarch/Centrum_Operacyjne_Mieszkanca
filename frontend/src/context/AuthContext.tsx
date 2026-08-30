@@ -18,6 +18,7 @@ import {
   UserUpdateData,
 } from '../../types';
 import * as authApi from '../services/authApi';
+import { getAcquisition } from '../services/analytics';
 import { DashboardLayoutId, getUserDashboardLayout } from '../config/dashboardLayouts';
 
 interface AuthContextType {
@@ -132,7 +133,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
 
     try {
-      const response = await authApi.register(data);
+      // Źródło pierwszej wizyty doklejamy TUTAJ, a nie w formularzu: rejestracja
+      // bywa wywoływana z kilku miejsc, a `users.acq_*` ma być wypełnione zawsze.
+      const response = await authApi.register({ ...data, acq: getAcquisition() });
       setUser(response.user);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Registration failed';

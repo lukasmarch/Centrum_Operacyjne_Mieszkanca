@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { track } from '../services/analytics';
 import { Landmark, Play, ExternalLink, ChevronDown, Gavel } from 'lucide-react';
 import {
     useCouncilSessions,
@@ -40,6 +41,13 @@ function shortStamp(stamp?: string | null): string {
     return stamp;
 }
 
+/**
+ * Znacznik czasu otwierający nagranie w konkretnej minucie.
+ *
+ * Klik jest mierzony, bo to była CAŁA obietnica rolki z 28.08 („klikasz i nagranie
+ * otwiera się dokładnie w tym miejscu"). Bez pomiaru nie wiadomo, czy ktokolwiek
+ * z tego skorzystał — a to rozstrzyga, czy znaczniki w skrócie mają sens.
+ */
 const StampLink: React.FC<{ stamp?: string | null; url?: string | null }> = ({ stamp, url }) => {
     if (!stamp) return null;
     const label = shortStamp(stamp);
@@ -52,6 +60,7 @@ const StampLink: React.FC<{ stamp?: string | null; url?: string | null }> = ({ s
             target="_blank"
             rel="noopener noreferrer"
             title="Otwórz nagranie w tej minucie"
+            onClick={() => track('session_stamp_click', { section: 'council', meta: { stamp: label } })}
             className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-400/30 bg-sky-400/10 px-2 py-1 font-mono text-xs font-semibold text-sky-300 transition-colors hover:border-sky-400/60 hover:bg-sky-400/20 hover:text-sky-200"
         >
             <Play size={10} aria-hidden className="fill-current" />

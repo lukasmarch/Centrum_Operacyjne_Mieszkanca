@@ -469,6 +469,14 @@ export interface RegisterData {
   location: string;
   consent_terms: boolean;
   consent_marketing?: boolean;
+  // Skąd przyszedł ten człowiek — doklejane automatycznie w AuthContext
+  // z pamięci przeglądarki (`rl_acq`). Pomiar, nigdy warunek rejestracji.
+  acq?: {
+    session_id?: string;
+    utm_campaign?: string;
+    landing?: string;
+    first_seen?: string;
+  };
 }
 
 export interface UserUpdateData {
