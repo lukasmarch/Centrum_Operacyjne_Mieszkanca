@@ -666,7 +666,74 @@ bez daty, więc model nie zaryzykował `event_at` i polityka mierzyła wiek od p
   rachunku). Nadrobienie ręczne: `run_council_session --url … --save` (~$0,59)
 - Testy: `python -m scripts.test_legal_acts [--db] [--live]`
 
+## Pomiar strony: log serwera widzi tylko pierwsze żądanie (2026-08-30)
+**24 132 zasięgu na FB, 138 urządzeń na stronie w tygodniu, ZERO nowych kont i ZERO
+zgód push — i żadnego źródła odpowiedzi „gdzie się odbili".** Front to SPA bez
+react-routera (nawigacja przez `history.pushState` w `frontend/App.tsx`), więc log
+Caddy widzi wyłącznie pierwsze żądanie HTML; do tego przewija się po **168 h**
+(`roll_keep_for`), więc fala 18–22.08 już nie istnieje.
+- **`site_events`** (migracja `add_site_events`) + `POST /api/events`
+  (`api/endpoints/analytics.py`). Front: `frontend/src/services/analytics.ts`,
+  wysyłka `navigator.sendBeacon` przy chowaniu karty
+- ⚠️ **Zamknięta lista `ALLOWED_EVENTS`** — endpoint jest publiczny i bez
+  uwierzytelnienia, więc bez białej listy to otwarty zapis do bazy. Nowe zdarzenie
+  dodaje się w **backendzie**, nie we froncie. `register_done` dopisuje SERWER
+  (`auth/routes.py`) — z przeglądarki przyszłoby też od kogoś bez konta
+- ⚠️ **Jedno miejsce podpięcia**: efekt na `activeSection` w `App.tsx` łapie wejście,
+  kliknięcie w menu i przycisk wstecz naraz. `activeSection` jest źródłem prawdy
+- **RODO**: brak IP i User-Agenta w bazie (z nagłówka zostaje samo `mobile`/`desktop`),
+  `rl_sid` w **sessionStorage** (ginie z kartą, nie łączy wizyt między dniami →
+  bez banera zgody), `rl_acq` w localStorage trzyma źródło PIERWSZEJ wizyty.
+  Retencja: `session_id`/`user_id` → NULL po 90 dniach, wiersz po 180
+- ⚠️ **`captureAcquisition()` woła się w `index.tsx` PRZED montowaniem Reacta** —
+  `syncUrl` przepisuje adres przy pierwszej nawigacji i gubi wtedy `?utm_...`
+- ⚠️ **`Acquisition.strip_timezone`**: przeglądarka wysyła `toISOString()` ze strefą,
+  cały projekt trzyma naiwny UTC → bez walidatora rejestracja kończyła się **500 przy
+  KAŻDYM koncie**. Złapane testem end-to-end, nie w przeglądzie kodu
+- ⚠️ **`React.StrictMode` podwaja zdarzenia w trybie deweloperskim.** Na buildzie
+  produkcyjnym `view` strzela raz — sprawdzone. Nie „naprawiać" tego dedupem
+- Atrybucja: `users.acq_*` (denormalizacja celowa — `site_events` kasuje retencja,
+  a skąd wziął się klient ma przeżyć dłużej niż log), `push_subscriptions.acq_session_id`
+  (5 z 9 subskrypcji nie ma `user_id`)
+- Raport: `python -u -m scripts.site_report [--days 7]`. ⚠️ Okna: `site_events` żyje
+  180 dni, log Caddy 7 — przy `--days` > 7 liczby z obu raportów są nieporównywalne
+
+## Newsletter: kolumny bez mechanizmu (2026-08-30)
+**`newsletter_logs.opened_at` i `clicked_at` istniały od początku projektu i NIC
+w całym repozytorium do nich nie pisało** — 91 wysyłek, 0 otwarć. To nie był wynik,
+to był brak mechanizmu; nie dało się powiedzieć, czy Premium dostaje to, za co zapłacił.
+- `newsletter_logs.provider_message_id` ← `result["id"]` z Resend (zwracany od zawsze
+  przez `email_service.send_email`, tylko wyrzucany). Zapis w `newsletter_job.py`, 2 miejsca
+- `api/endpoints/newsletter_webhook.py` — `POST /api/newsletter/webhook/resend`,
+  zdarzenia `email.opened` i `email.clicked`
+- ⚠️ **Podpis Svix liczony ręcznie**, bez paczki `svix`: 189 z 202 zależności nie ma
+  przypiętej wersji, więc nowy pakiet = świeży resolve przy przebudowie obrazu, co już
+  raz położyło produkcję na 20 min
+- ⚠️ **Odpowiedź zawsze 200** — Resend, jak P24, ponawia webhooka przy każdym innym kodzie
+- ⚠️ Wymaga ręcznej konfiguracji: adres w panelu Resend + `RESEND_WEBHOOK_SECRET`
+  w `.env.production` + `up -d --force-recreate backend`
+
+## Link ma prowadzić tam, co obiecał post (2026-08-30)
+**`social_content.tracked_url()` prowadził ZAWSZE na stronę główną**, więc kto kliknął
+po informację o wyłączeniu prądu, lądował na ogólnym pulpicie i szukał jej sam.
+- Pomiar kampanii „sesja XXIV" (log Caddy, 24–30.08): post ze zdjęciem i deep linkiem
+  na `/sesje` → **2,48% i 3,86%** zasięgu jako wejścia, rolka na tę samą stronę **0,84%**,
+  automat na stronę główną — zero
+- Sekcja liczona z **PRAWDZIWEJ kategorii** artykułu nagłówka (`articles.category`
+  przez `cited_articles[0].id` w `_latest_summary`), nie ze słów w tytule — ta sama
+  zasada co `ground_categorization`
+- ⚠️ `CATEGORY_TO_PATH` to **trzecia kopia** listy ścieżek (obok `SECTION_TO_PATH`
+  w `frontend/App.tsx` i `STATIC_PAGES` w `api/endpoints/seo.py`). Rozjazd wyłapuje
+  `_assert_paths()` — link donikąd byłby widoczny dopiero w statystykach, tydzień po fakcie
+- `utm_content` niesie identyfikator kreacji; `scripts/traffic_report.py` przestał go ignorować
+
 ## TODO (Kolejne priorytety)
+- [ ] **Wdrożyć pomiar strony na PRODUKCJI** — kolejność: `add_site_events` na prodzie
+      → push (Actions wdraża backend) → `RESEND_WEBHOOK_SECRET` + `--force-recreate`
+      → `./deploy-frontend.sh` → webhook w panelu Resend
+- [ ] Decyzja o GA4 — **po** zebraniu pierwszego tygodnia z `site_events`, nie wcześniej
+- [ ] Cztery sierpniowe konta (id 8–11) zadały łącznie **1 pytanie** agentowi i żadne
+      nie ma zgody push. To retencja, nie pozyskanie — ale co naprawiać, powie dopiero pomiar
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
 - [ ] Filtrowanie artykułów po kategoriach
@@ -722,4 +789,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-08-26*
+*Ostatnia aktualizacja: 2026-08-30*
