@@ -63,6 +63,7 @@ interface QueuedEvent {
 let queue: QueuedEvent[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let listenersBound = false;
+let firstSent = false;
 
 /** Uuid wizyty. `crypto.randomUUID` nie istnieje w starszych Safari — stąd zapas. */
 const newId = (): string => {
@@ -191,7 +192,18 @@ export const track = (event: SiteEventName, props: Partial<QueuedEvent> = {}): v
       ...props,
     });
 
-    if (queue.length >= MAX_QUEUE) {
+    // PIERWSZE zdarzenie po wczytaniu strony idzie NATYCHMIAST, bez kolejki.
+    //
+    // Powód zmierzony na produkcji 30.08: wejście z Facebooka na stronę główną
+    // niesie `utm_*` i jest najważniejszym wpisem w całym pomiarze — a przy
+    // odczekaniu 5 s i przejściu dalej po prostu NIE DOTARŁO. Kto wchodzi
+    // z rolki i wychodzi po dwóch sekundach, to dokładnie ten człowiek, którego
+    // trzeba policzyć; gubienie go wywraca sens tabeli.
+    //
+    // Ruch jest rzędu 138 urządzeń na tydzień, więc jedno żądanie na wejście
+    // nic nie kosztuje. Kolejka zostaje dla zdarzeń NASTĘPNYCH w tej samej wizycie.
+    if (!firstSent || queue.length >= MAX_QUEUE) {
+      firstSent = true;
       send();
       return;
     }
