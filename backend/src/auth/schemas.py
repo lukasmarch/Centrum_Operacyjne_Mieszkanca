@@ -2,7 +2,7 @@
 Pydantic schemas for authentication
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from src.database import UserTier
@@ -11,6 +11,33 @@ from src.database import UserTier
 # ======================
 # Request Schemas
 # ======================
+
+class Acquisition(BaseModel):
+    """
+    Skąd przyszedł ten, kto zakłada konto — z pierwszej wizyty zapamiętanej
+    w przeglądarce (`localStorage.rl_acq`, patrz `frontend/src/services/analytics.ts`).
+
+    Pole jest opcjonalne i nigdy nie może zablokować rejestracji: przeglądarka
+    z wyczyszczoną pamięcią albo wejście prosto z adresu po prostu go nie przyśle.
+    """
+    session_id: Optional[str] = Field(default=None, max_length=36)
+    utm_campaign: Optional[str] = Field(default=None, max_length=100)
+    landing: Optional[str] = Field(default=None, max_length=200)
+    first_seen: Optional[datetime] = None
+
+    @field_validator("first_seen")
+    @classmethod
+    def strip_timezone(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """
+        Przeglądarka wysyła `toISOString()`, czyli czas ZE STREFĄ („…Z”), a cały
+        projekt trzyma naiwny UTC. Bez tego asyncpg odrzuca zapis do kolumny
+        TIMESTAMP („can't subtract offset-naive and offset-aware datetimes”)
+        i rejestracja kończy się błędem 500 — przy KAŻDYM nowym koncie.
+        """
+        if v is None or v.tzinfo is None:
+            return v
+        return v.astimezone(timezone.utc).replace(tzinfo=None)
+
 
 class UserCreate(BaseModel):
     """Schema for user registration"""
@@ -21,6 +48,7 @@ class UserCreate(BaseModel):
     referral_code: Optional[str] = Field(default=None, max_length=20)  # Kod polecającego
     consent_terms: bool = Field(default=False)      # akceptacja regulaminu + polityki prywatności (wymagana)
     consent_marketing: bool = Field(default=False)  # zgoda marketingowa (opcjonalna)
+    acq: Optional[Acquisition] = None               # źródło wizyty (pomiar, nie warunek rejestracji)
 
     @field_validator("password")
     @classmethod

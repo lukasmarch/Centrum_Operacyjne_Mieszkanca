@@ -107,11 +107,15 @@ async def send_weekly_newsletter():
                         subscriber.emails_sent += 1
                         subscriber.last_sent_at = datetime.utcnow()
 
-                        # Log the send
+                        # Log the send. `provider_message_id` to identyfikator
+                        # z Resend — bez niego webhook nie ma po czym trafić
+                        # w ten wiersz, i dlatego `opened_at` stało puste przez
+                        # 91 wysyłek (kolumna była, mechanizmu nie było).
                         log = NewsletterLog(
                             subscriber_id=subscriber.id,
                             newsletter_type="weekly",
                             subject=content.get("subject", "Weekly Newsletter"),
+                            provider_message_id=result.get("id"),
                             status="sent"
                         )
                         session.add(log)
@@ -249,6 +253,7 @@ async def send_daily_newsletter():
                                 subscriber_id=subscriber.id,
                                 newsletter_type="daily",
                                 subject=content.get("subject", "Daily Briefing"),
+                                provider_message_id=result.get("id"),
                                 status="sent"
                             )
                             session.add(log)

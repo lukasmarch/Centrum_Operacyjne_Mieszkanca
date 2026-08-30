@@ -30,7 +30,54 @@ SITE_URL = "https://rybnolive.pl"
 HASHTAGS = "#Rybno #GminaRybno #PowiatDziałdowski"
 
 
-def tracked_url(medium: str, day: Optional[str] = None) -> str:
+# Kategoria z AI → sekcja serwisu, na którą ma prowadzić link pod postem.
+#
+# Ścieżki są LUSTREM `SECTION_TO_PATH` z `frontend/App.tsx`; trzecia kopia tej
+# listy stoi w `api/endpoints/seo.py` (sitemapa, `STATIC_PAGES`). Rozjazd wyłapuje `_assert_paths()`
+# niżej — link prowadzący na nieistniejący adres byłby widoczny dopiero
+# w statystykach, tydzień po fakcie.
+#
+# Kategorie pochodzą z `summary_by_category` i z `articles.category`
+# (patrz CATEGORIZATION_PROMPT) — nie zgadujemy ich ze słów w nagłówku.
+CATEGORY_TO_PATH: dict = {
+    "Awaria": "/wiadomosci",
+    "Urząd": "/wiadomosci",
+    "Kultura": "/wydarzenia",
+    "Sport": "/wydarzenia",
+    "Społeczność": "/wydarzenia",
+    "Inne": "/",
+}
+
+
+def _slug_category(category: Optional[str]) -> str:
+    """„Społeczność" → „spolecznosc”. Do `utm_content`, więc bez ogonków i spacji."""
+    if not category:
+        return "ogolne"
+    table = str.maketrans("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ", "acelnoszzACELNOSZZ")
+    return re.sub(r"[^a-z0-9]+", "-", category.translate(table).lower()).strip("-") or "ogolne"
+
+
+def _assert_paths() -> None:
+    """Ścieżki muszą istnieć w sitemapie — inaczej link prowadzi donikąd."""
+    try:
+        from src.api.endpoints.seo import STATIC_PAGES
+    except Exception:
+        return  # import cykliczny albo brak modułu — nie blokujemy budowy posta
+    known = {p["loc"] for p in STATIC_PAGES}
+    unknown = {v for v in CATEGORY_TO_PATH.values() if v not in known}
+    if unknown:
+        logger.warning("CATEGORY_TO_PATH wskazuje adresy spoza sitemapy: %s", unknown)
+
+
+_assert_paths()
+
+
+def tracked_url(
+    medium: str,
+    day: Optional[str] = None,
+    category: Optional[str] = None,
+    content: Optional[str] = None,
+) -> str:
     """
     Adres do PIERWSZEGO KOMENTARZA pod postem — nigdy do treści.
 
@@ -38,13 +85,29 @@ def tracked_url(medium: str, day: Optional[str] = None) -> str:
     a posty z linkiem w treści zero. Facebook tnie zasięg materiału, który wyprowadza
     z platformy, i nie liczy kliknięć z komentarza — jedynym pomiarem jest log Caddy,
     stąd `utm_*` obowiązkowo. `utm_campaign` niesie rodzaj i dzień, bo `traffic_report`
-    grupuje właśnie po nim (`utm_content` ignoruje).
+    grupuje właśnie po nim.
+
+    **Link prowadzi tam, co obiecał post.** Do 30.08 każdy automat wysyłał człowieka
+    na stronę główną, bez względu na temat — kto kliknął po informację o wyłączeniu
+    prądu, lądował na ogólnym pulpicie i musiał jej szukać sam. Pomiar kampanii
+    „sesja XXIV": posty prowadzące wprost na `/sesje` dowiozły 2,48% i 3,86% zasięgu
+    jako wejścia, rolka na tę samą stronę 0,84%, a automat na stronę główną — zero.
+
+    `content` niesie identyfikator kreacji (np. `karta-awaria`), żeby dało się
+    odróżnić dwa posty z tego samego dnia.
     """
     # Data bywa obiektem `date` (z bazy) albo pełnym znacznikiem czasu — do adresu
     # wchodzi zawsze sam dzień.
     day = str(day)[:10] if day else date.today().isoformat()
-    return (f"{SITE_URL}/?utm_source=facebook&utm_medium={medium}"
-            f"&utm_campaign={medium}-{day}")
+    path = CATEGORY_TO_PATH.get((category or "").strip(), "/")
+    # Strona główna zostaje pod "/", reszta bez końcowego ukośnika — tak samo
+    # jak w sitemapie, żeby nie mnożyć adresów tej samej strony.
+    prefix = f"{SITE_URL}/" if path == "/" else f"{SITE_URL}{path}"
+    url = (f"{prefix}?utm_source=facebook&utm_medium={medium}"
+           f"&utm_campaign={medium}-{day}")
+    if content:
+        url += f"&utm_content={content}"
+    return url
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Post tekstowy (dzienne podsumowanie AI)
@@ -75,7 +138,11 @@ def build_text_post(summary: dict) -> dict:
     return {
         "kind": "text",
         "message": "\n\n".join(p for p in parts if p),
-        "first_comment": tracked_url("karta", summary.get("date")),
+        "first_comment": tracked_url(
+            "karta", summary.get("date"),
+            category=summary.get("headline_category"),
+            content=f"karta-{_slug_category(summary.get('headline_category'))}",
+        ),
         "headline": headline,
         "date": content.get("date") or summary.get("date"),
     }
@@ -324,7 +391,11 @@ async def build_photo_post(summary: dict) -> dict:
     return {
         "kind": "photo",
         "message": message,
-        "first_comment": tracked_url("post", content.get("date") or summary.get("date")),
+        "first_comment": tracked_url(
+            "post", content.get("date") or summary.get("date"),
+            category=summary.get("headline_category"),
+            content=f"post-{_slug_category(summary.get('headline_category'))}",
+        ),
         "claim": claim,
         "cast": cast_id,
         "prompt": prompt,

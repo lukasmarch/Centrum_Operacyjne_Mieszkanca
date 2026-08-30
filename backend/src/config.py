@@ -51,6 +51,10 @@ class Settings(BaseSettings):
 
     # Newsletter settings (Sprint 2)
     RESEND_API_KEY: Optional[str] = None
+    # Sekret podpisu webhooka Resend (`whsec_…`), z panelu Resend → Webhooks.
+    # Puste = webhook odrzuca wszystko: bez weryfikacji podpisu ten endpoint jest
+    # otwartym zapisem do `newsletter_logs` dla każdego, kto zna adres.
+    RESEND_WEBHOOK_SECRET: str = ""
     NEWSLETTER_FROM_EMAIL: str = "newsletter@centrum-mieszkanca.pl"
     NEWSLETTER_FROM_NAME: str = "Centrum Operacyjne Mieszkańca"
     APP_URL: str = "http://localhost:3000"  # Frontend URL for links

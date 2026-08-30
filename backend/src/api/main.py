@@ -128,6 +128,15 @@ app.include_router(voice_router)  # /api/voice/transcribe
 
 app.include_router(social_router)  # /api/social/* — propozycje postów dla n8n
 
+# Pomiar strony. Front jest SPA bez react-routera, więc log Caddy widzi tylko
+# PIERWSZE żądanie HTML — bez tego endpointu nie wiadomo, co człowiek robi dalej.
+from src.api.endpoints.analytics import router as analytics_router
+app.include_router(analytics_router)  # /api/events
+
+# Webhook Resend — jedyne źródło `newsletter_logs.opened_at` / `clicked_at`.
+from src.api.endpoints.newsletter_webhook import router as newsletter_webhook_router
+app.include_router(newsletter_webhook_router)  # /api/newsletter/webhook/resend
+
 # Sesje Rady Gminy — skróty obrad. Publiczne widzą wyłącznie skróty zatwierdzone
 # przez człowieka; `/review/{token}` to strona akceptacji otwierana z maila.
 from src.api.endpoints.council import router as council_router

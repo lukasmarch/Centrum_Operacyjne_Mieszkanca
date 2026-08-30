@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.database import get_session, User
-from src.database.schema import Referral, UserTier
+from src.database.schema import Referral, SiteEvent, UserTier
 from src.config import settings
 from src.auth.dependencies import get_current_active_user
 from src.newsletter.subscriptions import ensure_subscription
@@ -112,12 +112,30 @@ async def register(
         consent_terms_at=datetime.utcnow(),
         consent_marketing=user_data.consent_marketing,
         consent_privacy_version=PRIVACY_POLICY_VERSION,
+        # Skąd przyszedł ten człowiek. Zapisywane RAZ, przy zakładaniu konta —
+        # `site_events` kasuje retencja po 180 dniach, a odpowiedź na „który post
+        # dowiózł tego klienta" ma przeżyć dłużej niż log.
+        acq_session_id=(user_data.acq.session_id if user_data.acq else None),
+        acq_utm_campaign=(user_data.acq.utm_campaign if user_data.acq else None),
+        acq_landing=(user_data.acq.landing if user_data.acq else None),
+        acq_first_seen=(user_data.acq.first_seen if user_data.acq else None),
         created_at=datetime.utcnow()
     )
 
     session.add(new_user)
     await session.commit()
     await session.refresh(new_user)
+
+    # Zdarzenie w lejku. Dopisuje je SERWER, nie przeglądarka: z przeglądarki
+    # `register_done` przyszłoby też od kogoś, kto konta nie założył.
+    session.add(SiteEvent(
+        session_id=new_user.acq_session_id,
+        user_id=new_user.id,
+        event="register_done",
+        utm_campaign=new_user.acq_utm_campaign,
+        path=new_user.acq_landing,
+    ))
+    await session.commit()
 
     # Jeśli jest polecający — zapisz referral i nagrodź +14 dni (jeśli polecający ma Premium)
     if referrer:

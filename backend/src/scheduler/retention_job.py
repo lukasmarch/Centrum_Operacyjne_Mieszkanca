@@ -11,6 +11,8 @@ retencji w Polityce prywatności):
   - reports rozwiązane > 12 mies.: anonimizacja danych autora (treść zostaje)
   - agent_tool_calls: treść pytania i user_id znikają po 30 dniach,
     cały wiersz po 180 (liczniki narzędzi zostają do analityki)
+  - site_events: session_id i user_id znikają po 90 dniach, cały wiersz po 180
+    (liczniki zdarzeń i kampanii zostają do analityki)
 """
 import asyncio
 from datetime import datetime, timedelta, date
@@ -21,7 +23,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
 from src.config import settings
-from src.database.schema import AnonymousChatUsage, NewsletterLog, Report
+from src.database.schema import AnonymousChatUsage, NewsletterLog, Report, SiteEvent
 from src.database.vectors import Conversation, ChatMessage, APICostLog, AgentToolCall
 from src.utils.logger import setup_logger
 
@@ -37,6 +39,11 @@ RETENTION_RESOLVED_REPORT_DAYS = 365
 # tylko tak długo, jak trwa jej użyteczność (art. 5 ust. 1 lit. e RODO).
 RETENTION_TOOL_CALL_QUESTION_DAYS = 30
 RETENTION_TOOL_CALL_DAYS = 180
+# Pomiar strony. `session_id` wiąże zdarzenia w jedną wizytę i tylko po to
+# istnieje — po kwartale odtwarzanie pojedynczej ścieżki nikomu już nie służy,
+# a zestawienia liczą się po `event`, `section` i `utm_campaign`.
+RETENTION_SITE_EVENT_SESSION_DAYS = 90
+RETENTION_SITE_EVENT_DAYS = 180
 
 
 async def run_retention_async():
@@ -125,6 +132,27 @@ async def run_retention_async():
             delete(AgentToolCall).where(AgentToolCall.created_at < cutoff_tool)
         )
         logger.info(f"agent_tool_calls: usunięto {res.rowcount} wpisów")
+
+        # 7. Pomiar strony — najpierw odpięcie od osoby i od wizyty, potem wiersz
+        cutoff_se_sess = now - timedelta(days=RETENTION_SITE_EVENT_SESSION_DAYS)
+        res = await session.execute(
+            update(SiteEvent)
+            .where(
+                SiteEvent.occurred_at < cutoff_se_sess,
+                or_(
+                    SiteEvent.session_id != None,  # noqa: E711
+                    SiteEvent.user_id != None,     # noqa: E711
+                ),
+            )
+            .values(session_id=None, user_id=None)
+        )
+        logger.info(f"site_events: odpięto session_id/user_id z {res.rowcount} wpisów")
+
+        cutoff_se = now - timedelta(days=RETENTION_SITE_EVENT_DAYS)
+        res = await session.execute(
+            delete(SiteEvent).where(SiteEvent.occurred_at < cutoff_se)
+        )
+        logger.info(f"site_events: usunięto {res.rowcount} wpisów")
 
         await session.commit()
 

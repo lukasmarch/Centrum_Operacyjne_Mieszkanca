@@ -91,6 +91,15 @@ class User(SQLModel, table=True):
     consent_marketing: bool = Field(default=False)       # zgoda marketingowa (newsletter, oferty)
     consent_privacy_version: Optional[str] = Field(default=None, max_length=20)  # wersja zaakceptowanych dokumentów
 
+    # Skąd wzięło się konto — wypełniane raz, przy rejestracji, z pierwszej wizyty
+    # zapamiętanej w przeglądarce. Świadoma denormalizacja: `site_events` kasuje
+    # retencja po 180 dniach, a odpowiedź na „który post dowiózł tego klienta"
+    # ma przeżyć dłużej niż log.
+    acq_session_id: Optional[str] = Field(default=None, max_length=36)
+    acq_utm_campaign: Optional[str] = Field(default=None, max_length=100)
+    acq_landing: Optional[str] = Field(default=None, max_length=200)
+    acq_first_seen: Optional[datetime] = None
+
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
@@ -171,7 +180,12 @@ class NewsletterLog(SQLModel, table=True):
     sent_at: datetime = Field(default_factory=datetime.utcnow)
     opened_at: Optional[datetime] = None
     clicked_at: Optional[datetime] = None
-    status: str = Field(default="sent", max_length=20)  # sent, opened, bounced, failed
+    status: str = Field(default="sent", max_length=20)  # sent, opened, clicked, bounced, failed
+
+    # Identyfikator wiadomości u dostawcy (Resend). Bez niego webhook nie ma
+    # po czym trafić w wiersz — i dokładnie dlatego `opened_at` z `clicked_at`
+    # stały puste przez 91 wysyłek: kolumny były, mechanizmu nie było.
+    provider_message_id: Optional[str] = Field(default=None, max_length=80, index=True)
 
 
 class Source(SQLModel, table=True):
@@ -814,6 +828,11 @@ class PushSubscription(SQLModel, table=True):
     # Metadata urządzenia
     user_agent: Optional[str] = Field(default=None, max_length=500)
 
+    # Wizyta, w trakcie której padła zgoda. Te same pięć subskrypcji bez
+    # `user_id` nie da się inaczej powiązać z kampanią — a to jedyna droga,
+    # żeby wiedzieć, który post przynosi zgody na push.
+    acq_session_id: Optional[str] = Field(default=None, max_length=36)
+
     # Status
     active: bool = Field(default=True)
 
@@ -1219,3 +1238,53 @@ class CouncilSession(SQLModel, table=True):
 
     first_seen_at: datetime = Field(default_factory=datetime.utcnow)
     processed_at: Optional[datetime] = None
+
+
+# ======================
+# POMIAR STRONY (2026-08-30)
+# ======================
+
+class SiteEvent(SQLModel, table=True):
+    """
+    Jedno zdarzenie na stronie: wejście do sekcji albo klik, który coś znaczy.
+
+    Po co osobna tabela, skoro jest log Caddy: front jest SPA bez react-routera
+    (nawigacja przez `history.pushState` w `frontend/App.tsx`), więc serwer widzi
+    WYŁĄCZNIE pierwsze żądanie HTML. Log nie powie, na którą sekcję ktoś wszedł,
+    ile ich obejrzał ani gdzie się zatrzymał — a do tego przewija się po 168 h.
+
+    `user_id` celowo BEZ klucza obcego, jak w `AgentToolCall`: log ma przeżyć
+    skasowanie konta (RODO kasuje samo `user_id`), a klucz obcy blokowałby
+    `scripts/cleanup_test_accounts.py`.
+
+    RODO: brak IP, brak User-Agenta. `session_id` i `user_id` → NULL po 90 dniach,
+    wiersz kasowany po 180 (`scheduler/retention_job.py`).
+    """
+    __tablename__ = "site_events"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    occurred_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+    # uuid z `sessionStorage` — NIE ciasteczko. Ginie z zamknięciem karty, więc
+    # nie łączy wizyt między dniami i nie wymaga banera zgody.
+    session_id: Optional[str] = Field(default=None, max_length=36, index=True)
+    user_id: Optional[int] = Field(default=None)
+
+    # Zamknięta lista — `ALLOWED_EVENTS` w `api/endpoints/analytics.py`.
+    event: str = Field(max_length=40)
+    section: Optional[str] = Field(default=None, max_length=40)   # AppSection z frontend/types.ts
+    path: Optional[str] = Field(default=None, max_length=200)
+    referrer_host: Optional[str] = Field(default=None, max_length=120)
+
+    utm_source: Optional[str] = Field(default=None, max_length=60)
+    utm_medium: Optional[str] = Field(default=None, max_length=60)
+    utm_campaign: Optional[str] = Field(default=None, max_length=100, index=True)
+    utm_content: Optional[str] = Field(default=None, max_length=100)
+
+    # `mobile` / `desktop`, liczone z nagłówka po stronie serwera. Samego
+    # User-Agenta nie zapisujemy.
+    device: Optional[str] = Field(default=None, max_length=10)
+
+    meta: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)

@@ -238,6 +238,9 @@ def main() -> None:
                 "utm_source": (query.get("utm_source") or [""])[0],
                 "utm_medium": (query.get("utm_medium") or [""])[0],
                 "utm_campaign": (query.get("utm_campaign") or [""])[0],
+                # Który KREATYW, nie która kampania. Bez tego dwa posty z tego
+                # samego dnia zlewają się w jedną pozycję raportu.
+                "utm_content": (query.get("utm_content") or [""])[0],
             }
         )
 
@@ -268,12 +271,14 @@ def main() -> None:
         print(f"    {n:>4} · {src}")
 
     utm = Counter(
-        f"{v['utm_source']}/{v['utm_medium']}" + (f"/{v['utm_campaign']}" if v["utm_campaign"] else "")
+        f"{v['utm_source']}/{v['utm_medium']}"
+        + (f"/{v['utm_campaign']}" if v["utm_campaign"] else "")
+        + (f" [{v['utm_content']}]" if v["utm_content"] else "")
         for v in views
         if v["utm_source"]
     )
     if utm:
-        print("\n  Znaczniki kampanijne (utm_source/medium)")
+        print("\n  Znaczniki kampanijne (utm_source/medium/campaign [content])")
         for tag, n in utm.most_common():
             print(f"    {n:>4} · {tag}")
     else:

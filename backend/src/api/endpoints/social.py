@@ -39,6 +39,7 @@ from sqlmodel import select
 
 from src.config import settings
 from src.database import DailySummary
+from src.database.schema import Article
 from src.database.connection import async_session
 from src.services import social_card, social_content
 
@@ -222,19 +223,38 @@ def cast_reference_url(cast_id: str) -> Optional[str]:
 
 
 async def _latest_summary() -> dict:
-    """Najnowsze dzienne podsumowanie — to samo źródło co GET /api/summary/daily."""
+    """
+    Najnowsze dzienne podsumowanie — to samo źródło co GET /api/summary/daily.
+
+    Dokładamy `headline_category`: kategorię artykułu, który dał nagłówek dnia.
+    Decyduje ona, na którą sekcję prowadzi link pod postem (`tracked_url`), bo do
+    30.08 każdy automat wysyłał człowieka na stronę główną bez względu na temat.
+    Bierzemy PRAWDZIWĄ kategorię z `articles`, a nie zgadujemy jej ze słów
+    w nagłówku — ta sama zasada co przy `ground_categorization`.
+    """
     async with async_session() as session:
         result = await session.execute(
             select(DailySummary).order_by(DailySummary.date.desc()).limit(1)
         )
         summary = result.scalar_one_or_none()
 
-    if not summary:
-        raise HTTPException(status_code=404, detail="Brak dziennego podsumowania w bazie")
+        if not summary:
+            raise HTTPException(status_code=404, detail="Brak dziennego podsumowania w bazie")
+
+        # `cited_articles[0]` to artykuł nagłówka — ustala go `_select_top_article`
+        # w summary_generator i zapisuje na pierwszej pozycji.
+        headline_category = None
+        cited = (summary.content or {}).get("cited_articles") or []
+        if cited and isinstance(cited[0], dict) and cited[0].get("id"):
+            row = await session.execute(
+                select(Article.category).where(Article.id == cited[0]["id"])
+            )
+            headline_category = row.scalar_one_or_none()
 
     return {
         "date": summary.date.strftime("%Y-%m-%d"),
         "headline": summary.headline,
+        "headline_category": headline_category,
         "content": summary.content,
     }
 

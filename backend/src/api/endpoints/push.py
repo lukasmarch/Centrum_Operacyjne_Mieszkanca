@@ -36,6 +36,9 @@ class PushSubscribeRequest(BaseModel):
     user_agent: Optional[str] = None
     # Miejscowość dla alertów o awariach. Puste = cała gmina.
     location: Optional[str] = None
+    # Wizyta, w trakcie której padła zgoda (`sessionStorage.rl_sid`). Pięć z sześciu
+    # aktywnych subskrypcji nie ma `user_id` — to jedyne, co wiąże zgodę z kampanią.
+    session_id: Optional[str] = None
 
 
 class PushUnsubscribeRequest(BaseModel):
@@ -114,6 +117,7 @@ async def subscribe_push(
             categories=payload.categories,
             location=payload.location or (current_user.location if current_user else None),
             user_agent=user_agent[:500] if user_agent else None,
+            acq_session_id=payload.session_id,
             active=True,
         )
         session.add(subscription)
