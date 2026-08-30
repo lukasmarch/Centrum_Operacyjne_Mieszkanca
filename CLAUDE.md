@@ -728,9 +728,16 @@ po informację o wyłączeniu prądu, lądował na ogólnym pulpicie i szukał j
 - `utm_content` niesie identyfikator kreacji; `scripts/traffic_report.py` przestał go ignorować
 
 ## TODO (Kolejne priorytety)
-- [ ] **Wdrożyć pomiar strony na PRODUKCJI** — kolejność: `add_site_events` na prodzie
-      → push (Actions wdraża backend) → `RESEND_WEBHOOK_SECRET` + `--force-recreate`
-      → `./deploy-frontend.sh` → webhook w panelu Resend
+- [x] ~~Migracja `add_site_events` na produkcji~~ ✅ 30.08 (schemat zweryfikowany)
+- [x] ~~Backend na produkcji~~ ✅ 30.08, `818a497` — `/api/events` i webhook odpowiadają,
+      rejestracja zgodna wstecz (front bez `acq` przechodzi), zero błędów w logu
+- [ ] **FRONT CZEKA na `./deploy-frontend.sh 91.99.142.30`** — bez tego beacon nie
+      istnieje i `site_events` zostaje puste. Produkcja stoi na `5c6be34`, jedyny
+      commit frontowy od tamtej pory to `2bd45f4`, więc nic obcego nie wypłynie
+- [ ] `RESEND_WEBHOOK_SECRET` w `.env.production` + adres webhooka w panelu Resend
+      (`https://api.rybnolive.pl/api/newsletter/webhook/resend`, zdarzenia
+      `email.opened` i `email.clicked`), potem `up -d --force-recreate backend`.
+      Do tego czasu webhook odrzuca wszystko — stan bezpieczny, nie awaria
 - [ ] Decyzja o GA4 — **po** zebraniu pierwszego tygodnia z `site_events`, nie wcześniej
 - [ ] Cztery sierpniowe konta (id 8–11) zadały łącznie **1 pytanie** agentowi i żadne
       nie ma zgody push. To retencja, nie pozyskanie — ale co naprawiać, powie dopiero pomiar
