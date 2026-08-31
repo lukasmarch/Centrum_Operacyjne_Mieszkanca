@@ -136,6 +136,15 @@ export function useChat(options: UseChatOptions = {}) {
   const [limitInfo, setLimitInfo] = useState<LimitInfo | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Krok „w toku" domyka wynik narzędzia — ale tylko ten, który ma `tool`
+  // (dopasowanie po nazwie niżej). Zdarzenie handoffu przychodzi ze
+  // `state: "running"` i BEZ `tool`, więc nie miało czym się zamknąć i kręciło
+  // się w nieskończoność: 31.08 po gotowej odpowiedzi wisiały dwa spinnery
+  // („Pytanie przejmuje Redaktor.ai", „…GUS-Analityk.ai"). Koniec strumienia
+  // jest momentem, w którym żaden krok nie jest już „w toku" — z definicji.
+  const settleSteps = (steps?: AgentStep[]): AgentStep[] | undefined =>
+    steps?.map(s => (s.state === 'running' ? { ...s, state: 'done' } : s));
+
   const sendMessage = useCallback(async (text: string) => {
     // Sama liczba pytań, bez treści — ta leży w `chat_messages` i ma własną
     // retencję. Cztery sierpniowe konta zadały łącznie jedno pytanie, więc to
@@ -273,7 +282,10 @@ export function useChat(options: UseChatOptions = {}) {
               ));
             } else if (data.type === 'done') {
               setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, isStreaming: false, agent_name: data.agent_name } : m
+                m.id === assistantId
+                  ? { ...m, isStreaming: false, agent_name: data.agent_name,
+                      steps: settleSteps(m.steps) }
+                  : m
               ));
             } else if (data.type === 'error') {
               setMessages(prev => prev.map(m =>
@@ -293,7 +305,9 @@ export function useChat(options: UseChatOptions = {}) {
     } finally {
       setIsLoading(false);
       setMessages(prev => prev.map(m =>
-        m.id === assistantId ? { ...m, isStreaming: false } : m
+        m.id === assistantId
+          ? { ...m, isStreaming: false, steps: settleSteps(m.steps) }
+          : m
       ));
     }
   }, [isLoading, conversationId, options.agentName, limitReached]);

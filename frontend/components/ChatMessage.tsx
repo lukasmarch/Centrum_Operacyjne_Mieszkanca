@@ -194,8 +194,16 @@ const AgentStepRow: React.FC<{
 }> = ({ step, isLast, isStreaming, hasContent }) => {
   // „W toku" pokazujemy tylko dopóki naprawdę trwa: po dojściu treści albo po
   // zamknięciu strumienia kręcące się kółko kłamałoby.
+  //
+  // ⚠️ `isStreaming` obowiązuje TAKŻE kroki z jawnym `state: "running"`. Bez tego
+  // warunku krok, którego nikt nie domknął, kręcił się po gotowej odpowiedzi —
+  // tak wyszło 31.08 ze zdarzeniem handoffu (przychodzi jako „running" i bez
+  // `tool`, więc dopasowanie po nazwie narzędzia go nie zamykało). `useChat`
+  // domyka je teraz w danych; to jest druga bramka, na wypadek kolejnego kroku,
+  // który o domknięciu zapomni.
   const spinning =
-    step.state === 'running' || (isStreaming && !hasContent && isLast && !step.state);
+    isStreaming &&
+    (step.state === 'running' || (!hasContent && isLast && !step.state));
 
   return (
     <div className="flex items-start gap-1.5 text-[11px] leading-tight">
