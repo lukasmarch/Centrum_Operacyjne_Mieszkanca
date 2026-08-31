@@ -50,6 +50,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.services import provenance as prov
 from src.utils.logger import setup_logger
 
 logger = setup_logger("AgentTools")
@@ -115,6 +116,12 @@ class Tool:
     # Jednozdaniowy opis do bloku „TWOJE NARZĘDZIA". Krótszy niż `description`,
     # bo tamten czyta model przy KAŻDYM wywołaniu, a ten trafia do promptu raz.
     short: str = ""
+    # Kto odpowiada za treść, którą to narzędzie zwraca (`services/provenance.py`).
+    # Etykieta dokleja się do KAŻDEGO wyniku idącego do modelu, żeby fakt z BIP
+    # i zdanie z Facebooka nie wyglądały w odpowiedzi tak samo. Domyślnie `MEDIA`,
+    # bo to najostrożniejsza z warstw, które realnie mamy — ale narzędzie ma ją
+    # deklarować jawnie i pilnuje tego `scripts/test_provenance.py`.
+    provenance: str = prov.MEDIA
     # Własny limit czasu; `None` = wspólny `TOOL_TIMEOUT_S` z `base_agent`.
     # Ustawiają go WYŁĄCZNIE narzędzia, które nie są zapytaniem do bazy:
     # delegacja (`tools/delegation.py`) uruchamia całą pętlę innego agenta wraz

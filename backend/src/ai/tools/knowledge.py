@@ -52,6 +52,7 @@ import openai
 from sqlalchemy import case, func, or_, select
 
 from src.ai.embeddings import embedding_service
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.config import settings
 from src.database.schema import Article, LegalAct, Source
@@ -497,6 +498,7 @@ async def search_legal_acts(
 
 register(Tool(
     name="search_news",
+    provenance=prov.MEDIA,
     description=(
         "Szuka w archiwum artykułów lokalnych (gmina Rybno, powiat działdowski "
         "i okolice) fragmentów na KONKRETNY temat: nazwa miejscowości, imprezy, "
@@ -526,6 +528,7 @@ register(Tool(
 
 register(Tool(
     name="search_documents",
+    provenance=prov.URZEDOWE,
     description=(
         "Szuka w dokumentach urzędowych: stałe działy BIP (statut, procedury, "
         "podatki i opłaty, ochrona środowiska i azbest, gospodarka odpadami, "
@@ -555,6 +558,7 @@ register(Tool(
 
 register(Tool(
     name="latest_local_news",
+    provenance=prov.MEDIA,
     description=(
         "Najnowsze wpisy serwisu w kolejności, w jakiej widzi je mieszkaniec na "
         "stronie głównej — z datą, zasięgiem (gmina Rybno / okolice) i kategorią. "
@@ -583,6 +587,7 @@ register(Tool(
 
 register(Tool(
     name="search_legal_acts",
+    provenance=prov.URZEDOWE,
     description=(
         "Rejestr aktów prawnych gminy: uchwały Rady Gminy i zarządzenia Wójta — "
         "wraz z TREŚCIĄ aktu. "

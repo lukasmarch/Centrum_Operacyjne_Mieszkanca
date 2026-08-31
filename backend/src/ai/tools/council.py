@@ -26,6 +26,7 @@ from typing import Optional
 
 from sqlalchemy import func, select
 
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import CouncilSession, CouncilSessionStatus, LegalAct
 from src.utils.logger import setup_logger
@@ -167,6 +168,7 @@ async def council_sessions(ctx: ToolContext, limit: int = DEFAULT_LIMIT) -> Tool
 
 register(Tool(
     name="council_sessions",
+    provenance=prov.URZEDOWE,
     description=(
         "PRZEBIEG obrad Rady Gminy Rybno, które JUŻ SIĘ ODBYŁY: co Rada "
         "omawiała, co ustaliła, jak głosowała, kto zabierał głos, wraz "

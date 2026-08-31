@@ -25,6 +25,7 @@ from typing import Optional
 
 from sqlalchemy import select, text
 
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Event
 from src.services.feed_policy import time_label, visible_event_conditions, word_stem
@@ -222,6 +223,7 @@ def _place_row(place: dict) -> dict:
 
 register(Tool(
     name="upcoming_events",
+    provenance=prov.MEDIA,
     description=(
         "Wydarzenia zaplanowane w gminie Rybno i okolicy: festyny, koncerty, "
         "zawody, zebrania, imprezy dla dzieci. Zwraca datę, miejsce i organizatora. "
@@ -252,6 +254,7 @@ register(Tool(
 
 register(Tool(
     name="local_places",
+    provenance=prov.ZEWNETRZNE,
     description=(
         "Miejsca w gminie Rybno i okolicy: restauracje, kawiarnie, noclegi, "
         "atrakcje turystyczne, obiekty sportowe, szlaki i przyroda. Zwraca nazwę, "

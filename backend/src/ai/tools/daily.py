@@ -34,6 +34,7 @@ from typing import Optional
 
 from sqlalchemy import text
 
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.utils.logger import setup_logger
 
@@ -278,6 +279,7 @@ async def pharmacy_duty(ctx: ToolContext) -> ToolResult:
 
 register(Tool(
     name="waste_schedule",
+    provenance=prov.POMIAR,
     description=(
         "Terminy wywozu odpadów dla konkretnej miejscowości w gminie Rybno: "
         "zmieszane, segregacja, bio, gabaryty, popiół. Użyj przy każdym pytaniu "
@@ -309,6 +311,7 @@ register(Tool(
 
 register(Tool(
     name="cinema_repertoire",
+    provenance=prov.MEDIA,
     description=(
         "Repertuar kin w Działdowie i Lubawie na dziś i jutro: tytuły, gatunki, "
         "godziny seansów. Użyj przy pytaniu o kino, film, seans, repertuar."
@@ -321,6 +324,7 @@ register(Tool(
 
 register(Tool(
     name="clinic_schedule",
+    provenance=prov.POMIAR,
     description=(
         "Harmonogram przyjęć lekarzy w SPGZOZ Rybno: POZ, stomatologia, "
         "ginekologia, logopedia, gabinet zabiegowy, USG. Zwraca nazwiska "
@@ -344,6 +348,7 @@ register(Tool(
 
 register(Tool(
     name="pharmacy_duty",
+    provenance=prov.POMIAR,
     description=(
         "Apteki dyżurujące dziś w powiecie działdowskim, z adresem i telefonem. "
         "Użyj przy pytaniu o aptekę, dyżur apteki, gdzie kupić leki wieczorem."

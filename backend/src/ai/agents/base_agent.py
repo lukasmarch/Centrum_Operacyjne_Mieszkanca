@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai import tools as agent_tools
 from src.ai.tools import ToolContext, ToolResult
+from src.services import provenance as prov
 from src.config import settings
 from src.services.gmina_facts import gmina_facts
 from src.services.tool_telemetry import ToolTelemetry
@@ -80,6 +81,10 @@ def base_context_messages() -> list[dict]:
     return [
         {"role": "system", "content": get_datetime_context()},
         {"role": "system", "content": gmina_facts()},
+        # Reguła pochodzenia idzie PO karcie gminy: karta jest materiałem,
+        # a to jest instrukcja, co wolno zrobić z materiałem. Jedna kopia dla
+        # wszystkich siedmiu agentów — patrz `services/provenance.py`.
+        prov.precedence_message(),
     ]
 
 
@@ -279,13 +284,27 @@ class BaseAgent:
 
     @staticmethod
     def _tool_message(call: dict, result: ToolResult) -> dict:
-        """Wynik narzędzia w postaci wiadomości `tool` dla modelu."""
+        """Wynik narzędzia w postaci wiadomości `tool` dla modelu.
+
+        Tu doklejamy `zrodlo` — jedyne przewężenie, przez które przechodzi
+        KAŻDY wynik idący do modelu (obie ścieżki, strumień i non-stream,
+        wszystkie gałęzie błędów). Bez tego „6682 osoby z GUS" i „około 180 km
+        znikąd" docierają do modelu jako dwa nieodróżnialne obiekty JSON —
+        patrz `services/provenance.py`.
+        """
         payload = result.content
         if result.empty and isinstance(payload, dict):
             # Rozróżnienie, na którym stoi cała wiarygodność odpowiedzi:
             # „szukałem i nie ma" to fakt do zakomunikowania, a nie powód,
             # żeby model sięgnął po wiedzę ogólną i zgadywał.
             payload = {**payload, "pusty_wynik": True}
+        tool = agent_tools.get(call["name"])
+        zrodlo = prov.label(tool.provenance) if tool is not None else None
+        if zrodlo and isinstance(payload, dict):
+            # Etykieta NIE nadpisuje pola, które narzędzie ustawiło samo —
+            # narzędzie zna swój materiał lepiej niż jego domyślna warstwa
+            # (np. wynik mieszający uchwałę z artykułem prasowym).
+            payload = {"zrodlo": zrodlo, **payload}
         return {
             "role": "tool",
             "tool_call_id": call["id"],

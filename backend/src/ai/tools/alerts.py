@@ -31,6 +31,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select, text
 
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Article, Source
 from src.services.feed_policy import article_scope, publishable_conditions, time_label
@@ -227,6 +228,7 @@ async def citizen_reports(ctx: ToolContext, days: int = 14) -> ToolResult:
 
 register(Tool(
     name="active_alerts",
+    provenance=prov.MEDIA,
     description=(
         "Awarie i zdarzenia z terminem dotyczące gminy Rybno i okolic: wyłączenia "
         "prądu, przerwy w dostawie wody, ostrzeżenia meteo, utrudnienia drogowe, "
@@ -246,6 +248,7 @@ register(Tool(
 
 register(Tool(
     name="citizen_reports",
+    provenance=prov.MIESZKANCY,
     description=(
         "Zgłoszenia mieszkańców ze Zgłoszeń 24: dziury w drodze, przepalone "
         "latarnie, dzikie wysypiska, uszkodzona infrastruktura. Zwraca kategorię, "

@@ -41,6 +41,7 @@ on wie, ilu przeskoków już użyliśmy i kto był po drodze.
 """
 from typing import Optional
 
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 
 # Cel przekazania musi być nazwą agenta z rejestru. Lista jest tu jawna, a nie
@@ -88,6 +89,7 @@ async def przekaz_dalej(
 
 register(Tool(
     name="przekaz_dalej",
+    provenance=prov.STEROWANIE,
     description=(
         "Przekaż pytanie innemu agentowi, gdy NIE MASZ narzędzia, żeby na nie "
         "odpowiedzieć. Użyj tego ZAMIAST pisać, że czegoś nie potrafisz "

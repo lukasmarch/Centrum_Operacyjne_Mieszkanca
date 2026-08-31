@@ -26,6 +26,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
 
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 
 LOCAL_TZ = ZoneInfo("Europe/Warsaw")
@@ -329,6 +330,7 @@ _LOCATION_PARAM = {
 
 register(Tool(
     name="current_weather",
+    provenance=prov.POMIAR,
     description=(
         "Aktualny pomiar pogody: temperatura, odczuwalna, opis, wiatr, wilgotność, "
         "ciśnienie, wschód i zachód słońca. Użyj przy pytaniu o pogodę TERAZ, dziś, "
@@ -346,6 +348,7 @@ register(Tool(
 
 register(Tool(
     name="weather_forecast",
+    provenance=prov.POMIAR,
     description=(
         "Prognoza pogody na najbliższe dni (do 5): temperatura min/max, opis, "
         "szansa opadów, suma opadu, wiatr, indeks UV. Użyj ZAWSZE, gdy pytanie "
@@ -379,6 +382,7 @@ register(Tool(
 
 register(Tool(
     name="air_quality",
+    provenance=prov.POMIAR,
     description=(
         "Jakość powietrza z czujnika Airly: PM2.5, PM10, indeks CAQI i jego poziom. "
         "Użyj przy pytaniu o smog, czystość powietrza, warunki dla alergika lub "

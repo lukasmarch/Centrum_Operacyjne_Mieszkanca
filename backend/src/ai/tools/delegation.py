@@ -28,6 +28,7 @@ w grę wchodzi cała pętla narzędziowa agenta, nie pojedyncze zapytanie.
 Tu cena jest realna (kilka sekund na delegację, nie milisekundy), ale
 równoległość na wspólnej sesji to nie optymalizacja, tylko wyścig.
 """
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 
 # Agent → (etykieta w UI, co potrafi). Koordynatora tu NIE MA i to jest
@@ -128,6 +129,7 @@ def _make_delegate(agent_name: str):
 for _name, (_label, _zakres) in DELEGATES.items():
     register(Tool(
         name=f"zapytaj_{_name}",
+        provenance=prov.STEROWANIE,
         description=(
             f"Zadaj pytanie agentowi {_label}. Jego zakres: {_zakres}. "
             "Zadaj JEDNO konkretne pytanie dotyczące wyłącznie jego dziedziny — "

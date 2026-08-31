@@ -27,6 +27,7 @@ from typing import Optional
 
 from sqlalchemy import text
 
+from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 
 # Mowa potoczna → `kind` z bazy. Krótka lista, nie słownik synonimów: model
@@ -147,6 +148,7 @@ async def institution_info(ctx: ToolContext, instytucja: Optional[str] = None) -
 
 register(Tool(
     name="institution_info",
+    provenance=prov.URZEDOWE,
     description=(
         "Adres, telefon, kierownik i godziny pracy jednostek gminy Rybno: "
         "Urząd Gminy, GOPS (pomoc społeczna), ośrodek zdrowia, biblioteka, "

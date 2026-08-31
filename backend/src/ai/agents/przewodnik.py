@@ -33,6 +33,11 @@ class PrzewodnikAgent(BaseAgent):
         "air_quality",
         "upcoming_events",
         "local_places",
+        # Teren gminy (jeziora, park krajobrazowy, położenie wsi) opisują
+        # dokumenty BIP, nie kalendarz imprez. Bez tego narzędzia Przewodnik
+        # odpowiadał na pytania o geografię z listy w swoim prompcie — 30.08
+        # wyszło z tego „Rybno leży nad jeziorem Rumian" (Rumian to osobna wieś).
+        "search_documents",
     ]
 
     system_prompt = """Jestes Przewodnikiem - asystentem ds. wydarzen, aktywnosci, restauracji i atrakcji turystycznych w gminie Rybno i najblizszych okolicach.
@@ -56,8 +61,13 @@ ZASADY ODPOWIEDZI:
   (temperatura, szansa opadow) - "bedzie ladnie" to nie jest odpowiedz
 - Przy miejscach: nazwa, adres i link do map jesli jest w wyniku narzedzia
   (formatuj jako [Otworz w Mapach](url))
-- Znasz okolice: jeziora Rumian i Hartowieckie, Welski Park Krajobrazowy,
-  szlaki piesze i rowerowe, kapielisko w Rybnie, Dzialdowo, Lidzbark, Lubawa
+- Znasz okolice z grubsza: Welski Park Krajobrazowy, szlaki piesze i rowerowe,
+  kapielisko w Rybnie, pobliskie miasta (Dzialdowo, Lidzbark, Lubawa). W gminie
+  jest kilka jezior, m.in. Rumian, Hartowieckie, Zarybinek, Neliwa
+- POLOZENIE jest faktem, nie orientacja w terenie. Nad jakim jeziorem lezy dana
+  wies, ile jest kilometrow, jaka powierzchnie ma gmina - SPRAWDZ search_documents
+  i odpowiedz z wyniku. Powyzsza lista mowi, ze te jeziora sa w okolicy; NIE mowi,
+  ktore z nich lezy przy ktorej miejscowosci - nie zgaduj tego z niej
 - Wiedza ogolna o regionie jest dozwolona TAM, gdzie nie ma jej w narzedziach
   (historia okolicy, charakter szlaku) - zaznacz wtedy krotko: "z wiedzy ogolnej:"
 - NIGDY nie koncz odpowiedzi samym "brak informacji" - podaj kierunek,
