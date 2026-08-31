@@ -845,12 +845,57 @@ async def run_handoff_tests():
           "koordynator wymienia dokładnie te narzędzia, które istnieją")
 
 
+
+def run_agent_name_tests():
+    """Odpowiedź routera → nazwa agenta (`Orchestrator._resolve_agent`).
+
+    Model prosi się o identyfikator, a odpowiada uprzejmie: „urzędnik"
+    z ogonkiem, „Urzednik.ai", czasem z kropką. Do 31.08 każdy taki wariant
+    szedł cichym fallbackiem do Redaktora — z WARNING-iem, który w produkcji
+    ginie w szumie. Błąd jest niewidoczny dla użytkownika: dostaje odpowiedź,
+    tylko od niewłaściwego agenta.
+    """
+    from src.ai.agents.orchestrator import Orchestrator
+
+    print("\n== Rozwiązywanie nazwy agenta z odpowiedzi routera ==")
+    orch = Orchestrator()
+
+    class _Stub:
+        def __init__(self, name):
+            self.name = name
+            self.display_name = name
+
+    for n in ("redaktor", "urzednik", "gus_analityk"):
+        orch.agents[n] = _Stub(n)
+
+    trafia = {
+        "urzednik": "urzednik",              # postać kanoniczna
+        "urzędnik": "urzednik",              # ogonek — realny przypadek z 31.08
+        "Urzednik": "urzednik",              # wielka litera
+        "urzednik.": "urzednik",             # kropka na końcu zdania
+        '"urzednik"': "urzednik",            # w cudzysłowie
+        "Urzednik.ai": "urzednik",           # display_name
+        "  urzędnik \n": "urzednik",         # białe znaki
+        "GUS-Analityk": "gus_analityk",      # display_name z myślnikiem
+        "gus analityk": "gus_analityk",      # spacja zamiast podkreślnika
+    }
+    for raw, expected in trafia.items():
+        check(orch._resolve_agent(raw) == expected,
+              f"{raw!r} → {expected}", f"dostałem {orch._resolve_agent(raw)!r}")
+
+    for raw in ("", None, "   ", "kompletnie_inny", "agent", "nie wiem"):
+        check(orch._resolve_agent(raw) is None,
+              f"{raw!r} → None (fallback, nie zgadywanie)",
+              f"dostałem {orch._resolve_agent(raw)!r}")
+
+
 async def main():
     run_forecast_unit_tests()
     run_scope_tests()
     run_alert_kind_tests()
     await run_loop_tests()
     await run_handoff_tests()
+    run_agent_name_tests()
     # Po pętli, bo korzysta z atrap zarejestrowanych w `run_loop_tests`.
     await run_telemetry_tests()
     if "--db" in sys.argv or "--live" in sys.argv:

@@ -22,6 +22,8 @@ nie ma się od czego uruchomić. Płacimy tylko tam, gdzie dziś i tak
 przegrywaliśmy: przy odmowie.
 """
 import json
+import re
+import unicodedata
 import openai
 from typing import AsyncGenerator, Optional, Union
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,11 +66,16 @@ Dostepni agenci i ich INTENCJE:
 
 - gus_analityk: chce STATYSTYK HISTORYCZNYCH I DANYCH LICZBOWYCH z GUS
   Przykladowe pytania: "ile wynosi bezrobocie w powiecie?", "jaki jest PKB gminy?",
+  "ilu mieszkancow ma Rybno?", "ilu jest bezrobotnych?", "ilu ludzi mieszka w gminie?",
   "ile ludzi pracuje na 1000 mieszkancow?", "jak zmienila sie demografia?", "dane o finansach gminy"
   UWAGA: pytania o konkretne oferty pracy lub firmy szukajace pracownikow -> redaktor, NIE tutaj!
-  UWAGA: samo slowo "ile" NIE oznacza statystyki. GUS opisuje zjawiska MIERZONE W CZASIE
-  (ludnosc, bezrobocie, budzet, liczba firm). Pytania o ustroj i organizacje gminy
-  ("ile solectw", "ilu radnych", "ile szkol prowadzi gmina") -> urzednik, NIE tutaj!
+  ROZSTRZYGNIECIE "ile" / "ilu": FORMA PYTANIA NIC NIE ZNACZY - obu uzywaja obie strony
+  ("ilu mieszkancow" to GUS, "ilu radnych" to urzednik). Zapytaj siebie, OD CZEGO
+  ZALEZY TA LICZBA:
+  - zmienia sie sama, rok do roku, i ktos ja MIERZY (mieszkancy, bezrobotni, urodzenia,
+    firmy, dochody, mieszkania) -> gus_analityk
+  - zmienia sie UCHWALA Rady albo decyzja organu i tak zostaje na lata (solectwa, radni,
+    szkoly prowadzone przez gmine, jednostki organizacyjne) -> urzednik
 
 - przewodnik: pyta o MIEJSCA, WYDARZENIA lub POGODE
   Przykladowe pytania: "co robic w weekend?", "gdzie zjesc?", "jaka bedzie pogoda?",
@@ -116,6 +123,44 @@ class Orchestrator:
         self.agents[agent.name] = agent
         logger.info(f"Registered agent: {agent.name} ({agent.display_name})")
 
+    def _resolve_agent(self, raw: Optional[str]) -> Optional[str]:
+        """Odpowiedź routera → nazwa agenta z rejestru, albo `None`.
+
+        Model bywa uprzejmy tam, gdzie prosimy o identyfikator: zwraca
+        „urzędnik" z ogonkiem, „Urzednik.ai", czasem z kropką na końcu.
+        Porównanie `agent_name in self.agents` żadnego z tych wariantów nie
+        łapało — pytanie szło wtedy cichym fallbackiem do Redaktora, a jedynym
+        śladem był WARNING, który w produkcji ginie w szumie. 31.08 zdarzyło
+        się to na „kiedy powstała gmina Rybno": router wskazał urzędnika,
+        odpowiadał redaktor.
+
+        Nie normalizujemy tu tekstu w ogólności (na to jest pięć kopii
+        w `services/`) — dopasowujemy do ZAMKNIĘTEJ listy nazw, więc wolno
+        być agresywnym: zostają litery ASCII i podkreślnik.
+        """
+        if not raw:
+            return None
+        flat = self._flatten(raw)
+        if not flat:
+            return None
+        # Nazwy agentów przechodzą przez TĘ SAMĄ normalizację, więc „gus_analityk"
+        # i „GUS-Analityk" (display_name, którego model też potrafi użyć)
+        # spotykają się jako „gusanalityk".
+        by_flat = {self._flatten(name): name for name in self.agents}
+        if flat in by_flat:
+            return by_flat[flat]
+        # „urzednikai" z „Urzednik.ai". Przedrostek jest tu bezpieczny, bo nazwy
+        # agentów są rozłączne; przy remisie wolimy fallback niż zgadywanie.
+        matches = [orig for norm, orig in by_flat.items() if flat.startswith(norm)]
+        return matches[0] if len(matches) == 1 else None
+
+    @staticmethod
+    def _flatten(text: str) -> str:
+        """Nazwa do porównania: same litery ASCII, bez ogonków i interpunkcji."""
+        lowered = unicodedata.normalize("NFKD", text.strip().lower().replace("ł", "l"))
+        return re.sub(r"[^a-z]", "",
+                      "".join(c for c in lowered if not unicodedata.combining(c)))
+
     async def route(
         self,
         user_message: str,
@@ -148,15 +193,15 @@ class Orchestrator:
                 max_tokens=20
             )
 
-            agent_name = response.choices[0].message.content.strip().lower()
+            raw = response.choices[0].message.content
 
-            # Validate agent name
-            if agent_name in self.agents:
-                logger.info(f"Routed '{user_message[:50]}...' -> {agent_name}")
-                return agent_name
+            resolved = self._resolve_agent(raw)
+            if resolved:
+                logger.info(f"Routed '{user_message[:50]}...' -> {resolved}")
+                return resolved
 
             # Fallback to redaktor for general queries
-            logger.warning(f"Unknown agent '{agent_name}', falling back to redaktor")
+            logger.warning(f"Unknown agent '{(raw or '').strip()[:40]}', falling back to redaktor")
             return "redaktor"
 
         except Exception as e:
