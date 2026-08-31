@@ -15,6 +15,9 @@ Scenariusze:
      żaden mail tu nie wychodził, bo job patrzył wyłącznie na trial_ends_at)
   7. subskrypcja za 1 dzień → 'last_day' + brak powtórki tego samego dnia
   8. porzucona płatność → wpis `pending` starszy niż doba zamknięty
+  9-11. awaria poczty w dniu wygaśnięcia → plan ZOSTAJE, mail wraca nazajutrz,
+     a po karencji (`ENDED_GRACE_DAYS`) zejście następuje mimo milczącej poczty
+  12. treść przypomnienia nie kłamie o długości okresu próbnego
 
 Nic nie wychodzi na zewnątrz: `EmailService.send_email` jest podmieniony na zapis
 do listy. Konta testowe (`@qa.rybnolive.pl`) są kasowane na końcu, także po błędzie.
@@ -48,9 +51,17 @@ TEST_DOMAIN = "@qa.rybnolive.pl"  # .local/.test odrzuca walidator adresu
 sent_emails = []
 
 
+# Awaria poczty na żądanie — scenariusz 9 sprawdza, co job robi, gdy Resend milczy.
+mail_broken = {"on": False}
+
+
 def capture_emails():
     """Podmienia wysyłkę na zapis do listy — nic nie idzie do Resend."""
     async def capture(self, to_email, subject, html_content, reply_to=None, unsubscribe_url=None):
+        if mail_broken["on"]:
+            # Dokładnie to, co 31.08.2026 oddawał Resend przy niezweryfikowanej domenie:
+            # wyjątku nie ma, jest status „failed" — a job musi go zauważyć.
+            return {"status": "failed", "error": "domain is not verified", "to": to_email}
         sent_emails.append({"to": to_email, "subject": subject, "html": html_content})
         return {"status": "sent", "id": "test", "to": to_email}
     EmailService.send_email = capture
@@ -295,6 +306,98 @@ async def cleanup(engine):
     print(f"\n🧹 Konta testowe ({TEST_DOMAIN}) usunięte")
 
 
+async def scenario_mail_outage(session) -> bool:
+    """9-11. Poczta padła w dniu zejścia z Premium → plan zostaje, mail wraca nazajutrz.
+
+    Etap 'ended' wypada tylko raz: po wyzerowaniu `trial_ends_at` konto znika ze
+    WSZYSTKICH zapytań jobu, więc nieudany mail nie miałby jak wrócić, a plan
+    zniknąłby w ciszy. 31.08.2026 Resend odrzucał wszystko przez niezweryfikowaną
+    domenę — dzień takiej awarii wystarczy, żeby trafić w ten jeden przebieg.
+
+    Asercje patrzą na KONKRETNE konto, nie na licznik zwrócony przez job: w bazie
+    siedzą jeszcze konta z wcześniejszych scenariuszy i one też się kwalifikują.
+    """
+    from src.scheduler.trial_expiry_job import _downgrade_expired_trials, ENDED_GRACE_DAYS
+
+    def poszedl_do(email: str) -> bool:
+        return any(m["to"] == email for m in sent_emails)
+
+    print("\n9️⃣  Awaria poczty w dniu wygaśnięcia → downgrade odłożony")
+    sent_emails.clear()
+    now = datetime.utcnow()
+    user = await make_user(session, f"awaria-poczty{TEST_DOMAIN}", days_left=-1)
+
+    mail_broken["on"] = True
+    try:
+        await _downgrade_expired_trials(session, now)
+    finally:
+        mail_broken["on"] = False
+    await session.commit()
+    await session.refresh(user)
+
+    ok = check("plan nadal Premium", user.tier == UserTier.PREMIUM.value, user.tier)
+    ok &= check("data trialu zachowana (jest z czego złożyć mail)", user.trial_ends_at is not None)
+    ok &= check("etap 'ended' NIE zużyty", not user.trial_reminder_stage,
+                str(user.trial_reminder_stage))
+
+    print("\n🔟  Poczta wróciła nazajutrz → mail wychodzi, plan spada")
+    sent_emails.clear()
+    await _downgrade_expired_trials(session, now + timedelta(days=1))
+    await session.commit()
+    await session.refresh(user)
+    ok &= check("plan Free", user.tier == UserTier.FREE.value, user.tier)
+    ok &= check("mail o zmianie planu wyszedł", poszedl_do(user.email))
+    ok &= check("etap 'ended' zapisany", user.trial_reminder_stage == "ended",
+                str(user.trial_reminder_stage))
+
+    print("\n1️⃣1️⃣  Trwała awaria → po karencji plan spada mimo braku maila")
+    sent_emails.clear()
+    uparty = await make_user(session, f"cisza{TEST_DOMAIN}", days_left=-(ENDED_GRACE_DAYS + 1))
+    mail_broken["on"] = True
+    try:
+        await _downgrade_expired_trials(session, now)
+    finally:
+        mail_broken["on"] = False
+    await session.commit()
+    await session.refresh(uparty)
+    ok &= check(f"po {ENDED_GRACE_DAYS} dniach karencji plan schodzi",
+                uparty.tier == UserTier.FREE.value, uparty.tier)
+    ok &= check("żaden mail nie udawał, że poszedł", not poszedl_do(uparty.email))
+    ok &= check("etap 'ended' nie zapisany bez wysyłki", not uparty.trial_reminder_stage,
+                str(uparty.trial_reminder_stage))
+    return ok
+
+
+async def scenario_perks_text(session) -> bool:
+    """12. Mail nie kłamie o długości okresu próbnego (30 dni, nie dwa tygodnie).
+
+    Renderujemy w trybie płatności URUCHOMIONYCH — lokalnie `P24_SANDBOX` bywa
+    włączony i mail idzie wtedy gałęzią „odpisz na maila", czyli nie tą, którą
+    dostaje mieszkaniec z produkcji.
+    """
+    print("\n1️⃣2️⃣  Treść przypomnienia zgadza się z 30-dniowym okresem próbnym")
+    from src.scheduler.trial_expiry_job import _send_upcoming_reminders
+
+    sent_emails.clear()
+    now = datetime.utcnow()
+    user = await make_user(session, f"tresc{TEST_DOMAIN}", days_left=7)
+
+    sandbox = settings.P24_SANDBOX
+    settings.P24_SANDBOX = False
+    try:
+        await _send_upcoming_reminders(session, now)
+        await session.commit()
+    finally:
+        settings.P24_SANDBOX = sandbox
+
+    html = next((m["html"] for m in sent_emails if m["to"] == user.email), "")
+    ok = check("mail wyszedł", bool(html))
+    ok &= check("bez zdania o 'dwóch tygodniach'", "dwa tygodnie" not in html)
+    ok &= check("podaje cenę", "9,99" in html)
+    ok &= check("prowadzi do cennika", "/cennik" in html)
+    return ok
+
+
 async def main() -> int:
     print("=" * 62)
     print("TEST CYKLU ŻYCIA PLANU: OKRES PRÓBNY I SUBSKRYPCJA OPŁACONA")
@@ -313,6 +416,8 @@ async def main() -> int:
             ok &= await scenario_unsubscribed(session)
             ok &= await scenario_paid_subscription(session)
             ok &= await scenario_abandoned_payment(session)
+            ok &= await scenario_mail_outage(session)
+            ok &= await scenario_perks_text(session)
     finally:
         await cleanup(engine)
         await engine.dispose()

@@ -34,6 +34,12 @@ logger = setup_logger("TrialExpiryJob")
 # Kolejność etapów — mail wychodzi tylko wtedy, gdy jest dalszy niż ostatnio wysłany
 REMINDER_ORDER = {None: 0, "": 0, "week": 1, "last_day": 2, "ended": 3}
 
+# Ile dni czekamy z odebraniem planu, gdy mail „ended" nie wyszedł. Powód odmowy
+# bywa trwały (konto bez rekordu subskrybenta nie ma jak dostać stopki z wypisem),
+# więc czekanie musi mieć koniec — inaczej jedna dziura w danych fundowałaby
+# komuś Premium bez końca.
+ENDED_GRACE_DAYS = 3
+
 
 async def _unsubscribe_token(session: AsyncSession, user: User) -> Optional[str]:
     """Token wypisu z rekordu subskrybenta — stopka maila musi mieć działający link."""
@@ -204,6 +210,66 @@ async def _send_paid_reminders(session: AsyncSession, now: datetime) -> int:
     return sent
 
 
+async def _downgrade_expired_trials(session: AsyncSession, now: datetime) -> int:
+    """Zejście na plan darmowy po wygaśnięciu okresu próbnego. Zwraca liczbę zejść.
+
+    Osobna funkcja, bo `run_trial_expiry_async` buduje własny engine pod event loop
+    APSchedulera i nie da się jej podać sesji testowej — a to jest ten moment,
+    w którym człowiek traci dostęp, więc musi być sprawdzalny testem.
+    """
+    result = await session.execute(
+        select(User).where(
+            User.tier == UserTier.PREMIUM.value,
+            User.trial_ends_at != None,  # noqa: E711
+            User.trial_ends_at < now,
+            User.is_active == True,  # noqa: E712
+        )
+    )
+
+    downgraded = 0
+    for user in result.scalars().all():
+        # Aktywna (płatna) subskrypcja bije wygasły trial
+        sub_result = await session.execute(
+            select(Subscription).where(
+                Subscription.user_id == user.id,
+                Subscription.status == SubscriptionStatus.ACTIVE.value,
+                Subscription.expires_at > now,
+            )
+        )
+        if sub_result.scalar_one_or_none():
+            user.trial_ends_at = None
+            session.add(user)
+            logger.info(f"User {user.id} has paid subscription, clearing trial flag")
+            continue
+
+        # Mail idzie PRZED wyzerowaniem trial_ends_at — po zmianie planu nie ma już
+        # z czego złożyć daty, a użytkownik ma się dowiedzieć, co się właśnie stało.
+        announced = await _send_reminder(session, user, "ended", now)
+
+        # Poczta padła? Dostęp zostaje do jutra. Wyzerowane `trial_ends_at` wypycha
+        # konto ze WSZYSTKICH zapytań tego jobu, więc mail nigdy by nie wrócił,
+        # a plan zniknąłby w ciszy — dokładnie to, przed czym etap 'ended' miał
+        # chronić. Etapy 'week' i 'last_day' są odporne same z siebie (znacznik
+        # stawiamy dopiero po realnej wysyłce, a próg obowiązuje nazajutrz);
+        # 'ended' wypada tylko raz, więc potrzebuje tej klamry. 31.08.2026 Resend
+        # odrzucał wszystko przez niezweryfikowaną domenę — dzień takiej awarii
+        # wystarczy, żeby trafić w ten jeden przebieg.
+        if not announced and now - user.trial_ends_at < timedelta(days=ENDED_GRACE_DAYS):
+            logger.warning(
+                f"User {user.id} ({user.email}): mail 'ended' nie wyszedł — "
+                f"downgrade odłożony, spróbuję jutro"
+            )
+            continue
+
+        user.tier = UserTier.FREE.value
+        user.trial_ends_at = None
+        session.add(user)
+        downgraded += 1
+        logger.info(f"User {user.id} ({user.email}) trial expired → downgraded to Free")
+
+    return downgraded
+
+
 async def _close_abandoned_payments(session: AsyncSession, now: datetime) -> int:
     """Zamyka wpisy `pending` po porzuconej płatności (starsze niż doba).
 
@@ -236,7 +302,6 @@ async def run_trial_expiry_async():
     """Downgrade userów po wygaśnięciu triala."""
     logger.info("=== Trial Expiry Job START ===")
     now = datetime.utcnow()
-    downgraded = 0
 
     # Tworzymy własny engine dla tego event loopa (nie reużywamy globalnego z uvloop FastAPI)
     engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
@@ -249,44 +314,8 @@ async def run_trial_expiry_async():
         reminded_paid = await _send_paid_reminders(session, now)
         await session.commit()
 
-        # Znajdź userów z wygasłym trialem (tier=premium, trial_ends_at < now)
-        result = await session.execute(
-            select(User).where(
-                User.tier == UserTier.PREMIUM.value,
-                User.trial_ends_at != None,
-                User.trial_ends_at < now,
-                User.is_active == True,
-            )
-        )
-        trial_expired_users = result.scalars().all()
-
-        for user in trial_expired_users:
-            # Sprawdź czy ma aktywną (płatną) subskrypcję
-            sub_result = await session.execute(
-                select(Subscription).where(
-                    Subscription.user_id == user.id,
-                    Subscription.status == SubscriptionStatus.ACTIVE.value,
-                    Subscription.expires_at > now,
-                )
-            )
-            active_sub = sub_result.scalar_one_or_none()
-
-            if active_sub:
-                # Ma płatną subskrypcję — wyczyść trial, zostaw tier
-                user.trial_ends_at = None
-                session.add(user)
-                logger.info(f"User {user.id} has paid subscription, clearing trial flag")
-            else:
-                # Mail idzie PRZED wyzerowaniem trial_ends_at — po zmianie planu nie ma już
-                # z czego złożyć daty, a użytkownik ma się dowiedzieć, co się właśnie stało.
-                await _send_reminder(session, user, "ended", now)
-
-                # Brak subskrypcji — downgrade do Free
-                user.tier = UserTier.FREE.value
-                user.trial_ends_at = None
-                session.add(user)
-                downgraded += 1
-                logger.info(f"User {user.id} ({user.email}) trial expired → downgraded to Free")
+        # 1b. Zejście na plan darmowy po wygaśnięciu okresu próbnego
+        downgraded = await _downgrade_expired_trials(session, now)
 
         # 2. Wygaś opłacone subskrypcje po expires_at
         expired_subs = 0
