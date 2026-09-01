@@ -82,6 +82,7 @@ async def update_articles_job(
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     total_saved = 0
+    total_updated = 0
     total_sources = 0
     failed_sources = []
 
@@ -178,8 +179,17 @@ async def update_articles_job(
                         articles = filter_recent_articles(articles, days=2)
                         saved_ids = await scraper.save_to_db(articles, session)
 
-                logger.info(f"✓ {source_name}: {len(saved_ids)} new articles saved")
-                total_saved += len(saved_ids)
+                # NOWE i ODŚWIEŻONE liczymy osobno: `saved_ids` niesie oba
+                # przypadki, więc re-scrape tego samego posta (drugi przebieg
+                # dnia, aktualizacja wpisu Energi) zawyżał licznik świeżych.
+                new_count = len(scraper.new_ids)
+                updated_count = len(scraper.updated_ids)
+                logger.info(
+                    f"✓ {source_name}: {new_count} new articles saved"
+                    f" ({updated_count} refreshed)"
+                )
+                total_saved += new_count
+                total_updated += updated_count
 
                 # Update last_scraped timestamp
                 await session.execute(
@@ -202,6 +212,7 @@ async def update_articles_job(
     logger.info("=" * 60)
     logger.info(f"Total sources processed: {total_sources}")
     logger.info(f"Total new articles saved: {total_saved}")
+    logger.info(f"Total existing articles refreshed: {total_updated}")
     logger.info(f"Failed sources: {len(failed_sources)}")
     if failed_sources:
         for failed in failed_sources:

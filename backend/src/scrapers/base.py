@@ -23,6 +23,14 @@ class BaseScraper(ABC):
         self.rate_limit = self.config.get('rate_limit', settings.SCRAPER_RATE_LIMIT)
         self.max_retries = self.config.get('max_retries', settings.SCRAPER_MAX_RETRIES)
 
+        # Rozdzielone wyniki zapisu. `save_to_db` zwraca jedną listę ID (nowe
+        # + odświeżone), bo woła ją też `scrape()` i kod, który nie odróżnia
+        # tych przypadków. Licznik joba potrzebuje jednak samych NOWYCH:
+        # re-scrape nadpisuje `scraped_at` i bez tego rozdzielenia ten sam post
+        # liczy się jako świeży przy każdym przebiegu dnia.
+        self.new_ids: List[int] = []
+        self.updated_ids: List[int] = []
+
     async def __aenter__(self):
         self.client = httpx.AsyncClient(
             headers={'User-Agent': self.user_agent},
@@ -103,6 +111,7 @@ class BaseScraper(ABC):
                     await session.commit()
                     await session.refresh(existing_article)
                     saved_ids.append(existing_article.id)
+                    self.updated_ids.append(existing_article.id)
                 else:
                     article = Article(
                         source_id=self.source_id,
@@ -112,6 +121,7 @@ class BaseScraper(ABC):
                     await session.commit()
                     await session.refresh(article)
                     saved_ids.append(article.id)
+                    self.new_ids.append(article.id)
                     self.logger.info(f"Saved new article: {article.title}")
 
             except Exception as e:
