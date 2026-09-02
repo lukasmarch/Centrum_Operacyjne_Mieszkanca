@@ -497,14 +497,30 @@ class ArticleProcessor:
 
         self.logger.info(f"Found {len(articles)} articles to process")
 
+        # Po pętli chodzą ID, nie obiekty ORM. `process_article` przy błędzie robi
+        # `session.rollback()`, a rollback UNIEWAŻNIA wszystkie wczytane obiekty
+        # — niezależnie od `expire_on_commit=False` w `ai_jobs.py`. Sam handler
+        # niżej sięgał wtedy po `article.id`, czyli próbował dociągnąć wpis z bazy
+        # w kodzie synchronicznym, i wywracał CAŁY przebieg na `MissingGreenlet`
+        # — z wnętrza `except`, więc `continue` nie miało już czego ratować
+        # (2.09.2026: wyczerpane kredyty OpenAI ubiły pierwszy artykuł, a ten
+        # zabrał pozostałych czternaście — do modelu nie trafił żaden).
+        # `session.get` czyta świadomie i asynchronicznie, więc jeden zły wpis
+        # kosztuje wyłącznie siebie. Ta sama poprawka co w `event_extractor`
+        # z 22.08.2026 — tamta pętla dostała ją, ta została pominięta.
+        article_ids = [article.id for article in articles]
+
         # Przetwórz każdy artykuł
         processed_count = 0
-        for article in articles:
+        for article_id in article_ids:
             try:
+                article = await session.get(Article, article_id)
+                if article is None:
+                    continue
                 await self.process_article(article, session)
                 processed_count += 1
             except Exception as e:
-                self.logger.error(f"Batch processing failed for article {article.id}: {e}")
+                self.logger.error(f"Batch processing failed for article {article_id}: {e}")
                 # Kontynuuj dla pozostałych artykułów
                 continue
 
