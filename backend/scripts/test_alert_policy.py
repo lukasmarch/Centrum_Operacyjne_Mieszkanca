@@ -45,6 +45,62 @@ CASES: List[Tuple[str, str, str, Optional[datetime], Optional[datetime], Optiona
         "ZGK informuje o braku wody do godzin wieczornych.",
         None, None, "woda",
     ),
+    # --- Formy, które przechodziły bokiem do 2.09.2026 ------------------------
+    # Zmierzone na 60 wpisach z produkcji: SZEŚĆ realnych awarii w gminie nie
+    # przeszło bramki rodzaju, więc nie wysłały ani jednego powiadomienia.
+    # Wspólny mianownik: wzorce pisane pod jedno sformułowanie, które akurat
+    # wtedy padło — dokładnie ta sama klasa błędu co „planowe" vs „planowane".
+    (
+        "awaria NA sieci wodociągowej — przyimek (ZGK, 2.09.2026)",
+        "Uwaga awaria !!!",
+        "Mamy awarie na sieci wodociągowej. W związku z wykonywanymi pracami "
+        "naprawczymi, może nastąpić spadek ciśnienia wody lub chwilowy jej brak. "
+        "Dotyczy: Gralewo Stacja, Żabiny, Rapaty, Prusy, Szczupliny, Nowa Wieś, "
+        "Groszki, Naguszewo.",
+        None, None, "woda",
+    ),
+    (
+        "czasowe WYŁĄCZENIE WODY — woda nie miała formy z wyłączeniem (art. 5689)",
+        "💧 UWAGA! CZASOWE WYŁĄCZENIE WODY W RYBNIE I OKOLICZNYCH MIEJSCOWOŚCIACH",
+        "W poniedziałek, 31 sierpnia 2026 roku, nastąpi czasowe wyłączenie wody.",
+        None, None, "woda",
+    ),
+    (
+        "wyłączenie DOSTAW wody — rzeczownik pośredni (art. 5679)",
+        "OGŁOSZENIE O CZASOWYM WYŁĄCZENIU DOSTAW WODY.",
+        "Uprzejmie informujemy, że w dniu 31 sierpnia nastąpi czasowe wyłączenie "
+        "dostaw wody w Rybnie.",
+        None, None, "woda",
+    ),
+    (
+        "AWARIA PRĄDU — najzwyklejsza polska forma, nie budziła nikogo (art. 5550)",
+        "⚡ KOLEJNA AKTUALIZACJA – AWARIA PRĄDU W RYBNIE MOŻE POTRWAĆ DO GODZ. 22:00!",
+        "Najnowsze informacje Energa Operator nie napawają optymizmem.",
+        None, None, "prad",
+    ),
+    (
+        "awaryjne wyłączenie ENERGII elektrycznej (art. 5536)",
+        "⚡ AWARIA PRĄDU! PROBLEMY M.IN. W GMINIE RYBNO",
+        "Energa Operator informuje o awaryjnym wyłączeniu energii elektrycznej "
+        "w gminie Rybno.",
+        None, None, "prad",
+    ),
+    (
+        # RODZAJ jest już rozpoznawany (do 2.09 nie był), ale post ZGK mówi
+        # „naszego rejonu" i nie nazywa ANI JEDNEJ wsi — zatrzymuje go bramka
+        # miejsca, tak jak ma zatrzymywać. Ten przypadek pilnuje, żeby
+        # rozluźnienie wzorca rodzaju nie przeciekło na bramkę miejsca.
+        "awarie prądu bez nazwy wsi — rodzaj tak, miejsce nie (art. 5554)",
+        "Drodzy mieszkańcy. Mamy sytuację kryzysową.",
+        "Silne wiatry spowodowały awarie prądu w znacznej części naszego rejonu.",
+        None, None, None,
+    ),
+    (
+        "budowa sieci wodociągowej to inwestycja, nie awaria",
+        "Budowa sieci wodociągowej w Rybnie — podpisano umowę",
+        "Gmina podpisała umowę na budowę sieci wodociągowej.",
+        None, None, None,
+    ),
     (
         "pożar budynku w Żabinach",
         "Pożar budynku gospodarczego w Żabinach",

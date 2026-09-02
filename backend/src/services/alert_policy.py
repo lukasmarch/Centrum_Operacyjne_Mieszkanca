@@ -74,17 +74,37 @@ def _flat(text: Optional[str]) -> str:
 # Wzorce działają na tekście BEZ ogonków (patrz `_flat`), stąd „prad", „pozar".
 # Kolejność ma znaczenie: pierwszy trafiony rodzaj wygrywa, a wyłączenie prądu
 # opisane jako „przerwa w dostawie energii" nie ma być wypadkiem.
+# Przyimek między słowem-kluczem a rzeczownikiem. „Mamy awarie NA sieci
+# wodociągowej" (ZGK, 2.09.2026) nie trafiało w `awari\w*\s+sieci` — jeden
+# przyimek wystarczył, żeby awaria wody w ośmiu wsiach nie wysłała powiadomienia.
+# Grupa nieprzechwytująca i opcjonalna, więc stare formy działają bez zmian.
+_PREP = r"(?:na\s+|w\s+)?"
+
 _INCIDENTS: tuple[tuple[str, str, str], ...] = (
     (
         "prad",
         "Wyłączenie prądu",
-        r"wylaczeni\w*\s+(prad|planow|biezac)|przerw\w*\s+w\s+dostaw\w*\s+(energii|pradu)"
-        r"|brak\w*\s+pradu|bez\s+pradu|awari\w*\s+(zasilania|sieci\s+energetycznej|energetyczn\w+)",
+        # `_PREP` po „awaria": ZGK i Syla piszą „awaria NA sieci", nie „awaria sieci".
+        # Rzeczownik po „wyłączenie" bywa dowolny z trójki prąd/energia/zasilanie —
+        # do 2.09 lista miała tylko „prad", więc „awaryjne wyłączenie ENERGII
+        # elektrycznej" (art. 5536) i „liczne wyłączenia energii" (5551) przechodziły
+        # bokiem. Najdotkliwsze było jednak `awari\w*` bez „pradu" w alternatywie:
+        # „AWARIA PRĄDU W RYBNIE" — najzwyklejsza polska forma — nie budziła nikogo.
+        r"wylaczeni\w*\s+" + _PREP + r"(prad\w*|planow\w*|biezac\w*|energi\w*|zasilania)"
+        r"|przerw\w*\s+w\s+dostaw\w*\s+(energii|pradu)"
+        r"|brak\w*\s+pradu|bez\s+pradu"
+        r"|awari\w*\s+" + _PREP + r"(prad\w*|zasilania|energi\w*|sieci\s+energetycznej|energetyczn\w+)",
     ),
     (
         "woda",
         "Przerwa w dostawie wody",
-        r"brak\w*\s+wody|bez\s+wody|przerw\w*\s+w\s+dostaw\w*\s+wody|awari\w*\s+(wodociag\w*|hydrofor\w*|sieci\s+wodociagowej)"
+        # Woda nie miała ANI JEDNEJ formy z „wyłączeniem", choć tak właśnie ZGK
+        # nazywa planowaną przerwę: „CZASOWE WYŁĄCZENIE WODY" (5689), „ogłoszenie
+        # o czasowym wyłączeniu DOSTAW wody" (5679). Stąd `(dostaw\w*\s+)?`.
+        r"brak\w*\s+wody|bez\s+wody"
+        r"|przerw\w*\s+w\s+dostaw\w*\s+wody"
+        r"|wylaczeni\w*\s+" + _PREP + r"(dostaw\w*\s+)?wody"
+        r"|awari\w*\s+" + _PREP + r"(sieci\s+)?(wodociag\w*|hydrofor\w*)"
         r"|skazeni\w*\s+wody|zakaz\w*\s+spozy\w*\s+wody|woda\s+niezdatna|nie\s+nadaje\s+sie\s+do\s+spozycia",
     ),
     (
