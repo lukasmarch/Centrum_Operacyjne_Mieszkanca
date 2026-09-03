@@ -783,6 +783,9 @@ Feed i briefing zadawały te same pytania własnymi, niepełnymi kopiami.
   ranking dawał wpisowi po terminie ×0,25, czyli spychał niżej zamiast usunąć — przy
   4–9 lokalnych wpisach dziennie „niżej" i tak znaczyło pierwszą stronę. Doba karencji,
   bo wczorajsza impreza czyta się jako relacja. Pomiar: wypada 6 wpisów z 70
+- **`idx_event_unique` usunięty** — dedup semantyczny (`canonical_id`) jest jedynym
+  sędzią powtórek; stary indeks tekstowy blokował zapis rozpoznanej powtórki i wywracał
+  całą pętlę (`PendingRollbackError` w następnej iteracji, trzeci nawrót tego wzorca)
 - **Bramka WEJŚCIOWA ekstrakcji wydarzeń ma być HOJNA** — nazwa miejscowości w tekście
   przebija niską `articles.locality`. Odsiewała 96 wpisów na 14 dni, w tym „VI Leśny
   Nocny Bieg w KOPANIARZACH" z oceną 0. Ostra jest bramka WYJŚCIOWA, która ocenia SAMO
@@ -799,10 +802,10 @@ Feed i briefing zadawały te same pytania własnymi, niepełnymi kopiami.
   `test_event_terms` 27 (sekcja 4 nowa)
 
 ## TODO (Kolejne priorytety)
-- [ ] **Usunąć `idx_event_unique (title, event_date, location)`** — relikt sprzed dedupu
-      semantycznego; 3.09 wywrócił nadrabianie ekstrakcji (drugi rekord z `canonical_id`
-      ma identyczny tytuł/datę/miejsce). Dziś obchodzony `except IntegrityError`, ale
-      artykuł traci wtedy ślad `source_article_id`. Migracja PRZED kodem
+- [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
+      sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
+      z `canonical_id`, 86 o identycznym tytule — indeks blokował podzbiór tego, co
+      `find_duplicate` łapie embeddingiem. Zostaje `idx_event_one_per_article`
 - [x] ~~Deploy: deploy key + `set -e` + weryfikacja SHA~~ ✅ 3.09 `6e9ecde`, sprawdzone
       pierwszym prawdziwym deployem. Front nadal ręcznie: `yes TAK | ./deploy-frontend.sh`
 - [ ] **Wolumen treści** (pomiar 3.09, 14 dni): 4–9 wpisów o gminie dziennie, 76% z jednego
