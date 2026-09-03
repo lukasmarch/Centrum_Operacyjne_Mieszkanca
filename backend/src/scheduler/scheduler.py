@@ -18,7 +18,7 @@ from src.scheduler.article_job import (
     run_midday_article_job,
     run_storm_watch_job,
 )
-from src.scheduler.ai_jobs import run_ai_job
+from src.scheduler.ai_jobs import run_ai_job, run_categorization_catchup_job
 from src.scheduler.summary_job import run_summary_job, run_summary_refresh_job
 from src.scheduler.gus_job import run_gus_job
 from src.scheduler.cinema_job import run_cinema_job
@@ -229,6 +229,19 @@ def start_scheduler():
         trigger=CronTrigger(hour='9,12,15,18,21', minute=5),
         id='energa_update',
         name='Update Energa outages (RSS, co 3h)',
+        replace_existing=True
+    )
+
+    # Kategoryzacja wpisów, które przyszły MIĘDZY pełnymi przebiegami.
+    # Dziesięć minut po Enerdze, bo to jedyne źródło chodzące poza rozkładem
+    # 6:00/13:00 — a jego komunikaty są dokładnie tym rodzajem materiału,
+    # który traci wartość, czekając do rana (`run_categorization_catchup`).
+    # Sama kategoryzacja: bez wydarzeń, bez briefingu, bez newslettera.
+    scheduler.add_job(
+        func=run_categorization_catchup_job,
+        trigger=CronTrigger(hour='9,12,15,18,21', minute=15),
+        id='ai_categorization_catchup',
+        name='Kategoryzacja uzupełniająca (po Enerdze)',
         replace_existing=True
     )
 
