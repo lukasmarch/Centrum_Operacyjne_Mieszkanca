@@ -248,14 +248,52 @@ def source_label(source_name: Optional[str]) -> Optional[str]:
     return source_name.replace(" (RSS)", "").strip()
 
 
-def publishable_conditions(article_model):
+# Ile jeszcze żyje zapowiedź po swoim terminie. Doba, nie zero: post
+# o wczorajszych dożynkach mieszkaniec czyta jako relację i ma prawo go
+# zobaczyć, a jego znacznik czasu mówi wprost „wczoraj". Wyłączenie prądu
+# sprzed dwóch dni nie mówi już nic nikomu.
+ENDED_EVENT_GRACE_H = 24
+
+
+def publishable_conditions(article_model, now: Optional[datetime] = None):
     """
-    Warunki SQL „to nadaje się do pokazania mieszkańcowi" — wspólne dla feedu
-    i briefingu. Dopisanie kolejnej reguły ma działać w obu miejscach naraz.
+    Warunki SQL „to nadaje się do pokazania mieszkańcowi" — wspólne dla feedu,
+    briefingu, newslettera, pusha i narzędzi agentów. Dopisanie kolejnej reguły
+    ma działać we wszystkich tych miejscach naraz.
+
+    Trzecia reguła (3.09.2026): zapowiedź, której termin minął ponad dobę temu,
+    znika. „Planowane wyłączenie prądu 1 września, 09:00–14:00 — Kopaniarze"
+    stało 3.09 w sekcji „Gmina Rybno" — okno feedu liczy się od publikacji
+    (2 dni), a ranking dawał takiemu wpisowi tylko ×0,25, czyli spychał go
+    niżej, zamiast usunąć. Przy 4–9 lokalnych wpisach dziennie „niżej" i tak
+    znaczyło pierwszą stronę.
+
+    Liczymy od KOŃCA zdarzenia, a dla zapowiedzi bez godziny końca — od końca
+    jej doby (`event_at` o północy to zapis całodniowy, tak samo jak w
+    `still_relevant_event` i `summary_generator._event_is_over`). Wpisy bez
+    terminu reguła nie dotyczy wcale: o nich rozstrzyga wiek publikacji.
     """
+    now = now or datetime.utcnow()
+    ended_before = now - timedelta(hours=ENDED_EVENT_GRACE_H)
+
     return [
         article_model.is_filler == False,        # noqa: E712 — SQLAlchemy
         article_model.is_promotional == False,   # noqa: E712
+        or_(
+            article_model.event_at.is_(None),
+            article_model.event_until >= ended_before,
+            and_(
+                article_model.event_until.is_(None),
+                or_(
+                    article_model.event_at >= ended_before,
+                    # zapowiedź całodniowa: doba liczy się od jej końca
+                    and_(
+                        cast(article_model.event_at, Time) == time(0, 0),
+                        article_model.event_at >= ended_before - timedelta(days=1),
+                    ),
+                ),
+            ),
+        ),
     ]
 
 
