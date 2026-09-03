@@ -727,7 +727,71 @@ po informację o wyłączeniu prądu, lądował na ogólnym pulpicie i szukał j
   `_assert_paths()` — link donikąd byłby widoczny dopiero w statystykach, tydzień po fakcie
 - `utm_content` niesie identyfikator kreacji; `scripts/traffic_report.py` przestał go ignorować
 
+## Układ trzech bramek: pustka nie jest neutralna (2026-09-03)
+**Cały wybór treści — feed, briefing, newsletter, kafel — stoi na czterech polach
+z kategoryzacji: `category`, `locality`, `content_score`, `event_at`. Każde bywa
+puste, a system traktował pustkę jako neutralną albo KORZYSTNĄ.** 3.09 briefing
+otworzył dzień poborem krwi za 13 dni (brak `event_at`), feed miał na szczycie
+podatek za psa w Działdowie (0,792 — najwyższy wynik, `locality=2` ignorowane),
+kafel pokazał wyłączenie w Mławce za tydzień, a 5 skrzynek Premium dostało
+o 7:15 wczorajszą awarię jako „dzisiejszą" (mail = kopia briefingu z 5:00).
+
+**Wzorzec, który powielamy, to `alert_policy` dla pusha: RODZAJ → MIEJSCE → CZAS.**
+Feed i briefing zadawały te same pytania własnymi, niepełnymi kopiami.
+| | Push (wzorzec) | Feed | Briefing |
+|---|---|---|---|
+| Rodzaj | `incident_of` z TEKSTU | `category` z AI | `CATEGORY_PRIORITY` |
+| Miejsce | `places_in` — nieomijalne | `locality_factor` | `_mark_local_articles` |
+| Czas | `is_timely` + `span_from_text` | `is_pinned_alert` + `span_from_text` | `_alert_still_running` |
+
+- **`locality` rozstrzyga w OBIE strony** (`MIN_ARTICLE_LOCALITY = 3`), pierwsze przed
+  źródłem. Obawę „model bywa skąpy" zmierzono: źródła gminne dają 3 w **30/35**
+  (Gmina Rybno 5/5, FB Rybno 9/10, BIP 11/13, ZGK 5/7). ⚠️ To NIE `MIN_EVENT_LOCALITY`(2):
+  tamten o widoczności wydarzeń, ten o kolejności wiadomości
+- **Briefing ma tę samą regułę w JEDNYM miejscu** (`_mark_local_articles`) — pierwszy
+  przebieg po naprawie feedu wybrał „akcję zdrowotną w LUBAWIE" (`locality=1`), bo
+  `_local_article_ids` było osobną kopią. ⚠️ `test_summary_headline` trzymał TRZECIĄ
+  kopię pod komentarzem „to samo, co briefing robi" — test woła teraz metodę produkcyjną
+- **Awaria bez godzin**: `AWARIA_PIN_HOURS` 24 → 12; zwolnienie z reguły powtórki nagłówka
+  wymaga DOWODU trwania (`ONGOING_ALERT_H = 12`) — wcześniej 5 z 6 briefingów zaczynało
+  się „AWARIA", a 2 i 3.09 to była ta sama awaria wody. ZGK nie publikuje „już działa"
+- **Etykieta niesie SKUTEK, nie tylko datę**: model dostał poprawne `[wczoraj 11:07]`
+  i napisał „**Dziś** spadek ciśnienia". Z etykietą „— AWARIA SPRZED DOBY, MOGŁA JUŻ
+  ZOSTAĆ USUNIĘTA" napisał „mogła już zostać usunięta". Ta sama zasada co „JUŻ PO"
+- **Wpis spoza gminy nie ma „drugiego życia" zapowiedzi** — dla `locality_factor < 1`
+  świeżość liczy się od TERMINU (Mławka za 7 dni nie jest wiadomością dnia)
+- **Data wprost w tekście jest zadaniem dla kodu** (`time_span.parse_date_span`): ten sam
+  post „📅 16 września 2026 r. ⏰ godz. 8:00–11:30" puszczony przez model 3× dał termin
+  w 2/3, godzinę końca w 0/3, kategorię raz Społeczność, raz Edukacja. W bazie
+  **27/104** wpisów z datą we własnym tytule nie miało `event_at`. Kod UZUPEŁNIA model
+  (bramka „data ≥ dzień publikacji" chroni relacje). ⚠️ Nowa linia ≠ koniec zdania —
+  FB łamie wiersz między datą a godziną. Backfill: `backfill_event_dates` (✅ prod, 30)
+- **`same_incident` zamiast równości sygnatur push**: przedruk Syli był urwany przez
+  scraper (3 wsie zamiast 8) i DOKŁADAŁ „Rybno" z nazwy nadawcy → drugi push o 6:03 dobę
+  po awarii. Reguła: odjąć nazwę gminy, gdy padła obok innych wsi, potem ZAWIERANIE.
+  ⚠️ Nie przecięcie — test pokazał, że każdy komunikat Energi niesie „Rybno gmina
+  wiejska" i przecięcie scaliłoby Koszelewy z Rybnem
+- **Kategoryzacja uzupełniająca** o :15 po każdym oknie Energi (9/12/15/18/21) —
+  `run_categorization_catchup`, sama kategoryzacja, batch 10. Wpis z 18:05 czekał do
+  6:15 rana bez pól, które o nim decydują; nieoceniony dostawał `content_factor` 1,0
+  = tyle co ocena 3/6
+- **Front**: `firstSentences` łamało briefing na skrócie „m.in." — lista skrótów, bez
+  lookbehind (Safari < 16.4)
+- ⚠️ **Zielony job Actions ≠ wdrożenie.** GitHub TRWALE limituje anonimowe pobrania
+  z IP serwera (3 próby, ten sam błąd), `git pull` pada, obraz buduje się z cache,
+  health „OK". Obejście: `git bundle create d.bundle main --not <SHA>` → scp → fetch
+  z pliku → `merge --ff-only` → build. Trwała naprawa (deploy key + `set -e`) NIEZROBIONA
+- Testy: `test_summary_headline` 36, `test_alert_policy` 46, `test_content_score` 17,
+  `test_event_terms` 27 (sekcja 4 nowa)
+
 ## TODO (Kolejne priorytety)
+- [ ] **Deploy: uwierzytelnić serwer wobec GitHuba** (deploy key) + `set -e` i weryfikacja
+      SHA w `deploy.yml` — bez tego każdy limit GitHuba = cichy deploy starego kodu
+- [ ] Waga `Facebook - Syla` = 0,85 (najniższa) przy 66 wpisach `locality=3` na 140 —
+      główne źródło wiadomości o gminie ma najniższą wagę; po 3.09 lokalność rozstrzyga
+      `locality`, więc waga gra mniejszą rolę, ale tabela wciąż mówi co innego niż dane
+- [ ] Kategoria skacze między przebiegami (Społeczność/Edukacja dla tego samego tekstu)
+      — `CATEGORY_PRIORITY` nagłówka opiera się na niedeterministycznej etykiecie
 - [x] ~~Migracja `add_site_events` na produkcji~~ ✅ 30.08 (schemat zweryfikowany)
 - [x] ~~Backend na produkcji~~ ✅ 30.08, `818a497` — `/api/events` i webhook odpowiadają,
       rejestracja zgodna wstecz (front bez `acq` przechodzi), zero błędów w logu
@@ -743,8 +807,9 @@ po informację o wyłączeniu prądu, lądował na ogólnym pulpicie i szukał j
 - [ ] Filtrowanie artykułów po kategoriach
 - [ ] Panel administracyjny
 - [ ] Wybór rejonu wywozu dla kont z zapisem „Rybno” (dziś dostają oba terminy)
-- [ ] `is_pinned_alert` bez czekania na kategorię — awaria ma trafiać na szczyt feedu
-      od razu po scrapingu, tak jak ostrzeżenia meteo (dziś czeka na 6:15/13:15)
+- [ ] `is_pinned_alert` bez czekania na kategorię — od 3.09 czeka najwyżej do :15
+      po oknie Energi (kategoryzacja uzupełniająca); pełne rozwiązanie = czytać
+      `incident_of` z treści, jak push i ostrzeżenia meteo
 - [ ] **Nagłówek briefingu nie zna rangi organu**: 26.08 jutrzejsze posiedzenia
       stały tak — Komisja Zdrowia 08:30, Komisja Budżetu 08:45, **XXIV sesja Rady
       10:00**. Wszystkie lokalne, wszystkie „Urząd", więc rozstrzygnął dystans
@@ -793,4 +858,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-08-30*
+*Ostatnia aktualizacja: 2026-09-03*
