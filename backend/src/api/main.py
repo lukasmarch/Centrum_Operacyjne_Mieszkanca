@@ -169,6 +169,25 @@ async def get_sources(session: AsyncSession = Depends(get_session)):
     sources = result.scalars().all()
     return {"sources": sources}
 
+def _scope_of(article, source_name: Optional[str]) -> str:
+    """
+    Zasięg wpisu dla układu zakładki Wiadomości: „gmina" / „okolice" / „region".
+
+    Ta sama kolejność zaufania co w rankingu (`feed_policy.locality_factor`)
+    i w nagłówku briefingu (`_mark_local_articles`): ocena z kategoryzacji,
+    gdy jest; dla wpisów bez oceny — źródło i nazwa w treści (`article_scope`).
+    """
+    from src.services.feed_policy import MIN_ARTICLE_LOCALITY, article_scope
+
+    locality = getattr(article, "locality", None)
+    if locality is not None:
+        if locality >= MIN_ARTICLE_LOCALITY:
+            return "gmina"
+        return "okolice" if locality == 2 else "region"
+    label = article_scope(source_name, article.title, article.content)
+    return {"gmina Rybno": "gmina", "okolice": "okolice"}.get(label, "region")
+
+
 @app.get("/api/articles", response_model=list[ArticleOutput])
 async def get_articles(
     limit: int = 50,
@@ -333,6 +352,7 @@ async def get_articles(
         article_dict['concerns_location'] = alert_policy.concerns(
             location, article.title, article.content
         )
+        article_dict['scope'] = _scope_of(article, source_name)
         articles.append(ArticleOutput(**article_dict))
 
     return articles

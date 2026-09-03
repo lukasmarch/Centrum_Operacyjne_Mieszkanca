@@ -37,6 +37,13 @@ class ArticleOutput(BaseModel):
     # Bez `location` zawsze True — patrz `alert_policy.concerns`.
     alert_places: List[str] = []
     concerns_location: bool = True
+    # Zasięg dla układu strony: „gmina" / „okolice" (powiat) / „region".
+    # Liczony z oceny kategoryzacji (`locality`), dla wpisów bez oceny —
+    # z `feed_policy.article_scope`. Dopisany 3.09.2026, gdy zakładka
+    # Wiadomości grupowała po DACIE publikacji: wszystko lokalne wchodzi rano
+    # z wczorajszą datą (Apify raz dziennie), więc sekcję „Dzisiaj" otwierały
+    # zawsze trzy RSS-y z powiatu, choć ranking miał je na 5., 11. i 15. miejscu.
+    scope: str = "region"
 
     class Config:
         from_attributes = True
