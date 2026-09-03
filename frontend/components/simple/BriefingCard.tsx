@@ -17,12 +17,33 @@ const renderBold = (text: string): React.ReactNode =>
             : <span key={i}>{part}</span>,
     );
 
+// Polskie skróty kończące się kropką, która NIE kończy zdania.
+// 3.09.2026 strona główna pokazała „Utrudnienia dotyczą m.in." i na tym się
+// urywała: dzielenie po samym `[.!?]` uznało kropkę w „m.in." za koniec
+// trzeciego zdania. Lista jest krótsza niż wyjątki, które by ją zastąpiły.
+const ABBREVIATIONS = new Set([
+    'm.in.', 'np.', 'itp.', 'itd.', 'tj.', 'ok.', 'ul.', 'godz.', 'proc.',
+    'r.', 'ww.', 'br.', 'woj.', 'gm.', 'nr.', 'tzw.', 'ds.', 'ub.',
+]);
+
 /** Pierwsze zdania omówienia — tyle, ile mieści się bez zwijania na telefonie. */
 const firstSentences = (text: string, count = 3): string => {
-    const parts = text.match(/[^.!?]+[.!?]+/g);
-    if (!parts) return text;
-    return parts.slice(0, count).join('').trim();
+    const sentences: string[] = [];
+    let current: string[] = [];
+
+    for (const word of text.split(/\s+/)) {
+        current.push(word);
+        const ends = /[.!?]$/.test(word) && !ABBREVIATIONS.has(word.toLowerCase());
+        if (ends) {
+            sentences.push(current.join(' '));
+            current = [];
+            if (sentences.length >= count) break;
+        }
+    }
+    if (!sentences.length) return text;
+    return sentences.join(' ').trim();
 };
+
 
 interface BriefingCardProps {
     onShowAll: () => void;
