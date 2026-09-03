@@ -17,6 +17,8 @@
 ```
 main   ← aktywna gałąź, zmiany idą tu bezpośrednio
         push → GitHub Actions → SSH deploy backend na VPS
+        (od 3.09: klucz deploy na serwerze, `set -e`, HEAD musi równać się github.sha,
+         zdrowie = API przez Caddy; zielony job ZNACZY wdrożone)
         
 Deploy frontendu (ręcznie):
   ./deploy-frontend.sh 91.99.142.30
@@ -777,6 +779,10 @@ Feed i briefing zadawały te same pytania własnymi, niepełnymi kopiami.
   = tyle co ocena 3/6
 - **Front**: `firstSentences` łamało briefing na skrócie „m.in." — lista skrótów, bez
   lookbehind (Safari < 16.4)
+- **Wiadomości w sekcjach po ZASIĘGU** (`scope` w `/api/articles`: gmina/okolice/region
+  z `locality`, fallback `article_scope`). Grupowanie po dacie unieważniało ranking:
+  lokalne posty wchodzą rano z WCZORAJSZĄ datą (Apify raz o 6:00), więc „Dzisiaj (3)"
+  otwierały zawsze RSS-y z powiatu stojące w rankingu na 5., 11. i 15. miejscu
 - ⚠️ **Zielony job Actions ≠ wdrożenie.** GitHub TRWALE limituje anonimowe pobrania
   z IP serwera (3 próby, ten sam błąd), `git pull` pada, obraz buduje się z cache,
   health „OK". Obejście: `git bundle create d.bundle main --not <SHA>` → scp → fetch
@@ -785,8 +791,12 @@ Feed i briefing zadawały te same pytania własnymi, niepełnymi kopiami.
   `test_event_terms` 27 (sekcja 4 nowa)
 
 ## TODO (Kolejne priorytety)
-- [ ] **Deploy: uwierzytelnić serwer wobec GitHuba** (deploy key) + `set -e` i weryfikacja
-      SHA w `deploy.yml` — bez tego każdy limit GitHuba = cichy deploy starego kodu
+- [x] ~~Deploy: deploy key + `set -e` + weryfikacja SHA~~ ✅ 3.09 `6e9ecde`, sprawdzone
+      pierwszym prawdziwym deployem. Front nadal ręcznie: `yes TAK | ./deploy-frontend.sh`
+- [ ] **Wolumen treści** (pomiar 3.09, 14 dni): 4–9 wpisów o gminie dziennie, 76% z jednego
+      profilu (Syla); oficjalne kanały gminy prawie milczą (Gmina Rybno 2, FB Rybno 8).
+      Radio 7 + KPP = 91 wpisów, 2 lokalne. Wzbogacenie = nowe profile FB przez Apify
+      (limit FREE $5/mies., każdy profil to osobny run) — decyzja produktowa
 - [ ] Waga `Facebook - Syla` = 0,85 (najniższa) przy 66 wpisach `locality=3` na 140 —
       główne źródło wiadomości o gminie ma najniższą wagę; po 3.09 lokalność rozstrzyga
       `locality`, więc waga gra mniejszą rolę, ale tabela wciąż mówi co innego niż dane
