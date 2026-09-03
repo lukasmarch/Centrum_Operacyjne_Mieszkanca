@@ -22,6 +22,7 @@ from typing import Optional
 
 from pydantic_ai import Agent, RunContext
 from sqlalchemy import text as sql_text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -577,7 +578,25 @@ URL: {article.url}
                 )
 
             session.add(event)
-            await session.commit()
+            try:
+                await session.commit()
+            except IntegrityError as exc:
+                # `idx_event_unique (title, event_date, location)` to relikt
+                # sprzed deduplikacji semantycznej (21.08.2026). Ten sam
+                # komunikat opisany przez DWA artykuły daje dwa rekordy —
+                # drugi z `canonical_id`, ale o identycznym tytule, dacie
+                # i miejscu, więc stary unikat go odrzuca. Powtórka i tak nie
+                # wnosi nic kalendarzowi: nie ma embeddingu i nie jest widoczna.
+                #
+                # ⚠️ Cena: artykuł nie dostaje śladu `source_article_id`, więc
+                # wróci do modelu przy następnym przebiegu, dopóki nie wypadnie
+                # z okna. Jedno wywołanie gpt-4o zamiast wywróconego przebiegu.
+                await session.rollback()
+                self.logger.info(
+                    f"Wydarzenie '{event.title}' już jest w kalendarzu "
+                    f"(unikat tytuł+data+miejsce) — pomijam"
+                )
+                return None
             await session.refresh(event)
 
             # Embedding zapisujemy dopiero teraz: przed commitem wydarzenie nie
@@ -679,10 +698,23 @@ URL: {article.url}
 
         event_count = 0
         for article_id in article_ids:
-            article = await session.get(Article, article_id)
-            if article is None:
+            # Sesja po nieudanym flushu wymaga rollbacku, zanim cokolwiek
+            # przeczyta — inaczej `session.get` niżej rzuca PendingRollbackError
+            # i zabiera CAŁĄ resztę przebiegu. `extract_event` sprząta po sobie,
+            # ale nie każdy błąd rodzi się w jego `try` (3.09.2026: nadrabianie
+            # 7 dni padło na duplikacie i przerwało 65-elementową pętlę).
+            # Trzeci raz ten sam wzorzec: `article_processor` 2.09, ta pętla 22.08.
+            if session.in_transaction() and not session.is_active:
+                await session.rollback()
+            try:
+                article = await session.get(Article, article_id)
+                if article is None:
+                    continue
+                event = await self.extract_event(article, session)
+            except Exception as exc:
+                self.logger.error(f"✗ Artykuł {article_id} pominięty: {exc}")
+                await session.rollback()
                 continue
-            event = await self.extract_event(article, session)
             if event:
                 event_count += 1
 
