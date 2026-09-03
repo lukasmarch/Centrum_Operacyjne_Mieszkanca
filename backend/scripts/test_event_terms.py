@@ -153,6 +153,63 @@ def run_ranking() -> int:
     return failures
 
 
+# --- 4. data wprost w tekście — czyta kod (3.09.2026) --------------------------
+# Ten sam post puszczony przez model trzy razy dał termin w 2 przebiegach na 3,
+# godzinę końca w 0 na 3. Data, która stoi w tekście, nie może zależeć od losu.
+# (opis, tekst, publikacja UTC, oczekiwany początek UTC, oczekiwany koniec UTC)
+DATE_CASES = [
+    ("pobór krwi ← art. 5770, model gubił termin w 1 na 3 przebiegów",
+     "HDK PCK zaprasza na Jesienny Pobór Krwi. 📅 16 września 2026 r. ⏰ godz. 8:00–11:30 📍 Rybno",
+     datetime(2026, 9, 2, 13, 44), datetime(2026, 9, 16, 6, 0), datetime(2026, 9, 16, 9, 30)),
+    ("sama data bez godziny → lokalna północ",
+     "Weekend z GSZS Delfin Rybno 5 września. Zapraszamy kibiców.",
+     datetime(2026, 9, 2, 10, 27), datetime(2026, 9, 4, 22, 0), None),
+    ("zapis numeryczny z rokiem",
+     "Czasowe wyłączenie wody 31.08.2026 w godzinach 8:00-15:00",
+     datetime(2026, 8, 29, 9, 0), datetime(2026, 8, 31, 6, 0), datetime(2026, 8, 31, 13, 0)),
+    ("zapis 8.00 to godzina, nie ósmy dzień miesiąca zerowego",
+     "Awaria wodociągu. Prace od 8.00 do 15.00.",
+     datetime(2026, 9, 2, 9, 0), None, None),
+    ("relacja z datą sprzed publikacji → nie zapowiedź",
+     "30 sierpnia odbyło się Święto Plonów. Dziękujemy wszystkim!",
+     datetime(2026, 9, 1, 12, 0), None, None),
+    ("data bez roku po przełomie roku → następny rok",
+     "Zapisy do 15 stycznia w sekretariacie.",
+     datetime(2026, 12, 20, 12, 0), datetime(2027, 1, 14, 23, 0), None),
+    ("pierwsza data minęła, druga przed nami → bierzemy drugą",
+     "Po turnieju z 30 sierpnia zapraszamy na rewanż 12 września o 17:00.",
+     datetime(2026, 9, 1, 12, 0), datetime(2026, 9, 12, 15, 0), None),
+    ("godziny poza oknem za datą nie są terminem",
+     "Zebranie 10 września. Biuro czynne w godzinach 7:30-15:30, telefon czynny w godzinach 8:00-16:00.",
+     datetime(2026, 9, 1, 12, 0), datetime(2026, 9, 9, 22, 0), None),
+    ("pół roku w przód — za daleko, jak dla modelu",
+     "Wielki finał 20 marca 2027 w Rybnie.",
+     datetime(2026, 9, 1, 12, 0), None, None),
+    ("brak publikacji → nic",
+     "16 września 2026", None, None, None),
+]
+
+
+def run_dates() -> int:
+    from src.services.time_span import parse_date_span
+    print()
+    print("=" * 78)
+    print("Data wprost w tekście — czyta kod, nie model")
+    print("=" * 78)
+
+    failures = 0
+    for label, text, published, exp_start, exp_end in DATE_CASES:
+        got = parse_date_span(text, published)
+        ok = got == (exp_start, exp_end)
+        failures += not ok
+        detail = f"{got[0]} → {got[1]}" + ("" if ok else f" (oczekiwano {exp_start} → {exp_end})")
+        print(f"{'✓' if ok else '✗'} {label:.<58} {detail}")
+
+    print("-" * 78)
+    print(f"{len(DATE_CASES) - failures}/{len(DATE_CASES)} zgodnych z oczekiwaniem")
+    return failures
+
+
 if __name__ == "__main__":
-    failed = run_parse() + run_ranking()
+    failed = run_parse() + run_ranking() + run_dates()
     sys.exit(1 if failed else 0)

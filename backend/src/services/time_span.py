@@ -132,3 +132,115 @@ def parse_span(
         return None, to_utc(end)
 
     return None, None
+
+
+# --- data wprost w tekście --------------------------------------------------
+#
+# 3.09.2026: ten sam post („📅 16 września 2026 r. ⏰ godz. 8:00–11:30") puszczony
+# przez model trzy razy dał termin w 2 przebiegach na 3, godzinę końca w 0 na 3.
+# W bazie 27 na 104 wpisów z datą we własnym tytule nie miało `event_at`, więc
+# feed liczył je jak świeże wiadomości, a briefing otworzył dzień poborem krwi
+# za trzynaście dni, mając w materiale bieg na jutro. Data, która stoi w tekście
+# wprost, jest zadaniem dla kodu — ta sama zasada, którą godziny dostały 24.08
+# (`parse_span`), a odpowiedzi modelu 12.08 (`ground_categorization`).
+
+_MONTHS = {
+    "stycznia": 1, "lutego": 2, "marca": 3, "kwietnia": 4, "maja": 5,
+    "czerwca": 6, "lipca": 7, "sierpnia": 8, "wrzesnia": 9,
+    "pazdziernika": 10, "listopada": 11, "grudnia": 12,
+}
+_MONTH_ALT = "|".join(_MONTHS)
+
+# „16 września 2026 r.", „16 września", „16.09.2026" — numeryczny zapis WYMAGA
+# roku: bez niego „8.00" (godzina po kropce, tak pisze ZGK) czytałoby się jako
+# ósmy dzień miesiąca zerowego.
+_DATE_RE = re.compile(
+    rf"\b(\d{{1,2}})\s+({_MONTH_ALT})(?:\s+(\d{{4}}))?\b"
+    rf"|\b(\d{{1,2}})\.(\d{{1,2}})\.(\d{{4}})\b"
+)
+
+# Godziny przy dacie: „godz. 8:00–11:30", „o godz. 15:00", „o 15:00",
+# „w godzinach 10:00-14:00". Szukane w oknie ZA datą, nie w całym tekście —
+# „Pełna treść u źródła" i godziny urzędowania na końcu posta to nie termin.
+_HOURS_AFTER_DATE_RE = re.compile(
+    rf"(?:godz\w*\.?|o\s+godz\w*\.?|o|w\s+godzinach|od)\s*{_H}(?:\s*(?:{_SEP}|do)\s*{_H})?"
+)
+_HOURS_WINDOW = 60
+_SENTENCE_END_RE = re.compile(r"[.!?]\s+(?=[a-z])|\n")
+
+# Ile dni w przód zapowiedź może sięgać. Ten sam bezpiecznik co
+# `article_processor._parse_event_time` dla odczytu modelu (pół roku).
+MAX_AHEAD_DAYS = 180
+
+
+def parse_date_span(
+    text: Optional[str],
+    reference_at: Optional[datetime],
+) -> tuple[Optional[datetime], Optional[datetime]]:
+    """
+    Pierwsza data z tekstu, która nie jest jeszcze za nami → (początek, koniec) w UTC.
+
+    „Nie za nami" liczy się względem DNIA PUBLIKACJI (`reference_at`, UTC),
+    nie względem teraz: kategoryzacja chodzi po zaległościach, a wpis sprzed
+    tygodnia ma prawo zapowiadać zdarzenie sprzed pięciu dni. Data wcześniejsza
+    niż publikacja to relacja („30 sierpnia odbyły się dożynki") — wtedy
+    zwracamy (None, None), bo relacji nie wolno zapisać jako zapowiedzi.
+
+    Rok bez podania: ten, w którym data wypada nie wcześniej niż publikacja
+    („15 stycznia" w poście grudniowym to styczeń przyszłego roku).
+
+    Sama data bez godziny → lokalna PÓŁNOC, jak zapisuje kategoryzacja
+    (zapowiedź całodniowa trwa do końca swojej doby — patrz `_event_is_over`).
+    Godziny bierzemy wyłącznie z okna tuż za datą.
+    """
+    if not reference_at or not text:
+        return None, None
+
+    text_flat = flat(text)
+    published_day = to_local(reference_at).date()
+
+    for match in _DATE_RE.finditer(text_flat):
+        if match.group(2):
+            day, month = int(match.group(1)), _MONTHS[match.group(2)]
+            year = int(match.group(3)) if match.group(3) else None
+        else:
+            day, month, year = int(match.group(4)), int(match.group(5)), int(match.group(6))
+
+        candidates = [year] if year else [published_day.year, published_day.year + 1]
+        local_date = None
+        for y in candidates:
+            try:
+                d = datetime(y, month, day).date()
+            except ValueError:
+                continue
+            if d >= published_day:
+                local_date = d
+                break
+        if local_date is None:
+            continue  # relacja albo śmieć — patrz następną datę
+        if (local_date - published_day).days > MAX_AHEAD_DAYS:
+            continue
+
+        start = datetime(local_date.year, local_date.month, local_date.day)
+        end = None
+        # Godziny liczą się tylko w TYM SAMYM ZDANIU co data. Granica zdania
+        # to kropka ze spacją i literą za nią („. Biuro czynne w godzinach
+        # 7:30-15:30" to godziny urzędowania z następnego zdania), a nie każda
+        # kropka — „godz. 8:00" i „2026 r. ⏰" mają kropkę w środku zwrotu.
+        window = text_flat[match.end(): match.end() + _HOURS_WINDOW]
+        window = _SENTENCE_END_RE.split(window, maxsplit=1)[0]
+        hours = _HOURS_AFTER_DATE_RE.search(window)
+        if hours:
+            h1, m1, h2, m2 = hours.groups()
+            try:
+                start = start.replace(hour=int(h1), minute=int(m1))
+                if h2:
+                    end = start.replace(hour=int(h2), minute=int(m2))
+                    if end <= start:
+                        end += timedelta(days=1)
+            except ValueError:
+                start = datetime(local_date.year, local_date.month, local_date.day)
+                end = None
+        return to_utc(start), (to_utc(end) if end else None)
+
+    return None, None

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
-from src.services import alert_policy, energa, weather_alert
+from src.services import alert_policy, time_span, energa, weather_alert
 from src.services.alert_policy import _flat, places_in
 from src.services.feed_policy import LOCAL_TZ
 from src.utils.cost_tracker import log_api_cost
@@ -393,6 +393,38 @@ class ArticleProcessor:
                         f"Event {article.id}: termin {start} (UTC) "
                         f"[{category_data.primary_category}]"
                     )
+
+            # Data stojąca w tekście WPROST jest zadaniem dla kodu, nie dla
+            # modelu. 3.09.2026: post „📅 16 września 2026 r. ⏰ godz. 8:00–11:30"
+            # puszczony trzy razy dał termin w 2 przebiegach na 3 i godzinę końca
+            # w 0 na 3; w bazie 27 na 104 wpisów z datą we własnym tytule nie
+            # miało `event_at`. Bez terminu zapowiedź liczy się jak świeża
+            # wiadomość (`feed_policy._reference_time`) i pobór krwi za 13 dni
+            # otworzył briefing, mając w materiale bieg na jutro.
+            #
+            # Kod uzupełnia model, nie zastępuje go: model rozstrzyga, CZY wpis
+            # zapowiada (relacja z datą to nie zapowiedź — tu broni tego bramka
+            # „data nie wcześniej niż publikacja"), a kod czyta datę, gdy model
+            # ją zgubił, i godzinę końca, gdy model ją pominął.
+            code_start, code_end = time_span.parse_date_span(
+                f"{article.title or ''}\n{text_content}", article.published_at
+            )
+            if article.event_at is None and article.event_until is None and code_start:
+                article.event_at = code_start
+                article.event_until = code_end
+                self.logger.info(
+                    f"Event {article.id}: termin z tekstu {code_start} (UTC)"
+                    + (f" do {code_end}" if code_end else "")
+                )
+            elif (
+                article.event_at is not None
+                and article.event_until is None
+                and code_end
+                and time_span.to_local(code_start).date()
+                == time_span.to_local(article.event_at).date()
+            ):
+                article.event_until = code_end
+                self.logger.info(f"Event {article.id}: koniec z tekstu {code_end} (UTC)")
 
             # Ostatnia deska: same godziny w treści, bez daty. Model ich nie
             # wpisuje, bo nie wie, którego dnia dotyczą — a to zawsze dzień
