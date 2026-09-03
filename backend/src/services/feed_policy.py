@@ -656,7 +656,21 @@ def article_score(
     niż ukarać po omacku wpis, którego treści nie widzimy.
     """
     now = now or datetime.utcnow()
-    timestamp = _reference_time(published_at, scraped_at, event_at, now)
+    place = locality_factor(locality, source_name, title, content)
+
+    # Zapowiedź żyje dwa razy — w dniu ogłoszenia i przed terminem
+    # (`_reference_time`). To „drugie życie" przysługuje jednak wyłącznie
+    # sprawom NASZEJ gminy. 3.09.2026 kafel „Ostatnio w gminie" pokazał
+    # mieszkańcowi „Planowane wyłączenie prądu 10 września — Mławka"
+    # (art. 5784, gmina Iłowo-Osada): komunikat Energi wpadł tego ranka, więc
+    # ogłoszenie było bliżej niż termin i wpis liczył się jako świeży mimo
+    # kary za miejsce. Cudze wyłączenie za tydzień nie jest wiadomością dnia
+    # — dla wpisu spoza gminy liczy się TERMIN, bo tylko on może kiedykolwiek
+    # uczynić go pilnym.
+    if place < 1.0 and event_at and event_at > now:
+        timestamp = event_at
+    else:
+        timestamp = _reference_time(published_at, scraped_at, event_at, now)
     if timestamp is None:
         return 0.0
 
@@ -674,7 +688,7 @@ def article_score(
         source_weight(source_name)
         * freshness
         * content_factor(content_score)
-        * locality_factor(locality, source_name, title, content)
+        * place
     )
 
 

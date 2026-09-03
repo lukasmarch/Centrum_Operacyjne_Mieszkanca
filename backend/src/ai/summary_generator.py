@@ -138,7 +138,38 @@ def _time_label(article, now: datetime) -> str:
 
     published = _local(article.published_at)
     word = _day_word((published.date() - today).days)
-    return f"[{word} {published:%H:%M}]" if word else f"[{published:%d.%m} {published:%H:%M}]"
+    stamp = f"{word} {published:%H:%M}" if word else f"{published:%d.%m} {published:%H:%M}"
+
+    # Awaria bez godzin, która przestała być sprawą teraz. Sama data tego nie
+    # mówi: 3.09.2026 model dostał przy awarii wodociągowej ZGK poprawną
+    # etykietę „[wczoraj 11:07]" i i tak otworzył briefing zdaniem „DZIŚ
+    # w Rybnie spadek ciśnienia wody". Etykieta jest ostatnią rzeczą, jaką
+    # czyta przy wpisie — musi nieść nie tylko KIEDY, ale i CO Z TEGO WYNIKA,
+    # dokładnie jak „JUŻ PO" przy zapowiedziach.
+    #
+    # Nie usuwamy wpisu z materiału: mieszkaniec może chcieć wiedzieć, że
+    # wczoraj była awaria. Zabraniamy tylko pisać o niej w czasie teraźniejszym.
+    if _alert_past_window(article, now):
+        return f"[{stamp} — AWARIA SPRZED DOBY, MOGŁA JUŻ ZOSTAĆ USUNIĘTA]"
+    return f"[{stamp}]"
+
+
+def _alert_past_window(article, now: datetime) -> bool:
+    """
+    Czy to awaria, która nie jest już sprawą najbliższych godzin.
+
+    Ten sam próg (`SummaryGenerator.ONGOING_ALERT_H`), na którym awaria traci
+    zwolnienie z reguły powtórki nagłówka — jedno pytanie „czy to jeszcze
+    trwa", jedna odpowiedź. Dotyczy wyłącznie wpisów BEZ terminu; te
+    z terminem mają własną etykietę „TRWA TERAZ" / „JUŻ PO" wyżej.
+    """
+    category = (getattr(article, "category", None) or "").lower()
+    if "awari" not in category:
+        return False
+    reference = article.published_at or getattr(article, "scraped_at", None)
+    if reference is None:
+        return False
+    return (now - reference).total_seconds() / 3600 > SummaryGenerator.ONGOING_ALERT_H
 
 
 # --- walidacja odpowiedzi briefingu ------------------------------------------
