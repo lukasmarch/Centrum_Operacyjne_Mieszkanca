@@ -298,6 +298,41 @@ CASES: List[Tuple[str, List[SimpleNamespace], List[str], int]] = [
          article(2, "Urząd", "XXIV sesja Rady Gminy Rybno", published_h=120, event_h=20)],
         [], 1,
     ),
+
+    # --- powtórka nagłówka przez awarię (3.09.2026) --------------------------
+    # Briefingi 2 i 3.09 otworzyły się TĄ SAMĄ awarią wodociągową ZGK
+    # (art. 5755, ogłoszoną 2.09 o 9:07 i nigdy nie odwołaną). Zwolnienie
+    # z reguły powtórki przysługiwało wtedy każdej awarii, którą
+    # `is_pinned_alert` uznawał za sprawę teraz — a bez godzin w treści
+    # znaczyło to „przez cały AWARIA_PIN_HOURS od ogłoszenia".
+    (
+        "awaria bez dowodu trwania nie otwiera dnia drugi raz",
+        [article(1, "Awaria", "Awaria sieci wodociągowej w Rybnie",
+                 "Facebook - ZakladGospodarkiKomunalnej", published_h=20, locality=3),
+         article(2, "Społeczność", "Pobór krwi w Rybnie", published_h=6, locality=3)],
+        ["Awaria sieci wodociągowej w Rybnie"], 2,
+    ),
+    (
+        "ta sama awaria, ale ze znanym terminem — trwa, więc zostaje",
+        [article(1, "Awaria", "Awaria sieci wodociągowej w Rybnie",
+                 "Facebook - ZakladGospodarkiKomunalnej",
+                 published_h=20, event_h=-3, until_h=4, locality=3),
+         article(2, "Społeczność", "Pobór krwi w Rybnie", published_h=6, locality=3)],
+        ["Awaria sieci wodociągowej w Rybnie"], 1,
+    ),
+    (
+        "świeża awaria bez terminu zostaje nagłówkiem mimo powtórki tematu",
+        [article(1, "Awaria", "Awaria sieci wodociągowej w Rybnie",
+                 "Facebook - ZakladGospodarkiKomunalnej", published_h=2, locality=3),
+         article(2, "Społeczność", "Pobór krwi w Rybnie", published_h=1, locality=3)],
+        ["Awaria sieci wodociągowej w Rybnie"], 1,
+    ),
+    (
+        "awaria sprzed doby wraca, gdy dzień jest chudy i nie ma alternatywy",
+        [article(1, "Awaria", "Awaria sieci wodociągowej w Rybnie",
+                 "Facebook - ZakladGospodarkiKomunalnej", published_h=20, locality=3)],
+        ["Awaria sieci wodociągowej w Rybnie"], 1,
+    ),
 ]
 
 

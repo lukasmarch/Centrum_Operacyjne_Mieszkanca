@@ -552,6 +552,14 @@ class SummaryGenerator:
     # wracać z przerwą: to samo wyłączenie otworzyło briefing 7, 10 i 11.08.2026.
     HEADLINE_MEMORY_DAYS = 3
 
+    # Jak długo po ogłoszeniu awaria bez znanego terminu wciąż uchodzi za
+    # trwającą — jedyny tytuł do POWTÓRZENIA wczorajszego nagłówka
+    # (`_alert_still_running`). Krótsze niż `AWARIA_PIN_HOURS`, bo odpowiada
+    # na trudniejsze pytanie: nie „czy pokazać", tylko „czy otworzyć tym dzień
+    # DRUGI RAZ". Awaria wodociągowa ZGK z 2.09.2026 ogłoszona o 9:07 wciąż
+    # otwierała briefing nazajutrz o 5:00, dwadzieścia godzin później.
+    ONGOING_ALERT_H = 12
+
     async def _recent_headline_topics(
         self,
         session: AsyncSession,
@@ -708,6 +716,30 @@ class SummaryGenerator:
         start, end = article.event_at, article.event_until
         return bool(start and end and start <= now <= end)
 
+    @classmethod
+    def _alert_still_running(cls, article, now: datetime) -> bool:
+        """
+        Czy mamy DOWÓD, że awaria trwa nadal — jedyny tytuł do powtórzenia
+        wczorajszego nagłówka.
+
+        Dwa dowody, w kolejności pewności: znany termin obejmujący tę chwilę
+        (`event_until` z kategoryzacji albo z `alert_policy.span_from_text`)
+        oraz świeżość samego ogłoszenia. Drugi jest domysłem i dlatego jest
+        krótki: komunikat ZGK „mogą wystąpić spadki ciśnienia" opisuje
+        godziny prac naprawczych, nie stan gminy na resztę doby.
+
+        ⚠️ Brak dowodu NIE znaczy „awaria się skończyła" — znaczy tyle, że
+        nie wolno na niej drugi raz otwierać dnia. Wpis zostaje w materiale
+        i w feedzie; traci wyłącznie zwolnienie z reguły powtórki.
+        """
+        if cls._is_ongoing(article, now):
+            return True
+
+        reference = article.published_at or article.scraped_at
+        if reference is None:
+            return False
+        return (now - reference).total_seconds() / 3600 <= cls.ONGOING_ALERT_H
+
     def _select_top_article(
         self,
         articles_by_category: dict,
@@ -749,6 +781,21 @@ class SummaryGenerator:
         temat — a podlega jej skutecznie, bo tytuł źródłowy Energi jest zawsze
         ten sam („Wyłączenie planowe - Region Mława - Rybno gmina wiejska"),
         więc dwie zapowiedzi pod rząd `same_topic` rozpoznaje jako jedną sprawę.
+
+        ⚠️ Zwolnienie wymaga DOWODU trwania (`_alert_still_running`), a nie
+        samej przynależności do priorytetu 0. Zdanie wyżej mówi „awaria, która
+        WCIĄŻ TRWA" — do 3.09.2026 kod tego nie sprawdzał i zwalniał każdą
+        awarię, którą `is_pinned_alert` uznawał za sprawę teraz, czyli również
+        taką bez godzin przez pełne `AWARIA_PIN_HOURS` od ogłoszenia. Skutek:
+        briefingi 2 i 3.09 otworzyły się TĄ SAMĄ awarią wodociągową ZGK
+        (art. 5755, ogłoszoną 2.09 o 9:07 i nigdy nie odwołaną — ZGK nie
+        publikuje „już działa"), a 5 z 6 kolejnych briefingów zaczynało się
+        słowem „AWARIA". Wyjątek pomyślany jako rzadki stał się regułą.
+
+        Dowodem trwania jest znany termin obejmujący tę chwilę albo świeżość
+        samego ogłoszenia (`ONGOING_ALERT_H`). Awaria bez terminu, ogłoszona
+        wczoraj i powtarzająca wczorajszy nagłówek, schodzi na koniec swojej
+        grupy — nie znika, więc przy chudym dniu wciąż może wygrać.
         """
         best = None
         best_key = (2, 2, 2, 999, float("inf"))
@@ -756,13 +803,16 @@ class SummaryGenerator:
         for category, arts in articles_by_category.items():
             for article in arts:
                 priority = self._headline_priority(category, article, now)
-                # Awaria, która JEST sprawą teraz, jest zwolniona z obu
-                # degradacji z tego samego powodu: „nie ma prądu" opisuje stan
-                # gminy, a nie zaproszenie, na które można było zdążyć.
+                # Awaria, która JEST sprawą teraz, jest zwolniona z degradacji
+                # „po terminie": „nie ma prądu" opisuje stan gminy, a nie
+                # zaproszenie, na które można było zdążyć.
                 alert_now = priority == self.CATEGORY_PRIORITY["Awaria"]
                 over = not alert_now and _event_is_over(article, now)
+                # Ze zwolnienia z reguły POWTÓRKI korzysta wyłącznie awaria
+                # z dowodem trwania — inaczej ta sama awaria bez godzin
+                # otwierałaby briefing tyle dni z rzędu, ile trwa jej pin.
                 repeats = (
-                    not alert_now
+                    not (alert_now and self._alert_still_running(article, now))
                     and self._repeats_recent_headline(article, recent_topics)
                 )
                 key = (
