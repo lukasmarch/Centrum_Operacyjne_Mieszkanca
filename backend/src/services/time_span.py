@@ -166,7 +166,11 @@ _HOURS_AFTER_DATE_RE = re.compile(
     rf"(?:godz\w*\.?|o\s+godz\w*\.?|o|w\s+godzinach|od)\s*{_H}(?:\s*(?:{_SEP}|do)\s*{_H})?"
 )
 _HOURS_WINDOW = 60
-_SENTENCE_END_RE = re.compile(r"[.!?]\s+(?=[a-z])|\n")
+# Nowa linia sama w sobie NIE kończy zdania: post FB łamie wiersz między datą
+# a godziną („16 września 2026 r.\n⏰ godz. 8:00–11:30" — art. 5770, przez to
+# pierwszy przebieg backfillu 3.09 zapisał mu północ). Kończy je nowa linia,
+# po której zaczyna się litera — czyli nowe zdanie, nie ciąg dalszy zwrotu.
+_SENTENCE_END_RE = re.compile(r"[.!?]\s+(?=[a-z])|\n\s*(?=[a-z])")
 
 # Ile dni w przód zapowiedź może sięgać. Ten sam bezpiecznik co
 # `article_processor._parse_event_time` dla odczytu modelu (pół roku).
