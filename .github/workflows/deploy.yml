@@ -1,5 +1,11 @@
 name: Deploy Backend
 
+# ⚠️ Zielony job NIE był dowodem wdrożenia (2 i 3.09.2026): `git pull` padał
+# (GitHub limituje anonimowe pobrania z IP serwera), a skrypt bez `set -e` szedł
+# dalej — budował obraz ze STAREGO kodu z warstw cache, health check drukował
+# „Health OK" i job kończył się sukcesem. Dziś: serwer ciągnie repo kluczem
+# deploy (read-only, `core.sshCommand` w repo), skrypt przerywa na pierwszym
+# błędzie, a po pullu porównuje SHA z tym, który wywołał workflow.
 on:
   push:
     branches: [main]
@@ -7,6 +13,7 @@ on:
       - 'backend/**'
       - 'docker-compose.prod.yml'
       - 'Caddyfile'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
@@ -18,9 +25,36 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
           script: |
+            set -euo pipefail
             cd /opt/centrum
-            git pull origin main
+
+            git fetch origin main
+            git merge --ff-only origin/main
+            DEPLOYED="$(git rev-parse HEAD)"
+            if [ "$DEPLOYED" != "${{ github.sha }}" ]; then
+              echo "::error::Po pullu HEAD=$DEPLOYED, a workflow wywołał ${{ github.sha }} — repo na serwerze nie nadążyło"
+              exit 1
+            fi
+            echo "Kod na serwerze: $DEPLOYED"
+
             docker compose -f docker-compose.prod.yml build backend
+
+            # Osierocony kontener po nieudanym `up` blokuje nazwę (3.09.2026,
+            # dwa razy): sprzątamy zatrzymane, zanim postawimy nowy.
+            docker ps -aq -f name=centrum-backend -f status=exited | xargs -r docker rm -f
             docker compose -f docker-compose.prod.yml up -d backend
-            docker compose -f docker-compose.prod.yml exec -T backend python -c "print('Health OK')"
+
+            # Zdrowie = nowy kod odpowiada przez Caddy, nie „print('Health OK')"
+            # w kontenerze, który zawsze przechodził.
+            for i in $(seq 1 12); do
+              if curl -sf -o /dev/null "https://api.rybnolive.pl/api/articles?limit=1"; then
+                echo "API odpowiada (próba $i)"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "::error::API nie odpowiedziało w 60 s po wdrożeniu"
+            docker compose -f docker-compose.prod.yml logs backend --tail 30
+            exit 1
