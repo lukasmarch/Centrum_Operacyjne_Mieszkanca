@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, ChevronUp, AlertTriangle, Clock, Sparkles, Megaphone, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, AlertTriangle, Megaphone, ExternalLink, MapPin, Globe, Map as MapIcon } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
 import ArticleImage, { getCategoryTheme } from './ArticleImage';
 import AlertPushPrompt from './AlertPushPrompt';
@@ -11,22 +11,20 @@ interface NewsFeedProps {
   initialCategory?: string;
 }
 
-const getDateGroup = (rawTimestamp: string): 'today' | 'yesterday' | 'older' => {
-  if (!rawTimestamp) return 'older';
-  const d = new Date(rawTimestamp);
-  if (isNaN(d.getTime())) return 'older';
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
-  if (d >= todayStart) return 'today';
-  if (d >= yesterdayStart) return 'yesterday';
-  return 'older';
-};
+// Do 3.09.2026 feed grupował po DACIE publikacji („Dzisiaj / Wczoraj / Starsze").
+// Wszystko lokalne wchodzi rano z WCZORAJSZĄ datą (Facebook przez Apify raz
+// dziennie o 6:00), a RSS-y z powiatu publikują w ciągu dnia — więc sekcję
+// „Dzisiaj" otwierały zawsze trzy obce wpisy (Władysławowo, Mławka, Strzegowo),
+// choć ranking miał je na 5., 11. i 15. miejscu. Data każdego wpisu została
+// na plakietce; sekcje mówią teraz, CZYJA to sprawa. Kolejność wewnątrz sekcji
+// to ranking z backendu (`feed_policy.article_score`).
+const SCOPE_GROUPS = ['gmina', 'okolice', 'region'] as const;
+type ScopeGroup = typeof SCOPE_GROUPS[number];
 
-const DATE_GROUP_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
-  today: { label: 'Dzisiaj', icon: <Sparkles size={12} className="text-blue-400" /> },
-  yesterday: { label: 'Wczoraj', icon: <Clock size={12} className="text-neutral-500" /> },
-  older: { label: 'Starsze', icon: <Clock size={12} className="text-neutral-600" /> },
+const SCOPE_GROUP_LABELS: Record<ScopeGroup, { label: string; icon: React.ReactNode }> = {
+  gmina: { label: 'Gmina Rybno', icon: <MapPin size={12} className="text-blue-400" /> },
+  okolice: { label: 'Powiat i sąsiedzi', icon: <MapIcon size={12} className="text-neutral-500" /> },
+  region: { label: 'Dalej w regionie', icon: <Globe size={12} className="text-neutral-600" /> },
 };
 
 const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
@@ -221,12 +219,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
     return () => { el?.remove(); };
   }, [filteredArticles]);
 
-  // Group by date
+  // Sekcje po zasięgu, kolejność wewnątrz = ranking z backendu
   const groupedArticles = useMemo(() => {
-    const groups: Record<string, Article[]> = { today: [], yesterday: [], older: [] };
+    const groups: Record<ScopeGroup, Article[]> = { gmina: [], okolice: [], region: [] };
     filteredArticles.forEach(a => {
-      const group = getDateGroup(a.rawTimestamp);
-      groups[group].push(a);
+      groups[a.scope ?? 'region'].push(a);
     });
     return groups;
   }, [filteredArticles]);
@@ -344,11 +341,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
         </div>
       )}
 
-      {/* Articles grouped by date */}
-      {(['today', 'yesterday', 'older'] as const).map(group => {
+      {/* Sekcje po zasięgu: najpierw gmina, potem powiat, na końcu reszta regionu */}
+      {SCOPE_GROUPS.map(group => {
         const groupArticles = groupedArticles[group];
         if (groupArticles.length === 0) return null;
-        const groupInfo = DATE_GROUP_LABELS[group];
+        const groupInfo = SCOPE_GROUP_LABELS[group];
         return (
           <div key={group} className="space-y-4">
             <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">

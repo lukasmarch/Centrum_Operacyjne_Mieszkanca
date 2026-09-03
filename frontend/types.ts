@@ -22,7 +22,11 @@ export interface Article {
   alertPlaces?: string[];
   /** Czy komunikat dotyczy wsi czytelnika. Bez podanej lokalizacji zawsze true. */
   concernsLocation?: boolean;
+  /** Zasięg wg backendu: gmina Rybno / powiat i sąsiedzi / dalej w regionie */
+  scope: ArticleScope;
 }
+
+export type ArticleScope = 'gmina' | 'okolice' | 'region';
 
 export interface WeatherData {
   temp: number;

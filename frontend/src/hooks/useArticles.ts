@@ -23,6 +23,7 @@ interface ArticleApiResponse {
   is_pinned: boolean;
   alert_places: string[];
   concerns_location: boolean;
+  scope?: 'gmina' | 'okolice' | 'region';
 }
 
 // Fallback musi zawierać /api — endpointy doklejają samą ścieżkę („/events").
@@ -97,6 +98,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
           eventUntil: item.event_until || undefined,
           alertPlaces: item.alert_places ?? [],
           concernsLocation: item.concerns_location ?? true,
+          scope: item.scope ?? 'region',
         }));
 
         setArticles(mappedArticles);
