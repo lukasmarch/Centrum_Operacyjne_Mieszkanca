@@ -33,6 +33,7 @@ NOW = datetime(2026, 7, 29, 12, 0)
 ENERGA = "Energa - wyłączenia planowane (RSS)"
 RYBNO = "Facebook - Rybno"
 OLSZTYN = "Radio Olsztyn (RSS)"
+SYLA = "Facebook - Syla"
 RADIO7 = "Radio 7 Działdowo (RSS)"
 KPP = "KPP Działdowo (RSS)"
 
@@ -333,6 +334,26 @@ CASES: List[Tuple[str, List[SimpleNamespace], List[str], int]] = [
                  "Facebook - ZakladGospodarkiKomunalnej", published_h=20, locality=3)],
         ["Awaria sieci wodociągowej w Rybnie"], 1,
     ),
+
+    # --- lokalność nagłówka czyta ocenę kategoryzacji (3.09.2026) ------------
+    # Po naprawie samego rankingu feedu briefing wciąż wybrał „Mieszkanki gminy
+    # Rybno wspierają akcję zdrowotną w LUBAWIE" (art. 5774, locality=1, powiat
+    # iławski), mając w materiale pobór krwi w Rybnie. `is_local_article`
+    # przepuszcza każdy wpis Syli bez patrzenia w treść.
+    (
+        "wpis z locality=1 nie jest lokalny, choćby źródło było gminne",
+        [article(1, "Zdrowie", "Mieszkanki gminy Rybno w akcji zdrowotnej w Lubawie",
+                 SYLA, published_h=26, locality=1),
+         article(2, "Społeczność", "Pobór krwi w Rybnie 16 września",
+                 SYLA, published_h=20, locality=3)],
+        [], 2,
+    ),
+    (
+        "brak oceny — rozstrzyga źródło i nazwa w treści, jak dotąd",
+        [article(1, "Zdrowie", "Akcja zdrowotna w Lubawie", SYLA, published_h=26),
+         article(2, "Społeczność", "Piknik w Działdowie", "Moje Działdowo", published_h=20)],
+        [], 1,
+    ),
 ]
 
 
@@ -364,11 +385,14 @@ def _generator(source_names: dict) -> SummaryGenerator:
 
 
 def _mark_local(generator: SummaryGenerator, articles: List) -> None:
-    """To samo, co briefing robi po zebraniu materiału."""
-    generator._local_article_ids = {
-        a.id for a in articles
-        if is_local_article(generator._source_names.get(a.source_id), a.title, a.content)
-    }
+    """
+    Dokładnie to, co briefing robi po zebraniu materiału — jego własną metodą.
+
+    ⚠️ Do 3.09.2026 stała tu KOPIA reguły. Kopia rozjechała się z produkcją
+    w dniu, w którym reguła zaczęła czytać `articles.locality`, i test
+    sprawdzałby wtedy własną atrapę zamiast kodu, który idzie na serwer.
+    """
+    generator._mark_local_articles(articles)
 
 
 def _by_category(articles: List) -> dict:

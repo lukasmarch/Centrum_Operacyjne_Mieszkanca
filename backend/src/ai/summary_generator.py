@@ -21,6 +21,7 @@ from src.services.feed_policy import (
     collapse_duplicates,
     dedup_text,
     is_local_article,
+    MIN_ARTICLE_LOCALITY,
     visible_event_conditions,
     is_pinned_alert,
     publishable_conditions,
@@ -325,17 +326,7 @@ class SummaryGenerator:
         if extended:
             self.logger.info(f"Extended window: {len(articles)} articles (today + yesterday)")
 
-        # Lokalność liczona raz na przebieg: przy źródłach powiatowych rozstrzyga
-        # ją treść wpisu, a `_is_local` pyta o nią przy każdym sortowaniu
-        self._local_article_ids = {
-            article.id
-            for article in articles
-            if is_local_article(
-                self._source_names.get(article.source_id),
-                article.title,
-                article.content,
-            )
-        }
+        self._mark_local_articles(articles)
 
         # 2. Pogrupuj artykuły po kategoriach
         articles_by_category = {}
@@ -601,6 +592,45 @@ class SummaryGenerator:
             return False
         signature = topic_signature(article.title)
         return any(same_topic(signature, seen) for seen in recent_topics)
+
+    def _mark_local_articles(self, articles: list) -> None:
+        """
+        Które wpisy liczą się jako „nasze" — liczone raz na przebieg, bo
+        `_is_local` pyta o to przy każdym sortowaniu, a lokalność jest PIERWSZĄ
+        osią klucza nagłówka.
+
+        Ocena z kategoryzacji rozstrzyga, gdy jest — ten sam próg
+        (`MIN_ARTICLE_LOCALITY`) i ta sama kolejność zaufania co w rankingu
+        feedu (`feed_policy.locality_factor`). 3.09.2026, już po naprawie
+        samego feedu, briefing wybrał na nagłówek „Mieszkanki gminy Rybno
+        wspierają akcję zdrowotną w LUBAWIE" (art. 5774, `locality=1`, powiat
+        iławski), mając w materiale pobór krwi w Rybnie i mecz Delfina:
+        `is_local_article` przepuszcza każdy wpis Syli bez patrzenia w treść,
+        bo to źródło nie jest w `COUNTY_WIDE_SOURCES`. Ta sama dziura co
+        w `locality_factor`, tyle że w osobnej kopii.
+
+        Dla wpisów bez oceny — sprzed 21.08.2026 i czekających na
+        kategoryzację — zostaje dawna ścieżka: źródło, potem nazwa w treści.
+
+        ⚠️ Metoda istnieje po to, żeby reguła była w JEDNYM miejscu.
+        `scripts/test_summary_headline` trzymał jej kopię pod komentarzem
+        „to samo, co briefing robi po zebraniu materiału" — i po tej zmianie
+        przestało być to samo, więc test sprawdzałby własną atrapę zamiast
+        produkcji. Woła teraz tę metodę.
+        """
+        self._local_article_ids = {
+            article.id
+            for article in articles
+            if (
+                article.locality >= MIN_ARTICLE_LOCALITY
+                if getattr(article, "locality", None) is not None
+                else is_local_article(
+                    self._source_names.get(article.source_id),
+                    article.title,
+                    article.content,
+                )
+            )
+        }
 
     def _is_local(self, article) -> bool:
         return article.id in self._local_article_ids
