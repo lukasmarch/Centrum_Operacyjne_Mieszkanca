@@ -47,6 +47,55 @@ CASES: List[Tuple[str, str, bool, bool, bool]] = [
 ]
 
 
+# (opis, tytuł, treść, locality, czy ma przejść)
+#
+# Bramka lokalności odsiewa najwięcej ze wszystkich: pomiar 3.09.2026 na 14 dniach
+# dał 96 odrzuconych, z czego 10 wymieniało miejscowość z gminy Rybno. Ocena
+# dotyczy ARTYKUŁU i bywa niedeterministyczna, więc nazwa w tekście ją przebija.
+LOCALITY_CASES = [
+    ("bieg w Kopaniarzach z oceną 0 ← realny wpis, wydarzenie uratował drugi post",
+     "VI Leśny Nocny Bieg w Kopaniarzach zaprasza do udziału",
+     "Zapraszamy na bieg w Kopaniarzach 5 września.", 0, True),
+    ("turniej w Tuczkach z oceną 0",
+     "Charytatywny Turniej Piłki Nożnej w Tuczkach",
+     "Turniej odbył się w Tuczkach.", 0, True),
+    ("piknik w Ciechanowie — cudzy powiat, nadal odpada",
+     "Piknik rodzinny w Ciechanowie",
+     "Impreza w Ciechanowie dla mieszkańców.", 0, False),
+    ("festyn w Sierpcu z oceną 1 — odpada",
+     "Festyn w Sierpcu", "Zapraszamy do Sierpca.", 1, False),
+    ("wpis z gminy z poprawną oceną przechodzi jak dotąd",
+     "Dożynki w Rybnie", "Święto plonów w Rybnie.", 3, True),
+    ("brak oceny — decyduje dopiero ocena wydarzenia",
+     "Zebranie wiejskie", "Spotkanie mieszkańców.", None, True),
+]
+
+
+def run_locality_cases() -> bool:
+    print()
+    print("=" * 72)
+    print("BRAMKA LOKALNOŚCI — nazwa miejscowości przebija niską ocenę")
+    print("=" * 72)
+
+    failed = False
+    for opis, tytul, tresc, locality, oczekiwane in LOCALITY_CASES:
+        article = Article(
+            source_id=1, title=tytul, content=tresc,
+            url=f"https://example.test/{abs(hash(opis))}",
+            category="Sport", is_filler=False, is_promotional=False,
+            processed=True, locality=locality,
+        )
+        wynik = is_event_candidate(article)
+        ok = wynik == oczekiwane
+        failed = failed or not ok
+        znak = "✓" if ok else "✗"
+        strzalka = "przechodzi" if wynik else "odpada"
+        print(f"  {znak} [locality={str(locality):<4}] {opis[:52]:<52} → {strzalka}")
+        if not ok:
+            print(f"      OCZEKIWANO: {'przechodzi' if oczekiwane else 'odpada'}")
+    return failed
+
+
 def run_cases() -> bool:
     print("=" * 72)
     print("BRAMKA EKSTRAKCJI WYDARZEŃ — przypadki brzegowe")
@@ -124,6 +173,7 @@ async def run_db() -> None:
 
 if __name__ == "__main__":
     failed = run_cases()
+    failed = run_locality_cases() or failed
     if "--db" in sys.argv:
         asyncio.run(run_db())
     sys.exit(1 if failed else 0)

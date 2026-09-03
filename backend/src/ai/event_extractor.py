@@ -99,8 +99,22 @@ def is_event_candidate(article: Article) -> bool:
     # nie ma powodu płacić za gpt-4o, żeby wyekstrahować wydarzenie, które
     # bramka miejsca i tak odrzuci przy zapisie. NULL = wpis sprzed migracji
     # albo poniżej progu treści; wtedy decyduje dopiero ocena wydarzenia.
+    #
+    # ⚠️ Nazwa miejscowości w tekście PRZEBIJA niską ocenę. Ocena dotyczy
+    # ARTYKUŁU i bywa niedeterministyczna (3.09.2026 zmierzono: ten sam tekst
+    # dostaje raz jedną kategorię, raz drugą), a tutaj kosztuje najwięcej ze
+    # wszystkich bramek: pomiar na 14 dniach dał 96 wpisów odrzuconych przez
+    # lokalność, z czego 10 wymieniało miejscowość z gminy Rybno — w tym
+    # „VI Leśny Nocny Bieg w KOPANIARZACH" z oceną 0, „Turniej w TUCZKACH"
+    # i „Zawody pożarnicze w SZCZUPLINACH". Bieg trafił do kalendarza tylko
+    # dlatego, że opisał go jeszcze jeden post, oceniony wyżej.
+    #
+    # Bramka wejściowa ma być HOJNA, bo tylko oszczędza wywołanie modelu;
+    # ostra jest bramka wyjściowa (`visible_event_conditions`), która ocenia
+    # SAMO WYDARZENIE, nie artykuł. Do 3.09.2026 było odwrotnie. Koszt tej
+    # zmiany to ~10 wywołań gpt-4o na dwa tygodnie.
     if article.locality is not None and article.locality < MIN_EVENT_LOCALITY:
-        return False
+        return bool(places_in(article.title, article.content or article.summary))
 
     return True
 
