@@ -356,6 +356,48 @@ SIGNATURE_GROUPS: List[Tuple[str, List[Tuple[str, str, datetime]], int]] = [
         ],
         2,
     ),
+    (
+        # 3.09.2026, 6:03 — drugie powiadomienie o awarii wody ogłoszonej
+        # poprzedniego dnia o 9:07. Treści z produkcji (art. 5755 i 5773):
+        # przedruk jest URWANY przez scraper, więc ma trzy miejscowości
+        # zamiast ośmiu, a do tego DOKŁADA „Rybno" z nazwy nadawcy.
+        "przedruk urwany przez scraper — krótsza lista wsi to ta sama awaria",
+        [
+            (
+                "Uwaga awaria !!!",
+                "Mamy awarie na sieci wodociągowej. W związku z wykonywanymi pracami "
+                "naprawczymi, może nastąpić spadek ciśnienia wody lub chwilowy jej brak. "
+                "Dotyczy następujących miejscowości: Gralewo Stacja, Żabiny, Rapaty, "
+                "Prusy, Szczupliny, Nowa Wieś, Groszki, Naguszewo",
+                datetime(2026, 9, 2, 9, 7),
+            ),
+            (
+                "UWAGA! AWARIA SIECI WODOCIĄGOWEJ",
+                "Zakład Gospodarki Komunalnej w Rybnie informuje o awarii na sieci "
+                "wodociągowej. Utrudnienia dotyczą miejscowości: Gralewo-Stacja, Żabiny…",
+                datetime(2026, 9, 2, 9, 17),
+            ),
+        ],
+        1,
+    ),
+    (
+        # Kontrola do powyższego: odjęcie nazwy gminy nie może scalać
+        # awarii w RÓŻNYCH wsiach — „Rybno" pada tu jako nazwa gminy.
+        "awaria w Żabinach i awaria w Koszelewach tego samego dnia — dwa alerty",
+        [
+            (
+                "Awaria wodociągu",
+                "Zakład Gospodarki Komunalnej w Rybnie: brak wody w miejscowości Żabiny.",
+                datetime(2026, 9, 2, 9, 7),
+            ),
+            (
+                "Awaria wodociągu",
+                "Zakład Gospodarki Komunalnej w Rybnie: brak wody w miejscowości Koszelewy.",
+                datetime(2026, 9, 2, 14, 30),
+            ),
+        ],
+        2,
+    ),
 ]
 
 # Wyłączenia Energi mają termin z bazy (parsuje go `services/energa.py` przy
@@ -374,7 +416,10 @@ def run_signature_cases() -> int:
 
     failures = 0
     for label, entries, expected in SIGNATURE_GROUPS:
-        signatures = set()
+        # Zwijamy przez `same_incident`, a nie przez `set()`: od 3.09.2026
+        # o powtórce decyduje porównanie sygnatur, nie ich równość. Przedruk
+        # bywa urwany przez scraper i ma inną listę miejscowości niż oryginał.
+        signatures = []
         for title, content, published in entries:
             event_at = next(
                 (dt for marker, dt in ENERGA_EVENTS.items() if marker in content), None
@@ -383,8 +428,8 @@ def run_signature_cases() -> int:
                 title=title, content=content,
                 published_at=published, event_at=event_at,
             )
-            if sig:
-                signatures.add(sig)
+            if sig and not any(alert_policy.same_incident(sig, seen) for seen in signatures):
+                signatures.append(sig)
         ok = len(signatures) == expected
         failures += not ok
         detail = f"{len(signatures)} z {len(entries)}"

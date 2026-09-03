@@ -401,6 +401,68 @@ def signature(
     return (incident[0], frozenset(places), event_day)
 
 
+# Nazwa gminy pada w komunikatach w roli ADMINISTRACYJNEJ, nie jako miejsce
+# zdarzenia: Energa tytułuje każde wyłączenie „Rybno gmina wiejska", a ZGK
+# podpisuje się „Zakład Gospodarki Komunalnej w Rybnie". `places_in` nie ma jak
+# tego odróżnić i nie powinno — bramce miejsca ta nazwa jest potrzebna, bo
+# rozstrzyga, czy komunikat w ogóle dotyczy naszej gminy.
+_GMINA_NAME = "Rybno"
+
+
+def _incident_places(places: frozenset) -> frozenset:
+    """Miejsca ZDARZENIA — bez nazwy gminy, gdy padła obok innych wsi."""
+    rest = frozenset(p for p in places if p != _GMINA_NAME)
+    return rest or places
+
+
+def same_incident(a: Optional[tuple], b: Optional[tuple]) -> bool:
+    """
+    Czy dwie sygnatury opisują to samo zdarzenie — porównanie zamiast równości.
+
+    3.09.2026 o 6:03 poszło DRUGIE powiadomienie o awarii wodociągowej ZGK
+    ogłoszonej poprzedniego dnia o 9:07. Pierwsze wyszło 2.09 o 13:03 z wpisu
+    ZGK (art. 5755), drugie z przedruku na profilu Syli (art. 5773) — mimo
+    pamięci sygnatur, bo klucze różniły się listą miejscowości:
+
+        5755 (ZGK):  Gralewo, Groszki, Naguszewo, Nowa Wieś, Prusy, Rapaty,
+                     Szczupliny, Żabiny
+        5773 (Syla): Gralewo, Rybno, Żabiny
+
+    Dwie przyczyny naraz. Scraper URYWA treść przedruku („Utrudnienia dotyczą
+    miejscowości: Gralewo-Stacja, Żabiny…"), więc miejsc jest mniej — a
+    jednocześnie DOCHODZI „Rybno", wyłuskane z nazwy nadawcy („Zakład
+    Gospodarki Komunalnej w Rybnie"), nie z listy dotkniętych wsi.
+
+    Stąd reguła w dwóch krokach. Najpierw odejmujemy nazwę gminy, o ile padła
+    obok innych wsi (`_incident_places`) — zostają miejsca ZDARZENIA. Potem
+    pytamy o ZAWIERANIE: komunikat mówiący o podzbiorze tych samych wsi opisuje
+    tę samą awarię, choćby lista była krótsza. Gdy po odjęciu nie zostaje nic
+    (komunikat mówi wyłącznie „Rybno"), wracamy do zbioru pełnego i wymagamy
+    równości — tak jak dotąd.
+
+    ⚠️ Zawieranie, NIE przecięcie. Pierwsze podejście 3.09 pytało o niepuste
+    przecięcie i test natychmiast pokazał, czym to jest: każdy komunikat Energi
+    niesie w tytule „Rybno gmina wiejska", więc wyłączenie w Koszelewach
+    przecinało się z wyłączeniem w Rybnie i drugie nie obudziłoby nikogo.
+    Ta sama pułapka co wyżej, tylko z drugiej strony — nazwa gminy udająca
+    miejsce zdarzenia.
+
+    ⚠️ Cena, wprost: komunikat o podzbiorze wsi nie wyśle własnego
+    powiadomienia, nawet gdy dotyczy innej awarii tego samego dnia i rodzaju.
+    Cena płacona już wcześniej dla zbiorów równych (patrz `signature`), tu
+    rozszerzona na zawierające się.
+    """
+    if a is None or b is None:
+        return False
+    kind_a, places_a, day_a = a
+    kind_b, places_b, day_b = b
+    if kind_a != kind_b or day_a != day_b:
+        return False
+
+    core_a, core_b = _incident_places(places_a), _incident_places(places_b)
+    return core_a <= core_b or core_b <= core_a
+
+
 def evaluate(
     title: Optional[str],
     content: Optional[str] = None,

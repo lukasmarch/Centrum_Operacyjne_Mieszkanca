@@ -142,6 +142,11 @@ async def _already_announced(session: AsyncSession, now: datetime) -> set:
     O czym powiadomiliśmy w ostatniej dobie — kluczem alertu, nie identyfikatorem
     wpisu. `alert_pushed_at` chroni przed powtórką TEGO SAMEGO artykułu; to
     chroni przed powtórką tego samego ZDARZENIA opisanego gdzie indziej.
+
+    ⚠️ Zbiór porównuje się przez `alert_policy.same_incident`, nie operatorem
+    `in`: przedruk bywa urwany przez scraper i ma inną listę miejscowości niż
+    oryginał, więc równość kluczy go przepuszczała (3.09.2026, drugi push
+    o awarii wody dobę po pierwszym).
     """
     result = await session.execute(
         select(Article)
@@ -184,7 +189,9 @@ async def run_alert_push_async():
                 # Wpis i tak dostaje znacznik: inaczej wracałby do oceny co
                 # kwadrans, dopóki termin zdarzenia nie minie.
                 sig = _signature(article)
-                if sig and sig in announced:
+                if sig and any(
+                    alert_policy.same_incident(sig, seen) for seen in announced
+                ):
                     article.alert_pushed_at = datetime.utcnow()
                     session.add(article)
                     await session.commit()
