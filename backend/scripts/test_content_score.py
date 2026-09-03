@@ -134,11 +134,36 @@ def main() -> int:
             locality_factor(None, OLSZTYN, "Łaciate Mazury MTB zadebiutuje w Rybnie") == 1.0,
             f"{locality_factor(None, OLSZTYN, 'Łaciate Mazury MTB zadebiutuje w Rybnie')}",
         ),
+        # Do 3.09.2026 ocena mogła wpis wyłącznie PODNIEŚĆ. Skutkiem był feed,
+        # w którym „Termin płatności III raty podatku i opłaty za psa
+        # w DZIAŁDOWIE" miał wynik 0,792 — najwyższy w całym materiale, wyżej
+        # niż awaria wodociągowa w Rybnie. Kategoryzacja oceniła go na
+        # `locality=2`, ale profil Gminy Działdowo jest w `LOCAL_SOURCES`,
+        # więc mnożnik i tak wychodził 1,00.
+        #
+        # Obawę „model bywa skąpy" zmierzono na produkcji (30 dni): źródła
+        # czysto gminne dostają `locality=3` w 30 przypadkach na 35 — Gmina
+        # Rybno 5/5, Facebook Rybno 9/10, BIP 11/13, ZGK 5/7. Reszta to wpisy,
+        # które naprawdę dotyczą powiatu. Kara jest mnożnikiem 0,55, nie
+        # filtrem, więc pomyłka modelu przesuwa wpis, a nie usuwa go z feedu.
         (
-            "ocena z kategoryzacji może podnieść, nigdy nie obniża źródła lokalnego",
-            locality_factor(2, GMINA, "Sesja Rady") == 1.0
+            "ocena z kategoryzacji rozstrzyga w OBIE strony",
+            locality_factor(2, GMINA, "Sesja Rady") == LOCALITY_FACTOR_FOREIGN
             and locality_factor(3, ENERGA, T_LIDZBARK) == 1.0,
-            "locality=2 z Gminy → 1,0 · locality=3 przebija tytuł",
+            "locality=2 → 0,55 mimo źródła · locality=3 przebija tytuł",
+        ),
+        (
+            "wpis bez oceny nadal pyta o źródło i nazwę w treści",
+            locality_factor(None, GMINA, "Sesja Rady") == 1.0
+            and locality_factor(None, ENERGA, T_LIDZBARK) == LOCALITY_FACTOR_FOREIGN,
+            "None → dawna ścieżka: źródło, potem nazwa",
+        ),
+        (
+            "podatek za psa w Działdowie schodzi pod wiadomość z Rybna ← 3.09",
+            score("Facebook - Gmina Działdowo", 18, 5, 2, "Termin płatności III raty podatku w Działdowie")
+            < score("Facebook - Syla", 18, 5, 3, "Zespoły GSZS Delfin Rybno zagrają w weekend"),
+            f"{score('Facebook - Gmina Działdowo', 18, 5, 2, 'Termin płatności III raty podatku w Działdowie'):.4f} < "
+            f"{score('Facebook - Syla', 18, 5, 3, 'Zespoły GSZS Delfin Rybno zagrają w weekend'):.4f}",
         ),
         # To jest cel zmiany: świeże wyłączenie w cudzej gminie przestaje
         # otwierać dzień, w którym gmina ma własne wiadomości

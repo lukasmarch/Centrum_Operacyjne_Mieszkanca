@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_, cast, or_
 from sqlalchemy.types import Time
 
-from src.services.alert_policy import is_foreign_region, places_in
+from src.services.alert_policy import is_foreign_region, places_in, span_from_text
 from src.services.weather_alert import expired as weather_alert_expired
 from src.services.weather_alert import is_weather_alert
 
@@ -37,8 +37,20 @@ LOOKAHEAD_HALFLIFE_H = 48.0
 # Ile innych wpisów musi dzielić dwa wpisy z tego samego źródła
 SOURCE_GAP = 2
 
-# Awaria bez znanego terminu trafia na górę feedu tylko dopóki jest „teraz"
-AWARIA_PIN_HOURS = 24
+# Awaria bez znanego terminu trafia na górę feedu tylko dopóki jest „teraz".
+#
+# ⚠️ Doba była za długa i 3.09.2026 pokazała, na czym to polega: awaria
+# wodociągowa ZGK ogłoszona 2.09 o 9:07 stała przypięta na szczycie jeszcze
+# następnego dnia rano, choć prace naprawcze skończyły się poprzedniego dnia.
+# ZGK nie publikuje „już działa", więc sygnału końca nie ma i nie będzie —
+# jedyne, co możemy zrobić, to nie udawać, że wpis sprzed doby opisuje stan
+# gminy TERAZ. Dwanaście godzin znaczy: awaria ogłoszona rano schodzi ze
+# szczytu wieczorem, ogłoszona wieczorem — rano.
+#
+# Awarii ze ZNANYM terminem to nie dotyczy: tam rozstrzyga `event_until`
+# (z kategoryzacji albo wyczytany z treści przez `alert_policy.span_from_text`),
+# a wyłączenie zapowiedziane na osiem godzin jest przypięte przez całe osiem.
+AWARIA_PIN_HOURS = 12
 
 # Zdarzenie z terminem przypinamy dopiero, gdy jest na wyciągnięcie ręki.
 # Bez tego wyłączenie zapowiedziane na przyszły czwartek stało cztery dni
@@ -545,6 +557,17 @@ def content_factor(content_score: Optional[int]) -> float:
 # dojeżdżających realna informacja. Ma zejść pod materiał lokalny, nie zniknąć.
 LOCALITY_FACTOR_FOREIGN = 0.55
 
+# Od jakiej oceny kategoryzacji wpis liczy się jako „nasz". 3 = gmina Rybno;
+# 2 to sąsiednie gminy powiatu (Działdowo, Lidzbark, Iłowo-Osada) i właśnie
+# one wypychały lokalny materiał ze szczytu feedu.
+#
+# ⚠️ To NIE jest `MIN_EVENT_LOCALITY` z `visible_event_conditions` (= 2).
+# Tam próg decyduje o WIDOCZNOŚCI wydarzenia i jest celowo szerszy: festyn
+# w sąsiedniej gminie to realna propozycja na weekend. Tu próg decyduje
+# o KOLEJNOŚCI wiadomości, a wiadomość z cudzej gminy nie ma prawa stać
+# nad naszą. Nie podstawiać jednej stałej pod drugą.
+MIN_ARTICLE_LOCALITY = 3
+
 
 def locality_factor(
     locality: Optional[int],
@@ -568,8 +591,23 @@ def locality_factor(
     Trzy odpowiedzi na pytanie „czy to nasze", w kolejności zaufania:
     ocena z kategoryzacji (3 = gmina Rybno), przynależność źródła, wreszcie
     sama nazwa w tekście — ta ostatnia po to, żeby artykuł o Rybnie w Radiu
-    Olsztyn nie był karany za to, że źródło jest wojewódzkie. Ocena może wpis
-    wyłącznie PODNIEŚĆ: model bywa skąpy, a `is_local_article` zna źródła.
+    Olsztyn nie był karany za to, że źródło jest wojewódzkie.
+
+    ⚠️ Do 3.09.2026 ocena mogła wpis wyłącznie PODNIEŚĆ, nigdy obniżyć —
+    „model bywa skąpy, a `is_local_article` zna źródła". Pomiar tego dnia
+    pokazał, czym to jest w praktyce: „Termin płatności III raty podatku
+    i opłaty za psa w DZIAŁDOWIE" miał NAJWYŻSZY wynik całego feedu (0,792),
+    wyżej niż trwająca awaria wodociągowa w Rybnie (0,722). Kategoryzacja
+    oceniła go na `locality=2`, czyli powiedziała wprost „to nie nasza gmina",
+    a mnożnik i tak wyszedł 1,00 — bo `Facebook - Gmina Działdowo` jest
+    w `LOCAL_SOURCES`, a nie w `COUNTY_WIDE_SOURCES`, więc `is_local_article`
+    przepuszczało je bez zaglądania w treść. Kara trafiała wtedy w 3 wpisy
+    na 20; cała reszta obcego materiału jechała bez niej.
+
+    Dziś ocena rozstrzyga w OBIE strony i jest pierwsza w kolejności: model
+    czytał ten konkretny tekst, źródło jest tylko domysłem o tym, o czym
+    źródło zwykle pisze. Bramka źródła i nazwy zostaje dla wpisów bez oceny —
+    tych sprzed 21.08.2026 i tych, które czekają na kategoryzację.
     """
     if locality is None and title is None and content is None:
         return 1.0  # wywołanie bez materiału — nie zgadujemy
@@ -577,9 +615,12 @@ def locality_factor(
     if is_foreign_region(title, content):
         return LOCALITY_FACTOR_FOREIGN  # cudze Rybno
 
+    # Ocena z kategoryzacji rozstrzyga sama — w obie strony.
+    if locality is not None:
+        return 1.0 if locality >= MIN_ARTICLE_LOCALITY else LOCALITY_FACTOR_FOREIGN
+
     local = (
-        (locality is not None and locality >= 3)
-        or is_local_article(source_name, title, content)
+        is_local_article(source_name, title, content)
         or bool(places_in(title, content))
     )
     return 1.0 if local else LOCALITY_FACTOR_FOREIGN
@@ -686,6 +727,14 @@ def is_pinned_alert(
     in_gmina = locality >= 3 if locality is not None else bool(places_in(title, content))
     if not in_gmina:
         return False
+
+    # Godziny bywają w samym komunikacie, choć kategoryzacja ich nie wpisała
+    # („W godzinach 8:00 - 15:00" bez daty). Push czyta je od 24.08.2026
+    # (`alert_policy.span_from_text`), feed nie czytał ich wcale — więc ta sama
+    # awaria bywała na stronie przypięta długo po tym, jak push przestawał ją
+    # uznawać za sprawę teraz. Jedna odpowiedź na jedno pytanie, jeden parser.
+    if event_at is None and event_until is None:
+        event_at, event_until = span_from_text(title, content, published_at)
 
     if event_at:
         if event_until and now > event_until:
