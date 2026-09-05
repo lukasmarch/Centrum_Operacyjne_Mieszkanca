@@ -506,8 +506,67 @@ async def run_db():
           f"kat={top.category}\n  {(top.title or '')[:100]}")
 
 
+def run_window() -> int:
+    """
+    Okno materiału briefingu — doba LOKALNA, rozdzielona od klucza dnia (5.09.2026).
+
+    Woła metodę PRODUKCYJNĄ `_material_window`, nie własną kopię reguły: kopia
+    pod komentarzem „to samo, co briefing robi" już raz sprawdzała atrapę
+    (`_local_article_ids`, 3.09). Klucz dnia zostaje północą UTC i test tego
+    pilnuje — to etykieta dnia, nie chwila, a wisi na nim unikat kolumny
+    i ścieżka `/api/summary/daily/{date}`.
+    """
+    from src.ai.summary_generator import SummaryGenerator
+
+    print()
+    print("=" * 78)
+    print("Okno materiału briefingu a klucz dnia")
+    print("=" * 78)
+
+    KLUCZ = datetime(2026, 9, 5, 0, 0)          # `daily_summaries.date` — północ UTC
+    POPOLUDNIE = datetime(2026, 9, 5, 11, 30)   # 13:30 lokalnie (przebieg odświeżający)
+    RANO = datetime(2026, 9, 5, 5, 0)           # 7:00 lokalnie
+
+    start, end = SummaryGenerator._material_window(POPOLUDNIE, KLUCZ)
+    rano_start, rano_end = SummaryGenerator._material_window(RANO, KLUCZ)
+
+    # Prawdziwe wpisy z dnia „VI Leśnego Nocnego Biegu"
+    BIEG = datetime(2026, 9, 4, 22, 0)          # zapowiedź całodniowa na 5.09
+    NOCNA_PUBLIKACJA = datetime(2026, 9, 4, 22, 30)   # 00:30 lokalnie 5.09
+    WCZORAJ_WIECZOR = datetime(2026, 9, 4, 18, 0)     # 20:00 lokalnie 4.09
+
+    checks = [
+        ("okno zaczyna się o lokalnej północy", start, datetime(2026, 9, 4, 22, 0)),
+        ("okno nie sięga w przyszłość", end, POPOLUDNIE),
+        ("rano też nie sięga dalej niż teraz", rano_end, RANO),
+        ("zapowiedź całodniowa NA DZIŚ jest w materiale",
+         start <= BIEG < end, True),
+        ("wpis z 00:30 lokalnie należy do dziś",
+         start <= NOCNA_PUBLIKACJA < end, True),
+        ("wczorajszy wieczór nadal poza oknem",
+         start <= WCZORAJ_WIECZOR < end, False),
+        # regresja, od której się zaczęło: granica w UTC gubiła zapowiedź
+        ("stara granica UTC gubiłaby bieg",
+         KLUCZ <= BIEG, False),
+        # klucz dnia zostaje nietknięty
+        ("klucz dnia to nadal północ UTC", KLUCZ.hour, 0),
+        ("okno to NIE klucz", start == KLUCZ, False),
+    ]
+
+    failures = 0
+    for label, got, expected in checks:
+        ok = got == expected
+        failures += not ok
+        detail = f"{got}" + ("" if ok else f" (oczekiwano {expected})")
+        print(f"{'✓' if ok else '✗'} {label:.<58} {detail}")
+
+    print("-" * 78)
+    print(f"{len(checks) - failures}/{len(checks)} zgodnych z oczekiwaniem")
+    return failures
+
+
 if __name__ == "__main__":
-    failed = run_cases()
+    failed = run_cases() + run_window()
     if "--db" in sys.argv:
         asyncio.run(run_db())
     sys.exit(1 if failed else 0)

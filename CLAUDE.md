@@ -876,9 +876,18 @@ surowym `strftime` na UTC, a obok, w bloku SPORT, ten sam bieg miał poprawne
       --days 7`), potem dopiero decyzja o GA4
 - [ ] Cztery sierpniowe konta (id 8–11) zadały łącznie **1 pytanie** agentowi i żadne
       nie ma zgody push. To retencja, nie pozyskanie — ale co naprawiać, powie dopiero pomiar
-- [ ] `daily_summaries.date` to klucz dnia liczony w UTC (`# tz-ok` w kodzie) —
-      rozdzielenie klucza od okna materiału to osobna praca; dziś okno artykułów
-      briefingu zaczyna się o 2:00 lokalnego czasu
+- [ ] **`date_start` w briefingu pełni DWIE role naraz** — jest kluczem dnia
+      w `daily_summaries` I granicą okna materiału (`_fetch_articles`). Klucz jest
+      poprawny jako północ UTC (etykieta dnia, jak `session_date`; 186 wierszy,
+      unikat na kolumnie, `/api/summary/daily/{date}` parsuje `strptime`) — zepsuty
+      jest tylko drugi użytek. **Pomiar 5.09 na prodzie: artykuł zapowiadający
+      DZISIEJSZE wydarzenie całodniowe wypada z materiału** (`event_at >= window_start`,
+      a wpis stoi na 22:00 dnia poprzedniego): okno UTC dało 7 artykułów bez biegu,
+      okno lokalne 9 z biegiem. Ratuje go wyłącznie fallback chudego dnia (<10
+      artykułów) — **przez 30 dni 19 dni miało taki wpis, 17 z nich było „obfitych",
+      więc fallback by NIE zadziałał**. Naprawa = rozdzielić `key_date` (bez zmian)
+      od `window_start/window_end` z `local_day_bounds`; bez migracji i bez ruszania
+      endpointu. Uboczne: znika też luka publikacji 00:00–02:00 (9/607 wpisów, 1 lokalny)
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
 - [ ] Filtrowanie artykułów po kategoriach

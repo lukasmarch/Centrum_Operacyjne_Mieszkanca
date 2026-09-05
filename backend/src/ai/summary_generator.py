@@ -278,10 +278,11 @@ class SummaryGenerator:
         MIN_ARTICLES_THRESHOLD = 10
 
         now = datetime.utcnow()
-        # tz-ok: `date_start` to KLUCZ DNIA w `daily_summaries` (i w ścieżce
-        # `/api/summary/daily/{date}`), a nie okno pokazywane mieszkańcowi.
-        # Przestawienie go na dobę lokalną zmieniłoby wartość istniejących
-        # wierszy — osobna praca, patrz TODO w CLAUDE.md.
+        # tz-ok: KLUCZ DNIA w `daily_summaries` — etykieta „briefing z 5 września",
+        # nie chwila. Tą samą wartością posługuje się ścieżka
+        # `/api/summary/daily/{date}` (`strptime` → północ) i unikat na kolumnie,
+        # który rozstrzyga, czy popołudniowy przebieg NADPISUJE poranny wiersz.
+        # Zostaje północą UTC świadomie — jak `session_date` sesji Rady.
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
         if target_date is None:
@@ -290,7 +291,7 @@ class SummaryGenerator:
             target_date = target_date.replace(hour=0, minute=0, second=0, microsecond=0)  # tz-ok: jak wyżej — klucz dnia
 
         date_start = target_date
-        date_end = min(target_date + timedelta(days=1), now)  # nie sięgamy w przyszłość
+        window_start, window_end = self._material_window(now, target_date)
 
         self.logger.info(f"Generating daily summary for {date_start.date()}")
 
@@ -310,16 +311,17 @@ class SummaryGenerator:
         self._source_names = {row.id: row.name for row in source_rows}
 
         # 1. Pobierz artykuły z dziś (tylko przetworzone i nadające się do publikacji)
-        articles = await self._fetch_articles(session, date_start, date_end)
+        articles = await self._fetch_articles(session, window_start, window_end)
 
-        # Fallback: jeśli mało artykułów z dziś, rozszerz okno o wczoraj
+        # Fallback: jeśli mało artykułów z dziś, rozszerz okno o wczoraj.
+        # Doba wstecz liczona od granicy LOKALNEJ, nie od klucza dnia.
         extended = False
         if len(articles) < MIN_ARTICLES_THRESHOLD and date_start == today_start:
-            yesterday_start = today_start - timedelta(days=1)
+            yesterday_start, _ = local_day_bounds(now=now - timedelta(days=1))
             self.logger.info(
                 f"Only {len(articles)} articles for today – extending window to yesterday ({yesterday_start.date()})"
             )
-            articles = await self._fetch_articles(session, yesterday_start, date_end)
+            articles = await self._fetch_articles(session, yesterday_start, window_end)
             extended = True
 
         if not articles:
@@ -541,6 +543,35 @@ class SummaryGenerator:
     # zebraniu materiału — ID wpisów, które feed_policy uznaje za lokalne
     _source_names: dict = {}
     _local_article_ids: set = set()
+
+    @staticmethod
+    def _material_window(
+        now: datetime,
+        target_date: Optional[datetime] = None,
+    ) -> tuple[datetime, datetime]:
+        """
+        Okno materiału briefingu — doba LOKALNA, przycięta do „teraz".
+
+        Rozdzielone od klucza dnia 5.09.2026. Jedna zmienna `date_start` pełniła
+        obie role naraz, więc okno zaczynało się o północy UTC, czyli o 2:00
+        czasu polskiego. Kosztowało to dwie rzeczy:
+
+          • zapowiedź DZISIEJSZEGO wydarzenia całodniowego wypadała z materiału.
+            `_fetch_articles` filtruje `event_at >= window_start`, a taki wpis
+            stoi na 22:00 dnia POPRZEDNIEGO. Pomiar z 5.09 (dzień „VI Leśnego
+            Nocnego Biegu"): okno UTC dawało 7 artykułów BEZ biegu, lokalne 9
+            z biegiem. Uratował go wtedy fallback chudego dnia — ale przez 30 dni
+            19 dni miało taki wpis, a 17 z nich było na tyle obfitych, że fallback
+            by się nie włączył;
+          • wpisy opublikowane między 00:00 a 02:00 lokalnie nie należały do
+            żadnego dnia (9 z 607 przez 30 dni, w tym 1 lokalny).
+
+        Klucz dnia (`daily_summaries.date`) zostaje północą UTC — patrz komentarz
+        w `generate_daily_summary`. To etykieta dnia, nie chwila.
+        """
+        day = now if target_date is None else target_date
+        start, end = local_day_bounds(day=to_local(day))
+        return start, min(end, now)  # nie sięgamy w przyszłość
 
     async def _fetch_articles(
         self,
