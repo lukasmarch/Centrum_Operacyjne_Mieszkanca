@@ -16,6 +16,30 @@ logger = setup_logger("EmbeddingService")
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIMENSIONS = 1536
 
+# Ile kandydatów wolno OBEJRZEĆ indeksowi przybliżonemu, zanim odda wynik.
+#
+# ⚠️ To NIE jest strojenie wydajności, tylko warunek poprawności — i kosztował
+# nas fałszywą odpowiedź (5.09.2026). Indeks wektorowy jest PRZYBLIŻONY: zwraca
+# najbliższych sąsiadów spośród tych, które zdążył obejrzeć, i nigdy nie mówi,
+# że czegoś nie obejrzał. Zapytanie kończy się sukcesem, a właściwego dokumentu
+# w wyniku po prostu nie ma.
+#
+# Domyślne `ivfflat.probes = 1` znaczy „przejrzyj jedną ze 100 list", czyli ~1%
+# korpusu. Pomiar na 15 realnych pytaniach: widoczne 54% właściwego top-12,
+# przy dwóch pytaniach 0%. Na pytanie „nocny bieg organizowany przez
+# Nadleśnictwo" artykuł o biegu, który odbywał się TEGO DNIA, miał najwyższe
+# podobieństwo w całej bazie (0,582) i nie pojawił się w wynikach wcale.
+#
+# `hnsw.ef_search` ma DRUGI, twardszy skutek: HNSW zwraca najwyżej `ef_search`
+# wierszy, więc wartość mniejsza od `LIMIT` zapytania obcina wynik po cichu.
+# Musi być ≥ największego `candidate_limit` z `hybrid_search` (dziś 96).
+#
+# Ustawiamy OBA, bo baza lokalna i produkcyjna mogą stać na różnych indeksach —
+# nieużywany GUC nic nie kosztuje, a milcząca różnica trafności między
+# środowiskami kosztowałaby dzień śledztwa.
+HNSW_EF_SEARCH = 200
+IVFFLAT_PROBES = 20
+
 
 class EmbeddingService:
     """Generates embeddings and performs semantic search using pgvector"""
@@ -59,6 +83,24 @@ class EmbeddingService:
 
         self.last_usage_tokens = used_tokens
         return all_embeddings
+
+    @staticmethod
+    async def _widen_index_scan(session: AsyncSession) -> None:
+        """Otwiera indeksowi przybliżonemu pole widzenia na czas TEGO zapytania.
+
+        `SET LOCAL`, więc ustawienie znika wraz z transakcją i nie wycieka na
+        inne zapytania sesji — a sesje bierzemy z puli, więc wartość globalna
+        nie miałaby jak się utrzymać.
+
+        Błąd jest połykany świadomie: starsze pgvector nie zna `hnsw.ef_search`,
+        a wyszukiwanie z węższym polem widzenia jest lepsze niż brak wyszukiwania.
+        """
+        for guc, value in (("hnsw.ef_search", HNSW_EF_SEARCH),
+                           ("ivfflat.probes", IVFFLAT_PROBES)):
+            try:
+                await session.execute(text(f"SET LOCAL {guc} = {int(value)}"))
+            except Exception as e:  # noqa: BLE001 — patrz docstring
+                logger.debug(f"Nie ustawiono {guc}: {e}")
 
     async def store_embedding(
         self,
@@ -105,6 +147,7 @@ class EmbeddingService:
         """
         query_embedding = await self.embed_text(query)
         embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+        await self._widen_index_scan(session)
 
         # Build filter clause
         # Note: embedding_str is interpolated directly (not a param) because
@@ -164,6 +207,7 @@ class EmbeddingService:
         """
         query_embedding = await self.embed_text(query)
         embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+        await self._widen_index_scan(session)
 
         candidate_limit = max(top_k * 6, 40)
         filter_clause = ""
