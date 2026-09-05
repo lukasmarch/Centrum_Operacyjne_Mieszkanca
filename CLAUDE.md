@@ -860,6 +860,75 @@ surowym `strftime` na UTC, a obok, w bloku SPORT, ten sam bieg miał poprawne
 - Testy: `test_timezone_guard`, `test_event_terms` sekcja 5 (16 sprawdzeń na
   prawdziwym rekordzie biegu), `test_summary_headline` 36 + 9 (okno vs klucz)
 
+## Wyszukiwarka pokazywała 1% bazy — i nikt tego nie widział (2026-09-05)
+**Mieszkaniec pyta o nocny bieg, który odbywa się TEGO DNIA w Kopaniarzach.
+Agent podaje „Leśny zryw" ze Starych Jabłonek — cudzy bieg sprzed pół roku.**
+To nie była halucynacja: model dostał ten artykuł jako NAJLEPSZE trafienie.
+
+**`idx_embeddings_vector` był indeksem ivfflat ze 100 listami, a `ivfflat.probes`
+nikt nigdy nie ustawił.** Wartość domyślna to **1** — jedna lista, ~1% korpusu.
+| pomiar (12 pytań, prod) | recall@12 | właściwy #1 |
+|---|---|---|
+| przed (probes=1) | **38%** | 8/12 |
+| po (HNSW) | **100%** | 12/12 |
+Zerową trafność miały „podatek od nieruchomości stawki" i „GOPS zasiłek rodzinny".
+
+- ⚠️ **To nie jest awaria widoczna w logu.** Zapytanie kończy się sukcesem, zwraca
+  wyniki, a rerank i progi pracują na materiale bez właściwej odpowiedzi. Część
+  wcześniejszych porażek retrievalu przypisywanych progom mogła mieć TĘ przyczynę
+- ✅ prod: `swap_vector_index_to_hnsw` (HNSW m=16, `CONCURRENTLY` — o 6:50/13:45
+  chodzi job osadzania; budowa 5,8 s, 74 MB). ivfflat był przy tym **wolniejszy
+  od skanu dokładnego** (85 vs 36 ms na 9540 wektorach) — płaciliśmy za gorsze wyniki
+- ⚠️ **`hnsw.ef_search` MUSI być ≥ LIMIT zapytania** — HNSW zwraca najwyżej
+  `ef_search` wierszy, więc niższa wartość obcina wynik PO CICHU. Ustawia to
+  `embeddings._widen_index_scan` (`SET LOCAL`, bo sesje są z puli); ustawiamy oba
+  GUC-i, bo lokalna baza może stać na innym indeksie
+- Test: `python -m scripts.test_rag_recall` — prawdę liczy **skan dokładny**, więc
+  test nie zależy od tego, jaki indeks stoi w bazie. Sprawdzony na stanie sprzed
+  naprawy: czerwony (to jedyny dowód, że strażnik działa)
+
+**Kalendarz i ogłoszenie to jedna sprawa, agent widział je osobno.** Termin stoi
+w `events`, a nazwa wsi, godzina i trasa — w artykule, z którego je wyłuskaliśmy.
+- `upcoming_events` dokłada fragment ogłoszenia (`source_article_id`, jedno
+  zapytanie na listę) + `miejscowosc` liczoną KODEM (`alert_policy.places_in`;
+  pole `miejsce` mówiło „Gmina Rybno", a bieg był w Kopaniarzach)
+- `days_back` (0–365): kalendarz był ślepy na własną przeszłość — z 1180 wydarzeń
+  agent widział **7**. „Kiedy był ten bieg" nie miało ŻADNEGO narzędzia
+- Przewodnik dostał `search_news`; miał wcześniej tylko `search_documents`
+  (wyszukiwarkę strojoną pod BIP)
+
+**Pierwszy niepusty wynik kończył pracę — dołożenie narzędzia tego NIE naprawia.**
+Pomiar: to samo pytanie w czterech konfiguracjach; dwie miały komplet narzędzi
+i użyły wyłącznie pierwszego. Pętla kończy się, gdy model przestaje wołać
+narzędzia, a nie gdy odpowiedź pokrywa pytanie.
+- `base_agent.COMPLETENESS` — reguła w kontekście bazowym KAŻDEGO agenta (+671 B).
+  ⚠️ Nie w bloku „TWOJE NARZĘDZIA": tamten ma twardy limit 2 kB i jest go 1976 B
+- `tools.EMPTY_RESULT_RULE` — **trzeci nawrót** wzorca z 25.08: pustka „nie ma
+  awarii" JEST odpowiedzią, pustka „nie znalazłem" nie jest. `co_powiedziec`
+  w `upcoming_events`, `_search`, `latest_local_news`, `local_places` wskazuje
+  NASTĘPNY KROK zamiast zamykać wątek
+- Fragmenty wyszukiwarki niosą `zasieg` (`article_scope`, NIE `is_local_article`)
+  i `trafione_slowa` — ile słów z pytania faktycznie pada w tekście. Zero we
+  wszystkich fragmentach → `uwaga_dopasowanie`: to podobny TEMAT, nie ta sprawa
+- ⚠️ `active_alerts` i `latest_local_news` wołały `publishable_conditions` **bez
+  `now`**, więc mieszały czas wstrzyknięty z zegarem — odtworzenie awarii z 7.08
+  przestało widzieć wyłączenie, którego dotyczy. Wstrzykiwany czas jest wart tyle,
+  ile najsłabsze ogniwo, które go pomija
+
+**Czego NIE DA SIĘ zdobyć — sprawdzone, nie założone.** Post gminy urywa się na
+„⏰ Godzina…" (limit 300 zn., `make_social_snippet` — decyzja prawna). Facebook
+oddaje serwerowi 338 kB skorupy BEZ treści posta; ta sama impreza na
+powiatdzialdowski.pl to 480 znaków i żaden konkret. Dociągnięcie źródła NIE
+odpowiedziałoby na to pytanie.
+- `feed_policy.is_truncated` + pola `ogloszenie_urwane` / `urwany`: model ma
+  WIEDZIEĆ, że czyta wypis, i powiedzieć mieszkańcowi, że reszta jest u źródła
+- ⚠️ Podniesienie limitu 300 znaków to decyzja **prawna**, nie techniczna —
+  najkrótsza droga do lepszych odpowiedzi o lokalnych wydarzeniach, ale wymaga
+  świadomej zgody. Urwanych jest 193/246 wpisów Syli i 11/12 wpisów gminy
+- ⚠️ **Radio 7 (234 wpisy) i KPP (156) nie mają `content` WCALE** — sam tytuł
+  i streszczenie RSS. Ich strony są osiągalne z serwera (200), więc to do
+  odzyskania; BIP nadal oddaje serwerowi 403
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
