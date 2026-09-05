@@ -19,6 +19,9 @@ Ten test skanuje `src/` i pada na dwóch wzorcach:
   2. DOBA liczona w UTC — `utcnow().replace(hour=0, ...)`. Granica dnia
      w UTC nie jest granicą dnia; okno „dziś" wypuszcza wydarzenie całodniowe
      dzisiejsze i wpuszcza jutrzejsze.
+  3. TERMIN porównany z chwilą „teraz" — `event_date >= now`. Zapowiedź bez
+     godziny stoi na lokalnej północy, więc taki warunek uznaje ją za przeszłą
+     o 00:01 w dniu, w którym się odbywa. Granicą ma być początek doby.
 
 Wyjątek zapisuje się w kodzie, nie tutaj: dopisek `# tz-ok: <powód>` w tej samej
 linii albo w komentarzu bezpośrednio nad nią. Powód jest obowiązkowy — chodzi
@@ -54,6 +57,16 @@ _FORMAT_RE = re.compile(
 # Doba wyznaczona w UTC. Łapiemy oba zapisy: przez `utcnow()` i przez zmienną
 # (`now = datetime.utcnow()` wyżej, potem `now.replace(hour=0, ...)`).
 _MIDNIGHT_RE = re.compile(r"\.replace\(\s*hour\s*=\s*0\s*,\s*minute\s*=\s*0")
+
+# Termin zdarzenia porównany wprost z „teraz". Bieg całodniowy przestawał
+# istnieć o 00:01 w dniu biegu — tak zniknął z `upcoming_events` agenta,
+# ze świeżego feedu Redaktora i z tygodniowego newslettera.
+# ⚠️ Wzorzec celuje w GOŁE „teraz". `event_at >= now - timedelta(days=1)`
+# w `publishable_conditions` to karencja po terminie i jest poprawne —
+# stąd negatywny lookahead na działanie za `now`.
+_EVENT_NOW_RE = re.compile(
+    r"\b(?:event_date|event_at)\s*>=\s*(?:ctx\.)?(?:now\b|datetime\.utcnow\(\))(?!\s*[-+])"
+)
 
 _OK_RE = re.compile(r"#\s*tz-ok:\s*\S")
 
@@ -93,6 +106,8 @@ def scan() -> list[tuple[str, int, str, str]]:
                 why = "moment z bazy bez konwersji"
             elif _MIDNIGHT_RE.search(line):
                 why = "doba liczona w UTC"
+            elif _EVENT_NOW_RE.search(line):
+                why = "termin porównany z „teraz”, nie z początkiem doby"
             else:
                 continue
             if _excused(lines, idx):

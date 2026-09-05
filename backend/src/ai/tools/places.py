@@ -31,6 +31,7 @@ from src.database.schema import Event
 from src.services.feed_policy import time_label, visible_event_conditions, word_stem
 from src.services.time_span import to_local
 from src.utils.logger import setup_logger
+from src.services.time_span import local_day_bounds
 
 logger = setup_logger("PlaceTools")
 
@@ -62,9 +63,14 @@ async def upcoming_events(
     # odpowiedział, że takich spotkań nie ma.
     pool = MAX_EVENTS * (8 if query else 2)
 
+    # Od początku DZISIEJSZEJ doby lokalnej, nie „od teraz". Zapowiedź bez
+    # godziny stoi na lokalnej północy, więc przy granicy „od teraz" przestawała
+    # istnieć dla agenta o 00:01 w dniu, w którym się odbywała — na pytanie
+    # „co się dziś dzieje w gminie" nie miał jej jak wymienić.
+    day_start, _ = local_day_bounds(now=ctx.now)
     stmt = (
         select(Event)
-        .where(Event.event_date >= ctx.now)
+        .where(Event.event_date >= day_start)
         .where(Event.event_date <= ctx.now + timedelta(days=days))
         .where(*visible_event_conditions(Event))
         .order_by(Event.event_date.asc())

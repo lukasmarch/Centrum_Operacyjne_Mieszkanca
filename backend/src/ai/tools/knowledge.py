@@ -67,6 +67,7 @@ from src.services.feed_policy import (
 from src.services.feed_policy import word_stem
 from src.services.search_synonyms import expand_query
 from src.utils.logger import setup_logger
+from src.services.time_span import local_day_bounds
 
 logger = setup_logger("KnowledgeTools")
 
@@ -258,7 +259,11 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
         .join(Source, Article.source_id == Source.id)
         .where(Article.processed == True)  # noqa: E712
         .where(*publishable_conditions(Article))
-        .where(or_(Article.published_at >= window_start, Article.event_at >= now))
+        # `event_at >= początek dzisiejszej doby`, nie „>= teraz": zapowiedź
+        # całodniowa (lokalna północ) wypadała z obu gałęzi warunku w dniu
+        # swojego terminu, jeśli ogłoszono ją dawniej niż okno publikacji.
+        .where(or_(Article.published_at >= window_start,
+                   Article.event_at >= local_day_bounds(now=now)[0]))
         .order_by(func.coalesce(Article.event_at, Article.published_at).desc())
         .limit(60)
     )

@@ -235,7 +235,8 @@ class NewsletterGenerator:
         # Get upcoming events (next 10 days)
         result = await session.execute(
             select(Event)
-            .where(Event.event_date >= datetime.utcnow())
+            # Od początku dzisiejszej doby lokalnej — patrz `upcoming_events`
+            .where(Event.event_date >= local_day_bounds()[0])
             .where(Event.event_date <= datetime.utcnow() + timedelta(days=10))
             .where(*visible_event_conditions(Event))
             .order_by(Event.event_date.asc())
