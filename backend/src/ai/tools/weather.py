@@ -28,6 +28,7 @@ from sqlalchemy import text
 
 from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
+from src.services.time_span import to_local
 
 LOCAL_TZ = ZoneInfo("Europe/Warsaw")
 
@@ -316,7 +317,12 @@ async def air_quality(ctx: ToolContext, location: Optional[str] = None) -> ToolR
         "pm10_ug_m3": data["pm10"],
         "caqi": data["caqi"],
         "poziom": data["caqi_level"],
-        "pomiar_z": data["fetched_at"].strftime("%d.%m.%Y %H:%M UTC") if data.get("fetched_at") else None,
+        # Godzina LOKALNA. Było „%H:%M UTC" — formalnie prawdziwe, ale agent
+        # przepisywał to mieszkańcowi, który czyta obok widget z inną liczbą.
+        "pomiar_z": (
+            f'{to_local(data["fetched_at"]):%d.%m.%Y %H:%M}'
+            if data.get("fetched_at") else None
+        ),
     })
 
 

@@ -36,6 +36,7 @@ from src.services.council_store import (
     summary_dict,
 )
 from src.utils.logger import setup_logger
+from src.services.time_span import to_local
 
 logger = setup_logger("CouncilAPI")
 
@@ -108,7 +109,7 @@ async def review_page(token: str, request: Request):
 
     if row.status == PUBLISHED:
         when = (
-            f" {row.published_at.strftime('%d.%m.%Y o %H:%M')}" if row.published_at else ""
+            f" {to_local(row.published_at):%d.%m.%Y o %H:%M}" if row.published_at else ""
         )
         return HTMLResponse(render_message(
             "Ten skrót jest już opublikowany",

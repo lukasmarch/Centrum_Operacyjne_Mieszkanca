@@ -48,6 +48,7 @@ def filter_recent_articles(articles: list, days: int = 2) -> list:
         if published_at >= cutoff_date:
             filtered.append(article)
         else:
+            # tz-ok: log diagnostyczny dla dewelopera, nie treść dla mieszkańca
             logger.debug(f"Skipping old article: {article.get('title', 'Unknown')} (published: {published_at.date()})")
 
     if len(filtered) < len(articles):

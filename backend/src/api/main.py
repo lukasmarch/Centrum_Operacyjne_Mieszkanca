@@ -518,8 +518,13 @@ async def get_upcoming_events(
 ):
     """Get upcoming events with source name (scraped from)"""
     from src.services.feed_policy import visible_event_conditions
-    now = datetime.utcnow()
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    from src.services.time_span import local_day_bounds
+
+    # Początek DZISIEJSZEJ doby LOKALNEJ, nie UTC. Wpis całodniowy stoi na
+    # lokalnej północy, czyli 22:00 UTC dnia poprzedniego — przy granicy
+    # liczonej w UTC wypadał z kalendarza w dniu, w którym się odbywał
+    # (5.09.2026: „VI Leśny Nocny Bieg" zniknął rano w sobotę biegu).
+    today_start, _ = local_day_bounds()
 
     result = await session.execute(
         select(Event, Source.name.label("source_name"))

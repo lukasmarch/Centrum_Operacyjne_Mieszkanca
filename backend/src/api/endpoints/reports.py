@@ -26,6 +26,7 @@ from src.database.connection import async_session
 from src.database.schema import Report, ReportStatus, ReportCategory
 from src.auth.dependencies import get_optional_user, get_admin_user
 from src.utils.logger import setup_logger
+from src.services.time_span import to_local
 
 logger = setup_logger("ReportsAPI")
 
@@ -442,7 +443,7 @@ async def _notify_admin_new_report(report: Report) -> None:
         category = (report.category or "other").lower()
         label = _CATEGORY_LABELS.get(category, category)
         pilne = category in _URGENT_CATEGORIES
-        kiedy = report.created_at.strftime("%H:%M") if report.created_at else "teraz"
+        kiedy = f"{to_local(report.created_at):%H:%M}" if report.created_at else "teraz"
 
         kontakt = " · ".join(filter(None, [
             report.author_name,

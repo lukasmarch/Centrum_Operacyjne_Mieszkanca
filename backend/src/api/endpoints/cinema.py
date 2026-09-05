@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from src.database import get_session
 from src.database.schema import CinemaShowtime
 from src.config import settings
+from src.services.time_span import to_local
 
 
 router = APIRouter()
@@ -99,7 +100,7 @@ async def get_cinema_repertoire(
     # Wyznacz datę pobrania dla informacji o aktualności
     fetched_at_str = None
     if showtimes[0].fetched_at:
-        fetched_at_str = showtimes[0].fetched_at.strftime('%d.%m.%Y')
+        fetched_at_str = f"{to_local(showtimes[0].fetched_at):%d.%m.%Y}"
 
     movies = [
         Movie(

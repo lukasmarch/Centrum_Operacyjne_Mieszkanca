@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.schema import Article, Source
 from src.services.alert_policy import places_in
 from src.services.feed_policy import is_local_source
+from src.services.time_span import to_local
 
 # Źródła o zasięgu szerszym niż gmina: samo „to Powiat/KPP/Energa" nie znaczy
 # „to nasze", więc wpis musi jeszcze nazwać miejscowość z gminy Rybno.
@@ -105,7 +106,7 @@ async def fetch_road_context(
         text = (article.content or article.summary or "").strip()
         text = " ".join(text.split())
         items.append(RoadItem(
-            date=article.published_at.strftime("%d.%m.%Y"),
+            date=f"{to_local(article.published_at):%d.%m.%Y}",
             source=source_name or "źródło lokalne",
             title=" ".join((article.title or "").split())[:120],
             snippet=text[:SNIPPET_CHARS],

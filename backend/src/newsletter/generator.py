@@ -14,6 +14,7 @@ from src.database import Article, Event, Weather, DailySummary, AirQuality, Repo
 from src.database.schema import CinemaShowtime, Source
 from src.newsletter.name_days import get_name_days, get_special_day
 from src.services import waste_policy
+from src.services.time_span import local_day_bounds, to_local, when_label
 # Newsletter jest obrazem feedu: ten sam materiał, ta sama polityka. Wcześniej
 # miał własne zapytania (zwykłe `order by published_at`) i własną listę
 # miejscowości, więc mieszkaniec dostawał mailem to, czego na stronie nie było:
@@ -338,7 +339,7 @@ class NewsletterGenerator:
                 "summary": a.summary or (a.content[:200] if a.content else ""),
                 "category": a.category,
                 "url": a.url,
-                "date": a.published_at.strftime("%Y-%m-%d") if a.published_at else ""
+                "date": to_local(a.published_at).strftime("%Y-%m-%d") if a.published_at else ""
             }
             for a in articles
         ]
@@ -346,7 +347,10 @@ class NewsletterGenerator:
         events_data = [
             {
                 "title": e.title,
-                "date": e.event_date.strftime("%Y-%m-%d"),
+                # Etykieta liczona od TERAZ, nie surowa data w UTC — model
+                # dostawał „2026-09-04" o biegu z 5.09 i pisał „dziś"
+                "kiedy": when_label(e.event_date, e.end_date, datetime.utcnow()),
+                "date": to_local(e.event_date).strftime("%Y-%m-%d"),
                 "time": e.event_time or "",
                 "location": e.location or "",
                 "description": e.short_description or ""
@@ -404,8 +408,9 @@ class NewsletterGenerator:
         content["events_db"] = [
             {
                 "title": e.title,
-                "day": e.event_date.day,
-                "month": MONTHS_PL_SHORT[e.event_date.month - 1],
+                # Czas LOKALNY — patrz `events_today_db` w briefingu dziennym
+                "day": to_local(e.event_date).day,
+                "month": MONTHS_PL_SHORT[to_local(e.event_date).month - 1],
                 "location": e.location or "",
                 "time": e.event_time or "",
                 "is_local": (e.locality or 0) >= 3,
@@ -444,13 +449,18 @@ class NewsletterGenerator:
         now_pl = get_poland_now()
         current_date_str = format_polish_date(now_pl)
 
-        today_utc = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        # Granice DZISIEJSZEJ doby LOKALNEJ w naiwnym UTC. Do 5.09.2026 stało tu
+        # `utcnow().replace(hour=0)`, czyli doba przesunięta o dwie godziny —
+        # a wpis całodniowy stoi dokładnie na lokalnej północy. Skutek widać było
+        # 4.09 o 7:15: pięć skrzynek dostało „Dziś w okolicy: VI Leśny Nocny
+        # Bieg", który odbywał się nazajutrz.
+        day_start, day_end = local_day_bounds()
         today_str = now_pl.strftime("%d.%m.%Y")
 
         # Get today's summary
         result = await session.execute(
             select(DailySummary)
-            .where(DailySummary.date >= today_utc - timedelta(days=1))
+            .where(DailySummary.date >= day_start - timedelta(days=1))
             .order_by(DailySummary.date.desc())
             .limit(1)
         )
@@ -462,8 +472,8 @@ class NewsletterGenerator:
         # warunek widoczności — ten sam, co w kalendarzu na stronie.
         result = await session.execute(
             select(Event)
-            .where(Event.event_date >= today_utc)
-            .where(Event.event_date < today_utc + timedelta(days=1))
+            .where(Event.event_date >= day_start)
+            .where(Event.event_date < day_end)
             .where(*visible_event_conditions(Event))
             .order_by(Event.event_date.asc())
             .limit(5)
@@ -498,7 +508,7 @@ class NewsletterGenerator:
         result = await session.execute(
             select(Article, Source.name)
             .join(Source, Article.source_id == Source.id)
-            .where(Article.published_at >= today_utc - timedelta(days=1))
+            .where(Article.published_at >= day_start - timedelta(days=1))
             .where(*publishable_conditions(Article))
             .order_by(Article.published_at.desc())
             .limit(40)
@@ -544,7 +554,7 @@ class NewsletterGenerator:
             select(Report)
             .where(Report.is_spam == False)
             .where(Report.status != "rejected")
-            .where(Report.created_at >= today_utc)
+            .where(Report.created_at >= day_start)
             .order_by(Report.upvotes.desc(), Report.created_at.desc())
             .limit(5)
         )
@@ -552,13 +562,13 @@ class NewsletterGenerator:
         reports_date_label = "dzisiaj"
 
         if not reports:
-            yesterday_utc = today_utc - timedelta(days=1)
+            yesterday_start = day_start - timedelta(days=1)
             result = await session.execute(
                 select(Report)
                 .where(Report.is_spam == False)
                 .where(Report.status != "rejected")
-                .where(Report.created_at >= yesterday_utc)
-                .where(Report.created_at < today_utc)
+                .where(Report.created_at >= yesterday_start)
+                .where(Report.created_at < day_start)
                 .order_by(Report.upvotes.desc(), Report.created_at.desc())
                 .limit(5)
             )
@@ -630,7 +640,7 @@ class NewsletterGenerator:
         ahead, past = [], []
         for article in articles:
             reference = article.event_at or article.published_at or article.scraped_at
-            target = ahead if reference and reference >= today_utc else past
+            target = ahead if reference and reference >= day_start else past
             target.append(_entry(article))
 
         # Generate with AI
@@ -717,8 +727,11 @@ class NewsletterGenerator:
         content["events_today_db"] = [
             {
                 "title": e.title,
-                "day": e.event_date.day,
-                "month": MONTHS_PL_SHORT[e.event_date.month - 1],
+                # Dzień i miesiąc z czasu LOKALNEGO: wpis całodniowy stoi
+                # w bazie na 22:00 dnia poprzedniego, więc surowe `.day`
+                # dawało na plakietce datę o dobę za wczesną.
+                "day": to_local(e.event_date).day,
+                "month": MONTHS_PL_SHORT[to_local(e.event_date).month - 1],
                 "location": e.location or "",
                 "time": e.event_time or "",
                 "is_local": (e.locality or 0) >= 3,

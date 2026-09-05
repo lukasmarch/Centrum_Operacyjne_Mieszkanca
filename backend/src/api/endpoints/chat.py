@@ -23,6 +23,7 @@ from src.ai.agents.orchestrator import orchestrator
 from src.auth.dependencies import get_optional_user
 from src.database.schema import User, AnonymousChatUsage
 from src.utils.logger import setup_logger
+from src.services.time_span import local_day_bounds, local_now
 
 logger = setup_logger("ChatAPI")
 
@@ -130,11 +131,13 @@ async def check_rate_limit(
     user_id: Optional[int],
 ) -> None:
     """Check rate limit. Raises HTTPException(429) with structured detail if exceeded."""
-    today = date.today()
-    reset_at = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    # Reset is next midnight UTC
-    from datetime import timedelta
-    reset_at = (reset_at + timedelta(days=1)).isoformat() + "Z"
+    # Doba LOKALNA, jedna dla obu gałęzi. Do 5.09.2026 anonimowi liczyli się
+    # po dacie lokalnej (`date.today()`), a zalogowani po dobie UTC — więc
+    # między północą a 2:00 jedni mieli już nowy dzień, drudzy jeszcze stary,
+    # a komunikat „limit odnowi się o północy" mijał się z prawdą o dwie godziny.
+    day_start, day_end = local_day_bounds()
+    today = local_now().date()
+    reset_at = day_end.isoformat() + "Z"
 
     if user is None:
         # Anonymous user — limit po zahaszowanym IP (nie przechowujemy adresu wprost)
@@ -182,13 +185,12 @@ async def check_rate_limit(
         if limit is None:
             return  # Safety fallback
 
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         count_result = await session.execute(
             select(ChatMessage)
             .join(Conversation)
             .where(Conversation.user_id == user_id)
             .where(ChatMessage.role == "user")
-            .where(ChatMessage.created_at >= today_start)
+            .where(ChatMessage.created_at >= day_start)
         )
         daily_count = len(count_result.scalars().all())
 

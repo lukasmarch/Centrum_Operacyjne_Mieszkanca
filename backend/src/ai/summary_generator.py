@@ -30,15 +30,22 @@ from src.services.feed_policy import (
     strip_foreign_cta,
     topic_signature,
 )
+# Baza trzyma naiwny UTC, mieszkaniec myśli czasem lokalnym. Konwersja,
+# pojęcie doby i etykieta „kiedy" mieszkają w JEDNYM miejscu — briefing był
+# do 5.09.2026 jedną z pięciu kopii tej wiedzy i jako jedyna gubiła strefę
+# przy wydarzeniach z kalendarza.
+from src.services.time_span import (
+    LOCAL_TZ,
+    is_all_day,
+    local_day_bounds,
+    to_local,
+    when_label,
+)
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 from src.config import settings
 
 logger = setup_logger("SummaryGenerator")
-
-# Baza trzyma naiwny UTC, mieszkaniec myśli czasem lokalnym — briefing pisze
-# o godzinach, więc konwersja musi być jawna
-LOCAL_TZ = ZoneInfo("Europe/Warsaw")
 
 # Lokalizacja, której pogodę briefing opisuje. Ta sama, którą widget bierze
 # z `/api/weather` — briefing i widget nie mogą mówić o innym miejscu.
@@ -50,7 +57,8 @@ FORECAST_SLOTS = 5
 
 
 def _local(stamp: datetime) -> datetime:
-    return stamp.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ)
+    """Naiwny UTC z bazy → czas lokalny. Cienka owijka na wspólną warstwę."""
+    return to_local(stamp)
 
 
 def _article_title(article) -> str:
@@ -71,8 +79,6 @@ def _article_body(article) -> str:
     return strip_foreign_cta(article.summary or "")
 
 
-def _day_word(day_offset: int) -> Optional[str]:
-    return {0: "dziś", 1: "jutro", -1: "wczoraj"}.get(day_offset)
 
 
 def _event_is_over(article, now: datetime) -> bool:
@@ -100,9 +106,8 @@ def _event_is_over(article, now: datetime) -> bool:
     if end is not None:
         return end < now
 
-    local_start = _local(start)
-    if (local_start.hour, local_start.minute) == (0, 0):
-        return _local(now).date() > local_start.date()
+    if is_all_day(start, end):
+        return _local(now).date() > _local(start).date()
     return start < now
 
 
@@ -116,17 +121,10 @@ def _time_label(article, now: datetime) -> str:
     zapowiedź straciła ważność między porannym przebiegiem a popołudniowym,
     a etykieta jest ostatnią rzeczą, jaką czyta przy wpisie.
     """
-    today = _local(now).date()
-
     event_at = getattr(article, "event_at", None)
     if event_at:
-        start = _local(event_at)
         end = getattr(article, "event_until", None)
-        span = f"{start:%H:%M}"
-        if end:
-            span += f"–{_local(end):%H:%M}"
-        word = _day_word((start.date() - today).days)
-        when = f"{word} {span}" if word else f"{start:%d.%m} {span}"
+        when = when_label(event_at, end, now)
         if end and event_at <= now <= end:
             return f"[ZDARZENIE {when} — TRWA TERAZ]"
         if _event_is_over(article, now):
@@ -136,9 +134,7 @@ def _time_label(article, now: datetime) -> str:
     if not article.published_at:
         return "[bez daty]"
 
-    published = _local(article.published_at)
-    word = _day_word((published.date() - today).days)
-    stamp = f"{word} {published:%H:%M}" if word else f"{published:%d.%m} {published:%H:%M}"
+    stamp = when_label(article.published_at, None, now, all_day=False)
 
     # Awaria bez godzin, która przestała być sprawą teraz. Sama data tego nie
     # mówi: 3.09.2026 model dostał przy awarii wodociągowej ZGK poprawną
@@ -282,12 +278,16 @@ class SummaryGenerator:
         MIN_ARTICLES_THRESHOLD = 10
 
         now = datetime.utcnow()
+        # tz-ok: `date_start` to KLUCZ DNIA w `daily_summaries` (i w ścieżce
+        # `/api/summary/daily/{date}`), a nie okno pokazywane mieszkańcowi.
+        # Przestawienie go na dobę lokalną zmieniłoby wartość istniejących
+        # wierszy — osobna praca, patrz TODO w CLAUDE.md.
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
         if target_date is None:
             target_date = today_start
         else:
-            target_date = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            target_date = target_date.replace(hour=0, minute=0, second=0, microsecond=0)  # tz-ok: jak wyżej — klucz dnia
 
         date_start = target_date
         date_end = min(target_date + timedelta(days=1), now)  # nie sięgamy w przyszłość
@@ -367,9 +367,13 @@ class SummaryGenerator:
                 articles_by_category[category] = []
             articles_by_category[category].append(article)
 
-        # 3. Pobierz nadchodzące wydarzenia (następne 7 dni)
-        events_start = date_end
-        events_end = events_start + timedelta(days=7)
+        # 3. Wydarzenia: od początku DZISIEJSZEJ doby lokalnej przez 7 dni.
+        #
+        # Było `events_start = date_end`, czyli „od teraz" — a wpis całodniowy
+        # stoi na lokalnej północy, więc o 7:00 był już przeszłością i wypadał
+        # z briefingu w dniu, w którym się odbywał. Dobę liczy wspólna warstwa
+        # (`time_span.local_day_bounds`), bo granica UTC to nie granica dnia.
+        events_start, events_end = local_day_bounds(now=now, days=8)
         events_result = await session.execute(
             select(Event)
             .where(Event.event_date >= events_start)
@@ -1079,11 +1083,15 @@ class SummaryGenerator:
             lines.append("NADCHODZĄCE WYDARZENIA:")
             lines.append("=" * 80 + "\n")
             for event in events:
-                event_date_str = event.event_date.strftime("%Y-%m-%d")
-                if event.event_time:
-                    event_date_str += f" {event.event_time}"
+                # Etykieta, nie surowa data. 4.09.2026 stało tu
+                # `event.event_date.strftime("%Y-%m-%d")` — bez konwersji, więc
+                # bieg z 5.09 (w bazie 4.09 22:00 UTC = lokalna północ) wszedł
+                # do promptu jako „2026-09-04" i briefing napisał „Dziś odbędzie
+                # się VI Leśny Nocny Bieg". Model przepisał wiernie to, co dostał;
+                # ten sam wpis w bloku SPORT miał obok poprawne „[ZDARZENIE jutro]".
+                when = when_label(event.event_date, event.end_date, now)
                 lines.append(f"• {event.title}")
-                lines.append(f"  Data: {event_date_str}")
+                lines.append(f"  Kiedy: {when}")
                 if event.location:
                     lines.append(f"  Miejsce: {event.location}")
                 lines.append("")
@@ -1108,10 +1116,9 @@ class SummaryGenerator:
             # Godzina pomiaru wchodzi do air_quality_summary — dzięki niej liczba
             # nie kłóci się z widgetem live stojącym obok briefingu
             measured_at = (
-                air_quality.fetched_at.strftime("%H:%M")
+                f"{to_local(air_quality.fetched_at):%H:%M}"
                 if air_quality.fetched_at else "brak danych"
             )
             lines.append(f"\nGodzina pomiaru: {measured_at}")
-            lines.append(f"Aktualizacja: {air_quality.fetched_at}")
 
         return "\n".join(lines)

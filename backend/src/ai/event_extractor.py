@@ -150,6 +150,7 @@ async def ground_event(
     # 2. Termin musi mieć ślad w tekście — liczba dnia albo „jutro"/„w sobotę".
     #    Ta sama funkcja, którą kategoryzacja przycina `event_start`.
     if output.event_date:
+        # tz-ok: przed `to_utc` — model zwraca czas lokalny i tak go tu porównujemy z tekstem
         stamp = output.event_date.strftime("%Y-%m-%dT%H:%M")
         if not _event_date_grounded(stamp, source):
             logger.info(f"Grounding: data {stamp} bez śladu w tekście — odrzucona")

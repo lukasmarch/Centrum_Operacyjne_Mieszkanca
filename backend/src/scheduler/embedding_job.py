@@ -15,6 +15,7 @@ from src.ai.embeddings import embedding_service
 from src.ai.chunker import chunker
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
+from src.services.time_span import local_day_bounds
 
 logger = setup_logger("EmbeddingJob")
 
@@ -23,7 +24,9 @@ MAX_BATCH_SIZE = 200  # Max articles per run
 
 async def _embed_articles(session):
     """Embed unembedded articles scraped today"""
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    # Doba LOKALNA — job chodzi 6:50 i 13:45 czasu polskiego, a granica UTC
+    # przecina dzień o 2:00 w nocy i wycięłaby materiał zescrapowany po północy.
+    today_start, _ = local_day_bounds()
 
     result = await session.execute(
         select(Article, Source.name)
