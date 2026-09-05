@@ -216,6 +216,88 @@ def run_dates() -> int:
     return failures
 
 
+# --- 5. warstwa czasu: doba lokalna i całodniowość (5.09.2026) ----------------
+#
+# Rekord kontrolny to prawdziwy wpis, na którym to pękło: „VI Leśny Nocny Bieg",
+# sobota 5.09.2026, ogłoszony bez godziny (post urwał się na „⏰ Godzina…"),
+# więc w bazie stoi jako lokalna północ = `2026-09-04 22:00` naiwnego UTC.
+#
+# W piątek briefing napisał o nim „Dziś odbędzie się", bo blok wydarzeń
+# formatował datę surowym `strftime` na UTC. W sobotę — w dniu biegu — wpis
+# wypadł z kalendarza, bo `/api/events` liczyło początek doby jako północ UTC,
+# czyli 2:00 lokalnego czasu. Jeden rekord, dwa przeciwne objawy.
+BIEG = datetime(2026, 9, 4, 22, 0)          # 5.09 00:00 lokalnie, bez godziny
+CZYTANIE = datetime(2026, 9, 5, 9, 0)       # 5.09 11:00 lokalnie
+PIATEK = datetime(2026, 9, 4, 5, 0)         # 4.09 07:00 lokalnie (pora briefingu)
+SOBOTA = datetime(2026, 9, 5, 11, 0)        # 5.09 13:00 lokalnie
+NIEDZIELA = datetime(2026, 9, 6, 6, 0)      # 6.09 08:00 lokalnie
+
+
+def run_timezone() -> int:
+    from src.services.feed_policy import time_label
+    from src.services.time_span import is_all_day, local_day_bounds, when_label
+
+    print()
+    print("=" * 78)
+    print("Warstwa czasu: doba lokalna, całodniowość, etykieta „kiedy”")
+    print("=" * 78)
+
+    checks: list[tuple[str, object, object]] = []
+
+    # a) czym w ogóle jest ten zapis
+    checks.append(("bieg bez godziny to wpis całodniowy", is_all_day(BIEG), True))
+    checks.append(("czytanie o 11:00 całodniowe nie jest", is_all_day(CZYTANIE), False))
+    checks.append(("znany koniec przeczy całodniowości",
+                   is_all_day(BIEG, datetime(2026, 9, 5, 20, 0)), False))
+
+    # b) okno doby — obie strony błędu naraz
+    piatek_start, piatek_end = local_day_bounds(now=PIATEK)
+    sobota_start, sobota_end = local_day_bounds(now=SOBOTA)
+    checks.append(("w piątek bieg NIE jest wydarzeniem dnia",
+                   piatek_start <= BIEG < piatek_end, False))
+    checks.append(("w sobotę bieg JEST wydarzeniem dnia",
+                   sobota_start <= BIEG < sobota_end, True))
+    checks.append(("granica doby to lokalna północ, nie UTC",
+                   sobota_start, datetime(2026, 9, 4, 22, 0)))
+    checks.append(("czytanie o 11:00 też jest sobotnie",
+                   sobota_start <= CZYTANIE < sobota_end, True))
+
+    # c) etykieta liczona od TERAZ
+    checks.append(("w piątek: jutro", when_label(BIEG, None, PIATEK), "jutro (cały dzień)"))
+    checks.append(("w sobotę: dziś", when_label(BIEG, None, SOBOTA), "dziś (cały dzień)"))
+    checks.append(("bez godziny nie zmyślamy północy",
+                   "00:00" in when_label(BIEG, None, SOBOTA), False))
+    checks.append(("z godziną podajemy godzinę",
+                   when_label(CZYTANIE, None, SOBOTA), "dziś 11:00"))
+    checks.append(("zakres godzin",
+                   when_label(datetime(2026, 9, 5, 7, 0), datetime(2026, 9, 5, 12, 0), SOBOTA),
+                   "dziś 09:00–14:00"))
+    checks.append(("dalszy termin — data dzienna",
+                   when_label(datetime(2026, 9, 16, 6, 0), None, SOBOTA), "16.09 08:00"))
+
+    # d) zapowiedź całodniowa trwa do końca SWOJEJ doby
+    checks.append(("w sobotę bieg jeszcze nie jest „po”",
+                   "zakończyło" in time_label(None, BIEG, None, SOBOTA), False))
+    checks.append(("w niedzielę już jest",
+                   "zakończyło" in time_label(None, BIEG, None, NIEDZIELA), True))
+
+    # e) publikacja o lokalnej północy to godzina, nie „cały dzień”
+    checks.append(("publikacja o północy zachowuje godzinę",
+                   when_label(datetime(2026, 9, 4, 22, 0), None, SOBOTA, all_day=False),
+                   "dziś 00:00"))
+
+    failures = 0
+    for label, got, expected in checks:
+        ok = got == expected
+        failures += not ok
+        detail = f"{got}" + ("" if ok else f" (oczekiwano {expected})")
+        print(f"{'✓' if ok else '✗'} {label:.<58} {detail}")
+
+    print("-" * 78)
+    print(f"{len(checks) - failures}/{len(checks)} zgodnych z oczekiwaniem")
+    return failures
+
+
 if __name__ == "__main__":
-    failed = run_parse() + run_ranking() + run_dates()
+    failed = run_parse() + run_ranking() + run_dates() + run_timezone()
     sys.exit(1 if failed else 0)
