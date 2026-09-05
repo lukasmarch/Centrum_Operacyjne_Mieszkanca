@@ -847,8 +847,18 @@ surowym `strftime` na UTC, a obok, w bloku SPORT, ten sam bieg miał poprawne
   publikacji skrótu sesji, data repertuaru. Limit pytań AI liczył **anonimowych po
   dacie lokalnej, a zalogowanych po dobie UTC** — między północą a 2:00 jedni mieli
   nowy dzień, drudzy stary
+- **Czwarta postać, znaleziona przy okazji: `date_start` briefingu pełnił DWIE
+  role** — klucz dnia w `daily_summaries` I granicę okna materiału. Klucz jest
+  poprawny jako północ UTC (etykieta dnia jak `session_date`; wisi na nim unikat
+  kolumny rozstrzygający, czy przebieg z 13:30 NADPISUJE poranny wiersz, oraz
+  `strptime` w `/api/summary/daily/{date}` i 186 wierszy) — **nie ruszać**.
+  Zepsuty był drugi użytek: `_fetch_articles` filtruje `event_at >= window_start`,
+  więc artykuł zapowiadający DZISIEJSZE wydarzenie całodniowe wypadał z materiału.
+  Okno wydzielone do `_material_window` (doba lokalna, przycięta do „teraz").
+  ⚠️ Pomiar 5.09: fallback chudego dnia (<10 artykułów) maskował to losowo —
+  19 dni na 30 miało taki wpis, **17 z nich było zbyt obfitych, by fallback pomógł**
 - Testy: `test_timezone_guard`, `test_event_terms` sekcja 5 (16 sprawdzeń na
-  prawdziwym rekordzie biegu), `test_summary_headline` 36
+  prawdziwym rekordzie biegu), `test_summary_headline` 36 + 9 (okno vs klucz)
 
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
@@ -876,18 +886,12 @@ surowym `strftime` na UTC, a obok, w bloku SPORT, ten sam bieg miał poprawne
       --days 7`), potem dopiero decyzja o GA4
 - [ ] Cztery sierpniowe konta (id 8–11) zadały łącznie **1 pytanie** agentowi i żadne
       nie ma zgody push. To retencja, nie pozyskanie — ale co naprawiać, powie dopiero pomiar
-- [ ] **`date_start` w briefingu pełni DWIE role naraz** — jest kluczem dnia
-      w `daily_summaries` I granicą okna materiału (`_fetch_articles`). Klucz jest
-      poprawny jako północ UTC (etykieta dnia, jak `session_date`; 186 wierszy,
-      unikat na kolumnie, `/api/summary/daily/{date}` parsuje `strptime`) — zepsuty
-      jest tylko drugi użytek. **Pomiar 5.09 na prodzie: artykuł zapowiadający
-      DZISIEJSZE wydarzenie całodniowe wypada z materiału** (`event_at >= window_start`,
-      a wpis stoi na 22:00 dnia poprzedniego): okno UTC dało 7 artykułów bez biegu,
-      okno lokalne 9 z biegiem. Ratuje go wyłącznie fallback chudego dnia (<10
-      artykułów) — **przez 30 dni 19 dni miało taki wpis, 17 z nich było „obfitych",
-      więc fallback by NIE zadziałał**. Naprawa = rozdzielić `key_date` (bez zmian)
-      od `window_start/window_end` z `local_day_bounds`; bez migracji i bez ruszania
-      endpointu. Uboczne: znika też luka publikacji 00:00–02:00 (9/607 wpisów, 1 lokalny)
+- [x] ~~`date_start` w briefingu pełnił DWIE role naraz~~ ✅ 5.09 `0594e43` (prod).
+      Klucz dnia ZOSTAJE północą UTC (etykieta dnia, unikat kolumny, `strptime`
+      w `/api/summary/daily/{date}`); okno materiału wydzielone do
+      `_material_window` i liczone `local_day_bounds`. Weryfikacja produkcyjnym
+      kodem na produkcyjnej bazie: okno stare 7 artykułów, nowe 9 — doszedł
+      art. 5618 (zapowiedź biegu NA DZIŚ) i 5826
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
 - [ ] Filtrowanie artykułów po kategoriach
