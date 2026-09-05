@@ -66,6 +66,33 @@ def get_datetime_context() -> str:
     )
 
 
+# Reguła kompletności — dlaczego istnieje i dlaczego stoi TUTAJ.
+#
+# 5.09.2026, pomiar na produkcji: to samo pytanie („napisz szczegóły
+# dzisiejszego nocnego biegu") puszczone przez cztery konfiguracje agenta.
+# W dwóch z nich Przewodnik miał komplet narzędzi — kalendarz ORAZ wyszukiwarkę
+# artykułów — i użył wyłącznie pierwszego. Odpowiedź niosła datę i organizatora,
+# nie niosła miejsca ani godziny, czyli tego, o co pytano. Dołożenie narzędzia
+# nie zmieniło NICZEGO, bo pętla kończy się wtedy, gdy model przestaje wołać
+# narzędzia — a nie wtedy, gdy odpowiedź pokrywa pytanie.
+#
+# To jest różnica między „mam jakiś materiał" a „mam odpowiedź". Kod jej nie
+# rozstrzygnie: tylko model wie, o co pytano. Może natomiast dostać polecenie,
+# żeby zadał sobie to pytanie, zanim zacznie pisać.
+#
+# ⚠️ Stoi tu, a nie w bloku „TWOJE NARZĘDZIA", bo tamten ma twardy limit 2 kB
+# (rozdęty konkuruje o uwagę z materiałem źródłowym) i jest go dziś 1976 B.
+COMPLETENESS = """ZANIM ODPOWIESZ — sprawdź, czy masz to, O CO PYTANO:
+- Wypisz sobie w myśli, czego dotyczyło pytanie (co? gdzie? kiedy? o której?).
+  Jeśli któregoś z tych elementów nie ma w wynikach narzędzi, a mieszkaniec
+  o niego pytał — zawołaj kolejne narzędzie, zanim zaczniesz pisać.
+- Pierwszy niepusty wynik NIE kończy pracy. Kalendarz zna termin, wiadomości
+  znają szczegóły, dokumenty znają procedurę — jedno pytanie często wymaga dwóch.
+- Czego i tak nie znalazłeś, nazwij WPROST („godziny startu nie ma w ogłoszeniu”)
+  i wskaż, gdzie mieszkaniec to sprawdzi. Nie zastępuj brakującego szczegółu
+  ogólnikiem ani własnym domysłem."""
+
+
 def base_context_messages() -> list[dict]:
     """Wiadomości `system`, które dostaje KAŻDY agent, zanim zobaczy KONTEKST.
 
@@ -85,6 +112,9 @@ def base_context_messages() -> list[dict]:
         # a to jest instrukcja, co wolno zrobić z materiałem. Jedna kopia dla
         # wszystkich siedmiu agentów — patrz `services/provenance.py`.
         prov.precedence_message(),
+        # Pochodzenie mówi, CZY wolno użyć materiału. Kompletność — czy materiału
+        # w ogóle WYSTARCZA. Dwie różne bramki, obie przed pisaniem odpowiedzi.
+        {"role": "system", "content": COMPLETENESS},
     ]
 
 

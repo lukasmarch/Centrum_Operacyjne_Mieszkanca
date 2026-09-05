@@ -207,13 +207,33 @@ async def _search(
             except Exception:
                 data = raw_date[:10]
 
-        fragmenty.append({
+        fragment = {
             "tekst": doc["chunk_text"],
             "zrodlo": meta.get("source_name", doc["source_type"]),
             "tytul": meta.get("title", ""),
             "data": data or None,
             "trafnosc": round(doc["similarity"], 2),
-        })
+            # Ile słów z PYTANIA faktycznie pada w tym fragmencie. Podobieństwo
+            # wektora mówi „to jest o czymś podobnym", a nie „to jest o TYM":
+            # 5.09.2026 „nocny bieg organizowany przez Nadleśnictwo" trafiło
+            # w opis biegu charytatywnego spod Ostródy z wynikiem 0,578 i model
+            # podał go jako odpowiedź. Zero trafionych słów przy wysokim
+            # podobieństwie to sygnał „ten sam TEMAT, inna RZECZ".
+            "trafione_slowa": _query_word_hits(query, doc["chunk_text"],
+                                               meta.get("title", "")),
+        }
+        # Zasięg tylko dla artykułów — uchwała i dokument BIP z definicji
+        # dotyczą naszej gminy, a doklejona im etykieta miejsca myliłaby.
+        if doc["source_type"] == "article":
+            # `article_scope`, NIE `is_local_article`: ta druga steruje
+            # rankingiem i jest celowo szeroka, więc jako etykieta kłamie
+            # (24.08: „budowa bloku w Działdowie (gmina Rybno)"). Bez tego pola
+            # fragment z cudzego powiatu docierał do modelu nieodróżnialny od
+            # naszego — i tak właśnie bieg spod Ostródy stał się „naszym".
+            fragment["zasieg"] = article_scope(
+                meta.get("source_name"), meta.get("title", ""), doc["chunk_text"]
+            )
+        fragmenty.append(fragment)
 
         # Kafelki źródeł idą OBOK odpowiedzi, nie przez model — przepisywanie
         # adresu URL było jedynym powodem, dla którego mógłby go przekręcić.
@@ -228,11 +248,53 @@ async def _search(
                 "similarity": doc["similarity"],
             })
 
+    tresc = {"czego_szukano": query, "fragmenty": fragmenty}
+
+    # Ostrzeżenie liczy KOD, bo to reguła sprawdzalna kodem — ten sam wzorzec
+    # co `ground_categorization` i `ground_event`. Gdy ŻADEN fragment nie niesie
+    # ani jednego słowa z pytania, wyszukiwarka oddała rzeczy o podobnym
+    # temacie, a nie o tej sprawie. Model bez tego zdania czyta wysoką
+    # „trafnosc" jako potwierdzenie i pisze o cudzym wydarzeniu w czasie
+    # teraźniejszym (5.09.2026).
+    if fragmenty and not any(f["trafione_slowa"] for f in fragmenty):
+        tresc["uwaga_dopasowanie"] = (
+            "ŻADEN fragment nie zawiera słów z pytania — to są teksty o podobnym "
+            "TEMACIE, niekoniecznie o tej sprawie. Zanim odpowiesz, zawołaj "
+            "wyszukiwarkę jeszcze raz z inaczej sformułowanym zapytaniem (sama "
+            "nazwa własna). Jeśli i to nie pomoże, powiedz wprost, że nie masz "
+            "materiału o tej konkretnej sprawie — i NIE przedstawiaj tych "
+            "fragmentów jako odpowiedzi."
+        )
+
     return ToolResult(
-        content={"czego_szukano": query, "fragmenty": fragmenty},
+        content=tresc,
         sources=sources,
         summary=f"{len(fragmenty)} {czego_szukam}",
     )
+
+
+# Ile znaków rdzenia porównujemy i od jakiej długości słowo w ogóle się liczy.
+# Krótkie słowa („na", „czy", „jest") są w każdym tekście i nic nie rozstrzygają.
+_MIN_QUERY_WORD = 4
+
+
+def _query_word_hits(query: str, *texts: str) -> int:
+    """Ile RÓŻNYCH słów z pytania pada w tekście — po rdzeniu, nie dosłownie.
+
+    Rdzeń, bo mieszkaniec pyta „o biegu", a tytuł mówi „Bieg". Ta sama funkcja
+    `word_stem` co w rejestrze uchwał i w kalendarzu — jedno miejsce na
+    obcinanie polskiej końcówki.
+    """
+    haystack = " ".join(t or "" for t in texts).lower()
+    trafione = {
+        stem for stem in (
+            word_stem(w.strip(".,!?„”\"'()"))
+            for w in (query or "").lower().split()
+            if len(w) >= _MIN_QUERY_WORD
+        )
+        if stem and stem in haystack
+    }
+    return len(trafione)
 
 
 async def search_news(ctx: ToolContext, query: str) -> ToolResult:
