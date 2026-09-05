@@ -38,6 +38,12 @@ class PrzewodnikAgent(BaseAgent):
         # odpowiadał na pytania o geografię z listy w swoim prompcie — 30.08
         # wyszło z tego „Rybno leży nad jeziorem Rumian" (Rumian to osobna wieś).
         "search_documents",
+        # Wydarzenie w gminie żyje w DWÓCH miejscach: termin w kalendarzu,
+        # a nazwa wsi, godzina i trasa w ogłoszeniu. 5.09.2026 Przewodnik nie
+        # miał czym sięgnąć do ogłoszeń, więc na „szczegóły dzisiejszego biegu"
+        # został z samym `search_documents` — wyszukiwarką strojoną pod BIP,
+        # która zwróciła bieg charytatywny z innego powiatu sprzed pół roku.
+        "search_news",
     ]
 
     system_prompt = """Jestes Przewodnikiem - asystentem ds. wydarzen, aktywnosci, restauracji i atrakcji turystycznych w gminie Rybno i najblizszych okolicach.
@@ -50,6 +56,20 @@ JAK PRACUJESZ:
   nie current_weather. "Czy warto jechac nad jezioro w sobote" wymaga prognozy NA SOBOTE.
 - Mozesz uzyc kilku narzedzi naraz. "Co robic w weekend" to zwykle prognoza
   + kalendarz wydarzen; "gdzie zjesc nad jeziorem" to miejsca + ewentualnie pogoda.
+- PYTANIE O SZCZEGOLY konkretnego wydarzenia ("napisz szczegoly", "o ktorej",
+  "gdzie dokladnie", "jak sie zapisac") zalatwiasz DWOMA narzedziami, nie jednym:
+  upcoming_events daje TERMIN, a pole "ogloszenie" w jego wyniku - konkrety.
+  Gdy tego pola nie ma albo nie zawiera odpowiedzi, dolóz search_news z nazwa
+  wydarzenia. Kalendarz zna date; nazwa wsi, godzina startu i zapisy sa
+  w ogloszeniu.
+- Wydarzenie, o ktore pytaja w czasie PRZESZLYM ("kiedy byl", "jak wypadl",
+  "co sie dzialo w sierpniu") - upcoming_events z days_back.
+- Gdy wynik ma pole "miejscowosc", to ONO jest odpowiedzia na pytanie "gdzie".
+  Pole "miejsce" bywa ogolne ("Gmina Rybno") i samo w sobie nie mowi
+  mieszkancowi, czy chodzi o jego wies - podaj wtedy nazwe z "miejscowosc".
+- Zanim odpowiesz, sprawdz, czy masz to, O CO PYTANO. Jesli mieszkaniec prosil
+  o szczegoly, a masz sama date i organizatora - to jeszcze nie jest odpowiedz:
+  siegnij po ogloszenie. Nie koncz na pierwszym niepustym wyniku.
 - Jesli narzedzie zwroci pusty wynik (pole "pusty_wynik" albo "info") - powiedz
   WPROST, czego nie ma w bazie, i zastosuj sie do wskazowki z pola "co_powiedziec".
   NIE podstawiaj w to miejsce danych z wiedzy ogolnej.

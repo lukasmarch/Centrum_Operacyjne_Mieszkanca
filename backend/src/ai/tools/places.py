@@ -23,11 +23,12 @@ Test: `cd backend && python -m scripts.test_agent_tools`
 from datetime import timedelta
 from typing import Optional
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Event
+from src.services.alert_policy import norm_place, places_in
 from src.services.feed_policy import time_label, visible_event_conditions, word_stem
 from src.services.time_span import to_local
 from src.utils.logger import setup_logger
@@ -47,12 +48,21 @@ async def upcoming_events(
     ctx: ToolContext,
     days: int = 14,
     query: Optional[str] = None,
+    days_back: int = 0,
 ) -> ToolResult:
-    """Nadchodzące wydarzenia z kalendarza gminy."""
+    """Wydarzenia z kalendarza gminy — domyślnie nadchodzące, na żądanie wstecz."""
     try:
         days = max(1, min(int(days), 60))
     except (TypeError, ValueError):
         days = 14
+    # Okno wstecz istnieje, bo kalendarz był ślepy na własną przeszłość:
+    # 5.09.2026 z 1180 wydarzeń w bazie agent widział 7 (0,6%). Pytanie „kiedy
+    # był ten bieg" albo „co się działo w sierpniu" nie miało ŻADNEGO narzędzia
+    # — a wydarzenie leżało w bazie z datą, miejscem i organizatorem.
+    try:
+        days_back = max(0, min(int(days_back or 0), 365))
+    except (TypeError, ValueError):
+        days_back = 0
 
     # Pula kandydatów rośnie, gdy model o coś PYTA. Bez tego zawężenie było
     # pozorne: 25.08.2026 na pytanie „czy gmina planuje spotkania z mieszkańcami
@@ -68,15 +78,24 @@ async def upcoming_events(
     # istnieć dla agenta o 00:01 w dniu, w którym się odbywała — na pytanie
     # „co się dziś dzieje w gminie" nie miał jej jak wymienić.
     day_start, _ = local_day_bounds(now=ctx.now)
+    okno_od = day_start - timedelta(days=days_back)
     stmt = (
         select(Event)
-        .where(Event.event_date >= day_start)
+        .where(Event.event_date >= okno_od)
         .where(Event.event_date <= ctx.now + timedelta(days=days))
         .where(*visible_event_conditions(Event))
-        .order_by(Event.event_date.asc())
+        # Przy patrzeniu wstecz interesuje nas to, co NAJBLIŻSZE dziś, a nie
+        # najstarsze w oknie — inaczej limit puli oddawałby początek sierpnia
+        # przy pytaniu o zeszły tydzień.
+        .order_by(
+            func.abs(func.extract("epoch", Event.event_date - ctx.now)).asc()
+            if days_back else Event.event_date.asc()
+        )
         .limit(pool)
     )
     rows = list((await ctx.session.execute(stmt)).scalars().all())
+    if days_back:
+        rows.sort(key=lambda e: e.event_date or ctx.now)
 
     if query:
         # Zawężenie po słowach robimy PO pobraniu — kalendarz gminy liczy
@@ -114,18 +133,31 @@ async def upcoming_events(
             content={
                 "info": f"Brak wydarzeń w kalendarzu na najbliższe {days} dni.",
                 "co_powiedziec": (
-                    "Powiedz wprost, że kalendarz jest pusty w tym oknie. "
-                    "Możesz zaproponować stałe aktywności okolicy, ale NIE "
-                    "wymyślaj konkretnych imprez ani dat."
+                    "To NIE jest jeszcze odpowiedź — kalendarz zna tylko "
+                    "wydarzenia wyłuskane z ogłoszeń i bywa niekompletny. "
+                    "SZUKAJ DALEJ, zanim cokolwiek napiszesz:\n"
+                    "1. search_news z nazwą wydarzenia — ogłoszenie o imprezie "
+                    "prawie zawsze jest w wiadomościach, nawet gdy nie ma jej "
+                    "w kalendarzu;\n"
+                    "2. jeśli pytanie dotyczy czegoś, co JUŻ BYŁO — zawołaj to "
+                    "narzędzie jeszcze raz z days_back;\n"
+                    "3. jeśli mieszkaniec podał nazwę własną, spróbuj jej samej, "
+                    "bez slów opisowych.\n"
+                    "Dopiero gdy TO wszystko wróci puste, powiedz wprost, że nic "
+                    "o tym nie masz. NIE wymyślaj imprez ani dat i nie zbywaj "
+                    "mieszkańca propozycją stałych aktywności zamiast odpowiedzi."
                 ),
             },
             empty=True,
             summary=f"kalendarz pusty w oknie {days} dni",
         )
 
-    wydarzenia = []
-    for ev in rows[:MAX_EVENTS]:
-        wydarzenia.append({
+    wybrane = rows[:MAX_EVENTS]
+    ogloszenia = await _source_announcements(ctx, wybrane)
+
+    wydarzenia, sources = [], []
+    for ev in wybrane:
+        wpis = {
             "tytul": ev.title,
             "kiedy": time_label(None, ev.event_date, None, ctx.now),
             # Czas LOKALNY, jak w `kiedy`. Baza trzyma naiwny UTC, więc surowe
@@ -137,12 +169,80 @@ async def upcoming_events(
             "kategoria": ev.category or "",
             "organizator": ev.organizer or "",
             "opis": (ev.description or "")[:200],
-        })
+        }
+        zrodlo = ogloszenia.get(ev.source_article_id)
+        # Miejscowość rozstrzyga KOD, nie model. Ekstraktor zapisuje w polu
+        # miejsca to, co wyczyta — a wyczytuje często „Gmina Rybno", bo tak
+        # mówi zdanie wstępne ogłoszenia. Mieszkańca to nie prowadzi nigdzie:
+        # gmina ma 22 miejscowości. Nazwa wsi stoi zwykle w TYTULE („…w
+        # Kopaniarzach”), a listę odmian trzyma `alert_policy` — jedna w projekcie.
+        wsie = places_in(ev.title, f"{ev.location or ''} {zrodlo['tekst'] if zrodlo else ''}")
+        if wsie and norm_place(ev.location or "") not in {norm_place(w) for w in wsie}:
+            wpis["miejscowosc"] = ", ".join(wsie)
+        if zrodlo:
+            # Kalendarz jest STRESZCZENIEM ogłoszenia, nie jego zamiennikiem.
+            # 5.09.2026 mieszkaniec pytał o szczegóły biegu, a wydarzenie miało
+            # w polu miejsca „Gmina Rybno" — nazwa wsi (Kopaniarze), godzina
+            # i trasa zostały w ogłoszeniu, którego agent nie miał jak zobaczyć.
+            # Dokładamy je TU, bez drugiego narzędzia i bez rundy modelu.
+            wpis["ogloszenie"] = zrodlo["tekst"]
+            wpis["ogloszenie_zrodlo"] = zrodlo["zrodlo"]
+            if zrodlo["url"]:
+                sources.append({
+                    "type": "article", "id": zrodlo["id"],
+                    "title": zrodlo["tytul"][:200], "url": zrodlo["url"],
+                    "similarity": 1.0,
+                })
+        wydarzenia.append(wpis)
 
+    okno = f"{days} dni w przód"
+    if days_back:
+        okno = f"{days_back} dni wstecz i {days} w przód"
     return ToolResult(
-        content={"okno_dni": days, "wydarzenia": wydarzenia},
-        summary=f"{len(wydarzenia)} wydarzeń w oknie {days} dni",
+        content={"okno": okno, "wydarzenia": wydarzenia},
+        sources=sources,
+        summary=f"{len(wydarzenia)} wydarzeń ({okno})",
     )
+
+
+# Ile treści ogłoszenia dokładamy do jednego wydarzenia. Tyle, żeby zmieściły
+# się konkrety (miejscowość, godzina, dystanse), i nie więcej: dziesięć
+# wydarzeń po pełnym poście wypchnęłoby z kontekstu wszystko inne.
+ANNOUNCEMENT_CHARS = 700
+
+
+async def _source_announcements(ctx: ToolContext, events: list) -> dict:
+    """Ogłoszenia, z których powstały te wydarzenia — po `source_article_id`.
+
+    Jedno zapytanie na całą listę, nie jedno na wydarzenie: `AsyncSession`
+    obsługuje jedną operację naraz, a pętla z zapytaniem w środku to dziesięć
+    rund tam i z powrotem po dane, które da się wziąć naraz.
+    """
+    ids = [e.source_article_id for e in events if e.source_article_id]
+    if not ids:
+        return {}
+    from src.database.schema import Article, Source
+
+    rows = (await ctx.session.execute(
+        select(Article.id, Article.title, Article.display_title, Article.content,
+               Article.summary, Article.url, Source.name)
+        .join(Source, Article.source_id == Source.id, isouter=True)
+        .where(Article.id.in_(ids))
+    )).all()
+
+    out = {}
+    for aid, title, display_title, content, summary, url, source_name in rows:
+        tekst = (content or summary or "").strip()
+        if len(tekst) > ANNOUNCEMENT_CHARS:
+            tekst = tekst[:ANNOUNCEMENT_CHARS].rstrip() + "…"
+        out[aid] = {
+            "id": aid,
+            "tytul": display_title or title or "",
+            "tekst": tekst,
+            "url": url or "",
+            "zrodlo": source_name or "",
+        }
+    return out
 
 
 async def local_places(
@@ -199,9 +299,13 @@ async def local_places(
                     f"Brak miejsc w bazie dla kategorii: {category or 'wszystkie'}."
                 ),
                 "co_powiedziec": (
-                    "Powiedz, czego nie masz w bazie. Możesz podać ogólną wiedzę "
-                    "o okolicy (Rybno, Działdowo, Lidzbark, Welski Park "
-                    "Krajobrazowy), ale zaznacz, że to nie jest sprawdzona lista."
+                    "Baza miejsc jest niepełna z założenia — to nie znaczy, że "
+                    "takiego miejsca nie ma. Zanim odpowiesz: nowo otwarty lokal "
+                    "albo obiekt bywa opisany w wiadomościach, więc spróbuj "
+                    "search_news z jego nazwą lub rodzajem. Dopiero potem powiedz, "
+                    "czego nie masz w bazie. Ogólną wiedzę o okolicy (Rybno, "
+                    "Działdowo, Lidzbark, Welski Park Krajobrazowy) wolno podać, "
+                    "ale zaznacz, że to nie jest sprawdzona lista."
                 ),
             },
             empty=True,
@@ -231,18 +335,22 @@ register(Tool(
     name="upcoming_events",
     provenance=prov.MEDIA,
     description=(
-        "Wydarzenia zaplanowane w gminie Rybno i okolicy: festyny, koncerty, "
-        "zawody, zebrania, imprezy dla dzieci. Zwraca datę, miejsce i organizatora. "
+        "Kalendarz wydarzeń gminy Rybno i okolicy: festyny, koncerty, zawody, "
+        "zebrania, posiedzenia Rady, imprezy dla dzieci. Zwraca datę, miejsce, "
+        "organizatora ORAZ fragment ogłoszenia źródłowego, w którym są szczegóły "
+        "(nazwa wsi, godzina startu, zapisy) — kalendarz sam ich nie przechowuje, "
+        "więc przy pytaniu o szczegóły odpowiadaj z pola `ogloszenie`. "
         "Użyj przy pytaniu: co się dzieje, co robić w weekend, jakie imprezy, "
-        "czy coś się szykuje."
+        "czy coś się szykuje, a z `days_back` także: kiedy to było, co się działo "
+        "w zeszłym tygodniu."
     ),
-    short="kalendarz wydarzeń w gminie (do 60 dni w przód)",
+    short="kalendarz wydarzeń gminy (wstecz i w przód) wraz z ogłoszeniem źródłowym",
     parameters={
         "type": "object",
         "properties": {
             "days": {
                 "type": "integer",
-                "description": "Okno w dniach, 1-60. Domyślnie 14. Na pytanie "
+                "description": "Okno W PRZÓD w dniach, 1-60. Domyślnie 14. Na pytanie "
                                "o weekend użyj 7, o miesiąc — 30.",
                 "minimum": 1, "maximum": 60,
             },
@@ -250,6 +358,17 @@ register(Tool(
                 "type": "string",
                 "description": "Opcjonalne słowo zawężające, np. „dożynki”, "
                                "„sesja rady”, „dla dzieci”.",
+            },
+            "days_back": {
+                "type": "integer",
+                "description": (
+                    "Okno WSTECZ w dniach, 0-365. Domyślnie 0 — sam kalendarz "
+                    "na przyszłość. Podaj, gdy pytanie dotyczy tego, co JUŻ BYŁO "
+                    "(„kiedy był ten bieg”, „co się działo w sierpniu”): 7 dla "
+                    "zeszłego tygodnia, 31 dla zeszłego miesiąca. Wydarzenie, "
+                    "które odbywa się DZIŚ, widać bez tego parametru."
+                ),
+                "minimum": 0, "maximum": 365,
             },
         },
         "required": [],
