@@ -29,7 +29,9 @@ from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Event
 from src.services.alert_policy import norm_place, places_in
-from src.services.feed_policy import time_label, visible_event_conditions, word_stem
+from src.services.feed_policy import (
+    is_truncated, time_label, visible_event_conditions, word_stem,
+)
 from src.services.time_span import to_local
 from src.utils.logger import setup_logger
 from src.services.time_span import local_day_bounds
@@ -187,6 +189,16 @@ async def upcoming_events(
             # Dokładamy je TU, bez drugiego narzędzia i bez rundy modelu.
             wpis["ogloszenie"] = zrodlo["tekst"]
             wpis["ogloszenie_zrodlo"] = zrodlo["zrodlo"]
+            if zrodlo["urwane"]:
+                # Bez tego zdania model czyta wypis jak całość i milczy o tym,
+                # że reszta istnieje. Mieszkaniec pytający o godzinę startu ma
+                # usłyszeć, że jej u nas nie ma i gdzie ją znajdzie — a nie
+                # dostać odpowiedź, z której wynika, że ogłoszenie jej nie zawiera.
+                wpis["ogloszenie_urwane"] = (
+                    "To WYPIS, nie całe ogłoszenie — pełna treść jest u źródła. "
+                    "Jeśli brakuje w nim szczegółu, o który pytano, powiedz to "
+                    "wprost i odeślij do oryginału."
+                )
             if zrodlo["url"]:
                 sources.append({
                     "type": "article", "id": zrodlo["id"],
@@ -233,14 +245,17 @@ async def _source_announcements(ctx: ToolContext, events: list) -> dict:
     out = {}
     for aid, title, display_title, content, summary, url, source_name in rows:
         tekst = (content or summary or "").strip()
+        urwane = is_truncated(tekst)
         if len(tekst) > ANNOUNCEMENT_CHARS:
             tekst = tekst[:ANNOUNCEMENT_CHARS].rstrip() + "…"
+            urwane = True
         out[aid] = {
             "id": aid,
             "tytul": display_title or title or "",
             "tekst": tekst,
             "url": url or "",
             "zrodlo": source_name or "",
+            "urwane": urwane,
         }
     return out
 

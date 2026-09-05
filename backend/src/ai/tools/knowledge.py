@@ -61,6 +61,7 @@ from src.services.feed_policy import (
     article_scope,
     collapse_duplicates,
     dedup_text,
+    is_truncated,
     publishable_conditions,
     time_label,
 )
@@ -222,6 +223,12 @@ async def _search(
             "trafione_slowa": _query_word_hits(query, doc["chunk_text"],
                                                meta.get("title", "")),
         }
+        # Wypis z Facebooka kończy się na 300 znakach (decyzja prawna, patrz
+        # `feed_policy.is_truncated`). Model, który tego nie wie, czyta urwane
+        # ogłoszenie jak komplet i nie mówi mieszkańcowi, że reszta jest
+        # u źródła — a to jedyna uczciwa odpowiedź, gdy szczegółu nie mamy.
+        if is_truncated(doc["chunk_text"]):
+            fragment["urwany"] = True
         # Zasięg tylko dla artykułów — uchwała i dokument BIP z definicji
         # dotyczą naszej gminy, a doklejona im etykieta miejsca myliłaby.
         if doc["source_type"] == "article":

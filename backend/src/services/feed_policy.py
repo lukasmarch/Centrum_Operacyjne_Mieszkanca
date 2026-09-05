@@ -845,6 +845,35 @@ def _similarity(a: frozenset[str], b: frozenset[str]) -> float:
     return len(a & b) / len(a | b)
 
 
+# Ślady po tym, że NIE MAMY całego tekstu źródła. Dwa różne powody, jeden skutek.
+#
+# 1. Post z Facebooka trzymamy jako wskaźnik: nagłówek + 300 znaków + odnośnik
+#    (`scrapers/apify_facebook.make_social_snippet`). To decyzja prawna — prawo
+#    autorskie i RODO — a nie niedoróbka, więc jej tu nie obchodzimy. Skutek jest
+#    jednak dotkliwy i zmierzony: 5.09.2026 mieszkaniec pytał o szczegóły biegu,
+#    a post gminy urywa się dokładnie na „⏰ Godzina…”. Z 246 wpisów Syli
+#    z 30 dni urwanych jest 193, z 12 wpisów gminy — 11.
+# 2. Wielokropek na końcu bywa też dziełem samego źródła (skrót RSS).
+#
+# ⚠️ Sprawdziliśmy, czy da się to obejść dociągnięciem strony: NIE DA SIĘ.
+#    Facebook oddaje serwerowi skorupę bez treści posta, a strona powiatu z tym
+#    samym ogłoszeniem ma 480 znaków tekstu i żadnego konkretu. Skoro brakującej
+#    informacji nie sposób zdobyć, jedyną uczciwą odpowiedzią jest powiedzieć,
+#    że jej nie mamy, i wskazać oryginał — a do tego model musi WIEDZIEĆ,
+#    że czyta wypis, nie całość.
+_TRUNCATION_MARKS = ("pełna treść u źródła", "pelna tresc u zrodla")
+
+
+def is_truncated(text: Optional[str]) -> bool:
+    """Czy ten tekst jest WYPISEM, a nie całym materiałem źródła."""
+    if not text:
+        return False
+    lowered = text.strip().lower()
+    if any(mark in lowered for mark in _TRUNCATION_MARKS):
+        return True
+    return lowered.endswith("…") or lowered.endswith("...")
+
+
 def dedup_text(article) -> str:
     """
     Materiał wpisu w postaci, w jakiej porównujemy go z innymi.
