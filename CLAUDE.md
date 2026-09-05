@@ -801,6 +801,55 @@ Feed i briefing zadawały te same pytania własnymi, niepełnymi kopiami.
 - Testy: `test_summary_headline` 36, `test_alert_policy` 46, `test_content_score` 17,
   `test_event_terms` 27 (sekcja 4 nowa)
 
+## Warstwa czasu: doba lokalna i wpis całodniowy (2026-09-05)
+**Jeden rekord, dwa przeciwne objawy, dwa dni z rzędu.** „VI Leśny Nocny Bieg",
+sobota 5.09, ogłoszony bez godziny (post urwał się na „⏰ Godzina…"), więc w bazie
+stoi jako `2026-09-04 22:00` — **lokalna północ**. W piątek briefing napisał
+„**Dziś** odbędzie się", w sobotę — w dniu biegu — wpis **zniknął z kalendarza**.
+Model nie zawinił: blok „NADCHODZĄCE WYDARZENIA" podał mu `Data: 2026-09-04`
+surowym `strftime` na UTC, a obok, w bloku SPORT, ten sam bieg miał poprawne
+„[ZDARZENIE jutro]" — materiał był **wewnętrznie sprzeczny**.
+
+**Cała wiedza o czasie mieszka w `services/time_span.py`** — było pięć kopii
+`_local` i sześć własnych sposobów na „dzisiejszą dobę":
+- `local_day_bounds(day, now, days)` — granice doby LOKALNEJ w naiwnym UTC.
+  ⚠️ Koniec liczony z lokalnej północy, **nie** przez `+timedelta` do granicy UTC:
+  w noc zmiany czasu (26.10) doba ma 23 albo 25 godzin
+- `is_all_day(start, end)` — lokalna 00:00 bez końca. Ta sama reguła co
+  `frontend/src/utils/eventTime.ts::isAllDay` i `summary._event_is_over`
+- `when_label(start, end, now, all_day=True)` — RDZEŃ „kiedy": „jutro (cały dzień)",
+  „dziś 09:00–14:00", „16.09 08:00". Ozdobniki („TRWA TERAZ", „JUŻ PO", „AWARIA
+  SPRZED DOBY") dokłada wołający — `feed_policy.time_label` i `summary._time_label`
+  stoją na tym samym rdzeniu, każdy w swoim brzmieniu.
+  ⚠️ `all_day=False` dla PUBLIKACJI: wpis wydany o lokalnej północy ukazał się
+  o 00:00, a nie „przez cały dzień"
+
+**Trzy postacie tego samego błędu** — trzecią znalazł dopiero strażnik:
+| Wzorzec | Skutek |
+|---|---|
+| `event_date.strftime(...)` bez konwersji | briefing „dziś" o jutrzejszym biegu; plakietka „4 wrz" w mailu |
+| `utcnow().replace(hour=0)` | kalendarz gubił wpis w dniu wydarzenia; mail „Dziś w okolicy" o jutrzejszym |
+| `event_date >= now` | zapowiedź całodniowa istniała **jedną minutę** — `upcoming_events`, świeży feed Redaktora, tygodnik |
+
+- **Strażnik: `python -m scripts.test_timezone_guard`** — skanuje `src/` na te trzy
+  wzorce. Wyjątek zapisuje się dopiskiem **`# tz-ok: <powód>`** przy linii (albo
+  w komentarzu nad nią), NIE listą w teście — lista rozjeżdża się przy pierwszym
+  przeniesieniu kodu. Cztery takie miejsca: data przed `to_utc` w ekstraktorze,
+  klucz dnia w `daily_summaries` (×2), log diagnostyczny
+- ⚠️ **Data kalendarzowa ≠ moment**: `session_date` sesji Rady i `DailySummary.date`
+  to identyfikatory DNIA, nie chwile — konwersja by je zepsuła. Poza zakresem strażnika
+- ⚠️ Karencja `event_at >= now - timedelta(days=1)` w `publishable_conditions` jest
+  **poprawna** — strażnik celuje w GOŁE „teraz" (lookahead na działanie za `now`)
+- **Kontener ma `TZ=Europe/Warsaw`**, więc `datetime.now()` (waste, proactive, agenci)
+  jest lokalne i poprawne. Pułapką jest wyłącznie `utcnow()` z bazy
+- Przy okazji, ta sama klasa: godzina pomiaru powietrza podawana agentowi jako UTC
+  (widget obok pokazywał inną liczbę), godzina zgłoszenia w mailu do redakcji, data
+  publikacji skrótu sesji, data repertuaru. Limit pytań AI liczył **anonimowych po
+  dacie lokalnej, a zalogowanych po dobie UTC** — między północą a 2:00 jedni mieli
+  nowy dzień, drudzy stary
+- Testy: `test_timezone_guard`, `test_event_terms` sekcja 5 (16 sprawdzeń na
+  prawdziwym rekordzie biegu), `test_summary_headline` 36
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
@@ -827,6 +876,9 @@ Feed i briefing zadawały te same pytania własnymi, niepełnymi kopiami.
       --days 7`), potem dopiero decyzja o GA4
 - [ ] Cztery sierpniowe konta (id 8–11) zadały łącznie **1 pytanie** agentowi i żadne
       nie ma zgody push. To retencja, nie pozyskanie — ale co naprawiać, powie dopiero pomiar
+- [ ] `daily_summaries.date` to klucz dnia liczony w UTC (`# tz-ok` w kodzie) —
+      rozdzielenie klucza od okna materiału to osobna praca; dziś okno artykułów
+      briefingu zaczyna się o 2:00 lokalnego czasu
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
 - [ ] Filtrowanie artykułów po kategoriach
@@ -883,4 +935,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-09-03*
+*Ostatnia aktualizacja: 2026-09-05*
