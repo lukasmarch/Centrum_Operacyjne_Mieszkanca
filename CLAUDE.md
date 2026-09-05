@@ -929,6 +929,28 @@ odpowiedziałoby na to pytanie.
   i streszczenie RSS. Ich strony są osiągalne z serwera (200), więc to do
   odzyskania; BIP nadal oddaje serwerowi 403
 
+**Lista awarii brała 20 PRZYPADKOWYCH wierszy.** `active_alerts` miało `.limit(20)`
+bez `ORDER BY`, więc ranking `_distance` porządkował przypadkową próbkę. 5.09 na
+„czy są jakieś awarie w gminie Rybno" agent wymienił Narodowe Czytanie i mecze
+Delfina, a pominął zablokowaną drogę do Truszczyn (kategoria „Awaria", zgłoszona
+poprzedniego wieczoru). Ta sama klasa błędu co `ORDER BY adopted_at` przy remisie.
+- Sortowanie po `coalesce(event_at, published_at) DESC`, pula 40 → do wyniku 10
+- **`czy_awaria`** (`incident_of` LUB kategoria „Awaria") — liczniki obejmują
+  wyłącznie awarie. Drugie ramię zapytania wciąga dożynki i spływ kajakowy, więc
+  `w_gminie_rybno` liczyło je razem z wyłączeniami prądu; model widział w tych
+  trzech mecz i czytanie i zaprzeczał własnym licznikom. ⚠️ To MARKER, nie bramka:
+  `incident_of` NIE rozpoznaje „DROGA ZABLOKOWANA" i jako bramka wycięłaby
+  dokładnie to zdarzenie
+- Prompt dostał regułę symetryczną: `w_gminie_rybno > 0` → NIE WOLNO zacząć od
+  „w gminie Rybno nie ma awarii"
+- ⚠️ **Dwie usterki były w WYROCZNI, nie w agencie**: `DENIAL` bez `\b` czytał
+  „obec**nie występuje** jedna awaria" jako zaprzeczenie, a poprawna odpowiedź
+  kończy zdaniem „nie ma zapowiedzianych wyłączeń" (licznik = 0, prompt tego
+  wymaga) — stąd węższy `DENIAL_AWARIE`. Przypadek `awarie` z TODO był czerwony
+  przy odpowiedzi bez zarzutu. **Zanim uznasz agenta za winnego, sprawdź wzorzec**
+- Pomiar: 6/6 przebiegów wymienia drogę jako pierwszą pozycję.
+  `test_agent_answers` z modelem: **14 OK, 0 błędnych**
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
