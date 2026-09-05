@@ -42,6 +42,109 @@ def to_local(utc_naive: datetime) -> datetime:
     return utc_naive.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ).replace(tzinfo=None)
 
 
+# ── Doba, całodniowość i etykieta „kiedy" ───────────────────────────────────
+#
+# Trzy pytania, które w całym projekcie zadawano ośmioma własnymi kopiami —
+# i połowa kopii gubiła strefę. 4.09.2026 briefing napisał „Dziś odbędzie się
+# VI Leśny Nocny Bieg" o biegu, który był 5.09, a nazajutrz ten sam wpis znikł
+# z kalendarza w dniu, w którym się odbywał. Jeden rekord, jeden błąd, dwa
+# przeciwne objawy: `event_date` wydarzenia całodniowego stoi jako 22:00 UTC
+# dnia POPRZEDNIEGO, bo to lokalna północ.
+#
+# Reguła: kto porównuje albo pokazuje datę z bazy, woła stąd. Pilnuje tego
+# `scripts/test_timezone_guard.py`.
+
+_DAY_WORDS = {-1: "wczoraj", 0: "dziś", 1: "jutro", 2: "pojutrze"}
+
+
+def local_now(now: Optional[datetime] = None) -> datetime:
+    """Teraz w czasie lokalnym (naiwny). `now` — naiwny UTC, jak wszędzie."""
+    return to_local(now or datetime.utcnow())
+
+
+def local_day_bounds(
+    day: Optional[datetime] = None,
+    *,
+    now: Optional[datetime] = None,
+    days: int = 1,
+) -> tuple[datetime, datetime]:
+    """
+    Granice lokalnej doby wyrażone w naiwnym UTC — takim, jaki stoi w bazie.
+
+    `day` to dzień lokalny (data albo `datetime`, godzina bez znaczenia);
+    domyślnie dzisiejszy, liczony z `now`. `days` rozszerza okno na kolejne
+    doby: koniec to lokalna północ dnia `day + days`.
+
+    ⚠️ Koniec liczy się z lokalnej północy, a NIE przez dodanie
+    `timedelta(days=N)` do granicy UTC. W nocy zmiany czasu (26.10.2026)
+    doba lokalna ma 23 albo 25 godzin i dodawanie stałej rozjeżdża okno.
+
+    Do 5.09.2026 sześć miejsc liczyło dobę jako `utcnow().replace(hour=0)`.
+    Skutek był dwustronny: wydarzenie całodniowe JUTRZEJSZE wpadało do okna
+    „dziś" (mail „Dziś w okolicy" o 7:15), a DZISIEJSZE z niego wypadało
+    (kalendarz `/api/events` i blok wydarzeń briefingu).
+    """
+    base = to_local(now or datetime.utcnow()) if day is None else day
+    start_local = datetime(base.year, base.month, base.day)
+    end_local = start_local + timedelta(days=days)
+    return to_utc(start_local), to_utc(end_local)
+
+
+def is_all_day(start: Optional[datetime], end: Optional[datetime] = None) -> bool:
+    """
+    Czy to zapowiedź BEZ godziny — w bazie zapisana jako lokalna północ.
+
+    Tak zapisuje termin bez godziny i kategoryzacja (`articles.event_at`),
+    i ekstraktor wydarzeń (`events.event_date`): „dożynki 5 września" nie
+    zaczynają się o północy, tylko trwają całą swoją dobę. Ta sama reguła
+    stoi we froncie (`frontend/src/utils/eventTime.ts::isAllDay`) i w
+    `summary_generator._event_is_over`.
+
+    Podany koniec przeczy całodniowości — źródło znało ramy godzinowe.
+    """
+    if start is None or end is not None:
+        return False
+    local = to_local(start)
+    return (local.hour, local.minute) == (0, 0)
+
+
+def when_label(
+    start: Optional[datetime],
+    end: Optional[datetime] = None,
+    now: Optional[datetime] = None,
+    *,
+    all_day: bool = True,
+) -> str:
+    """
+    Rdzeń etykiety czasu: „dziś (cały dzień)", „jutro 11:00–13:00", „12.09 15:00".
+
+    Sam mówi KIEDY. Co z tego wynika — „TRWA TERAZ", „JUŻ PO", „AWARIA SPRZED
+    DOBY" — dokłada wołający, bo każdy kanał ma własne brzmienie i briefing
+    jest na nie wrażliwy (`feed_policy.time_label`, `summary_generator._time_label`).
+
+    „(cały dzień)" zamiast „00:00" jest tu istotą, nie ozdobą: model dostawał
+    „jutro 00:00" i zapraszał na bieg o północy, choć godziny nikt nie podał.
+
+    `all_day=False` dla znaczników, które opisują CHWILĘ, a nie termin:
+    wpis opublikowany o lokalnej północy ukazał się o 00:00 i tyle — tylko
+    zapowiedź bez godziny znaczy „cały dzień".
+    """
+    if start is None:
+        return "bez daty"
+
+    local_start = to_local(start)
+    offset = (local_start.date() - to_local(now or datetime.utcnow()).date()).days
+    word = _DAY_WORDS.get(offset) or f"{local_start:%d.%m}"
+
+    if all_day and is_all_day(start, end):
+        return f"{word} (cały dzień)"
+
+    span = f"{local_start:%H:%M}"
+    if end is not None:
+        span += f"–{to_local(end):%H:%M}"
+    return f"{word} {span}"
+
+
 def flat(text: Optional[str]) -> str:
     """
     Tekst bez ogonków i wielkości liter. „ł" podmieniane ręcznie — jako jedyna
