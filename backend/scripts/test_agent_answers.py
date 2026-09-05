@@ -67,8 +67,28 @@ MONTHS_PL = [
 # Zdania, którymi model wypiera się wiedzy. To one były treścią awarii z 7.08,
 # więc mają własną nazwę i wracają w kilku przypadkach.
 DENIAL = (
-    r"(nie ma|brak|nie odnotowano|nie wystepuj|nie zarejestrowano|nie planuje)"
+    # ⚠️ `\b` na początku jest KONIECZNE i kosztowało nas fałszywy alarm przez
+    # kilkanaście dni. Bez niego „obecNIE WYSTĘPUJE jedna awaria" — zdanie
+    # dokładnie odwrotne do zaprzeczenia — trafiało we wzorzec `nie wystepuj`,
+    # bo „obecnie występuje" zawiera go jako podłańcuch. Przypadek `awarie`
+    # świecił się na czerwono przy POPRAWNEJ odpowiedzi, a wpis w CLAUDE.md
+    # opisywał to jako wadę agenta.
+    r"\b(nie ma|brak|nie odnotowano|nie wystepuj|nie zarejestrowano|nie planuje)"
     r"[^.]{0,70}(awari|wylacze|przerw|zglosze|utrudnie|ostrzez)"
+)
+
+# Zaprzeczenie samym AWARIOM — węższe od `DENIAL` i używane tam, gdzie w bazie
+# stoi konkretna awaria, a odpowiedź ma o niej powiedzieć.
+#
+# ⚠️ Po co osobny wzorzec: odpowiedź, która POPRAWNIE wymienia zablokowaną drogę,
+# zwykle kończy zdaniem „nie ma zapowiedzianych wyłączeń" — bo licznik
+# `zapowiedziane` wynosi 0 i prompt Strażnika tego wymaga. `DENIAL` łapał to
+# zdanie i wywracał przypadek przy odpowiedzi bez zarzutu (zmierzone: 6/6
+# przebiegów wymieniało awarię jako pierwszą pozycję). Test ma pilnować, czy
+# agent zaprzecza AWARII, a nie czy w ogóle użył słowa „nie ma".
+DENIAL_AWARIE = (
+    r"\b(nie ma|brak|nie odnotowano|nie wystepuj|nie zarejestrowano)"
+    r"[^.]{0,40}awari"
 )
 # „Nie mam aktualnych artykułów, ale ogólnie w gminie…" to ta sama porażka co
 # „nie posiadam danych", tylko lepiej ubrana — wzorzec musi łapać oba.
@@ -470,7 +490,7 @@ async def oracle_any_alert(session: AsyncSession) -> Expect:
     return Expect(
         fact=f"świeża awaria: {item['title'][:60]} (art. {item['id']})",
         must=[("miejscowość zdarzenia", _places_re(places_in(item["title"], item["content"])))],
-        must_not=[("wyparcie się wiedzy o awarii", DENIAL)],
+        must_not=[("wyparcie się wiedzy o awarii", DENIAL_AWARIE)],
     )
 
 

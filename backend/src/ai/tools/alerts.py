@@ -34,6 +34,7 @@ from sqlalchemy import func, or_, select, text
 from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Article, Source
+from src.services.alert_policy import incident_of
 from src.services.feed_policy import article_scope, publishable_conditions, time_label
 from src.utils.logger import setup_logger
 
@@ -102,7 +103,21 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
                 ),
             )
         )
-        .limit(20)
+        # ⚠️ ORDER BY jest tu WARUNKIEM POPRAWNOŚCI, nie kosmetyką. Do 5.09.2026
+        # zapytanie brało 20 wierszy BEZ żadnego porządku, więc Postgres oddawał
+        # dowolne — a ranking `_distance` (poniżej) porządkował już tylko tę
+        # przypadkową próbkę. 5.09 na pytanie „czy są jakieś awarie w gminie
+        # Rybno" wynik zawierał Narodowe Czytanie i mecze Delfina, a NIE
+        # zawierał zablokowanej drogi do Truszczyn (art. 5830, kategoria
+        # „Awaria", zgłoszona poprzedniego wieczoru). Ta sama klasa błędu co
+        # `ORDER BY adopted_at` przy remisie w rejestrze uchwał.
+        #
+        # Sortujemy po TERMINIE zdarzenia, a dla wpisów bez terminu po dacie
+        # zgłoszenia — czyli tym samym kluczem, którym zaraz porządkuje
+        # `_distance`. Pula 40, żeby ranking miał z czego wybierać: do wyniku
+        # i tak wchodzi 10.
+        .order_by(func.coalesce(Article.event_at, Article.published_at).desc())
+        .limit(40)
     )
 
     items = []
@@ -125,6 +140,25 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
             ),
             "opis": article.summary or "",
             "zrodlo": source_name,
+            # Czy to w ogóle AWARIA. Drugie ramię zapytania („cokolwiek
+            # z terminem w oknie 72 h") wciąga do narzędzia o awariach dożynki,
+            # spływ kajakowy i Narodowe Czytanie — a liczniki niżej liczyły je
+            # razem z wyłączeniami prądu. 5.09.2026 mieszkaniec pytający
+            # o awarie usłyszał „w gminie Rybno nie ma żadnych awarii" przy
+            # `w_gminie_rybno = 3`: model widział w tych trzech mecz i czytanie,
+            # więc słusznie nie uznał ich za awarie — i zaprzeczył sam licznikom,
+            # gubiąc przy okazji zablokowaną drogę.
+            #
+            # ⚠️ To MARKER, nie bramka wejściowa. `incident_of` jest zamkniętą
+            # listą dla pusha (prąd/woda/pożar/wypadek/gaz) i NIE rozpoznaje
+            # „DROGA ZABLOKOWANA" — gdyby decydowała o wejściu, wycięłaby
+            # dokładnie to zdarzenie, o które chodzi. Dlatego kategoria z AI
+            # („Awaria") jest równorzędnym dowodem, a odsiew robimy dopiero
+            # na licznikach.
+            "czy_awaria": bool(
+                incident_of(article.title, article.content)
+                or (article.category or "").lower().startswith("awari")
+            ),
             "_distance": abs((stamp - now).total_seconds()),
         })
 
@@ -155,13 +189,18 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
     # Rybna „zapowiedziano przerwy w dostawie prądu": zdarzenie ani nie było
     # zapowiedziane, ani nie dotyczyło jego gminy. To reguła sprawdzalna kodem,
     # więc sprawdza ją kod — tak samo jak `is_local_article` w feedzie.
-    lokalne = sum(1 for i in items if i["zasieg"] == "gmina Rybno")
-    zapowiedziane = sum(1 for i in items if i["rodzaj"] == "zapowiedziane")
-    trwajace = sum(1 for i in items if i["rodzaj"] == "trwa")
+    # Liczniki obejmują WYŁĄCZNIE awarie (`czy_awaria`) — bo o nich jest to
+    # narzędzie i o nie pyta mieszkaniec. Reszta zostaje na liście jako tło:
+    # zapowiedziane wydarzenie z terminem bywa odpowiedzią na „co się dzieje",
+    # ale nie jest awarią i nie może udawać jej w liczbach.
+    awarie = [i for i in items if i["czy_awaria"]]
+    lokalne = sum(1 for i in awarie if i["zasieg"] == "gmina Rybno")
+    zapowiedziane = sum(1 for i in awarie if i["rodzaj"] == "zapowiedziane")
+    trwajace = sum(1 for i in awarie if i["rodzaj"] == "trwa")
 
     content = {
         "w_gminie_rybno": lokalne,
-        "poza_gmina": len(items) - lokalne,
+        "poza_gmina": len(awarie) - lokalne,
         "zapowiedziane": zapowiedziane,
         "trwajace": trwajace,
         "zdarzenia": items,
