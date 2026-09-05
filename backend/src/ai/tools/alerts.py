@@ -81,7 +81,15 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
         select(Article, Source.name)
         .join(Source, Article.source_id == Source.id)
         .where(Article.processed == True)  # noqa: E712
-        .where(*publishable_conditions(Article))
+        # `now` z kontekstu, NIE z zegara. Bez tego argumentu polityka bierze
+        # `datetime.utcnow()` i narzędzie miesza dwa czasy naraz: okna niżej
+        # liczą się od chwili wstrzykniętej, a bramka „zapowiedź po terminie
+        # znika" (ENDED_EVENT_GRACE_H, 3.09.2026) — od teraz. Odtworzenie
+        # awarii z 7.08 przestało wtedy widzieć wyłączenie, którego dotyczy,
+        # więc jedyny test pilnujący tamtej regresji zrobił się czerwony
+        # z powodu, którego nie ma w produkcji. Wstrzykiwany czas jest wart
+        # tyle, ile najsłabsze ogniwo, które go pomija.
+        .where(*publishable_conditions(Article, now=now))
         .where(
             or_(
                 (Article.category == "Awaria")

@@ -92,6 +92,21 @@ check(
     f"blok nie rozdyma promptu ({len(block.encode('utf-8'))} B)",
     "rozdęty blok konkuruje o uwagę modelu z materiałem źródłowym",
 )
+# Reguła pustki (5.09.2026). Trzeci nawrót tej samej porażki: pusty wynik
+# narzędzia kończył rozmowę zdaniem „nie ma”, choć znaczył wyłącznie „nie
+# znalazłem tym narzędziem”. Stoi w JEDNYM miejscu — sprawdzamy, że dociera
+# do każdego agenta, bo w siedmiu promptach nikt by jej nie utrzymał zgodnej.
+check(
+    "„Nie znalazłem” to nie „nie ma”." in block,
+    "blok odróżnia pustkę-odpowiedź od pustki-nieznalezienia",
+    "bez tego agent zamyka sprawę, choć materiał leży w drugim narzędziu",
+)
+for _cls_name, _tools in (("Przewodnik", ["upcoming_events", "search_news"]),
+                          ("Urzędnik", ["search_legal_acts", "council_sessions"])):
+    check(
+        "PUSTY WYNIK" in describe_for(_tools),
+        f"{_cls_name}: reguła pustki jest w jego bloku",
+    )
 check(schemas_for(["nie_ma_takiego"]) == [], "nieznane narzędzie jest pomijane, nie wywala agenta")
 
 

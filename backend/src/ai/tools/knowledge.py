@@ -174,9 +174,20 @@ async def _search(
             content={
                 "info": f"Wyszukiwarka nie znalazła nic na temat: {query}",
                 "co_powiedziec": (
-                    "Powiedz wprost, że nie masz na to materiału w bazie, i dopiero "
-                    "potem odpowiedz z wiedzy ogólnej — zaznaczając, że to wiedza "
-                    "ogólna, a nie dokument gminy. Nie zmyślaj dat, numerów ani kwot."
+                    "To NIE jest jeszcze odpowiedź. Wyszukiwarka pracuje na "
+                    "PODOBIEŃSTWIE, więc pusty wynik znaczy „tak sformułowane "
+                    "pytanie nie trafiło”, a nie „tego nie ma”. Zanim odpowiesz, "
+                    "spróbuj RAZ jeszcze, INACZEJ:\n"
+                    "• sama nazwa własna, bez słów opisowych („VI Leśny Nocny "
+                    "Bieg” zamiast „bieg organizowany przez nadleśnictwo”);\n"
+                    "• język dokumentu zamiast języka mieszkańca;\n"
+                    "• pytanie o to, CO SŁYCHAĆ, załatwia latest_local_news, "
+                    "a numer uchwały — search_legal_acts. Wyszukiwarka nie jest "
+                    "do jednego ani do drugiego.\n"
+                    "Dopiero potem powiedz wprost, że nie masz na to materiału, "
+                    "i ewentualnie odpowiedz z wiedzy ogólnej — zaznaczając, że "
+                    "to wiedza ogólna, a nie dokument gminy. Nie zmyślaj dat, "
+                    "numerów ani kwot."
                 ),
             },
             empty=True,
@@ -258,7 +269,10 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
         select(Article, Source.name)
         .join(Source, Article.source_id == Source.id)
         .where(Article.processed == True)  # noqa: E712
-        .where(*publishable_conditions(Article))
+        # `now` z kontekstu, nie z zegara — ta sama pułapka co w `active_alerts`:
+        # okno liczone od chwili wstrzykniętej, a bramka zakończonych zapowiedzi
+        # od „teraz", dawałyby dwa różne czasy w jednym zapytaniu.
+        .where(*publishable_conditions(Article, now=now))
         # `event_at >= początek dzisiejszej doby`, nie „>= teraz": zapowiedź
         # całodniowa (lokalna północ) wypadała z obu gałęzi warunku w dniu
         # swojego terminu, jeśli ogłoszono ją dawniej niż okno publikacji.
@@ -286,8 +300,13 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
             content={
                 "info": f"Brak wpisów z ostatnich {hours} h.",
                 "co_powiedziec": (
-                    "Powiedz wprost, że w tym oknie czasowym nic nie przyszło. "
-                    "Nie sięgaj po starsze wiadomości udając, że są nowe."
+                    "W tym oknie czasowym nic nie przyszło — i to jest fakt do "
+                    "podania. Ale zanim zakończysz: jeśli mieszkaniec pytał "
+                    "o KONKRETNĄ sprawę, a nie o to, co słychać, zawołaj "
+                    "search_news z jej nazwą — ona szuka w całym archiwum, nie "
+                    "w oknie ostatnich godzin. Możesz też powtórzyć to wywołanie "
+                    "z większym `hours`. Nie sięgaj po starsze wiadomości udając, "
+                    "że są nowe."
                 ),
             },
             empty=True,

@@ -200,6 +200,30 @@ def schemas_for(names: list[str]) -> list[dict]:
     return schemas
 
 
+# Reguła, która obowiązuje KAŻDEGO agenta — dlatego stoi tu, a nie w siedmiu
+# promptach. Powstała po trzecim nawrocie tej samej porażki:
+#
+#   25.08 pusty `council_sessions` kończył się zdaniem „NIE streszczaj obrad
+#         z pamięci" — agent zamknął sprawę, choć termin sesji leżał w dwóch
+#         innych narzędziach;
+#   31.08 Przewodnik po pustym wyniku odpowiadał z własnego promptu;
+#    5.09 pusty kalendarz („nocny bieg") skończył rozmowę zdaniem „nie ma
+#         takiego wydarzenia" — wydarzenie było w bazie, a ogłoszenie o nim
+#         w czterech artykułach.
+#
+# Wspólny mechanizm: wynik narzędzia jest OSTATNIĄ rzeczą, jaką model czyta
+# przed pisaniem, więc bije prompt agenta. Skoro tak, to reguła o pustce też
+# musi być blisko wyniku — i musi rozróżniać dwie pustki, bo mylenie ich jest
+# tu całym błędem.
+EMPTY_RESULT_RULE = (
+    "PUSTY WYNIK: „nie ma awarii/zgłoszeń” JEST odpowiedzią — powiedz i skończ. "
+    "Ale gdy pytano o KONKRETNĄ rzecz, pustka znaczy tylko „nie tym narzędziem "
+    "i nie tak sformułowanym zapytaniem”. Spróbuj wtedy jeszcze raz: inne "
+    "narzędzie, sama nazwa własna zamiast opisu, szersze okno czasowe — "
+    "i kieruj się polem `co_powiedziec`. „Nie znalazłem” to nie „nie ma”."
+)
+
+
 def describe_for(names: list[str]) -> str:
     """Blok `system` „TWOJE NARZĘDZIA" — świadomość własnego zasięgu.
 
@@ -247,6 +271,7 @@ def describe_for(names: list[str]) -> str:
         "TWOJE NARZĘDZIA (wołaj je zamiast zgadywać; wynik narzędzia ma "
         "pierwszeństwo przed twoją wiedzą ogólną):\n"
         + "\n".join(lines)
+        + "\n\n" + EMPTY_RESULT_RULE
         + "\n\n" + ending
     )
 
