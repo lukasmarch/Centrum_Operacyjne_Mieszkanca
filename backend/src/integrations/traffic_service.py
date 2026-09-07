@@ -123,6 +123,17 @@ class TrafficService:
          tras: jeśli coś dotyczy każdej z nich jednakowo, prawie zawsze znaczy to,
          że nie dotyczy żadnej konkretnie.
 
+         JEDNO ZDARZENIE = JEDNA TRASA. Jeśli to samo utrudnienie chcesz wpisać przy
+         więcej niż jednej trasie, to znaczy, że nie wiesz, na której leży — wtedy
+         na WSZYSTKICH daj "Płynnie". 7.09.2026 blokada drogi lokalnej do Truszczyn
+         została zgłoszona naraz przy trasie do Lubawy i do Iławy; nie leżała na żadnej.
+
+      5. WIEK WPISU. Każda pozycja materiału ma etykietę wieku ("DZIŚ", "wczoraj",
+         "sprzed 5 dni"). Nie licz tego z daty — czytaj etykietę. Zdarzenie chwilowe
+         (spadły konar, kolizja, zablokowana droga, "służby są w drodze") jest
+         utrudnieniem WYŁĄCZNIE z etykietą "DZIŚ": służby zjeżdżają w kilka godzin,
+         a komunikatu "już przejezdne" nikt nie publikuje.
+
       Jeśli którykolwiek warunek nie jest spełniony — STATUS: Płynnie, DELAY: 0 min.
       Nie zgaduj i nie wnioskuj "na wszelki wypadek": lepiej napisać, że jest płynnie,
       niż ostrzec mieszkańca przed utrudnieniem, którego nie ma.
