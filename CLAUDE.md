@@ -951,6 +951,53 @@ poprzedniego wieczoru). Ta sama klasa błędu co `ORDER BY adopted_at` przy remi
 - Pomiar: 6/6 przebiegów wymienia drogę jako pierwszą pozycję.
   `test_agent_answers` z modelem: **14 OK, 0 błędnych**
 
+## Termin ginął w wypisie 300 znaków (2026-09-07)
+**Briefing napisał „Dziś odbędzie się zebranie wiejskie" o zebraniu, które jest
+17 września; kalendarz zapowiadał spotkanie w sprawie Planu Ogólnego 12.09,
+którego nie ma; widget ruchu trzeci dzień pokazywał blokadę drogi z 4.09.**
+Trzy zgłoszenia, trzy RÓŻNE przyczyny — żadnej nie dotyczyły naprawy warstwy
+czasu z 3.09 i 5.09. Tamte poprawiały konwersję `event_at`; tu pola po prostu
+NIE BYŁO, więc nie było czego konwertować.
+
+- **Data ginie w limicie 300 znaków** (`make_social_snippet`). Ten sam post Syli
+  stoi w bazie dwa razy: wersja z 21.08 miała „📅 17 września" w tytule i dostała
+  `event_at`, przedruk z 6.09 zaczynał się od innego leadu — data wypadła poza
+  wypis. Bez `event_at` jedyną datą przy wpisie zostaje PUBLIKACJA, a `_time_label`
+  podaje ją modelowi jako „[wczoraj 16:26]". ⚠️ **Limit 300 znaków ZOSTAJE** —
+  to decyzja prawna, nie parametr. `apify_facebook.event_span_from_full_text`
+  czyta termin z PEŁNEJ treści, zanim ją utnie: zapisujemy FAKT (dzień i godzina),
+  nie cudzy tekst. To jedyne miejsce w projekcie, gdzie pełny post jest widoczny —
+  po zapisie nikt go już nie zobaczy. Kategoryzacja nadpisuje tylko puste pole,
+  więc odczyt ze scrapera bije zgadywanie z wypisu
+- **Bramka działa od dnia wdrożenia, baza pamięta wstecz.** Wydarzenie „Plan
+  Ogólny 12.09" powstało 23.07 z artykułu, którego cała treść to skorupa strony
+  (137 zn., ani jednej daty). `ground_event` („termin musi mieć ślad w tekście")
+  weszła commitem 70e2687 z **21.08** — miesiąc później. ⚠️ **Po każdej nowej
+  bramce pytaj, co przepuściła, ZANIM powstała**: `python -u -m
+  scripts.production.audit_ungrounded_events [--apply]` (prod 7.09: 6 wydarzeń
+  przed nami, **1 bez śladu daty** — usunięte). Ta sama klasa przeoczenia co przy
+  `locality IS NULL`
+- **Reguła w prompcie nie jest odcięciem.** Widget ruchu miał regułę „źródło
+  starsze niż 14 dni → Płynnie", a konar sprzed 3 dni przeszedł **zgodnie z jej
+  brzmieniem**. `road_context.is_incident` czyta TREŚĆ (nie kategorię z AI — ta
+  powstaje 6:15/13:15, konar spadł 20:14), a `INCIDENT_DAYS = 2` wycina zdarzenie
+  chwilowe z materiału. ⚠️ **Roboty zostają w oknie 21 dni**: remont DW538
+  ogłoszono raz, 3.07, i tylko z takiego wpisu model wie, że coś się na trasie
+  dzieje — skrócenie TEGO okna cofa nas do zgadywania z wyszukiwarki, od którego
+  `road_context` się zaczął. Materiał niesie etykietę wieku („DZIŚ", „sprzed
+  5 dni"); sama data zmuszała model do rachunku, który przegrywał
+- ⚠️ **Materiał bywa NIEPEŁNY, nie tylko sprzeczny** (5.09 był sprzeczny).
+  Poprawny termin 17.09 stał w kalendarzu jako wydarzenie #1197, ale blok
+  „NADCHODZĄCE WYDARZENIA" ma okno **8 dni** — do promptu wszedł zmyślony Plan
+  Ogólny 12.09, a prawdziwe zebranie nie
+- **Jedno zdarzenie = jedna trasa**: blokada drogi lokalnej poszła naraz przy
+  trasie do Lubawy i do Iławy. Jeśli model chce wpisać zdarzenie przy dwóch
+  trasach, nie wie, na której leży — wtedy „Płynnie" na wszystkich
+- Regeneracja strony bez maila: `docker exec centrum-backend-1 python -u -m
+  scripts.production.regenerate_daily_summary` — **nie dotyka newslettera ani
+  pusha**, sam zapis do bazy
+- Testy: `test_road_context` (15), `test_event_terms` sekcja 6 (8)
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
@@ -1039,4 +1086,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-09-05*
+*Ostatnia aktualizacja: 2026-09-07*
