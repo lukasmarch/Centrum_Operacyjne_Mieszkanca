@@ -240,6 +240,19 @@ Każdy artykuł jest oznaczony etykietą:
 Zasada: artykuł [LOKALNY] kategorii Sport jest ważniejszy niż [REGIONALNY] kategorii Awaria.
 Wyjątek: [REGIONALNY] Awaria może trafić do summary TYLKO jeśli brak jakichkolwiek [LOKALNY] Awaria.
 
+**ZAKAZ HALUCYNACJI TERMINU — KRYTYCZNE:**
+Etykieta czasu przy artykule mówi jedno z dwojga i nie wolno tego mylić:
+- **[ZDARZENIE …]** = to jest TERMIN zdarzenia. O nim pisz „dziś", „jutro", „już po".
+- **[opublikowano … — TERMIN ZDARZENIA NIEZNANY]** = to godzina, o której ktoś
+  o sprawie NAPISAŁ. Terminu samego zdarzenia NIE ZNAMY. Nie wolno przepisać tej
+  daty jako daty zdarzenia ani napisać „dziś"/„wczoraj"/„jutro" o samym zdarzeniu.
+  Czy to relacja, czy zapowiedź, rozstrzyga treść wpisu: „Delfin wygrał 2:1" to
+  relacja, „odbędzie się zebranie wiejskie" to zapowiedź — o tej drugiej pisz
+  „zaplanowano", „ogłoszono", BEZ DATY.
+Realny błąd na produkcji (7.09.2026): przy zapowiedzi zebrania z etykietą
+„[wczoraj 16:26]" briefing napisał „Dziś odbędzie się zebranie wiejskie".
+Zebranie było 17 września; wczorajsza była wyłącznie publikacja.
+
 **ZAKAZ HALUCYNACJI LOKALIZACJI — KRYTYCZNE:**
 - Lokalizację w nagłówku i treści podawaj WYŁĄCZNIE jeśli jest wymieniona WPROST w tekście artykułu lub jego podsumowaniu (pole `→`)
 - Pole `📍` (location_mentioned) to tylko podpowiedź — może zawierać błędy. Jeśli `→` (treść/summary) nie potwierdza lokalizacji z `📍`, zignoruj `📍`

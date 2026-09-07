@@ -139,9 +139,16 @@ Pole "meta" to krótka etykieta kontekstu (max 30 znaków), np. "Komunikat urzę
   przeprowadzono…", „wczoraj w Rybnie odbyło się…". To relacje, nie zaproszenia.
 - Wpisy z bloku DZIŚ I PRZED NAMI opisuj jako sprawę bieżącą lub nadchodzącą:
   „dziś o 9:00 zbiera się…", „w sobotę wystartuje…".
+- Wpisy z bloku OGŁOSZONE — TERMIN NIEZNANY: etykieta podaje datę OGŁOSZENIA,
+  nie datę zdarzenia. NIE WOLNO Ci napisać, kiedy to się odbyło ani kiedy się
+  odbędzie — tej daty nie ma w materiale. Nie pisz „wczoraj", „dziś" ani „jutro"
+  o samym zdarzeniu. Czy to relacja, czy zapowiedź, poznasz po treści wpisu
+  („Delfin wygrał 2:1" to relacja; „odbędzie się zebranie wiejskie" to zapowiedź
+  bez podanego terminu — napisz o niej „zaplanowano", „ogłoszono", bez daty).
 - Etykieta w nawiasie kwadratowym przed każdym wpisem podaje jego czas
   ([wczoraj 14:00], [ZDARZENIE dziś 09:00–14:00 — TRWA TERAZ], [jutro 18:00]).
-  Trzymaj się jej — jest wyliczona z bazy, nie zgadywana.
+  Trzymaj się jej — jest wyliczona z bazy, nie zgadywana. Etykieta bez słowa
+  ZDARZENIE mówi WYŁĄCZNIE o chwili publikacji wpisu.
 
 **Ważne wytyczne:**
 - Nie wymyślaj informacji — korzystaj wyłącznie z podanych danych
@@ -162,6 +169,9 @@ JUŻ SIĘ WYDARZYŁO (relacje — czas przeszły):
 DZIŚ I PRZED NAMI (sprawy bieżące i zapowiedzi):
 {articles_ahead}
 
+OGŁOSZONE — TERMIN NIEZNANY (data przy wpisie to data OGŁOSZENIA, nie zdarzenia):
+{articles_undated}
+
 Zwróć treść w formacie JSON:
 {{
     "preview_text": "Krótki tekst preview (max 90 znaków, bez emotikon)",
@@ -173,6 +183,58 @@ Zwróć treść w formacie JSON:
     }}
 }}
 """
+
+
+def split_by_time(
+    articles: list,
+    day_start: datetime,
+    now: datetime,
+) -> tuple[list, list, list]:
+    """
+    Materiał rozdzielony na relacje, sprawy bieżące i wpisy bez terminu.
+
+    Model dostawał `{"title", "category"}` — ANI JEDNEJ daty — i sam rozstrzygał,
+    co się dopiero wydarzy: 21.08.2026 zapowiadał posiedzenie komisji, które
+    trwało. O tym, co minęło, rozstrzyga zegar, nie model.
+
+    ⚠️ Trzy koszyki, nie dwa. Do 7.09.2026 wpis BEZ `event_at` lądował
+    w „JUŻ SIĘ WYDARZYŁO" na podstawie samej daty PUBLIKACJI — a prompt każe ten
+    blok opisywać w czasie przeszłym. Tak powstało „Wczoraj w Rybnie odbyło się
+    zebranie dotyczące Funduszu Sołeckiego": zebranie jest 17 września, ogłoszono
+    je wczoraj, i to KOD zaklasyfikował zapowiedź jako relację. Model wykonał
+    polecenie, które dostał.
+
+    Data publikacji nie mówi, czy coś się odbyło. Kiedy terminu nie znamy, nie
+    zgadujemy go zegarem — mówimy modelowi, że go nie ma, a czas gramatyczny
+    zostawiamy treści wpisu („Delfin wygrał" to relacja, „odbędzie się zebranie"
+    to zapowiedź; tego akurat model nie myli).
+    """
+    ahead: list = []
+    past: list = []
+    undated: list = []
+
+    for article in articles:
+        # Bez terminu etykieta mówi wprost, czego dotyczy data. Samo
+        # „[wczoraj 16:26]" model czytał jako godzinę ZDARZENIA — a to
+        # godzina, o której ktoś o zdarzeniu napisał.
+        prefix = "" if article.event_at else "opublikowano "
+        entry = {
+            "when": time_label(
+                article.published_at or article.scraped_at,
+                article.event_at, article.event_until, now,
+                published_prefix=prefix,
+            ),
+            "title": article.display_title or article.title,
+            "category": article.category,
+        }
+        if not article.event_at:
+            undated.append(entry)
+        elif article.event_at >= day_start:
+            ahead.append(entry)
+        else:
+            past.append(entry)
+
+    return ahead, past, undated
 
 
 class NewsletterGenerator:
@@ -623,26 +685,7 @@ class NewsletterGenerator:
             for e in events
         ]
 
-        # Model dostawał `{"title", "category"}` — ANI JEDNEJ daty — i sam
-        # rozstrzygał, co się dopiero wydarzy: 21.08 briefing zapowiadał
-        # posiedzenie komisji, które trwało, i pisał o wczorajszym wydarzeniu
-        # w czasie przyszłym. Materiał rozdzielamy tu, w kodzie, bo o tym,
-        # co minęło, rozstrzyga zegar, nie model.
-        def _entry(article) -> dict:
-            return {
-                "when": time_label(
-                    article.published_at or article.scraped_at,
-                    article.event_at, article.event_until, now_naive,
-                ),
-                "title": article.display_title or article.title,
-                "category": article.category,
-            }
-
-        ahead, past = [], []
-        for article in articles:
-            reference = article.event_at or article.published_at or article.scraped_at
-            target = ahead if reference and reference >= day_start else past
-            target.append(_entry(article))
+        ahead, past, undated = split_by_time(articles, day_start, now_naive)
 
         # Generate with AI
         prompt = DAILY_NEWSLETTER_PROMPT.format(
@@ -655,6 +698,7 @@ class NewsletterGenerator:
             events=events_data,
             articles_past=past or "brak",
             articles_ahead=ahead or "brak",
+            articles_undated=undated or "brak",
         )
 
         response = await self.client.chat.completions.create(

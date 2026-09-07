@@ -993,6 +993,15 @@ NIE BYŁO, więc nie było czego konwertować.
 - **Jedno zdarzenie = jedna trasa**: blokada drogi lokalnej poszła naraz przy
   trasie do Lubawy i do Iławy. Jeśli model chce wpisać zdarzenie przy dwóch
   trasach, nie wie, na której leży — wtedy „Płynnie" na wszystkich
+- **Newsletter miał TEN SAM błąd, i to wpisany w kod.** Materiał dzielił się na
+  dwa bloki: `reference = event_at or published_at`, a blok „JUŻ SIĘ WYDARZYŁO"
+  ma w prompcie wzorzec „wczoraj w Rybnie odbyło się…". Wpis BEZ terminu szedł
+  tam po dacie PUBLIKACJI — zapowiedź klasyfikował jako relację KOD, nie model.
+  ✅ `newsletter.generator.split_by_time` daje TRZY koszyki; bez `event_at` wpis
+  ląduje w „OGŁOSZONE — TERMIN NIEZNANY", a czas gramatyczny rozstrzyga treść
+  („Delfin wygrał" ≠ „odbędzie się zebranie"). Etykieta niesie `opublikowano …`,
+  briefing dokłada `— TERMIN ZDARZENIA NIEZNANY`. ⚠️ Nie wolno takiego wpisu
+  wrzucić do „PRZED NAMI": relacja z meczu stałaby się zapowiedzią
 - Regeneracja strony bez maila: `docker exec centrum-backend-1 python -u -m
   scripts.production.regenerate_daily_summary` — **nie dotyka newslettera ani
   pusha**, sam zapis do bazy

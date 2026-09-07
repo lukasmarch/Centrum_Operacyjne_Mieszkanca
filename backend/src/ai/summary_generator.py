@@ -147,7 +147,14 @@ def _time_label(article, now: datetime) -> str:
     # wczoraj była awaria. Zabraniamy tylko pisać o niej w czasie teraźniejszym.
     if _alert_past_window(article, now):
         return f"[{stamp} — AWARIA SPRZED DOBY, MOGŁA JUŻ ZOSTAĆ USUNIĘTA]"
-    return f"[{stamp}]"
+
+    # Bez `event_at` etykieta mówi wprost, czego dotyczy data. 7.09.2026
+    # briefing dostał przy zapowiedzi zebrania poprawne „[wczoraj 16:26]"
+    # i napisał „Dziś odbędzie się zebranie wiejskie" — o zebraniu 17 września.
+    # Data publikacji nie jest datą zdarzenia, ale nazwana samą godziną
+    # wygląda dokładnie tak samo jak termin. Ta sama zasada, co przy „JUŻ PO"
+    # i „AWARIA SPRZED DOBY": etykieta niesie SKUTEK, nie tylko liczbę.
+    return f"[opublikowano {stamp} — TERMIN ZDARZENIA NIEZNANY]"
 
 
 def _alert_past_window(article, now: datetime) -> bool:
