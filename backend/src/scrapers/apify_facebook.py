@@ -5,10 +5,45 @@ import re
 
 from src.config import settings
 from src.scrapers.base import BaseScraper
+from src.services import time_span
 
 # Model "pointer" dla treści z social mediów (prawo autorskie + RODO):
 # przechowujemy nagłówek + snippet i odsyłamy do oryginału.
 SOCIAL_SNIPPET_LIMIT = 300
+
+
+def event_span_from_full_text(
+    title: str,
+    text: str,
+    published_at: Optional[datetime],
+) -> tuple[Optional[datetime], Optional[datetime]]:
+    """
+    Termin zdarzenia wyłuskany z PEŁNEGO tekstu posta — zanim `make_social_snippet`
+    utnie go do 300 znaków.
+
+    7.09.2026 briefing napisał „Dziś odbędzie się zebranie wiejskie" o zebraniu,
+    które jest 17 września. Ten sam post Syli stał w bazie dwa razy: wersja
+    z 21.08 miała datę w TYTULE („📅 17 września 2026 roku…") i dostała
+    `event_at` poprawnie, a przedruk z 6.09 zaczynał się od innego leadu —
+    data wypadła poza limit 300 znaków. Model nie zgubił terminu; on go nigdy
+    nie zobaczył, bo do bazy trafia sam wypis. Bez `event_at` jedyną datą przy
+    wpisie zostaje data publikacji i briefing czyta ją jako datę zdarzenia.
+
+    ⚠️ Limit 300 znaków ZOSTAJE — to decyzja prawna (prawo cytatu + RODO),
+    a nie parametr do podkręcenia. Zapisujemy tu FAKT wyczytany z tekstu
+    (dzień i godzina), nie cudzy tekst: sama data nie jest utworem. To jedyne
+    miejsce w projekcie, gdzie widać pełną treść posta, więc jedyne, gdzie
+    ten odczyt jest w ogóle możliwy.
+
+    Kod, nie model — ta sama zasada i ta sama funkcja, co
+    `article_processor.parse_date_span`: data stojąca w tekście wprost jest
+    zadaniem dla kodu. Kategoryzacja nadpisze to tylko wtedy, gdy pole jest
+    puste (warunek `event_at is None`), więc odczyt ze scrapera ma pierwszeństwo
+    nad zgadywaniem z wypisu.
+    """
+    if not published_at:
+        return None, None
+    return time_span.parse_date_span(f"{title}\n{text}", published_at)
 
 
 def make_social_snippet(text: str, source_url: str) -> str:
@@ -285,6 +320,21 @@ class ApifyFacebookScraper(BaseScraper):
 
                     if published_at:
                         article_data['published_at'] = published_at
+
+                        # Termin czytamy z PEŁNEGO tekstu, póki go widzimy —
+                        # po `make_social_snippet` zostaje 300 znaków i data
+                        # zapowiedzianego zdarzenia bywa poza nimi.
+                        event_at, event_until = event_span_from_full_text(
+                            title, text, published_at
+                        )
+                        if event_at:
+                            article_data['event_at'] = event_at
+                            if event_until:
+                                article_data['event_until'] = event_until
+                            self.logger.info(
+                                f"Post {post_id}: termin z pełnej treści {event_at} (UTC)"
+                                + (f" do {event_until}" if event_until else "")
+                            )
 
                     articles.append(article_data)
                     self.logger.debug(f"Sparsowano post: {title[:50]}...")

@@ -298,6 +298,82 @@ def run_timezone() -> int:
     return failures
 
 
+def run_social_snippet() -> int:
+    """
+    Sekcja 6: termin ginął w limicie 300 znaków (7.09.2026).
+
+    Ten sam post Syli o zebraniu wiejskim stał w bazie dwa razy. Wersja z 21.08
+    miała datę w pierwszym zdaniu i dostała `event_at`. Przedruk z 6.09 zaczynał
+    się od innego leadu — „17 września" wypadło poza wypis, `event_at` został
+    pusty, a briefing wziął za termin datę PUBLIKACJI i napisał „Dziś odbędzie
+    się zebranie" o zdarzeniu odległym o dziesięć dni.
+
+    Naprawa nie rusza limitu 300 znaków (decyzja prawna): scraper czyta termin
+    z pełnej treści, zanim ją utnie.
+    """
+    from src.scrapers.apify_facebook import (
+        event_span_from_full_text,
+        make_social_snippet,
+    )
+    from src.services.time_span import parse_date_span, to_local
+
+    print()
+    print("=" * 78)
+    print("Termin z posta FB: wypis 300 znaków kontra pełna treść")
+    print("=" * 78)
+
+    publikacja = datetime(2026, 9, 6, 16, 26, 3)
+    # Lead przedruku z 6.09 — dokładnie tyle, ile zmieściło się w bazie (art. 5856),
+    # plus zdanie z terminem, które w wypisie już się nie mieści.
+    pelny = (
+        "Mieszkańcy Rybna zdecydują, na co przeznaczyć ponad 73 tys. zł!\n\n"
+        "Sołtys Sołectwa Rybno Henryk Wiśniewski poinformował mieszkańców o terminie "
+        "zebrania wiejskiego, podczas którego jednym z najważniejszych tematów będzie "
+        "Fundusz Sołecki na 2027 rok. Do dyspozycji sołectwa Rybno będzie kwota "
+        "73 308 zł. Zebranie odbędzie się 17 września 2026 roku o godz. 17:00."
+    )
+    tytul = pelny[:100] + "..."
+    wypis = make_social_snippet(pelny, "https://www.facebook.com/x")
+
+    z_wypisu, _ = parse_date_span(f"{tytul}\n{wypis}", publikacja)
+    z_pelnego, koniec = event_span_from_full_text(tytul, pelny, publikacja)
+
+    checks = [
+        ("data jest w pełnej treści", "17 września" in pelny, True),
+        ("data NIE mieści się w wypisie", "17 września" in wypis, False),
+        ("wypis nie daje terminu (stan sprzed naprawy)", z_wypisu, None),
+        ("pełna treść daje termin", z_pelnego, datetime(2026, 9, 17, 15, 0)),
+        ("termin lokalnie to 17.09 17:00",
+         to_local(z_pelnego).strftime("%d.%m %H:%M") if z_pelnego else None, "17.09 17:00"),
+        ("bez godziny końca nie zmyślamy zakresu", koniec, None),
+    ]
+
+    # Relacja z przeszłości nie może wjechać jako zapowiedź — bramka „data nie
+    # wcześniej niż publikacja" żyje w `parse_date_span` i tu tylko ją potwierdzamy.
+    relacja = (
+        "Za nami zebranie wiejskie! W dniu 1 września 2026 roku mieszkańcy Rybna "
+        "zdecydowali o podziale środków z Funduszu Sołeckiego." + "x" * 250
+    )
+    checks.append(("relacja nie staje się zapowiedzią",
+                   event_span_from_full_text(relacja[:100], relacja, publikacja)[0], None))
+    checks.append(("post bez daty publikacji nic nie zwraca",
+                   event_span_from_full_text(tytul, pelny, None), (None, None)))
+
+    failures = 0
+    for label, got, expected in checks:
+        ok = got == expected
+        failures += not ok
+        detail = f"{got}" + ("" if ok else f" (oczekiwano {expected})")
+        print(f"{'✓' if ok else '✗'} {label:.<58} {detail}")
+
+    print("-" * 78)
+    print(f"{len(checks) - failures}/{len(checks)} zgodnych z oczekiwaniem")
+    return failures
+
+
 if __name__ == "__main__":
-    failed = run_parse() + run_ranking() + run_dates() + run_timezone()
+    failed = (
+        run_parse() + run_ranking() + run_dates() + run_timezone()
+        + run_social_snippet()
+    )
     sys.exit(1 if failed else 0)
