@@ -122,8 +122,16 @@ class SourceText:
 
 # Ślad daty w tekście: dzień miesiąca jako liczba albo słowo względne.
 # Sama nazwa miesiąca („pod koniec sierpnia") nie wystarcza na konkretny termin.
+#
+# ⚠️ „weekend" WYPADŁ z listy 8.09.2026. Słowo wskazuje porę, nie dzień, więc
+# przepuszczało dowolną datę: post „[WYNIKI] Piłkarski weekend Delfina Rybno —
+# seniorzy z pierwszą wygraną" (art. 5878) to RELACJA z rozegranych meczów,
+# a stanął w bazie z terminem 13 września, bo model potraktował „weekend" jako
+# zapowiedź kolejnej kolejki. Zapowiedź żyje w feedzie i w newsletterze do
+# swojego terminu, więc relacja udawała przyszłość przez pięć dni.
+# „W sobotę" zostaje — nazwa dnia wskazuje konkretną datę i da się ją sprawdzić.
 _RELATIVE_DATE_RE = re.compile(
-    r"\b(dzis|dzisiaj|jutro|pojutrze|weekend|"
+    r"\b(dzis|dzisiaj|jutro|pojutrze|"
     r"poniedzialek|poniedzialk\w*|wtorek|wtork\w*|srod\w*|czwartek|czwartk\w*|"
     r"piatek|piatk\w*|sobot\w*|niedziel\w*)\b"
 )
