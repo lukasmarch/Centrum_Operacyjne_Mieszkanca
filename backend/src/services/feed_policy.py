@@ -20,7 +20,7 @@ from datetime import datetime, time, timedelta
 from typing import Callable, Iterable, Optional, TypeVar
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, cast, or_
+from sqlalchemy import and_, case, cast, func, or_
 from sqlalchemy.types import Time
 
 from src.services.alert_policy import is_foreign_region, places_in, span_from_text
@@ -329,6 +329,106 @@ def still_relevant_event(article_model, now: Optional[datetime] = None):
             ),
         ),
     )
+
+
+# Jak długie zdarzenie wolno jeszcze uznać za „dzieje się TERAZ".
+#
+# Zerowy dystans należy się wyłączeniu prądu trwającemu dziewięć godzin
+# i imprezie całodniowej — nie akcji rozłożonej na tygodnie. Pomiar 8.09.2026
+# pokazał to od razu: bez progu na szczyt okna KPP weszły „Bezpieczna droga do
+# szkoły" i „Zwalniaj" (art. 5736, 5737) — kampanie z `event_until` na 30
+# września, więc „trwające" przez cały miesiąc — i wypchnęły stamtąd
+# zatrzymanie sprawców kradzieży oraz spot profilaktyczny. Akcja trwająca
+# miesiąc nigdy nie przestaje być „teraz", czyli zajmowałaby miejsce na stałe.
+#
+# 36 h mieści zapowiedź całodniową (doba) z zapasem na wpis, który zaczyna się
+# wieczorem i kończy nazajutrz. Dłuższe zdarzenie liczy dystans od swojego
+# POCZĄTKU — tak jak przed tą zmianą.
+ONGOING_MAX_SPAN_H = 36
+
+
+def _event_end(article_model):
+    """
+    Koniec zdarzenia w SQL — ta sama reguła co `still_relevant_event`:
+    deklarowany `event_until`, dla zapowiedzi całodniowej koniec jej doby,
+    dla reszty `DEFAULT_EVENT_DURATION_H`.
+    """
+    return case(
+        (article_model.event_until.isnot(None), article_model.event_until),
+        (
+            cast(article_model.event_at, Time) == time(0, 0),
+            article_model.event_at + timedelta(days=1),
+        ),
+        else_=article_model.event_at + timedelta(hours=DEFAULT_EVENT_DURATION_H),
+    )
+
+
+def source_window_order(article_model, now: Optional[datetime] = None):
+    """
+    Kolejność, w jakiej źródło wystawia swoje wpisy do okna `per_source`.
+
+    To osobne pytanie od rankingu feedu (`article_score`): tam rozstrzyga się,
+    co stoi wyżej, TU — co w ogóle wychodzi ze źródła. Wpis odcięty na tym
+    etapie nie istnieje dla mieszkańca, choćby w rankingu wygrywał wszystko.
+
+    ⚠️ 8.09.2026 to okno wycięło ze strony trzy wyłączenia prądu TRWAJĄCE
+    w tej chwili (Filice, Sękowo, Kramarzewo, wszystkie 8.09 do 17:00) oraz
+    jedyne wyłączenie w gminie Rybno (Truszczyny, art. 5790, nazajutrz
+    10:00–15:00). Miejsca w piątce zajęły zapowiedzi na 11, 14 i 15 września
+    — ogłoszone tego ranka, więc `least(termin, publikacja)` dawało im
+    dystans 0,7 h. Push o Truszczynach poszedł dzień wcześniej o 20:12,
+    briefing otwierał się nimi jako nagłówkiem; mieszkaniec, który kliknął
+    w powiadomienie, nie znajdował tego wpisu na stronie.
+
+    Dwie osi, obie brakujące wcześniej:
+
+    1. **Miejsce.** Wpis o gminie Rybno nie może zostać wypchnięty przez wpis
+       spoza gminy z tego samego źródła. `article_score` stosuje tę zasadę
+       od 22.08.2026 (`locality_factor`), okno źródła nie znało jej wcale —
+       a feedy Energi, KPP i Radia 7 obejmują cały powiat, więc wpisów spoza
+       gminy jest w nich z definicji więcej niż naszych. Próg wspólny
+       z rankingiem (`MIN_ARTICLE_LOCALITY`); wpis bez oceny lokalności nie
+       jest promowany, bo nie ma czym.
+
+    2. **Czas mierzony do OKNA zdarzenia, nie do jego początku.** Zdarzenie,
+       które właśnie trwa, jest odległe o zero — wcześniej liczyło się tak
+       samo jak zapowiedź na za cztery godziny i przegrywało ze świeżym
+       ogłoszeniem czegokolwiek. Po terminie dystans znów rośnie, więc
+       „drugie życie" zapowiedzi (`_reference_time`) zostaje nietknięte:
+       ogłoszenie z dziś o festynie za trzy tygodnie nadal jest wiadomością
+       dnia, bo bliżej ma publikację.
+    """
+    now = now or datetime.utcnow()
+
+    published_distance = func.abs(func.extract(
+        "epoch", func.coalesce(article_model.published_at, article_model.scraped_at) - now
+    ))
+    event_end = _event_end(article_model)
+    event_distance = case(
+        (article_model.event_at.is_(None), None),
+        (article_model.event_at > now, func.extract("epoch", article_model.event_at - now)),
+        (event_end < now, func.extract("epoch", now - event_end)),
+        # trwa TERAZ i jest zdarzeniem punktowym — bliżej być nie może
+        (
+            event_end - article_model.event_at
+            <= timedelta(hours=ONGOING_MAX_SPAN_H),
+            0.0,
+        ),
+        # trwa, ale to akcja rozłożona na tygodnie — liczymy od jej początku
+        else_=func.extract("epoch", now - article_model.event_at),
+    )
+    is_local = case(
+        (article_model.locality >= MIN_ARTICLE_LOCALITY, 1),
+        else_=0,
+    )
+
+    return [
+        is_local.desc(),
+        func.least(
+            func.coalesce(event_distance, published_distance), published_distance
+        ).asc(),
+        article_model.scraped_at.desc(),
+    ]
 
 
 # Kalendarz mieszkańca gminy Rybno kończy się na sąsiednich gminach powiatu:

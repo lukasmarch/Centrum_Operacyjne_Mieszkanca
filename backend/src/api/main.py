@@ -228,6 +228,7 @@ async def get_articles(
         is_pinned_alert,
         publishable_conditions,
         source_label,
+        source_window_order,
         still_relevant_event,
     )
 
@@ -237,27 +238,12 @@ async def get_articles(
     now = datetime.utcnow()
 
     # Use window function to rank articles per source
-    # Limit per źródło liczony od momentu, który się liczy: dla zapowiedzi zdarzeń
-    # (wyłączenia prądu) jest nim termin, nie data ogłoszenia.
-    #
-    # ODLEGŁOŚĆ od teraz, nie „najdalej w przyszłość" — ta sama reguła, którą
-    # ranking stosuje w `feed_policy._reference_time`. Sortowanie malejące po
-    # `coalesce(event_at, published_at)` stawiało na czele okna zapowiedzi
-    # z najodleglejszym terminem: po dopuszczeniu do feedu zdarzeń bez godziny
-    # końca (`still_relevant_event`) zebranie wiejskie z 16 września zajęłoby
-    # miejsce w piątce Syli, czyli największego źródła lokalnych wpisów.
-    reference_distance = func.least(
-        func.abs(func.extract(
-            "epoch",
-            func.coalesce(Article.event_at, Article.published_at, Article.scraped_at) - now,
-        )),
-        func.abs(func.extract(
-            "epoch", func.coalesce(Article.published_at, Article.scraped_at) - now
-        )),
-    )
+    # Które wpisy źródło w ogóle wystawia do okna `per_source` — polityka,
+    # nie prywatna reguła endpointu: miejsce, potem odległość od OKNA zdarzenia
+    # (trwające = zero), potem świeżość pobrania. Patrz `source_window_order`.
     row_number = func.row_number().over(
         partition_by=Article.source_id,
-        order_by=[reference_distance.asc(), Article.scraped_at.desc()],
+        order_by=source_window_order(Article, now),
     ).label('row_num')
 
     # Subquery with row numbers
