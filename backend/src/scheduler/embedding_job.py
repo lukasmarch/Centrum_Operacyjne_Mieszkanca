@@ -21,19 +21,35 @@ logger = setup_logger("EmbeddingJob")
 
 MAX_BATCH_SIZE = 200  # Max articles per run
 
+# Ile dni wstecz job sięga po materiał, który jeszcze nie ma osadzenia.
+#
+# ⚠️ Do 8.09.2026 okno wynosiło JEDNĄ DOBĘ („tylko dzisiejsze"), a job chodzi
+# 6:50 i 13:45. Wpis, który wpadł później — kanały Energi odświeżają się także
+# o 15:05, 18:05 i 21:05 — nie zdążał na żaden przebieg, a nazajutrz był już
+# poza oknem i zostawał z `embedded=false` NA ZAWSZE. Pomiar tego dnia:
+# 12 takich sierot od 10.08, w tym art. 5868 (wyłączenie prądu z 7.09,
+# `processed=true`). Dla agentów te wpisy po prostu nie istniały.
+#
+# Trzy doby, nie „wszystko nieosadzone": ~1065 historycznych artykułów stoi
+# poza RAG celowo (decyzja 19.07.2026) i trzyma `embedded=true` jako marker,
+# ale gdyby ktoś tę flagę kiedyś zdjął, okno jest jedynym bezpiecznikiem
+# przed rachunkiem za cały korpus w jednym przebiegu.
+EMBED_LOOKBACK_DAYS = 3
+
 
 async def _embed_articles(session):
-    """Embed unembedded articles scraped today"""
+    """Embed unembedded articles scraped within the lookback window"""
     # Doba LOKALNA — job chodzi 6:50 i 13:45 czasu polskiego, a granica UTC
     # przecina dzień o 2:00 w nocy i wycięłaby materiał zescrapowany po północy.
     today_start, _ = local_day_bounds()
+    window_start = today_start - timedelta(days=EMBED_LOOKBACK_DAYS - 1)
 
     result = await session.execute(
         select(Article, Source.name)
         .join(Source, Article.source_id == Source.id)
         .where(Article.embedded == False)
         .where(Article.processed == True)
-        .where(Article.scraped_at >= today_start)   # only today's articles
+        .where(Article.scraped_at >= window_start)
         .order_by(Article.scraped_at.desc())
         .limit(MAX_BATCH_SIZE)
     )
