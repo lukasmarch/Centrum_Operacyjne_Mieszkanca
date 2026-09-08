@@ -493,13 +493,6 @@ URL: {article.url}
                 self.logger.debug(f"Article {article.id} is not an event")
                 return None
 
-            # WALIDACJA: Wydarzenie musi mieć datę (event_date jest REQUIRED w bazie)
-            if not event_data.event_date:
-                self.logger.warning(
-                    f"Event '{event_data.title}' has no date - skipping (article {article.id})"
-                )
-                return None
-
             # Model dostaje i zwraca czas LOKALNY (tak stoi w ogłoszeniu: „o godz.
             # 12:00"), a baza trzyma naiwny UTC — jak cała reszta projektu.
             # `article_processor._event_stamp` robiło tę konwersję od początku,
@@ -512,9 +505,42 @@ URL: {article.url}
             # (zgodna z ogłoszeniem) i `kiedy` z `time_label`, który dokładał
             # przesunięcie strefy. XXIV sesja Rady z 27.08 o 10:00 pokazywała się
             # mieszkańcowi jako 12:00.
-            event_data.event_date = to_utc(event_data.event_date)
-            if event_data.end_date:
-                event_data.end_date = to_utc(event_data.end_date)
+            if event_data.event_date:
+                event_data.event_date = to_utc(event_data.event_date)
+                if event_data.end_date:
+                    event_data.end_date = to_utc(event_data.end_date)
+            elif article.event_at:
+                # Termin bywa już policzony — i to pewniej niż przez model.
+                # `articles.event_at` stawia albo kategoryzacja (ugruntowana
+                # `_event_date_grounded`), albo `time_span.parse_date_span`,
+                # który czyta datę z tekstu DOSŁOWNIE. Ta druga droga powstała
+                # 3.09.2026 właśnie dlatego, że model gubił daty stojące wprost
+                # w poście („📅 16 września 2026 r. ⏰ godz. 8:00–11:30" — termin
+                # w 2 przebiegach na 3, godzina końca w 0 na 3).
+                #
+                # ⚠️ 8.09.2026 ekstraktor odrzucił XIX Turniej Tenisa Stołowego
+                # w Jeżewie — rozgrywany TEGO DNIA — i spotkania policji
+                # z uczniami, oba z powodu „has no date", choć w `articles`
+                # leżał poprawny `event_at` wpisany godzinę wcześniej przez
+                # kod (log: „Event 5872: termin z tekstu 2026-09-07 22:00 UTC").
+                # Kalendarz był tego dnia pusty przy danych stojących obok.
+                #
+                # Wartość jest już naiwnym UTC — `to_utc` byłoby drugą konwersją.
+                event_data.event_date = article.event_at
+                event_data.end_date = (
+                    to_utc(event_data.end_date)
+                    if event_data.end_date
+                    else article.event_until
+                )
+                self.logger.info(
+                    f"Event '{event_data.title}': model nie podał terminu, "
+                    f"biorę articles.event_at = {article.event_at} (article {article.id})"
+                )
+            else:
+                self.logger.warning(
+                    f"Event '{event_data.title}' has no date - skipping (article {article.id})"
+                )
+                return None
 
             # Termin poza rozsądnym oknem to prawie zawsze pomyłka modelu (zwykle
             # zły rok) albo relacja przebrana za zapowiedź. Te same progi, co
