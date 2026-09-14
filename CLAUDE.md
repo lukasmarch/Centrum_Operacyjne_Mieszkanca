@@ -1007,6 +1007,79 @@ NIE BYŁO, więc nie było czego konwertować.
   pusha**, sam zapis do bazy
 - Testy: `test_road_context` (15), `test_event_terms` sekcja 6 (8)
 
+## Duplikat to zbieżność osi, nie wysoki próg (2026-09-14)
+**Powtórki wróciły do feedu PO RAZ CZWARTY** (12.08 azbest w czterech redakcjach,
+24.08 dwa pushe o jednej awarii, 3.09 przedruk Syli, 14.09 pobór krwi i zebranie
+wiejskie po dwa razy), a każda naprawa dostrajała JEDNĄ liczbę. Pomiar na 581
+artykułach z 30 dni i 29 parach oznaczonych ręcznie pokazuje, czemu to nie mogło
+zadziałać — **żadna pojedyncza oś tych klas nie rozdziela**:
+
+| oś | duplikaty | różne wiadomości |
+|---|---|---|
+| zawieranie rdzeni | 0,67–1,00 | 0,71–1,00 |
+| embedding (cosinus) | 0,70–0,89 | 0,50–0,89 |
+| odstęp publikacji | 2–209 h | 6–616 h |
+
+„Obchody 87. rocznicy w **Rybnie**" vs „**Olsztyn** obchodzi 87. rocznicę" =
+zawieranie **1,000**; „wyłączenie 15.09 08:00 **Lipówka**" vs „15.09 09:30
+**Przełęk**" = embedding **0,887**. Próg 0,70 skleiłby **9 z 12** różnych
+wiadomości. Obniżenie progu było więc wykluczone — i to ono kusiło za każdym razem.
+
+- **`feed_policy.same_story`** — jedno miejsce orzekania, trzy osie, każda
+  z prawem WETA. Ten sam układ co `alert_policy` dla pusha (RODZAJ → MIEJSCE → CZAS)
+  i co „układ trzech bramek" z 3.09
+- **CZAS: doba LOKALNA z dokładnością SŁABSZEGO terminu.** To była pierwsza
+  przyczyna nawrotu: `dedup_text` wklejał termin jako token `ev%Y%m%d%H%M` w UTC,
+  a `collapse_duplicates` robił `continue` przy rozłącznych tokenach — więc
+  zapowiedź BEZ godziny (w bazie: lokalna północ) i ta sama zapowiedź Z godziną
+  **nie były porównywane wcale**. Skutek: wpis z terminem był w praktyce zwolniony
+  z deduplikacji, a to właśnie zapowiedzi wiszą w feedzie tygodniami
+  (`still_relevant_event`). Lekcja z 25.08 i 5.09, której feed nigdy nie dostał
+- **MIEJSCE: `places_in`**, weto przy rozłącznych; nazwa gminy odjęta jak
+  w `alert_policy.same_incident`
+- **TREŚĆ: progi tekstowe BEZ ZMIAN** (0,72 / 0,85) + embedding artykułu
+  (`document_embeddings`, chunk 0) jako dowód dodatkowy
+- ⚠️ **Dowód semantyczny wymaga potwierdzenia OBU pozostałych osi.** Przy zgodnym
+  terminie, ale MILCZĄCEJ osi miejsca dwa wyłączenia Energi w różnych wsiach
+  (cosinus 0,869) skleiły się w jeden wpis — dla mieszkańca Priomy to utrata
+  komunikatu o jego wsi. Milczenie osi ZAWĘŻA orzekanie: brak dowodu nie jest dowodem
+- ⚠️ **`collapse_duplicates` przyjmuje wyłącznie `key_of`.** Wariant „sam tekst"
+  istniał przez pół dnia i natychmiast skleił dwa wyłączenia z RÓŻNYCH dni
+  (złapał to `test_grounding`): klucz z samego tekstu nie zna terminu, więc oś
+  czasu milczała. Dwie ścieżki orzekania to dwa zachowania tej samej polityki
+- **Jedna reguła w czterech miejscach**: feed, briefing, newsletter, `latest_local_news`
+- ⚠️ **Semantyka NIE MOŻE być jedynym sędzią**: `embedding_job` chodzi o 6:50
+  i 13:45, więc materiał z późniejszych okien wchodzi do feedu, zanim zostanie
+  osadzony (na żywym feedzie 37 z 38 wpisów miało osadzenie)
+- **Strażnik, którego nie było: `python -m scripts.test_feed_dedup [--pary] [--db]`.**
+  `collapse_duplicates` nie miał ANI JEDNEGO własnego testu, więc każdy nawrót
+  wychodził dopiero na stronie. Mierzy OBIE strony — zwinięte powtórki ORAZ
+  sklejone różne wiadomości, i **drugi licznik jest ważniejszy**, bo jego błąd
+  UKRYWA informację, a błąd pierwszego tylko ją powtarza. Siedem par ma jawną
+  adnotację `granica` z powodem; test psuje się TAKŻE wtedy, gdy granica znika,
+  żeby lista wyjątków nie rosła po cichu
+- Pomiar przed/po na tych samych 29 parach: duplikaty zwinięte **5/13 → 9/13**,
+  różne wiadomości sklejone **3/16 → 3/16**. Żywy feed: 38 → 36 wpisów
+- ⚠️ **Czego to NIE rozwiązuje** (opisane w teście jako granice): wpisy bez terminu
+  po OBU stronach — dwie relacje z meczu (0,702), warsztaty pod dwoma nagłówkami
+  modelu (tekst 0,400, embedding 0,845) — oraz „Rybno vs Olsztyn", gdzie oś miejsca
+  milczy, bo `places_in` zna wyłącznie wsie gminy
+
+## CEIDG: słownik statusów jest cudzy (2026-09-14)
+**13.09 `ceidg_sync` padł na `OCZEKUJE_NA_ROZPOCZECIE_DZIALANOSCI` (35 zn.) przy
+kolumnie `VARCHAR(30)`** — skrojonej pod trzy wartości znane w dniu jej powstania.
+Czwarta, `WYLACZNIE_W_FORMIE_SPOLKI` (25 zn., 5 firm), zmieściła się przypadkiem.
+- ⚠️ **Skutek szerszy niż jeden wiersz**: job zapisuje przebieg w JEDNEJ transakcji,
+  więc felerny rekord wycofał komplet (nowe firmy, zmiany statusu, wykreślenia),
+  a sync padał **co niedzielę**. Ta sama lekcja co przy kategoryzacji 2.09
+- `widen_ceidg_status` → `VARCHAR(60)` (✅ prod 14.09, przed kodem — rozszerzenie
+  kolumny jest zgodne wstecz); `STATUS_MAX_LENGTH` w `schema.py` to jedna liczba
+  dla migracji i kodu
+- `ceidg_job._fit_status` — przycięcie + ostrzeżenie w logu. ⚠️ `KNOWN_STATUSES`
+  to WYŁĄCZNIE lista do ostrzegania, **nie bramka**: firma o nieznanym statusie
+  ma trafić do katalogu, nie wypaść z niego
+- Front: `statusLabel()` zamiast surowego ciągu z podkreśleniami na karcie
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
@@ -1039,6 +1112,16 @@ NIE BYŁO, więc nie było czego konwertować.
       `_material_window` i liczone `local_day_bounds`. Weryfikacja produkcyjnym
       kodem na produkcyjnej bazie: okno stare 7 artykułów, nowe 9 — doszedł
       art. 5618 (zapowiedź biegu NA DZIŚ) i 5826
+- [ ] **Dedup: wpisy BEZ terminu po obu stronach** — dwie relacje z tego samego
+      meczu (embedding 0,702) i ta sama impreza pod dwoma nagłówkami modelu
+      (tekst 0,400, embedding 0,845) zostają w feedzie podwójnie. Oś czasu milczy,
+      więc dowód semantyczny nie ma prawa orzekać; zmierzone: poluzowanie tego
+      wymagania wpuszcza cotygodniowe danie dnia restauracji (0,837) i kampanie
+      KPP (0,863). Pary opisane w `test_feed_dedup` jako `granica`
+- [ ] **Dedup: oś miejsca zna wyłącznie wsie gminy** — „Obchody 87. rocznicy
+      w Rybnie" i „Olsztyn obchodzi 87. rocznicę" mają zawieranie rdzeni 1,000
+      i sklejają się (stan zastany). `places_in` nie rozpoznaje miejscowości spoza
+      gminy, a `is_foreign_region` działa tylko na formacie „Region X" Energi
 - [ ] Przewodnik: dane pogodowe w embeddingach lub direct query
 - [ ] Widget pogody → live API
 - [ ] Filtrowanie artykułów po kategoriach
@@ -1095,4 +1178,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-09-07*
+*Ostatnia aktualizacja: 2026-09-14*
