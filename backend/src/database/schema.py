@@ -430,6 +430,11 @@ class GUSGminaStats(SQLModel, table=True):
 # CEIDG Business Tables
 # ======================
 
+# Długość kolumny statusu firmy. Jedno miejsce, bo tę samą liczbę musi znać
+# migracja `widen_ceidg_status` i przycięcie w `ceidg_job._fit_status`.
+STATUS_MAX_LENGTH = 60
+
+
 class CEIDGBusiness(SQLModel, table=True):
     """Firmy z rejestru CEIDG dla Gminy Rybno"""
     __tablename__ = "ceidg_businesses"
@@ -451,12 +456,19 @@ class CEIDGBusiness(SQLModel, table=True):
     pkd_main: Optional[str] = Field(default=None, max_length=20, index=True)
     pkd_list: Optional[List[dict]] = Field(default=None, sa_column=Column(JSONB))
 
-    status: str = Field(max_length=30, default="AKTYWNY")  # AKTYWNY, ZAWIESZONY, WYKRESLONY
+    # Słownik statusów rejestru jest OTWARTY i nie jest naszą stałą. Znane dziś:
+    # AKTYWNY, ZAWIESZONY, WYKRESLONY, WYLACZNIE_W_FORMIE_SPOLKI,
+    # OCZEKUJE_NA_ROZPOCZECIE_DZIALANOSCI (35 znaków). Ten ostatni położył
+    # `ceidg_sync` 13.09.2026, bo kolumna miała 30 znaków — skrojone pod trzy
+    # wartości, które znaliśmy w dniu jej powstania. Długość ma zapas na
+    # następną wartość, a `ceidg_job._fit_status` pilnuje, by szósta nie
+    # wywróciła całego przebiegu. Patrz migracja `widen_ceidg_status`.
+    status: str = Field(max_length=STATUS_MAX_LENGTH, default="AKTYWNY")
     data_rozpoczecia: Optional[datetime] = None
 
     # Śledzenie zmian statusu — źródło danych dla „Radaru rynku lokalnego"
     # (nowe / zawieszone / wykreślone firmy w danym miesiącu)
-    previous_status: Optional[str] = Field(default=None, max_length=30)
+    previous_status: Optional[str] = Field(default=None, max_length=STATUS_MAX_LENGTH)
     status_changed_at: Optional[datetime] = Field(default=None, index=True)
     
     # Owner

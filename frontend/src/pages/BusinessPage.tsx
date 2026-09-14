@@ -76,6 +76,22 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
     'AKTYWNY': { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', label: 'Aktywne' },
     'ZAWIESZONY': { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Zawieszone' },
     'WYKRESLONY': { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', label: 'Wykreślone' },
+    'WYLACZNIE_W_FORMIE_SPOLKI': { bg: 'bg-sky-500/20', text: 'text-sky-400', border: 'border-sky-500/30', label: 'Tylko w spółce' },
+    'OCZEKUJE_NA_ROZPOCZECIE_DZIALANOSCI': { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/30', label: 'Przed startem' },
+};
+
+/**
+ * Etykieta statusu firmy. Słownik statusów CEIDG jest OTWARTY — 13.09.2026
+ * rejestr przysłał szósty (`OCZEKUJE_NA_ROZPOCZECIE_DZIALANOSCI`), a karta
+ * pokazywała wtedy surowy ciąg z podkreśleniami. Nieznanej wartości nie
+ * ukrywamy: firma z rejestru ma być widoczna, choćby pod zgrubną nazwą.
+ */
+const statusLabel = (status: string | null | undefined): string => {
+    if (!status) return 'Nieznany';
+    const known = STATUS_COLORS[status];
+    if (known) return known.label;
+    const words = status.toLowerCase().split('_').join(' ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
 // Interactive dual-bar chart: blue = total registrations, amber = suspended
@@ -1189,7 +1205,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                                     }`}>
                                     {business.status === 'AKTYWNY' ? '● Aktywna'
                                         : business.status === 'ZAWIESZONY' ? '⏸ Zawieszona'
-                                            : business.status}
+                                            : statusLabel(business.status)}
                                 </span>
                                 <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/8 flex items-center justify-center text-xs font-bold text-neutral-400 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all">
                                     {business.nazwa.substring(0, 2).toUpperCase()}

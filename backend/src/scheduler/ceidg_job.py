@@ -6,12 +6,13 @@ Pobiera firmy z Gminy Rybno (powiat działdowski) i zapisuje do bazy.
 """
 import asyncio
 from datetime import datetime
+from typing import Optional
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
 from src.config import settings
-from src.database.schema import CEIDGBusiness, CEIDGSyncStats
+from src.database.schema import CEIDGBusiness, CEIDGSyncStats, STATUS_MAX_LENGTH
 from src.integrations.ceidg_api import CEIDGService
 from src.utils.logger import setup_logger
 
@@ -24,6 +25,43 @@ DETAIL_FETCH_LIMIT = 60
 # Minimalne pokrycie listy z API względem bazy, przy którym ufamy, że brak firmy
 # w odpowiedzi oznacza wykreślenie z rejestru, a nie awarię/niepełną odpowiedź.
 MISSING_SANITY_RATIO = 0.8
+
+# Statusy, które kod zna z nazwy. Lista służy WYŁĄCZNIE do ostrzegania w logu —
+# nie jest bramką i nie wolno jej taką robić: rejestr jest cudzy, a firma
+# o nieznanym statusie ma trafić do katalogu, nie wypaść z niego.
+KNOWN_STATUSES = frozenset({
+    "AKTYWNY", "ZAWIESZONY", "WYKRESLONY",
+    "WYLACZNIE_W_FORMIE_SPOLKI", "OCZEKUJE_NA_ROZPOCZECIE_DZIALANOSCI",
+})
+
+
+def _fit_status(value: Optional[str]) -> str:
+    """
+    Status firmy przycięty do długości kolumny, z ostrzeżeniem o nieznanej wartości.
+
+    13.09.2026 rejestr zwrócił `OCZEKUJE_NA_ROZPOCZECIE_DZIALANOSCI` (35 znaków)
+    przy kolumnie `VARCHAR(30)` i CAŁY przebieg został wycofany: nowe firmy,
+    zmiany statusu i wykreślenia. Kolumna jest już szersza (`widen_ceidg_status`),
+    ale to nie jest naprawa — to przesunięcie tej samej ściany o 30 znaków.
+    Naprawą jest reguła: pojedynczy rekord z cudzego rejestru NIE MOŻE zabrać
+    przebiegu. Ta sama lekcja co przy kategoryzacji 2.09.2026.
+
+    Przycięcie jest tu lepsze od pominięcia wiersza: status dłuższy niż kolumna
+    i tak zostaje czytelny po pierwszych znakach, a firma zostaje w katalogu.
+    """
+    status = (value or "AKTYWNY").strip() or "AKTYWNY"
+    if status not in KNOWN_STATUSES:
+        logger.warning(
+            f"  ⚠️  Nieznany status CEIDG: {status!r} ({len(status)} zn.) — "
+            f"zapisuję, ale dopisz go do KNOWN_STATUSES"
+        )
+    if len(status) > STATUS_MAX_LENGTH:
+        logger.warning(
+            f"  ⚠️  Status {status!r} dłuższy niż kolumna "
+            f"({len(status)} > {STATUS_MAX_LENGTH}) — przycinam"
+        )
+        status = status[:STATUS_MAX_LENGTH]
+    return status
 
 
 async def run_ceidg_job_async():
@@ -112,7 +150,7 @@ async def fetch_ceidg_businesses():
                 api_ids.add(ceidg_id)
 
                 existing = db_firms.get(ceidg_id)
-                api_status = short_data.get("status", "AKTYWNY")
+                api_status = _fit_status(short_data.get("status"))
 
                 if existing is None:
                     # Nowa firma — pełne dane wymagają zapytania o szczegóły
@@ -120,6 +158,9 @@ async def fetch_ceidg_businesses():
                     data = service.extract_business_data(detailed or short_data)
                     if not data.get("ceidg_id"):
                         data["ceidg_id"] = ceidg_id
+                    # Szczegóły niosą WŁASNY status — bez przycięcia jeden wpis
+                    # z cudzego rejestru wywraca cały przebieg (13.09.2026)
+                    data["status"] = _fit_status(data.get("status"))
                     data["status_changed_at"] = now
                     session.add(CEIDGBusiness(**data))
                     new_count += 1
