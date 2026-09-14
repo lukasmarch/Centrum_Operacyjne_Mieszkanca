@@ -16,6 +16,7 @@ Cztery mechanizmy:
 """
 import re
 import unicodedata
+from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from typing import Callable, Iterable, Optional, TypeVar
 from zoneinfo import ZoneInfo
@@ -24,7 +25,7 @@ from sqlalchemy import and_, case, cast, func, or_
 from sqlalchemy.types import Time
 
 from src.services.alert_policy import is_foreign_region, places_in, span_from_text
-from src.services.time_span import is_all_day, when_label
+from src.services.time_span import is_all_day, to_local, when_label
 from src.services.weather_alert import expired as weather_alert_expired
 from src.services.weather_alert import is_weather_alert
 
@@ -985,19 +986,19 @@ def dedup_text(article) -> str:
     feedu — podobieństwo pełnych tekstów nie przekraczało 0,52 przy progu 0,72.
     Wpisy sprzed kategoryzacji (okno 6:00–6:15) porównujemy po staremu.
 
-    Termin zdarzenia wchodzi jako zwarty token `ev…` — dwa wyłączenia w Rybnie
-    mają identyczny tytuł i różnią się wyłącznie datą; poprzedni format
-    `%Y-%m-%d %H:%M` rozpadał się w `_tokens` na dwuznaki i ginął w filtrze
-    długości, więc daty realnie nie było w sygnaturze.
+    ⚠️ Termin zdarzenia NIE jest już częścią tego tekstu. Do 14.09.2026 wchodził
+    jako zwarty token `ev%Y%m%d%H%M` i pełnił rolę weta: wpisy o rozłącznych
+    tokenach nie były porównywane wcale. Weto było potrzebne (dwa wyłączenia
+    w tej samej wsi mają identyczny tytuł i różnią się wyłącznie datą), ale
+    liczone co do MINUTY w UTC zwalniało z deduplikacji każdą zapowiedź, której
+    dwa źródła podały z różną dokładnością godziny. Termin ma dziś własną oś
+    w `same_story` (`_term_axis`) i jest tam liczony w dobie LOKALNEJ.
     """
     display = getattr(article, "display_title", None)
     if display:
-        base = display
-    else:
-        body = (article.content or article.summary or "")[:300]
-        base = f"{article.title or ''} {body}"
-    event_at = getattr(article, "event_at", None)
-    return f"ev{event_at:%Y%m%d%H%M} {base}" if event_at else base
+        return display
+    body = (article.content or article.summary or "")[:300]
+    return f"{article.title or ''} {body}"
 
 
 D = TypeVar("D")
@@ -1014,9 +1015,6 @@ STEM_CONTAINMENT_THRESHOLD = 0.85
 # w wysokie zawieranie przypadkiem
 _STEM_MIN_TOKENS = 5
 
-_EVENT_TOKEN_RE = re.compile(r"^ev\d{12}$")
-
-
 def _stem_tokens(tokens: frozenset[str]) -> frozenset[str]:
     """
     Rdzenie słów — zgrubne ścięcie polskiej fleksji, przez którą „Rybno" i
@@ -1025,8 +1023,6 @@ def _stem_tokens(tokens: frozenset[str]) -> frozenset[str]:
     """
     stems = set()
     for word in tokens:
-        if _EVENT_TOKEN_RE.match(word):
-            continue  # termin porównujemy osobno, nie jako słowo
         stem = word.rstrip("aeiouy")[:6]
         stems.add(stem if len(stem) >= 3 else word)
     return frozenset(stems)
@@ -1038,7 +1034,256 @@ def _containment(a: frozenset[str], b: frozenset[str]) -> float:
     return len(a & b) / min(len(a), len(b))
 
 
-def collapse_duplicates(items: Iterable[D], text_of: Callable[[D], str]) -> list[D]:
+# ── Orzekanie „to ta sama sprawa" ────────────────────────────────────────────
+#
+# Powód, dla którego to jest OSOBNA warstwa, a nie kolejny próg: duplikaty
+# wracały do feedu czterokrotnie (12.08 azbest w czterech redakcjach, 24.08
+# dwa pushe o jednej awarii, 3.09 przedruk Syli, 14.09 pobór krwi i zebranie
+# wiejskie po dwa razy), a każda naprawa polegała na dostrojeniu JEDNEJ liczby.
+#
+# Pomiar 14.09.2026 na 581 artykułach z 30 dni i 30 parach oznaczonych ręcznie
+# pokazał, dlaczego to nie mogło zadziałać — ŻADNA pojedyncza oś nie rozdziela
+# tych klas:
+#
+#   zawieranie rdzeni  duplikaty 0,67–1,00   różne wiadomości 0,71–1,00
+#   embedding (cosinus) duplikaty 0,70–0,89   różne wiadomości 0,50–0,89
+#   odstęp publikacji   duplikaty 2 h–209 h   różne wiadomości 6 h–616 h
+#
+# Skrajne przykłady, które zamykają drogę każdemu progowi:
+#   „Obchody 87. rocznicy … w RYBNIE" vs „OLSZTYN obchodzi 87. rocznicę"
+#       → zawieranie rdzeni 1,000 przy dwóch różnych miastach;
+#   „Wyłączenie 15.09 08:00 LIPÓWKA" vs „Wyłączenie 15.09 09:30 PRZEŁĘK"
+#       → embedding 0,887 przy dwóch różnych wyłączeniach;
+#   „Pobór krwi 16 września…" vs „Pobór krwi w Rybnie w dniu 16 września…"
+#       → embedding 0,854, ale zawieranie rdzeni tylko 0,714.
+#
+# Wniosek, który ta warstwa utrwala: DUPLIKAT ORZEKAMY ZE ZBIEŻNOŚCI
+# NIEZALEŻNYCH OSI, NIGDY Z JEDNEJ LICZBY. Osie są trzy i są te same, co
+# w `alert_policy` dla pusha (RODZAJ → MIEJSCE → CZAS) — wzorzec, który projekt
+# uznał za obowiązujący 3.09 przy układzie trzech bramek:
+#
+#   CZAS    — termin zdarzenia; WETO przy różnych terminach, DOWÓD przy zgodnych
+#   MIEJSCE — miejscowości gminy; WETO przy rozłącznych
+#   TREŚĆ   — tekst (progi jak dotąd) albo semantyka (embedding)
+#
+# Każda oś ma prawo WETA i weto jest silniejsze od dowolnie wysokiego
+# podobieństwa — tak samo jak weto organu w dedupie wydarzeń (25.08.2026),
+# gdzie dwa RÓŻNE posiedzenia miały podobieństwo 0,909, a dwa opisy jednej
+# imprezy 0,790.
+
+# Powyżej tego podobieństwa kosinusowego uznajemy dwa wpisy o ZGODNYM TERMINIE
+# za jedną sprawę. Próg zmierzony 14.09.2026 na `document_embeddings`
+# (source_type='article', chunk 0) na 30 parach z produkcji: wszystkie 14 par
+# duplikatów miało ≥ 0,702, przy czym najniższa para to dwie redakcje relacji
+# z meczu, a najwyższa 0,891.
+#
+# ⚠️ Ten próg NIE JEST samodzielnym sędzią i nie wolno go takim uczynić: powyżej
+# 0,70 leży 11 z 16 zmierzonych par RÓŻNYCH wiadomości (mecze tego samego klubu,
+# kolejne starty tej samej zawodniczki, cotygodniowe danie dnia tej samej
+# restauracji). Embedding mierzy TEMAT, a lokalny materiał jest z natury
+# tematycznie powtarzalny. Działa wyłącznie w parze ze zgodnym terminem.
+SEMANTIC_DUPLICATE = 0.70
+
+
+@dataclass(frozen=True)
+class StoryKey:
+    """
+    Wpis w postaci, w jakiej pytamy „czy to ta sama sprawa".
+
+    Osobny typ, a nie krotka parametrów, bo ten sam klucz składają cztery
+    miejsca (feed, briefing, newsletter, narzędzie agenta) i każde z nich ma
+    inny materiał pod ręką: feed zna embedding, newsletter go nie pobiera.
+    Brakująca oś ma ZAWĘŻAĆ orzekanie, nie zmieniać reguł — dlatego wszystkie
+    pola poza tekstem są opcjonalne.
+    """
+    tokens: frozenset[str]
+    stems: frozenset[str]
+    event_at: Optional[datetime] = None
+    event_until: Optional[datetime] = None
+    places: frozenset[str] = frozenset()
+    embedding: Optional[tuple[float, ...]] = None
+
+
+def story_key(
+    article,
+    embedding: Optional[Iterable[float]] = None,
+) -> StoryKey:
+    """Klucz porównania dla artykułu — tekst, termin, miejsca, semantyka."""
+    tokens = _tokens(dedup_text(article))
+    return StoryKey(
+        tokens=tokens,
+        stems=_stem_tokens(tokens),
+        event_at=getattr(article, "event_at", None),
+        event_until=getattr(article, "event_until", None),
+        places=frozenset(places_in(
+            getattr(article, "display_title", None) or getattr(article, "title", None),
+            getattr(article, "content", None),
+        )),
+        embedding=tuple(embedding) if embedding is not None else None,
+    )
+
+
+def _term_axis(a: StoryKey, b: StoryKey) -> Optional[bool]:
+    """
+    Oś CZASU. `True` = terminy się zgadzają (dowód ZA), `False` = weto,
+    `None` = któryś wpis terminu nie ma, więc oś nic nie mówi.
+
+    Doba LOKALNA, nie moment w UTC — to ta sama reguła, którą dedup wydarzeń
+    dostał 25.08.2026, a warstwa czasu utrwaliła 5.09. Feed jej nigdy nie miał
+    i to była PIERWSZA z przyczyn nawrotu z 14.09: `dedup_text` wklejał termin
+    jako token `ev%Y%m%d%H%M`, więc zapowiedź BEZ godziny (w bazie: lokalna
+    północ, czyli 22:00 UTC dnia poprzedniego) miała inny token niż ta sama
+    zapowiedź z godziną — i para nie była w ogóle porównywana. Skutek: wpis
+    z terminem był w praktyce zwolniony z deduplikacji, a to właśnie zapowiedzi
+    wiszą w feedzie tygodniami (`still_relevant_event`) i mają najwięcej
+    przedruków.
+
+    Godziny wymagamy tylko wtedy, gdy znają ją OBA wpisy — czyli z dokładnością
+    SŁABSZEGO z dwóch terminów. Inaczej „pobór krwi 16 września" i „pobór krwi
+    16 września o 8:00" pozostałyby dwoma zdarzeniami, a to jedno ogłoszenie
+    przepisane przez drugie źródło.
+    """
+    if a.event_at is None or b.event_at is None:
+        return None
+    local_a, local_b = to_local(a.event_at), to_local(b.event_at)
+    if local_a.date() != local_b.date():
+        return False
+    if is_all_day(a.event_at, a.event_until) or is_all_day(b.event_at, b.event_until):
+        return True
+    return (local_a.hour, local_a.minute) == (local_b.hour, local_b.minute)
+
+
+def _place_axis(a: StoryKey, b: StoryKey) -> Optional[bool]:
+    """
+    Oś MIEJSCA. `False` = weto (rozłączne miejscowości), `None` = nie wiadomo.
+
+    Pytamy wyłącznie o miejscowości GMINY (`alert_policy.places_in`) — jedna
+    lista na projekt, nie druga kopia. Gdy któraś strona nie wymienia żadnej,
+    oś milczy: komunikat Energi o Lipówce i o Przełęku ma dwa puste zbiory,
+    więc rozstrzyga je oś czasu, nie ta.
+
+    Nazwa gminy odjęta tak samo jak w `alert_policy.same_incident`: „Rybno"
+    padające obok innych wsi bywa nazwą NADAWCY („Zakład Gospodarki Komunalnej
+    w Rybnie"), nie miejscem zdarzenia.
+    """
+    places_a, places_b = _incident_places(a.places), _incident_places(b.places)
+    if not places_a or not places_b:
+        return None
+    return not places_a.isdisjoint(places_b)
+
+
+def _incident_places(places: frozenset[str]) -> frozenset[str]:
+    """Miejsca zdarzenia — bez nazwy gminy, gdy padła obok innych wsi."""
+    rest = frozenset(p for p in places if p != _GMINA_NAME)
+    return rest or places
+
+
+_GMINA_NAME = "Rybno"
+
+
+def _cosine(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    if not norm_a or not norm_b:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _text_says_duplicate(a: StoryKey, b: StoryKey) -> bool:
+    """Oś TREŚCI po tekście — progi bez zmian, patrz komentarze przy stałych."""
+    if not a.tokens or not b.tokens:
+        return False
+    if _similarity(a.tokens, b.tokens) >= SIMILARITY_THRESHOLD:
+        return True
+    return (
+        len(a.stems) >= _STEM_MIN_TOKENS
+        and len(b.stems) >= _STEM_MIN_TOKENS
+        and _containment(a.stems, b.stems) >= STEM_CONTAINMENT_THRESHOLD
+    )
+
+
+async def fetch_article_embeddings(session, article_ids) -> dict:
+    """
+    Osadzenia artykułów do osi semantycznej — chunk 0, czyli tytuł z leadem.
+
+    Jedno zapytanie na cały feed (~40 wierszy), nie jedno na parę. Wpisy bez
+    osadzenia po prostu nie mają tej osi: `embedding_job` chodzi o 6:50 i 13:45,
+    więc materiał z późniejszych okien wchodzi do feedu wcześniej, niż zostanie
+    osadzony. To jest powód, dla którego semantyka NIE MOŻE być jedynym sędzią
+    powtórek — musi zostać dokładką do osi, które działają od pierwszej minuty.
+
+    Chunk 0, bo dalsze fragmenty długiego wpisu opisują szczegóły, a pytamy
+    o to, czy dwa wpisy są O TYM SAMYM. Ta sama zasada co przy wydarzeniach,
+    gdzie osadzany jest tytuł z opisem, a nie cała treść ogłoszenia.
+    """
+    from sqlalchemy import text as sql_text
+
+    ids = [int(i) for i in article_ids]
+    if not ids:
+        return {}
+
+    rows = await session.execute(sql_text("""
+        SELECT source_id, embedding::text
+        FROM document_embeddings
+        WHERE source_type = 'article' AND chunk_index = 0
+          AND source_id = ANY(:ids)
+    """), {"ids": ids})
+
+    osadzenia = {}
+    for source_id, wektor in rows:
+        if not wektor:
+            continue
+        try:
+            osadzenia[int(source_id)] = tuple(
+                float(x) for x in wektor.strip("[]").split(",")
+            )
+        except (ValueError, AttributeError):
+            continue  # uszkodzony wiersz nie może wywrócić feedu
+    return osadzenia
+
+
+def same_story(a: StoryKey, b: StoryKey) -> bool:
+    """
+    Czy dwa wpisy opisują tę samą sprawę — jedyne miejsce, gdzie to orzekamy.
+
+    Kolejność jest znacząca: najpierw WETA (bo odcinają bez względu na to, jak
+    podobne są teksty), potem dowody. Dowód tekstowy zostaje nietknięty, żeby
+    dzisiejsze zachowanie nie zmieniło się tam, gdzie działa; dowód semantyczny
+    dokłada się WYŁĄCZNIE do wpisów o zgodnym terminie.
+    """
+    term = _term_axis(a, b)
+    if term is False:
+        return False
+    if _place_axis(a, b) is False:
+        return False
+
+    if _text_says_duplicate(a, b):
+        return True
+
+    # Dowód semantyczny wymaga POTWIERDZENIA obu pozostałych osi: zgodnego
+    # terminu ORAZ wspólnej miejscowości. Nie jest to ostrożność na wyrost —
+    # to wynik pomiaru. Przy zgodnym terminie, ale MILCZĄCEJ osi miejsca
+    # (żaden wpis nie wymienia wsi z gminy) para komunikatów Energi o dwóch
+    # różnych wsiach spoza gminy ma cosinus 0,869 i sklejała się w jeden wpis:
+    # „Wyłączenie 13.09 17:48–20:30 — Wysoka" i „… — Prioma, Rutkowice"
+    # to jedno zdarzenie rozpisane na rejony, ale dla mieszkańca Priomy
+    # zniknięcie jego wsi z komunikatu jest utratą informacji.
+    #
+    # Milczenie osi ZAWĘŻA orzekanie i tak ma być: brak dowodu nie jest dowodem.
+    # Para bez wspólnej miejscowości wciąż może zostać zwinięta przez oś tekstu
+    # (nabór na „Czek Turystyczny" nie wymienia żadnej wsi, a zwija go Jaccard).
+    if term is not True or _place_axis(a, b) is not True:
+        return False
+    if a.embedding is None or b.embedding is None:
+        return False
+    return _cosine(a.embedding, b.embedding) >= SEMANTIC_DUPLICATE
+
+
+def collapse_duplicates(
+    items: Iterable[D],
+    key_of: Callable[[D], StoryKey],
+) -> list[D]:
     """
     Ten sam materiał z dwóch źródeł zostawia raz — wygrywa pozycja wcześniejsza,
     więc kolejność wejściowa musi już być rankingiem.
@@ -1048,40 +1293,25 @@ def collapse_duplicates(items: Iterable[D], text_of: Callable[[D], str]) -> list
     Deduplikacja po `external_id` łapie tylko wpisy o wspólnym identyfikatorze —
     to jest siatka bezpieczeństwa na przedruki między źródłami.
 
-    Dwa testy podobieństwa: Jaccard pełnych tokenów (przedruki niemal dosłowne)
-    oraz zawieranie rdzeni słów (ten sam komunikat w różnych redakcjach —
-    12.08.2026 nabór na azbest z BIP, strony gminy i FB zajął trzy pierwsze
-    miejsca feedu naraz). Blokada nadrzędna: wpisy z RÓŻNYMI terminami zdarzeń
-    nie są duplikatami nigdy — dwa wyłączenia Energi w tej samej wsi mają
-    identyczne tytuły i różnią się wyłącznie datą.
+    Samo orzekanie mieszka w `same_story` (trzy osie, każda z prawem weta) —
+    tutaj zostaje wyłącznie przebieg po liście.
+
+    ⚠️ `key_of` jest WYMAGANE i nie ma wariantu „sam tekst". Był przez pół dnia
+    14.09.2026 i natychmiast pokazał, czemu nie może istnieć: klucz zbudowany
+    z samego tekstu nie zna terminu, więc oś czasu milczała, a dwa wyłączenia
+    Energi z RÓŻNYCH dni skleiły się w jedno (`test_grounding` złapał to od razu).
+    Dwie ścieżki orzekania to dwa różne zachowania tej samej polityki — a cała
+    ta warstwa powstała właśnie po to, żeby zachowanie było jedno.
     """
     kept: list[D] = []
-    seen: list[tuple[frozenset[str], frozenset[str], frozenset[str]]] = []
+    seen: list[StoryKey] = []
 
     for item in items:
-        tokens = _tokens(text_of(item))
-        events = frozenset(t for t in tokens if _EVENT_TOKEN_RE.match(t))
-        stems = _stem_tokens(tokens)
-
-        duplicate = False
-        if tokens:
-            for seen_tokens, seen_stems, seen_events in seen:
-                if events and seen_events and events.isdisjoint(seen_events):
-                    continue  # różne terminy = różne zdarzenia
-                if _similarity(tokens, seen_tokens) >= SIMILARITY_THRESHOLD:
-                    duplicate = True
-                    break
-                if (
-                    len(stems) >= _STEM_MIN_TOKENS
-                    and len(seen_stems) >= _STEM_MIN_TOKENS
-                    and _containment(stems, seen_stems) >= STEM_CONTAINMENT_THRESHOLD
-                ):
-                    duplicate = True
-                    break
-        if duplicate:
+        key = key_of(item)
+        if key.tokens and any(same_story(key, other) for other in seen):
             continue
         kept.append(item)
-        seen.append((tokens, stems, events))
+        seen.append(key)
 
     return kept
 

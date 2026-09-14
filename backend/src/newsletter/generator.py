@@ -22,7 +22,7 @@ from src.services.time_span import local_day_bounds, to_local, when_label
 from src.services.feed_policy import (
     article_score,
     collapse_duplicates,
-    dedup_text,
+    story_key,
     publishable_conditions,
     time_label,
     visible_event_conditions,
@@ -586,7 +586,7 @@ class NewsletterGenerator:
             ),
             reverse=True,
         )
-        rows = collapse_duplicates(rows, text_of=lambda row: dedup_text(row[0]))
+        rows = collapse_duplicates(rows, key_of=lambda row: story_key(row[0]))
         articles = [article for article, _ in rows[:10]]
 
         # Get cinema showtimes for tonight

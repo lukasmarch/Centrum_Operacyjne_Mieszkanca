@@ -60,7 +60,7 @@ from src.services.feed_policy import (
     article_score,
     article_scope,
     collapse_duplicates,
-    dedup_text,
+    story_key,
     is_truncated,
     publishable_conditions,
     time_label,
@@ -362,7 +362,7 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
         ),
         reverse=True,
     )
-    rows = collapse_duplicates(rows, text_of=lambda row: dedup_text(row[0]))[:FEED_MAX_ITEMS]
+    rows = collapse_duplicates(rows, key_of=lambda row: story_key(row[0]))[:FEED_MAX_ITEMS]
 
     if not rows:
         return ToolResult(

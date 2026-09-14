@@ -19,7 +19,7 @@ from src.database.schema import Article, Event, AirQuality, DailySummary, Source
 from src.services import energa, weather_alert
 from src.services.feed_policy import (
     collapse_duplicates,
-    dedup_text,
+    story_key,
     is_local_article,
     MIN_ARTICLE_LOCALITY,
     visible_event_conditions,
@@ -357,7 +357,7 @@ class SummaryGenerator:
         # Ten sam materiał z dwóch źródeł idzie do AI raz — inaczej wraca
         # w briefingu jako dwie osobne „wiadomości"
         before_collapse = len(articles)
-        articles = collapse_duplicates(articles, text_of=dedup_text)
+        articles = collapse_duplicates(articles, key_of=story_key)
         if len(articles) < before_collapse:
             self.logger.info(
                 f"Duplicates collapsed: {before_collapse} → {len(articles)} articles"

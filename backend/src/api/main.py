@@ -223,11 +223,12 @@ async def get_articles(
         MAX_PINNED,
         article_score,
         collapse_duplicates,
-        dedup_text,
         diversify,
+        fetch_article_embeddings,
         is_pinned_alert,
         publishable_conditions,
         source_label,
+        story_key,
         source_window_order,
         still_relevant_event,
     )
@@ -287,9 +288,13 @@ async def get_articles(
         ),
         reverse=True,
     )
+    # Oś semantyczna powtórek: jedno zapytanie o osadzenia całej puli. Wpis bez
+    # osadzenia (materiał świeższy niż ostatni przebieg `embedding_job`) traci
+    # tę oś, ale nie wypada z deduplikacji — orzekają wtedy czas, miejsce i tekst.
+    embeddings = await fetch_article_embeddings(session, [row[0].id for row in rows])
     rows = collapse_duplicates(
         rows,
-        text_of=lambda row: dedup_text(row[0]),
+        key_of=lambda row: story_key(row[0], embeddings.get(row[0].id)),
     )
 
     # Awarie dotyczące najbliższych godzin zostają na górze — reszta wg rankingu

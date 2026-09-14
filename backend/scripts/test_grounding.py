@@ -44,7 +44,7 @@ from src.ai.summary_generator import (
     validate_summary,
 )
 from src.services.alert_policy import _flat
-from src.services.feed_policy import collapse_duplicates, dedup_text
+from src.services.feed_policy import collapse_duplicates, story_key
 
 
 @dataclass(eq=False)  # tożsamość, nie wartość — test sprawdza KTÓRY obiekt został
@@ -194,7 +194,7 @@ def main() -> int:
 
     # -- dedup tematyczny ----------------------------------------------------
     feed = collapse_duplicates(
-        AZBEST + [STYPENDIA], text_of=dedup_text
+        AZBEST + [STYPENDIA], key_of=story_key
     )
     outage_a = FakeArticle(title=ENERGA_TITLE, content="Ulice: Leśna, Polna",
                            event_at=datetime(2026, 8, 20, 8, 0))
@@ -203,7 +203,7 @@ def main() -> int:
     outage_a_refresh = FakeArticle(title=ENERGA_TITLE, content="Ulice: Leśna, Polna",
                                    event_at=datetime(2026, 8, 20, 8, 0))
     outages = collapse_duplicates(
-        [outage_a, outage_b, outage_a_refresh], text_of=dedup_text
+        [outage_a, outage_b, outage_a_refresh], key_of=story_key
     )
 
     checks = [

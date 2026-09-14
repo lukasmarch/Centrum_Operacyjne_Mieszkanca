@@ -59,7 +59,7 @@ from src.services.feed_policy import (  # noqa: E402
     MAX_PINNED,
     article_score,
     collapse_duplicates,
-    dedup_text,
+    story_key,
     diversify,
     is_local_article,
     is_pinned_alert,
@@ -244,7 +244,7 @@ def simulate_feed(articles: list[Art], now: datetime, limit: int = 50) -> list[A
         )
 
     rows.sort(key=score, reverse=True)
-    rows = collapse_duplicates(rows, text_of=dedup_text)
+    rows = collapse_duplicates(rows, key_of=story_key)
 
     pinned, regular = [], []
     for a in rows:
