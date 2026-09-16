@@ -244,6 +244,14 @@ class Article(SQLModel, table=True):
     # wpis co 3h (wspólny external_id), więc bez niego każde odświeżenie źródła
     # wysyłałoby powiadomienie o tym samym wyłączeniu od nowa.
     alert_pushed_at: Optional[datetime] = Field(default=None)
+    # Moment, w którym model był pytany, czy ten wpis zapowiada wydarzenie —
+    # bez względu na odpowiedź. Ekstrakcja bierze świeży materiał z okna 6 h,
+    # a dodatkowo NADRABIA zapowiedzi z przyszłym `event_at`, które z tego okna
+    # wypadły (16.09.2026 kalendarz nie miał przez to zebrania wiejskiego
+    # z 17.09). Bez tego znacznika nadrabianie pytałoby o nabory i konkursy
+    # („trwa do 30 września") przy każdym przebiegu, bo wpis, który nie jest
+    # wydarzeniem, nie zostawia po sobie nic w `events`.
+    event_checked_at: Optional[datetime] = Field(default=None)
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"

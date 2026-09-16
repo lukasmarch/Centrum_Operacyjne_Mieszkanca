@@ -36,6 +36,7 @@ from src.ai.event_extractor import (
     _place_key,
     _organ_key,
     same_event,
+    time_upgrade,
 )
 from src.ai.models import ExtractedEvent
 from src.services.feed_policy import MIN_EVENT_LOCALITY, is_pinned_alert
@@ -234,6 +235,40 @@ def run_cases() -> int:
         ok = _organ_key(title) == expected
         failed += 0 if ok else 1
         print(f"  {'✓' if ok else '✗'} „{title[:46]}” → „{_organ_key(title)}” ({label})")
+
+    print()
+    print("=" * 72)
+    print("7. GODZINA Z POWTÓRKI — scalanie zostawia wpis pierwszy, nie lepszy")
+    print("=" * 72)
+    # 16.09.2026: „Zebranie Wiejskie w Rybnie" (17.09) stało w kalendarzu jako
+    # całodniowe z art. 5502, a drugie ogłoszenie (art. 5856) podawało 18:00.
+    # Wartości jak w bazie: naiwny UTC, więc wpis całodniowy to lokalna północ,
+    # czyli 22:00 dnia poprzedniego (czas letni).
+    ALL_DAY_17 = datetime(2026, 9, 16, 22, 0)      # 17.09 cały dzień
+    AT_18_17 = datetime(2026, 9, 17, 16, 0)        # 17.09 18:00 lokalnego
+    AT_20_17 = datetime(2026, 9, 17, 18, 0)        # 17.09 20:00 lokalnego
+    ALL_DAY_18 = datetime(2026, 9, 17, 22, 0)      # 18.09 cały dzień
+
+    for label, args, expected in [
+        ("całodniowe + powtórka z godziną → podnosimy",
+         (ALL_DAY_17, None, AT_18_17, None), (AT_18_17, None)),
+        ("całodniowe + powtórka z godziną i końcem → bierzemy oba",
+         (ALL_DAY_17, None, AT_18_17, AT_20_17), (AT_18_17, AT_20_17)),
+        ("w kalendarzu jest już godzina → powtórka bez godziny jej nie kasuje",
+         (AT_18_17, None, ALL_DAY_17, None), None),
+        ("dwie różne godziny tego samego dnia → to sprawa dedupu, nie uzupełniania",
+         (AT_18_17, None, AT_20_17, None), None),
+        ("oba całodniowe → nie ma czego podnosić",
+         (ALL_DAY_17, None, ALL_DAY_17, None), None),
+        ("inna doba lokalna → bezpiecznik, nie ruszamy",
+         (ALL_DAY_18, None, AT_18_17, None), None),
+    ]:
+        got = time_upgrade(*args)
+        ok = got == expected
+        failed += 0 if ok else 1
+        print(f"  {'✓' if ok else '✗'} {label}")
+        if not ok:
+            print(f"      jest {got!r}, ma być {expected!r}")
 
     print()
     print(f"{'✓ Wszystko zielone' if not failed else f'✗ Błędów: {failed}'}")

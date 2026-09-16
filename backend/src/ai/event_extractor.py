@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from pydantic_ai import Agent, RunContext
+from sqlalchemy import and_, or_
 from sqlalchemy import text as sql_text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +42,7 @@ from src.config import settings
 from src.database.schema import Article, Event
 from src.services.alert_policy import places_in
 from src.services.feed_policy import MIN_EVENT_LOCALITY
-from src.services.time_span import to_local, to_utc
+from src.services.time_span import is_all_day, local_day_bounds, to_local, to_utc
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 
@@ -307,6 +308,44 @@ def same_event(
     return True
 
 
+def time_upgrade(
+    canonical_start: datetime,
+    canonical_end: Optional[datetime],
+    new_start: datetime,
+    new_end: Optional[datetime],
+) -> Optional[tuple[datetime, Optional[datetime]]]:
+    """
+    Godzina z DRUGIEGO ogłoszenia dla wpisu, który stoi w kalendarzu bez godziny.
+
+    Scalanie powtórek zostawia wpis pierwszy, a pierwszy bywa uboższy. 16.09.2026
+    kalendarz zapowiadał „Zebranie Wiejskie w Rybnie — Fundusz Sołecki" na 17.09
+    jako całodniowe (art. 5502, post bez godziny), choć drugie ogłoszenie tego
+    samego zebrania (art. 5856) mówiło wprost: 18:00. Mieszkaniec dostawał więc
+    termin, po którym nie da się zaplanować dnia, przy danych leżących obok.
+
+    Podnosimy WYŁĄCZNIE w jedną stronę — z „cały dzień" na konkretną godzinę:
+      - wpis w kalendarzu musi być całodniowy (lokalna północ, bez końca),
+      - powtórka musi mieć realną godzinę,
+      - oba muszą dotyczyć tej samej doby LOKALNEJ (bezpiecznik; `find_duplicate`
+        grupuje po dniu, ale ta funkcja jest czysta i bywa wołana w testach).
+
+    Nigdy w drugą stronę: gdy w kalendarzu stoi już godzina, ogłoszenie bez niej
+    nie może jej skasować, a dwie różne godziny tego samego dnia to sprawa dla
+    dedupu, nie dla uzupełniania. `None` znaczy „nie ma czego podnosić".
+
+    ⚠️ Embedding wpisu zostaje bez zmian. Niesie datę, nie godzinę, a dedup i tak
+    liczy dobę lokalną — przeliczenie kosztowałoby wywołanie modelu i niczego
+    by nie zmieniło.
+    """
+    if not is_all_day(canonical_start, canonical_end):
+        return None
+    if is_all_day(new_start, new_end):
+        return None
+    if to_local(canonical_start).date() != to_local(new_start).date():
+        return None
+    return new_start, new_end
+
+
 async def find_duplicate(
     session: AsyncSession,
     embedding: list[float],
@@ -422,6 +461,55 @@ class EventExtractor:
             endpoint="extractor:event_embedding",
         )
         return chunk, embedding
+
+    async def _apply_time_upgrade(
+        self, session: AsyncSession, canonical_id: int, duplicate: Event
+    ) -> None:
+        """Uzupełnij godzinę wpisu w kalendarzu danymi z powtórki (`time_upgrade`)."""
+        canonical = await session.get(Event, canonical_id)
+        if canonical is None:
+            return
+
+        upgrade = time_upgrade(
+            canonical.event_date, canonical.end_date,
+            duplicate.event_date, duplicate.end_date,
+        )
+        if upgrade is None:
+            return
+
+        start, end = upgrade
+        canonical.event_date = start
+        canonical.end_date = end
+        canonical.event_time = to_local(start).strftime("%H:%M")
+        canonical.updated_at = datetime.utcnow()
+        session.add(canonical)
+        self.logger.info(
+            f"Wydarzenie #{canonical_id} „{canonical.title[:40]}”: "
+            f"cały dzień → {canonical.event_time} (z powtórki „{duplicate.title[:40]}”)"
+        )
+
+    async def _mark_event_checked(self, session: AsyncSession, article_id: int) -> None:
+        """
+        „Model widział ten wpis" — znacznik dla gałęzi nadrabiania zapowiedzi.
+
+        Surowym UPDATE-em, nie przez obiekt ORM: `extract_event` kończy się
+        commitem albo rollbackiem, a po rollbacku wczytany wcześniej obiekt jest
+        unieważniony i sięgnięcie po jego pole dociągałoby go z bazy w kodzie
+        synchronicznym (`MissingGreenlet` — ta sama pułapka, przez którą pętla
+        wyżej chodzi po ID, a nie po obiektach).
+        """
+        try:
+            await session.execute(
+                sql_text("UPDATE articles SET event_checked_at = :now WHERE id = :id"),
+                {"now": datetime.utcnow(), "id": article_id},
+            )
+            await session.commit()
+        except Exception as exc:
+            # Znacznik jest optymalizacją kosztu, nie warunkiem poprawności —
+            # jego brak kosztuje jedno wywołanie modelu przy kolejnym przebiegu,
+            # więc nie ma prawa wywrócić całej pętli.
+            await session.rollback()
+            self.logger.warning(f"Nie zapisano event_checked_at dla {article_id}: {exc}")
 
     async def _persist_embedding(
         self, session: AsyncSession, event: Event, chunk: dict, embedding: list[float]
@@ -603,6 +691,10 @@ URL: {article.url}
                     f"Event '{event.title}' = powtórzenie #{canonical_id} "
                     f"(podobieństwo {similarity:.2f}) — scalone"
                 )
+                # Powtórka bywa bogatsza od wpisu, który już stoi w kalendarzu:
+                # drugie ogłoszenie tego samego zebrania podało godzinę 18:00,
+                # a widoczny wpis był całodniowy. Patrz `time_upgrade`.
+                await self._apply_time_upgrade(session, canonical_id, event)
 
             session.add(event)
             try:
@@ -657,6 +749,53 @@ URL: {article.url}
             await session.rollback()
             return None
 
+    async def candidates(
+        self,
+        session: AsyncSession,
+        hours: int = 24,
+        now: Optional[datetime] = None,
+    ) -> list[Article]:
+        """
+        Artykuły, o które ten przebieg zapyta model — surowy wynik zapytania,
+        przed tanią bramką `is_event_candidate`.
+
+        Osobna metoda, bo to samo zapytanie wykonuje podgląd kosztu
+        (`scripts/diagnostics/preview_event_catchup.py`). Gałąź nadrabiania
+        kosztuje wywołania gpt-4o, więc chcemy je policzyć PRZED wdrożeniem —
+        i policzyć zapytaniem produkcyjnym, nie jego kopią, która się rozjedzie.
+        """
+        now = now or datetime.utcnow()
+        cutoff = now - timedelta(hours=hours)
+
+        # Nadrabianie sięga początku DZISIEJSZEJ doby lokalnej, nie „teraz":
+        # zapowiedź bez godziny stoi w bazie jako lokalna północ, więc warunek
+        # `event_at >= now` wyrzucałby z okna wydarzenie odbywające się DZIŚ.
+        # Ta sama postać błędu, którą warstwa czasu zebrała 5.09.2026 —
+        # dlatego pilnuje jej `scripts.test_timezone_guard`.
+        day_start, _ = local_day_bounds(now=now)
+
+        already_extracted = select(Event.source_article_id).where(
+            Event.source_article_id.is_not(None)
+        )
+
+        result = await session.execute(
+            select(Article)
+            .where(
+                Article.processed == True,
+                Article.category.is_not(None),
+                Article.id.not_in(already_extracted),
+                or_(
+                    Article.scraped_at >= cutoff,
+                    and_(
+                        Article.event_at >= day_start,
+                        Article.event_checked_at.is_(None),
+                    ),
+                ),
+            )
+            .order_by(Article.scraped_at.desc())
+        )
+        return list(result.scalars().all())
+
     async def extract_from_recent(
         self,
         session: AsyncSession,
@@ -677,6 +816,18 @@ URL: {article.url}
         location)` tego nie widział: 129 wydarzeń z 30 dni pochodziło z 90
         artykułów — 39 rekordów to była ta sama informacja opłacona po raz drugi.
 
+        ⚠️ Okno pobrania samo nie wystarcza i 16.09.2026 pokazało, dlaczego:
+        zapowiedź, której model nie wyłuskał w swoim oknie, nie wraca NIGDY.
+        W kalendarzu brakowało zebrania wiejskiego w Rybnie (17.09 o 18:00,
+        ogłoszone 6.09) i sołeckiego turnieju halowego (27.09, ogłoszone 8.09) —
+        obu z terminem stojącym w `articles.event_at`, czyli z materiałem
+        gotowym. Druga gałąź okna bierze więc wpisy z PRZYSZŁYM terminem bez
+        względu na wiek pobrania, a przed zapętleniem kosztu chroni
+        `event_checked_at`: znacznik „model to widział", stawiany po każdej
+        próbie. Bez niego nabór trwający do 30 września wracałby do gpt-4o
+        dwa razy dziennie przez trzy tygodnie, bo wpis, który wydarzeniem nie
+        jest, nie zostawia śladu w `events`.
+
         Args:
             session: Async database session
             hours: Ile godzin wstecz sprawdzać artykuły
@@ -685,23 +836,7 @@ URL: {article.url}
             Liczba NOWYCH wydarzeń (powtórki scalone nie liczą się do wyniku)
         """
 
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
-
-        already_extracted = select(Event.source_article_id).where(
-            Event.source_article_id.is_not(None)
-        )
-
-        result = await session.execute(
-            select(Article)
-            .where(
-                Article.processed == True,
-                Article.scraped_at >= cutoff,
-                Article.category.is_not(None),
-                Article.id.not_in(already_extracted),
-            )
-            .order_by(Article.scraped_at.desc())
-        )
-        candidates = result.scalars().all()
+        candidates = await self.candidates(session, hours=hours)
         articles = [a for a in candidates if is_event_candidate(a)]
 
         if not articles:
@@ -742,6 +877,11 @@ URL: {article.url}
                 self.logger.error(f"✗ Artykuł {article_id} pominięty: {exc}")
                 await session.rollback()
                 continue
+            # Znacznik stawiamy po KAŻDEJ zakończonej próbie, także po „to nie
+            # jest wydarzenie" — właśnie te wpisy nie zostawiają śladu w `events`
+            # i to one wracałyby w gałęzi nadrabiania bez końca. Błąd (gałąź
+            # wyżej) znacznika NIE dostaje: tam nie wiemy, czy model to widział.
+            await self._mark_event_checked(session, article_id)
             if event:
                 event_count += 1
 
