@@ -192,7 +192,6 @@ def _scope_of(article, source_name: Optional[str]) -> str:
 async def get_articles(
     limit: int = 50,
     per_source: int = 5,
-    days: int = 2,
     location: Optional[str] = None,
     session: AsyncSession = Depends(get_session)
 ):
@@ -204,10 +203,15 @@ async def get_articles(
     (src/services/feed_policy.py). Bez tego pierwsza piątka zawsze pochodziła
     z jednego profilu FB publikującego kilkanaście razy dziennie.
 
+    O tym, CO należy dziś do feedu, rozstrzyga `feed_policy.in_feed_window`.
+    Parametr `days` zniknął 16.09.2026: wiek wpisu jest regułą POLITYKI
+    (`NEWS_MAX_AGE_DAYS`), jedną dla feedu, kafla i strony głównej — a jako
+    parametr zapytania znaczył co innego dla każdego z tych trzech miejsc
+    i liczył się od `scraped_at`, czyli od momentu, który re-scrape nadpisuje.
+
     Args:
         limit: Maximum total articles to return (default: 50)
         per_source: Maximum articles per source (default: 5)
-        days: Only return articles from the last N days (default: 2)
         location: Miejscowość czytelnika. Nie filtruje i nie zmienia kolejności —
             wypełnia `concerns_location`, czyli odpowiedź na pytanie „czy ta
             awaria dotyczy MOJEJ wsi". 25.08.2026 mieszkaniec Żabin dostawał na
@@ -215,8 +219,7 @@ async def get_articles(
             Wyzwolenia w Rybnie. Push tę bramkę ma od 24.08
             (`push_subscriptions.location`), strona nie miała jej wcale.
     """
-    from datetime import timedelta
-    from sqlalchemy import func, or_
+    from sqlalchemy import func
 
     from src.services import alert_policy
     from src.services.feed_policy import (
@@ -224,17 +227,15 @@ async def get_articles(
         article_score,
         collapse_duplicates,
         diversify,
+        feed_window_conditions,
         fetch_article_embeddings,
+        in_feed_window,
         is_pinned_alert,
         publishable_conditions,
         source_label,
         story_key,
         source_window_order,
-        still_relevant_event,
     )
-
-    # Calculate cutoff date (2 days ago)
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
 
     now = datetime.utcnow()
 
@@ -251,19 +252,12 @@ async def get_articles(
 
     subquery = (
         select(Article.id, row_number)
-        .where(
-            or_(
-                Article.published_at >= cutoff_date,
-                Article.scraped_at >= cutoff_date,
-                # zapowiedziane zdarzenie zostaje w feedzie do swojego terminu,
-                # choćby ogłoszenie miało trzy tygodnie. `still_relevant_event`,
-                # nie samo `event_until >= now`: godzinę końca zna Energa i alert
-                # meteo, nie zna jej zapowiedź czytana przez model, a wpis
-                # z terminem i bez końca wypadał z feedu w dniu, którego dotyczył
-                # (25.08.2026: konsultacje ws. kanalizacji tego dnia o 19:00).
-                still_relevant_event(Article, now),
-            )
-        )
+        # Okno feedu: wiadomość żyje trzy doby lokalne od PUBLIKACJI, zapowiedź
+        # czeka w kalendarzu i wchodzi w przeddzień terminu, a wcześniej wolno
+        # stać wyłącznie awarii i sprawie urzędowej dotyczącej gminy. Warunek
+        # SQL jest celowo szerszy — ostatecznie orzeka `in_feed_window` niżej,
+        # bo rodzaj zdarzenia i miejsce czyta się z TREŚCI, nie z kolumn.
+        .where(feed_window_conditions(Article, now))
         .where(*publishable_conditions(Article))  # filler i cudze reklamy poza feedem
         .subquery()
     )
@@ -276,7 +270,7 @@ async def get_articles(
         .where(subquery.c.row_num <= per_source)
     )
 
-    rows = list(result)
+    rows = [row for row in result if in_feed_window(row[0], now)]
 
     # Ten sam materiał z dwóch źródeł (oba kanały Energi, przedruki) — raz.
     # Kolejność wejściowa musi już być rankingiem, więc najpierw sortujemy.

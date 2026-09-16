@@ -24,8 +24,13 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_, case, cast, func, or_
 from sqlalchemy.types import Time
 
-from src.services.alert_policy import is_foreign_region, places_in, span_from_text
-from src.services.time_span import is_all_day, to_local, when_label
+from src.services.alert_policy import (
+    incident_of,
+    is_foreign_region,
+    places_in,
+    span_from_text,
+)
+from src.services.time_span import is_all_day, local_day_bounds, to_local, when_label
 from src.services.weather_alert import expired as weather_alert_expired
 from src.services.weather_alert import is_weather_alert
 
@@ -272,7 +277,7 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
 
     Liczymy od KOŃCA zdarzenia, a dla zapowiedzi bez godziny końca — od końca
     jej doby (`event_at` o północy to zapis całodniowy, tak samo jak w
-    `still_relevant_event` i `summary_generator._event_is_over`). Wpisy bez
+    `_event_end` i `summary_generator._event_is_over`). Wpisy bez
     terminu reguła nie dotyczy wcale: o nich rozstrzyga wiek publikacji.
     """
     now = now or datetime.utcnow()
@@ -299,37 +304,118 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
     ]
 
 
-def still_relevant_event(article_model, now: Optional[datetime] = None):
+# Ile dób lokalnych żyje w feedzie zwykła wiadomość: dziś, wczoraj i przedwczoraj.
+# Liczone od PUBLIKACJI, nigdy od `scraped_at` — ten ostatni jest nadpisywany przy
+# każdym ponownym pobraniu (`scrapers/base.save_to_db`), więc stary post wracał do
+# okna jak świeży: 15.09.2026 było tak z siedmioma wpisami naraz.
+NEWS_MAX_AGE_DAYS = 3
+
+# Zapowiedź wchodzi do feedu w PRZEDDZIEŃ swojego terminu. Wcześniej jej miejscem
+# jest kalendarz — o to właśnie rozjechała się polityka między 27.07 a 25.08.2026,
+# gdy `still_relevant_event` wpuściło do feedu każdą zapowiedź aż do terminu:
+# 15.09 na 35 wpisów 15 dotyczyło przyszłości, w tym zebranie ogłoszone 21.08
+# i certyfikat QMP ogłoszony 7.08.
+ANNOUNCEMENT_LEAD_DAYS = 1
+
+
+def feed_window_conditions(article_model, now: Optional[datetime] = None):
     """
-    Warunek SQL „termin tego wpisu jeszcze nie minął" — dla okna feedu.
+    Warunki SQL okna feedu — celowo SZERSZE niż prawda, ostatecznie orzeka
+    `in_feed_window` w Pythonie.
 
-    `event_until` bywa puste: zna je Energa (z komunikatu) i alert meteo,
-    nie zna go zapowiedź czytana przez model, bo źródło podaje samą godzinę
-    rozpoczęcia. Bez domyślnego czasu trwania taka zapowiedź wypadała z feedu
-    w dniu, w którym była aktualna — patrz `DEFAULT_EVENT_DURATION_H`.
-
-    Wpis bez godziny (`event_at` o północy) trwa do końca swojego dnia, nie
-    trzy godziny: „Wielkie Otwarcie 22 sierpnia" nie kończy się o 3 nad ranem.
-    Ta sama reguła co `utils/eventTime.isAllDay` na froncie.
-
-    Odejmujemy od `now`, zamiast dodawać do kolumny: warunek zostaje wtedy
-    porównaniem kolumny ze stałą, więc indeks na `event_at` nadal działa.
+    Ten sam podział pracy co przy przypinaniu awarii (`is_pinned_alert`): SQL
+    zawęża pulę do rozsądnego rozmiaru, a reguły, które muszą czytać TREŚĆ
+    (nazwa wsi przez `places_in`, rodzaj zdarzenia przez `incident_of`),
+    wykonuje Python. Nie da się ich wyrazić w SQL, a przepisanie ich na
+    kategorię z AI byłoby cofnięciem się do etykiety, która powstaje o 6:15
+    i 13:15 i potrafi się zmienić między przebiegami.
     """
     now = now or datetime.utcnow()
-    return or_(
-        article_model.event_until >= now,
-        and_(
-            article_model.event_until.is_(None),
-            article_model.event_at.isnot(None),
-            or_(
-                article_model.event_at >= now - timedelta(hours=DEFAULT_EVENT_DURATION_H),
-                and_(
-                    cast(article_model.event_at, Time) == time(0, 0),
-                    article_model.event_at >= now - timedelta(days=1),
-                ),
-            ),
-        ),
+    news_start, _ = local_day_bounds(now=now, days=1)
+    news_start -= timedelta(days=NEWS_MAX_AGE_DAYS - 1)
+    _, tomorrow_end = local_day_bounds(now=now, days=ANNOUNCEMENT_LEAD_DAYS + 1)
+    ended_before = now - timedelta(hours=ENDED_EVENT_GRACE_H)
+
+    with_term = and_(
+        article_model.event_at.isnot(None),
+        _event_end(article_model) >= ended_before,
     )
+
+    return or_(
+        # 1. Wiadomość — liczy się data publikacji, nie moment pobrania.
+        func.coalesce(article_model.published_at, article_model.scraped_at) >= news_start,
+        # 2. Zapowiedź w przeddzień, w dniu terminu albo trwająca.
+        and_(with_term, article_model.event_at < tomorrow_end),
+        # 3. Sprawy gminy z terminem — wcześniej niż D-1 wolno pokazać wyłącznie
+        #    awarii i wiadomości urzędowej. Które to są, rozstrzyga `in_feed_window`.
+        and_(with_term, article_model.locality >= MIN_ARTICLE_LOCALITY),
+        and_(with_term, article_model.category.ilike("%awari%")),
+    )
+
+
+# Kategoria wiadomości urzędowej — sprawa, na którą mieszkaniec ma zareagować
+# albo się stawić (zebranie wiejskie, konsultacje, termin w urzędzie). Tylko ona
+# i awaria mają prawo stać w feedzie wcześniej niż w przeddzień terminu.
+OFFICIAL_CATEGORY = "Urząd"
+
+
+def in_feed_window(article, now: Optional[datetime] = None) -> bool:
+    """
+    Czy ten wpis należy DZIŚ do feedu — jedyne miejsce, gdzie to orzekamy.
+
+    Trzy reguły, w kolejności od najczęstszej:
+
+    1. **Wiadomość bez terminu** żyje `NEWS_MAX_AGE_DAYS` dób lokalnych od
+       PUBLIKACJI.
+    2. **Zapowiedź** czeka w kalendarzu i wchodzi do feedu w przeddzień terminu.
+       Po terminie zostaje jeszcze dobę (`ENDED_EVENT_GRACE_H` w
+       `publishable_conditions`), bo wczorajsza impreza czyta się jako relacja.
+    3. **Wyjątek: awaria i wiadomość urzędowa DOTYCZĄCA GMINY** — te pokazujemy
+       od ogłoszenia, bo mieszkaniec ma się do nich przygotować. Wyłączenie prądu
+       w Żabinach za tydzień jest wiadomością; ten sam komunikat o Działdowie
+       czeka do przeddnia i stoi w sekcji „Powiat i sąsiedzi".
+
+    Rodzaj zdarzenia czytamy z TEKSTU (`alert_policy.incident_of`), nie
+    z kategorii — ta powstaje o 6:15/13:15, a komunikat Energi z 18:05 wisi do
+    rana bez niej. Kategoria „Urząd" dokłada się do tego, bo zebrania wiejskiego
+    żaden wzorzec awarii nie rozpozna i rozpoznać nie powinien.
+    """
+    now = now or datetime.utcnow()
+    event_at = getattr(article, "event_at", None)
+
+    if event_at is None:
+        published = getattr(article, "published_at", None) or getattr(article, "scraped_at", None)
+        if published is None:
+            return False
+        news_start, _ = local_day_bounds(now=now, days=1)
+        news_start -= timedelta(days=NEWS_MAX_AGE_DAYS - 1)
+        return published >= news_start
+
+    # Zapowiedź po terminie: o karencji rozstrzyga `publishable_conditions`,
+    # tutaj wystarczy, że zdarzenie już się zaczęło.
+    if event_at <= now:
+        return True
+
+    _, lead_end = local_day_bounds(now=now, days=ANNOUNCEMENT_LEAD_DAYS + 1)
+    if event_at < lead_end:
+        return True
+
+    title = getattr(article, "title", None)
+    content = getattr(article, "content", None)
+    display = getattr(article, "display_title", None)
+    locality = getattr(article, "locality", None)
+
+    in_gmina = (
+        locality >= MIN_ARTICLE_LOCALITY if locality is not None
+        else bool(places_in(display or title, content))
+    )
+    if not in_gmina:
+        return False
+
+    category = (getattr(article, "category", None) or "").strip()
+    if category == OFFICIAL_CATEGORY:
+        return True
+    return bool(incident_of(display or title, content)) or "awari" in category.lower()
 
 
 # Jak długie zdarzenie wolno jeszcze uznać za „dzieje się TERAZ".
@@ -350,7 +436,8 @@ ONGOING_MAX_SPAN_H = 36
 
 def _event_end(article_model):
     """
-    Koniec zdarzenia w SQL — ta sama reguła co `still_relevant_event`:
+    Koniec zdarzenia w SQL — ta sama reguła, którą stosuje okno feedu
+    (`feed_window_conditions`) i karencja w `publishable_conditions`:
     deklarowany `event_until`, dla zapowiedzi całodniowej koniec jej doby,
     dla reszty `DEFAULT_EVENT_DURATION_H`.
     """
@@ -1135,8 +1222,8 @@ def _term_axis(a: StoryKey, b: StoryKey) -> Optional[bool]:
     północ, czyli 22:00 UTC dnia poprzedniego) miała inny token niż ta sama
     zapowiedź z godziną — i para nie była w ogóle porównywana. Skutek: wpis
     z terminem był w praktyce zwolniony z deduplikacji, a to właśnie zapowiedzi
-    wiszą w feedzie tygodniami (`still_relevant_event`) i mają najwięcej
-    przedruków.
+    mają najwięcej przedruków: każde źródło opisuje je po swojemu, a od 16.09.2026
+    wchodzą do feedu wszystkie naraz, w przeddzień wspólnego terminu.
 
     Godziny wymagamy tylko wtedy, gdy znają ją OBA wpisy — czyli z dokładnością
     SŁABSZEGO z dwóch terminów. Inaczej „pobór krwi 16 września" i „pobór krwi

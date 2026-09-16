@@ -96,7 +96,7 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
 const VISIBLE_CHIPS = 4;
 
 const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
-  const { articles, loading, error } = useArticles({ limit: 50, perSource: 5, days: 2 });
+  const { articles, loading, error } = useArticles({ limit: 50, perSource: 5 });
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory || 'Wszystkie');
   const [chipsExpanded, setChipsExpanded] = useState(false);
   const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);

@@ -36,7 +36,6 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 interface UseArticlesOptions {
   limit?: number;
   perSource?: number;
-  days?: number;
   /**
    * Miejscowość czytelnika. Nie filtruje wyników i nie zmienia kolejności —
    * backend odpowiada nią na pytanie „czy ta awaria dotyczy MOJEJ wsi"
@@ -46,7 +45,12 @@ interface UseArticlesOptions {
 }
 
 export function useArticles(options: UseArticlesOptions = {}) {
-  const { limit = 50, perSource = 5, days = 2, location = null } = options;
+  // Wiek wpisu nie jest już parametrem zapytania: o tym, co należy do feedu,
+  // rozstrzyga jedna polityka w backendzie (`feed_policy.in_feed_window`).
+  // Do 16.09.2026 każde miejsce prosiło o własne okno („days”), a liczyło się
+  // ono od momentu pobrania, który re-scrape nadpisuje — stary post wracał
+  // wtedy na stronę jako świeży.
+  const { limit = 50, perSource = 5, location = null } = options;
 
   const [articles, setArticles] = useState<Article[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +63,6 @@ export function useArticles(options: UseArticlesOptions = {}) {
         const query = new URLSearchParams({
           limit: String(limit),
           per_source: String(perSource),
-          days: String(days),
         });
         if (location) query.set('location', location);
         const response = await fetch(`${API_URL}/articles?${query}`);
@@ -117,7 +120,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
     const interval = setInterval(fetchArticles, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [limit, perSource, days, location]);
+  }, [limit, perSource, location]);
 
   return { articles, loading, error };
 }
