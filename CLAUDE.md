@@ -1090,7 +1090,29 @@ Czwarta, `WYLACZNIE_W_FORMIE_SPOLKI` (25 zn., 5 firm), zmieściła się przypadk
 - [ ] **Wolumen treści** (pomiar 3.09, 14 dni): 4–9 wpisów o gminie dziennie, 76% z jednego
       profilu (Syla); oficjalne kanały gminy prawie milczą (Gmina Rybno 2, FB Rybno 8).
       Radio 7 + KPP = 91 wpisów, 2 lokalne. Wzbogacenie = nowe profile FB przez Apify
-      (limit FREE $5/mies., każdy profil to osobny run) — decyzja produktowa
+      (limit FREE $5/mies., każdy profil to osobny run) — decyzja produktowa.
+      ✅ 16.09 dodane 4 profile: GOPS Rybno, Żłobek w Rybnie, Sołectwo Hartowiec,
+      Sołtys Żabiny (`add_gmina_fb_sources`, prod). Pobierane **pon–pt**
+      (`WEEKDAY_ONLY_SOURCES`) — pusty przebieg Apify też kosztuje $0,008
+- [ ] **Model widzi pełny post, baza trzyma 300 znaków** (decyzja Łukasza 16.09).
+      Pomiar 16.09: **272/272 wpisy FB są urwane**, mediana pełnego posta 789 zn.,
+      w 300 zn. mieści się **6%** postów (w 500 zn. — 29%, w 800 — 51%). Data jest
+      już czytana z PEŁNEJ treści (`event_span_from_full_text`, 7.09) i to działa:
+      udział wpisów FB z terminem 29% → 46%. Ale kategoria, ocena lokalności,
+      NAGŁÓWEK i ekstrakcja wydarzeń widzą sam wypis — stąd art. 5929
+      „Mistrzostwa Nordic Walking **18 września**" przy poprawnym terminie 18.10
+      (sprawdzone w oryginale posta: „📅 18 października 2026 r.").
+      ⚠️ **Limit publikacji 300 zn. ZOSTAJE** — zasada z 7.09 bez zmian:
+      zapisujemy FAKT, nie cudzy tekst. Zmienia się tylko to, ile model WIDZI,
+      zanim tekst wyrzucimy: „pokazujemy więcej, zapisujemy mniej".
+      ⚠️ **Tylko na bieżąco — NIE działamy wstecz**: żadnego backfillu starych
+      wpisów, zmiana obowiązuje od wdrożenia.
+      Najpierw POMIAR na 30 dniach: ilu wpisom zmieniłaby się kategoria albo
+      ocena lokalności i ile dostałoby wydarzenie, gdyby model widział całość.
+      Pełne teksty do pomiaru są dostępne w datasetach Apify (bez ponownego
+      scrapowania, bez kosztu). Dopiero wynik uzasadnia wdrożenie.
+      ⚠️ Temat wracał DWA RAZY (5.09, 7.09) i za każdym razem kończył się zdaniem
+      w notatce, nigdy zadaniem — stąd ta pozycja
 - [ ] Waga `Facebook - Syla` = 0,85 (najniższa) przy 66 wpisach `locality=3` na 140 —
       główne źródło wiadomości o gminie ma najniższą wagę; po 3.09 lokalność rozstrzyga
       `locality`, więc waga gra mniejszą rolę, ale tabela wciąż mówi co innego niż dane
