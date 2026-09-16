@@ -1001,8 +1001,24 @@ _WORD_RE = re.compile(r"[0-9a-ząćęłńóśźż]+")
 
 
 def _tokens(text: str) -> frozenset[str]:
-    """Zbiór znaczących słów — bez ogonków, emoji i interpunkcji."""
-    flat = unicodedata.normalize("NFKD", (text or "").lower())
+    """
+    Zbiór znaczących słów — bez ogonków, emoji i interpunkcji.
+
+    ⚠️ Znaki łączące trzeba ODSIAĆ, nie tylko rozłożyć. NFKD rozkłada „ó" na
+    „o" + znak łączący, a ten nie należy do `_WORD_RE`, więc wyrażenie tnie
+    słowo w miejscu ogonka: 16.09.2026 „łódź" rozpadała się na „ło" i „dz"
+    (oba krótsze niż trzy znaki, więc GINĘŁY), a „wartości" na „wartos" i „ci".
+    Tego dnia dwa opisy tej samej łodzi ratowniczej dla OSP Hartowiec (art.
+    6028 i 6034) miały przez to podobieństwo tekstu 0,44 przy słowie „łódź"
+    w obu tytułach.
+
+    „ł" wymaga osobnej podmiany, bo jako jedyna polska litera nie rozkłada się
+    w NFKD — ta sama pułapka i to samo obejście co w `alert_policy._flat`,
+    gdzie kosztowała niedziałający wzorzec na „wyłączenie prądu".
+    """
+    lowered = (text or "").lower().replace("ł", "l")
+    stripped = unicodedata.normalize("NFKD", lowered)
+    flat = "".join(c for c in stripped if not unicodedata.combining(c))
     words = _WORD_RE.findall(flat)
     return frozenset(w for w in words if len(w) > 2 and w not in _STOPWORDS)
 
@@ -1170,6 +1186,28 @@ def _containment(a: frozenset[str], b: frozenset[str]) -> float:
 # restauracji). Embedding mierzy TEMAT, a lokalny materiał jest z natury
 # tematycznie powtarzalny. Działa wyłącznie w parze ze zgodnym terminem.
 SEMANTIC_DUPLICATE = 0.70
+
+# Ten sam dowód dla pary, w której ŻADEN wpis nie ma terminu — a więc dla
+# zwykłych wiadomości, nie zapowiedzi. Oś czasu milczy z definicji, więc jej
+# rolę przejmuje oś MIEJSCA i musi być POTWIERDZONA: obie strony wymieniają tę
+# samą wieś z gminy. Milczenie miejsca (Energa o wsiach spoza gminy, kampanie
+# KPP bez nazw) zostawia parę w spokoju, tak jak dotąd.
+#
+# Próg zmierzony 16.09.2026 na parach z produkcji, osobno dla tej klasy:
+#   duplikaty ze wspólną wsią   0,845 (warsztaty Cariboo / jazda na rowerze),
+#                               0,889 (świnki dożynkowe), 0,904 (łódź OSP)
+#   różne wiadomości ze wspólną wsią  0,753 (dwa mecze Delfina), 0,741
+#                               (dwa starty Natalii Zakrzewskiej), 0,579
+#                               (znaleziony pies / znaleziona bransoletka)
+# Rozstęp 0,753 ↔ 0,845 jest wąski i taki zostanie: wiadomości z jednej wsi są
+# tematycznie podobne z natury. Dlatego próg stoi pośrodku, a nie przy dolnej
+# krawędzi — i dlatego ta gałąź NIE działa bez potwierdzonego miejsca.
+#
+# 16.09.2026 przez jej brak feed pokazał dwa razy tę samą łódź ratowniczą dla
+# OSP Hartowiec: wpis gminy i wpis z profilu gminy na Facebooku, cosinus 0,904,
+# ta sama wieś, ten sam dzień — a model nadał im dwa różne nagłówki, więc oś
+# tekstu dała 0,44 i nie miał kto orzec.
+SEMANTIC_DUPLICATE_UNDATED = 0.80
 
 
 @dataclass(frozen=True)
@@ -1347,6 +1385,16 @@ def same_story(a: StoryKey, b: StoryKey) -> bool:
 
     if _text_says_duplicate(a, b):
         return True
+
+    # Para BEZ terminu po obu stronach — dwie wiadomości, nie zapowiedzi.
+    # Oś czasu nie ma tu czego powiedzieć, więc dowodem musi być potwierdzona
+    # wspólna miejscowość i wyższy próg semantyczny (`SEMANTIC_DUPLICATE_UNDATED`).
+    if a.event_at is None and b.event_at is None:
+        if _place_axis(a, b) is not True:
+            return False
+        if a.embedding is None or b.embedding is None:
+            return False
+        return _cosine(a.embedding, b.embedding) >= SEMANTIC_DUPLICATE_UNDATED
 
     # Dowód semantyczny wymaga POTWIERDZENIA obu pozostałych osi: zgodnego
     # terminu ORAZ wspólnej miejscowości. Nie jest to ostrożność na wyrost —

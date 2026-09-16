@@ -51,6 +51,7 @@ sys.path.insert(0, str(backend_path))
 
 from src.services.feed_policy import (  # noqa: E402
     SEMANTIC_DUPLICATE,
+    SEMANTIC_DUPLICATE_UNDATED,
     StoryKey,
     _containment,
     _place_axis,
@@ -262,6 +263,14 @@ PARY: list[Para] = [
         b_termin="", b_koniec=None,
     ),
     Para(
+        etykieta="DUP", podobienstwo=0.904,
+        a_id=6028, b_id=6034,
+        a_tytul="Nowa łódź ratownicza zasili OSP Hartowiec",
+        b_tytul="OSP Hartowiec z nową łodzią ratowniczą o wartości 120 tys. zł",
+        a_termin="", a_koniec=None,
+        b_termin="", b_koniec=None,
+    ),
+    Para(
         etykieta="DUP", podobienstwo=0.891,
         a_id=5808, b_id=5906,
         a_tytul="Nabór do programu Warmińsko-Mazurski Czek Turystyczny od 7 września",
@@ -327,9 +336,6 @@ PARY: list[Para] = [
         b_tytul="Warsztaty jazdy na rowerze dla dzieci w Gminie Rybno",
         a_termin="", a_koniec=None,
         b_termin="", b_koniec=None,
-        granica=(
-            "oba bez terminu, a model nadał tej samej imprezie nagłówki bez wspólnych słów (warsztaty Cariboo kontra warsztaty jazdy na rowerze) — tekst 0,400. Rozstrzygnąłby embedding (0,845), ale bez osi czasu nie jest wiarygodny"
-        ),
     ),
     Para(
         etykieta="DUP", podobienstwo=0.843,
@@ -487,6 +493,26 @@ def sprawdz_reguly() -> list[str]:
     spr(not same_story(a, b),
         f"embedding {0.99} bez zgodnego terminu NIE zwija (próg {SEMANTIC_DUPLICATE})")
 
+    # 5b. Para BEZ terminu po obu stronach: rolę osi czasu przejmuje MIEJSCE
+    emb_a, emb_b = _wektory(0.90)
+    a = _klucz("Nowa łódź ratownicza zasili OSP Hartowiec", None, None, emb_a)
+    b = _klucz("OSP Hartowiec z nową łodzią ratowniczą za 120 tys. zł", None, None, emb_b)
+    spr(same_story(a, b),
+        f"oba bez terminu + ta sama wieś + embedding 0,90 = jedna sprawa "
+        f"(próg {SEMANTIC_DUPLICATE_UNDATED})")
+
+    a = _klucz("Zasady bezpieczeństwa dla rowerzystów na drogach", None, None, emb_a)
+    b = _klucz("Bezpieczeństwo rowerzystów na drogach. Przestrzegaj przepisów",
+               None, None, emb_b)
+    spr(not same_story(a, b),
+        "oba bez terminu, ale ŻADEN nie wymienia wsi gminy — miejsce milczy, nie zwijamy")
+
+    emb_a, emb_b = _wektory(0.78)
+    a = _klucz("Delfin Rybno przegrywa z Iławą 2:12", None, None, emb_a)
+    b = _klucz("Mecz Delfina Rybno z Iławą zakończony wygraną gospodarzy", None, None, emb_b)
+    spr(not same_story(a, b),
+        "ta sama wieś, ale embedding pod progiem — dwa mecze tego klubu zostają osobno")
+
     # 6. Brak embeddingu nie zmienia reguł — tylko zawęża
     a = _klucz(tytul, "2026-09-17 16:00", None, None)
     b = _klucz(tytul, "2026-09-17 16:00", None, None)
@@ -504,9 +530,11 @@ def sprawdz_reguly() -> list[str]:
 
     from src.services.feed_policy import story_key
 
+    # Para zwijana samą OSIĄ TEKSTU (zawieranie 1,00) — tu sprawdzamy wyłącznie,
+    # która pozycja zostaje, więc dowód nie może zależeć od embeddingu ani progu.
     wpisy = [
-        Wpis(1, "Pobór krwi w Rybnie 16 września o 8:00", "2026-09-16 06:00"),
-        Wpis(2, "Pobór krwi 16 września w Zespole Szkół w Rybnie", "2026-09-15 22:00"),
+        Wpis(1, "Bezpłatne badania mammograficzne w Rybnie 20 września", "2026-09-19 22:00"),
+        Wpis(2, "Bezpłatne badania mammograficzne 20 września w Rybnie", "2026-09-19 22:00"),
     ]
     zostalo = collapse_duplicates(wpisy, key_of=lambda w: story_key(w))
     spr([w.id for w in zostalo] == [1],
@@ -520,22 +548,32 @@ async def sprawdz_na_bazie() -> list[str]:
     from sqlalchemy import select
     from src.database.connection import async_session
     from src.database.schema import Article, Source
-    from src.services.feed_policy import publishable_conditions, story_key
+    from src.services.feed_policy import (
+        feed_window_conditions,
+        in_feed_window,
+        publishable_conditions,
+        story_key,
+    )
 
     print("\n" + "=" * 78)
     print("ŻYWY FEED")
     print("=" * 78)
 
+    # Okno bierzemy z POLITYKI, nie z własnego zapytania. Do 16.09.2026 stała tu
+    # kopia: „opublikowane od dzisiejszej północy UTC" — czyli i inne okno niż
+    # feed (9 wpisów zamiast 38, więc test mierzył powtórki na garstce materiału),
+    # i doba liczona w UTC, a nie lokalnie. Tego drugiego błędu nie widzi
+    # `test_timezone_guard`: skanuje `src/`, nie `scripts/`.
+    now = datetime.utcnow()
     bledy: list[str] = []
     async with async_session() as session:
         wynik = await session.execute(
             select(Article, Source.name)
             .join(Source, Article.source_id == Source.id)
-            .where(*publishable_conditions(Article))
-            .where(Article.published_at >= datetime.utcnow().replace(
-                hour=0, minute=0, second=0, microsecond=0))
+            .where(*publishable_conditions(Article, now=now))
+            .where(feed_window_conditions(Article, now))
         )
-        wiersze = list(wynik)
+        wiersze = [row for row in wynik if in_feed_window(row[0], now)]
         if not wiersze:
             print("  (brak artykułów z dzisiaj — nic do sprawdzenia)")
             return bledy
