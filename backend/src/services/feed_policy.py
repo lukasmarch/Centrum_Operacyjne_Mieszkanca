@@ -92,6 +92,13 @@ SOURCE_WEIGHTS: dict[str, float] = {
     # urząd i służby
     "Gmina Rybno": 1.35,
     "BIP Gminy Rybno": 1.35,
+    # jednostki gminy i sołectwa (dodane 16.09.2026 — patrz migracja
+    # `add_gmina_fb_sources`). Mówią wyłącznie o gminie Rybno, więc stoją wyżej
+    # niż media powiatowe, ale niżej niż urząd i operator sieci.
+    "Facebook - GOPS Rybno": 1.30,
+    "Facebook - Sołectwo Hartowiec": 1.20,
+    "Facebook - Sołtys Żabiny": 1.20,
+    "Facebook - Żłobek w Rybnie": 1.15,
     "KPP Działdowo (RSS)": 1.30,
     "Facebook - Gmina Działdowo": 1.25,
     "Powiat Działdowski (RSS)": 1.20,
@@ -134,6 +141,10 @@ LOCAL_SOURCES: frozenset[str] = COUNTY_WIDE_SOURCES | {
     "Facebook - Rybno",
     "Facebook - Syla",
     "Facebook - ZakladGospodarkiKomunalnej",
+    "Facebook - GOPS Rybno",
+    "Facebook - Żłobek w Rybnie",
+    "Facebook - Sołectwo Hartowiec",
+    "Facebook - Sołtys Żabiny",
     "Facebook - Panorama Regionu",
     "Facebook - Gmina Działdowo",
     "Moje Działdowo",
@@ -175,6 +186,29 @@ GMINA_SOURCES: frozenset[str] = frozenset({
     "Facebook - ZakladGospodarkiKomunalnej",
     "Facebook - Syla",
     "Łaciate Mazury MTB",
+    # Jednostki gminy i sołectwa — piszą o swojej wsi i o gminie, nigdy
+    # o sąsiednim powiecie
+    "Facebook - GOPS Rybno",
+    "Facebook - Żłobek w Rybnie",
+    "Facebook - Sołectwo Hartowiec",
+    "Facebook - Sołtys Żabiny",
+})
+
+
+# Źródła, z których do feedu wchodzą WYŁĄCZNIE ogłoszenia — sprawa urzędowa,
+# awaria albo wpis z terminem. Reszta zostaje w bazie i nie trafia na stronę.
+#
+# 16.09.2026 dotyczy to jednego źródła: „Facebook - Sołtys Żabiny" jest PROFILEM
+# OSOBOWYM (data urodzenia, lista znajomych), a nie stroną instytucji. Publikuje
+# jednak materiał, którego nie mamy skąd wziąć — ogłoszenie o posiedzeniu Komisji
+# Rewizyjnej 22.09 nie wisi ani na stronie gminy, ani w BIP-ie (ten oddaje
+# serwerowi 403). Wpuszczamy więc treść urzędową, a nie życie prywatne.
+#
+# ⚠️ To rozwiązanie TYMCZASOWE, do czasu aż sołectwa dostaną własne miejsce do
+# publikowania ogłoszeń na naszej stronie (decyzja Łukasza z 16.09; pomysł stoi
+# w notatkach od 22.08). Wtedy to źródło wyłączamy, zamiast rozszerzać bramkę.
+ANNOUNCEMENT_ONLY_SOURCES: frozenset[str] = frozenset({
+    "Facebook - Sołtys Żabiny",
 })
 
 
@@ -238,6 +272,12 @@ def is_local_article(
 # ("Facebook - ZakladGospodarkiKomunalnej"). Sufiks "(RSS)" zdejmowany automatycznie.
 SOURCE_DISPLAY_NAMES: dict[str, str] = {
     "Facebook - ZakladGospodarkiKomunalnej": "ZGK w Rybnie",
+    "Facebook - GOPS Rybno": "GOPS w Rybnie",
+    "Facebook - Żłobek w Rybnie": "Żłobek w Rybnie",
+    "Facebook - Sołectwo Hartowiec": "Sołectwo Hartowiec",
+    # Funkcja, nie nazwisko: mieszkaniec ma wiedzieć, że to ogłoszenie sołtysa,
+    # a nie że czyta czyjś prywatny profil.
+    "Facebook - Sołtys Żabiny": "Sołtys Sołectwa Żabiny",
     "Facebook - Gmina Działdowo": "Gmina Działdowo",
     "Facebook - Rybno": "Gmina Rybno (Facebook)",
     "KPP Działdowo (RSS)": "Policja — KPP Działdowo",
@@ -280,12 +320,30 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
     `_event_end` i `summary_generator._event_is_over`). Wpisy bez
     terminu reguła nie dotyczy wcale: o nich rozstrzyga wiek publikacji.
     """
+    from sqlalchemy import select as sql_select
+
+    from src.database.schema import Source
+
     now = now or datetime.utcnow()
     ended_before = now - timedelta(hours=ENDED_EVENT_GRACE_H)
+
+    # Źródła „tylko ogłoszenia" (dziś: profil osobowy sołtysa Żabin). Warunek
+    # stoi TUTAJ, a nie w endpointcie feedu, żeby obowiązywał wszędzie naraz —
+    # także w briefingu, newsletterze i narzędziach agentów. Import lokalny,
+    # bo `schema` nie może zależeć od polityki treści.
+    announcement_only = sql_select(Source.id).where(
+        Source.name.in_(sorted(ANNOUNCEMENT_ONLY_SOURCES))
+    )
 
     return [
         article_model.is_filler == False,        # noqa: E712 — SQLAlchemy
         article_model.is_promotional == False,   # noqa: E712
+        or_(
+            article_model.source_id.notin_(announcement_only),
+            article_model.category == OFFICIAL_CATEGORY,
+            article_model.category.ilike("%awari%"),
+            article_model.event_at.isnot(None),
+        ),
         or_(
             article_model.event_at.is_(None),
             article_model.event_until >= ended_before,

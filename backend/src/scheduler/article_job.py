@@ -57,6 +57,17 @@ def filter_recent_articles(articles: list, days: int = 2) -> list:
     return filtered
 
 
+# Profile FB jednostek gminy i sołectw — pobierane tylko w dni robocze.
+# Powód jest jeden i policzalny: darmowy limit Apify (patrz warunek w
+# `update_articles_job` i migracja `add_gmina_fb_sources`).
+WEEKDAY_ONLY_SOURCES = [
+    "Facebook - GOPS Rybno",
+    "Facebook - Żłobek w Rybnie",
+    "Facebook - Sołectwo Hartowiec",
+    "Facebook - Sołtys Żabiny",
+]
+
+
 async def update_articles_job(
     source_filter: str = None,
     source_prefix: str = None,
@@ -113,6 +124,22 @@ async def update_articles_job(
             }
             for s in sources_orm
         ]
+
+        # Profile pobierane wyłącznie w dni robocze — decyzja KOSZTOWA z 16.09.2026,
+        # nie redakcyjna. Apify liczy 0,008 USD za przebieg nawet wtedy, gdy nowych
+        # postów nie ma (aktor zwraca pozycję „no_items"), a plan FREE ma 5 USD/mies.
+        # przy zużyciu ~4,5. Cztery profile jednostek i sołectw w dni robocze to
+        # ~0,7 USD/mies.; codziennie byłoby ~0,95 i limit by pękł.
+        # GOPS, żłobek i sołectwa publikują w tygodniu — w sobotę ich przebieg
+        # w 90% przypadków kosztowałby wyłącznie za pustkę.
+        if datetime.now().weekday() >= 5:  # tz-ok: kontener ma TZ=Europe/Warsaw
+            weekend_skipped = [s for s in sources if s["name"] in WEEKDAY_ONLY_SOURCES]
+            if weekend_skipped:
+                sources = [s for s in sources if s["name"] not in WEEKDAY_ONLY_SOURCES]
+                logger.info(
+                    f"Weekend — pomijam {len(weekend_skipped)} profili pobieranych "
+                    f"tylko w dni robocze: {[s['name'] for s in weekend_skipped]}"
+                )
 
         logger.info(f"Found {len(sources)} active sources to scrape")
 
