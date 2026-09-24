@@ -21,8 +21,7 @@ from datetime import datetime, time, timedelta
 from typing import Callable, Iterable, Optional, TypeVar
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, case, cast, func, or_
-from sqlalchemy.types import Time
+from sqlalchemy import and_, case, func, or_
 
 from src.services.alert_policy import (
     incident_of,
@@ -30,7 +29,14 @@ from src.services.alert_policy import (
     places_in,
     span_from_text,
 )
-from src.services.time_span import is_all_day, local_day_bounds, to_local, when_label
+from src.services.time_span import (
+    is_all_day,
+    local_day_bounds,
+    sql_is_all_day,
+    sql_local_day_end,
+    to_local,
+    when_label,
+)
 from src.services.weather_alert import expired as weather_alert_expired
 from src.services.weather_alert import is_weather_alert
 
@@ -315,10 +321,12 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
     niżej, zamiast usunąć. Przy 4–9 lokalnych wpisach dziennie „niżej" i tak
     znaczyło pierwszą stronę.
 
-    Liczymy od KOŃCA zdarzenia, a dla zapowiedzi bez godziny końca — od końca
-    jej doby (`event_at` o północy to zapis całodniowy, tak samo jak w
-    `_event_end` i `summary_generator._event_is_over`). Wpisy bez
-    terminu reguła nie dotyczy wcale: o nich rozstrzyga wiek publikacji.
+    Koniec zdarzenia liczy `_event_end` — ta sama funkcja, co w oknie feedu
+    i w kolejce źródła. Do 23.09.2026 stała tu WŁASNA kopia tego warunku
+    i to ona się rozjechała: pytała o północ UTC zamiast lokalnej, więc
+    gałąź „zapowiedź całodniowa" nie wykonała się ani razu (patrz `_event_end`).
+    Wpisy bez terminu reguła nie dotyczy wcale: o nich rozstrzyga wiek
+    publikacji.
     """
     from sqlalchemy import select as sql_select
 
@@ -346,18 +354,7 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
         ),
         or_(
             article_model.event_at.is_(None),
-            article_model.event_until >= ended_before,
-            and_(
-                article_model.event_until.is_(None),
-                or_(
-                    article_model.event_at >= ended_before,
-                    # zapowiedź całodniowa: doba liczy się od jej końca
-                    and_(
-                        cast(article_model.event_at, Time) == time(0, 0),
-                        article_model.event_at >= ended_before - timedelta(days=1),
-                    ),
-                ),
-            ),
+            _event_end(article_model) >= ended_before,
         ),
     ]
 
@@ -494,16 +491,30 @@ ONGOING_MAX_SPAN_H = 36
 
 def _event_end(article_model):
     """
-    Koniec zdarzenia w SQL — ta sama reguła, którą stosuje okno feedu
-    (`feed_window_conditions`) i karencja w `publishable_conditions`:
-    deklarowany `event_until`, dla zapowiedzi całodniowej koniec jej doby,
-    dla reszty `DEFAULT_EVENT_DURATION_H`.
+    Koniec zdarzenia w SQL — JEDNA reguła dla okna feedu
+    (`feed_window_conditions`), kolejki źródła (`source_window_order`)
+    i karencji (`publishable_conditions`): deklarowany `event_until`, dla
+    zapowiedzi całodniowej koniec jej doby, dla reszty
+    `DEFAULT_EVENT_DURATION_H`.
+
+    ⚠️ Całodniowość rozstrzyga `time_span.sql_is_all_day`, czyli lokalna
+    północ — nie północ UTC. Do 23.09.2026 stało tu `cast(event_at, Time) ==
+    time(0, 0)`, a zapowiedź bez godziny zapisuje się jako 22:00 UTC dnia
+    poprzedniego (zimą 23:00), więc ta gałąź nie wykonała się ANI RAZU:
+    na 191 wpisów z terminem z 30 dni 113 było całodniowych i żaden nie miał
+    północy UTC. Każdy z nich dostawał koniec trzy godziny po SWOJEJ północy,
+    czyli około 01:00 — i przez resztę dnia, w którym się odbywał, liczył się
+    jako zdarzenie sprzed kilkunastu godzin.
+
+    Docstring mówił „ta sama reguła" od początku; rozjazd polegał na tym, że
+    `publishable_conditions` miała własną kopię tego warunku zamiast wołać tę
+    funkcję. Dziś woła.
     """
     return case(
         (article_model.event_until.isnot(None), article_model.event_until),
         (
-            cast(article_model.event_at, Time) == time(0, 0),
-            article_model.event_at + timedelta(days=1),
+            sql_is_all_day(article_model.event_at, article_model.event_until),
+            sql_local_day_end(article_model.event_at),
         ),
         else_=article_model.event_at + timedelta(hours=DEFAULT_EVENT_DURATION_H),
     )

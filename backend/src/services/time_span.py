@@ -26,12 +26,18 @@ sekcja „Termin wyczytany z treści komunikatu".
 """
 import re
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import and_, cast, func
+from sqlalchemy.types import Time
+
 # Komunikaty podają czas lokalny, baza trzyma naiwny UTC (jak reszta projektu).
-LOCAL_TZ = ZoneInfo("Europe/Warsaw")
+# Nazwa strefy stoi obok obiektu, bo `AT TIME ZONE` w SQL bierze tekst — i ma
+# brać DOKŁADNIE tę samą strefę, co konwersje w Pythonie niżej.
+LOCAL_TZ_NAME = "Europe/Warsaw"
+LOCAL_TZ = ZoneInfo(LOCAL_TZ_NAME)
 
 
 def to_utc(local_naive: datetime) -> datetime:
@@ -106,6 +112,55 @@ def is_all_day(start: Optional[datetime], end: Optional[datetime] = None) -> boo
         return False
     local = to_local(start)
     return (local.hour, local.minute) == (0, 0)
+
+
+# ── To samo, ale dla zapytania ──────────────────────────────────────────────
+#
+# Baza odpowiada na te same trzy pytania co funkcje wyżej i nie umie wykonać
+# Pythona, więc druga postać jest nieunikniona. Stoi TUTAJ, pod pierwszą,
+# bo rozjazd wziął się dokładnie z tego, że mieszkały w osobnych plikach.
+#
+# 23.09.2026: `feed_policy` pytał w SQL `cast(event_at, Time) == '00:00'`,
+# czyli o północ UTC, podczas gdy `is_all_day` pyta o północ LOKALNĄ. Pomiar
+# na produkcji, 30 dni: 113 wpisów całodniowych na 191 z terminem — i ANI
+# JEDEN z północą UTC. Gałąź nie wykonała się nigdy od dnia, w którym
+# powstała. Skutek widać było dopiero na stronie: zapowiedź na DZIŚ dostawała
+# koniec o 01:00 nad ranem (`event_at` + `DEFAULT_EVENT_DURATION_H`), więc
+# feed liczył ją jako zdarzenie sprzed kilkunastu godzin. Tak wypadło ze
+# strony otwarcie drogi Tuczki–Koszelewy w dniu otwarcia.
+#
+# ⚠️ Kto pyta bazę o dobę albo o koniec zdarzenia, woła stąd — nie pisze
+# `cast(col, Time)` u siebie. Pilnuje tego `scripts/test_timezone_guard.py`.
+
+
+def sql_to_local(column):
+    """Kolumna naiwnego UTC → naiwny czas lokalny (`AT TIME ZONE` ×2)."""
+    return func.timezone(LOCAL_TZ_NAME, func.timezone("UTC", column))
+
+
+def sql_to_utc(column):
+    """Kolumna naiwnego czasu lokalnego → naiwny UTC."""
+    return func.timezone("UTC", func.timezone(LOCAL_TZ_NAME, column))
+
+
+def sql_is_all_day(start_column, end_column=None):
+    """`is_all_day` dla zapytania: lokalna północ i brak podanego końca."""
+    midnight = cast(sql_to_local(start_column), Time) == time(0, 0)
+    if end_column is None:
+        return midnight
+    return and_(end_column.is_(None), midnight)
+
+
+def sql_local_day_end(start_column):
+    """
+    Koniec doby LOKALNEJ, do której należy `start_column` — w naiwnym UTC.
+
+    Doba dodawana po stronie czasu lokalnego, a NIE jako `+ timedelta(days=1)`
+    do wartości UTC — to ta sama zasada, którą stosuje `local_day_bounds`:
+    26.10.2026 doba lokalna ma 25 godzin i stała rozjeżdża granicę.
+    """
+    local_midnight = func.date_trunc("day", sql_to_local(start_column))
+    return sql_to_utc(local_midnight + timedelta(days=1))
 
 
 def when_label(
