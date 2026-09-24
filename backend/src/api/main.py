@@ -224,7 +224,9 @@ async def get_articles(
     from src.services import alert_policy
     from src.services.feed_policy import (
         MAX_PINNED,
+        SOURCE_POOL,
         article_score,
+        cap_per_source,
         collapse_duplicates,
         diversify,
         feed_window_conditions,
@@ -263,11 +265,14 @@ async def get_articles(
     )
 
     # Main query - join with subquery to filter by row_num <= per_source
+    # `SOURCE_POOL`, nie `per_source`: TU zbieramy tylko pulę kandydatów, żeby
+    # zapytanie nie ciągnęło archiwum. Limit feedu nakłada `cap_per_source` na
+    # samym końcu — patrz komentarz przy tej funkcji.
     result = await session.execute(
         select(Article, Source.name)
         .join(Source, Article.source_id == Source.id)
         .join(subquery, Article.id == subquery.c.id)
-        .where(subquery.c.row_num <= per_source)
+        .where(subquery.c.row_num <= SOURCE_POOL)
     )
 
     rows = [row for row in result if in_feed_window(row[0], now)]
@@ -290,6 +295,12 @@ async def get_articles(
         rows,
         key_of=lambda row: story_key(row[0], embeddings.get(row[0].id)),
     )
+
+    # Bramka POJEMNOŚCI — tu, a nie w SQL. Materiał jest już uporządkowany
+    # rankingiem i odsiany z wpisów, które dziś do feedu nie należą, więc źródło
+    # oddaje swoje miejsca najlepszym wpisom, jakie ma, zamiast pierwszym pięciu
+    # z kolejki liczonej przed wszystkim.
+    rows = cap_per_source(rows, per_source, key=lambda row: row[0].source_id)
 
     # Awarie dotyczące najbliższych godzin zostają na górze — reszta wg rankingu
     pinned, regular = [], []

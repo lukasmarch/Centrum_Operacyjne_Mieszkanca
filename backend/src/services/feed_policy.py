@@ -437,6 +437,10 @@ def in_feed_window(article, now: Optional[datetime] = None) -> bool:
     """
     now = now or datetime.utcnow()
     event_at = getattr(article, "event_at", None)
+    title = getattr(article, "title", None)
+    content = getattr(article, "content", None)
+    display = getattr(article, "display_title", None)
+    category = (getattr(article, "category", None) or "").strip()
 
     if event_at is None:
         published = getattr(article, "published_at", None) or getattr(article, "scraped_at", None)
@@ -446,18 +450,30 @@ def in_feed_window(article, now: Optional[datetime] = None) -> bool:
         news_start -= timedelta(days=NEWS_MAX_AGE_DAYS - 1)
         return published >= news_start
 
-    # Zapowiedź po terminie: o karencji rozstrzyga `publishable_conditions`,
-    # tutaj wystarczy, że zdarzenie już się zaczęło.
+    # Zdarzenie już się zaczęło. O karencji po terminie rozstrzyga zwykle
+    # `publishable_conditions` (doba — wczorajsza impreza czyta się jako relacja),
+    # ale AWARIA karencji nie dostaje: wyłączenie prądu 9:00–14:00 o 15:00 nie
+    # jest relacją, tylko nieprawdą. „Nie ma nic gorszego niż oglądać alert po
+    # czasie jako informację aktualną" — zgłoszenie z 23.09.2026.
+    #
+    # Rodzaj czytamy z TREŚCI (`incident_of`), nie z kategorii: ta powstaje
+    # o 6:15 i 13:15, a komunikat Energi z 18:05 wisi do rana bez niej. Ten sam
+    # układ RODZAJ → MIEJSCE → CZAS, co w `alert_policy` dla pusha.
     if event_at <= now:
+        koniec = event_end(event_at, getattr(article, "event_until", None))
+        if koniec and now > koniec:
+            czy_awaria = (
+                bool(incident_of(display or title, content))
+                or "awari" in category.lower()
+            )
+            if czy_awaria:
+                return False
         return True
 
     _, lead_end = local_day_bounds(now=now, days=ANNOUNCEMENT_LEAD_DAYS + 1)
     if event_at < lead_end:
         return True
 
-    title = getattr(article, "title", None)
-    content = getattr(article, "content", None)
-    display = getattr(article, "display_title", None)
     locality = getattr(article, "locality", None)
 
     in_gmina = (
@@ -467,7 +483,6 @@ def in_feed_window(article, now: Optional[datetime] = None) -> bool:
     if not in_gmina:
         return False
 
-    category = (getattr(article, "category", None) or "").strip()
     if category == OFFICIAL_CATEGORY:
         return True
     return bool(incident_of(display or title, content)) or "awari" in category.lower()
@@ -518,6 +533,27 @@ def _event_end(article_model):
         ),
         else_=article_model.event_at + timedelta(hours=DEFAULT_EVENT_DURATION_H),
     )
+
+
+def event_end(
+    event_at: Optional[datetime],
+    event_until: Optional[datetime] = None,
+) -> Optional[datetime]:
+    """
+    Koniec zdarzenia w Pythonie — ta sama reguła, co `_event_end` w SQL, i stoi
+    tuż obok niej z tego samego powodu, co `sql_is_all_day` obok `is_all_day`:
+    rozjazd bierze się z odległości.
+
+    Deklarowany `event_until`; dla zapowiedzi całodniowej koniec jej doby
+    LOKALNEJ; dla reszty `DEFAULT_EVENT_DURATION_H`.
+    """
+    if event_until is not None:
+        return event_until
+    if event_at is None:
+        return None
+    if is_all_day(event_at, event_until):
+        return local_day_bounds(day=to_local(event_at))[1]
+    return event_at + timedelta(hours=DEFAULT_EVENT_DURATION_H)
 
 
 def source_window_order(article_model, now: Optional[datetime] = None):
@@ -1043,8 +1079,15 @@ def is_pinned_alert(
         event_at, event_until = span_from_text(title, content, published_at)
 
     if event_at:
-        if event_until and now > event_until:
-            return False  # po zdarzeniu
+        # Po zdarzeniu — koniec liczy wspólna reguła (`event_end`), nie sam
+        # `event_until`. Wcześniej warunek wymagał PODANEJ godziny końca, więc
+        # awaria z samym terminem („wyłączenie 23 września") zostawała przypięta
+        # przez całą dobę karencji: `hours_ahead` robiło się ujemne i przechodziło
+        # próg z każdą kolejną godziną. Mieszkaniec oglądał na szczycie strony
+        # alarm o rzeczy, która skończyła się wczoraj.
+        koniec = event_end(event_at, event_until)
+        if koniec and now > koniec:
+            return False
         hours_ahead = (event_at - now).total_seconds() / 3600
         return hours_ahead <= PIN_LOOKAHEAD_H
 
@@ -1521,6 +1564,51 @@ def collapse_duplicates(
 
 
 T = TypeVar("T")
+
+
+# Ile wpisów ze źródła wchodzi do PULI, zanim ranking cokolwiek powie. Nie jest
+# to limit feedu — ten nakłada `cap_per_source` NA KOŃCU. Tutaj chodzi wyłącznie
+# o to, żeby zapytanie nie ciągnęło całego archiwum źródła, które publikuje
+# kilkanaście razy dziennie. Próg celowo z zapasem: przy 4–9 lokalnych wpisach
+# dziennie i oknie trzech dób nic realnego się o niego nie obija.
+SOURCE_POOL = 25
+
+
+def cap_per_source(
+    items: Iterable[T],
+    limit: int,
+    key: Callable[[T], object],
+) -> list[T]:
+    """
+    Najwyżej `limit` wpisów z jednego źródła — bramka POJEMNOŚCI, nakładana na
+    materiale JUŻ uporządkowanym rankingiem.
+
+    Kolejność bramek jest tu całą rzeczą. Do 24.09.2026 limit `per_source`
+    stał w SQL, czyli PRZED `in_feed_window` (czy wpis należy dziś do feedu)
+    i PRZED `article_score` (co jest ważniejsze). Źródło wydawało pięć miejsc,
+    zanim ktokolwiek zapytał, czy te wpisy w ogóle mają prawo się pokazać —
+    a wpisy odrzucone chwilę później NIE zwalniały miejsca.
+
+    Pomiar na produkcji 24.09.2026, feed w tej samej chwili: 63 kandydatów,
+    15 wpisów na stronie, **8 miejsc zużytych przez wpisy odrzucone zaraz po
+    przydziale** i **23 uprawnione czekające za odciętą granicą**. Facebook
+    Syli: 27 kandydatów → 2 na stronie, trzy sloty zmarnowane na zapowiedzi,
+    które `in_feed_window` odrzuca jako zbyt odległe (turniej 7 listopada),
+    podczas gdy relacje z otwarcia drogi Tuczki–Koszelewy stały poza granicą.
+
+    Podniesienie `per_source` tego nie naprawiało: wpuszczało dziesięć
+    komunikatów KPP zamiast pięciu, nie zwalniając ani jednego zmarnowanego
+    miejsca. Wadą był kierunek potoku, nie liczba.
+    """
+    seen: dict[object, int] = {}
+    kept: list[T] = []
+    for item in items:
+        k = key(item)
+        if seen.get(k, 0) >= limit:
+            continue
+        seen[k] = seen.get(k, 0) + 1
+        kept.append(item)
+    return kept
 
 
 def diversify(
