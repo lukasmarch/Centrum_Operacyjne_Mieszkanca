@@ -168,8 +168,17 @@ class TrafficService:
                     break
                 except Exception as api_error:
                     last_error = api_error
-                    # 429 (brak limitu) nie minie przez ponowienie — przerwij od razu
-                    if "RESOURCE_EXHAUSTED" in str(api_error) or "429" in str(api_error):
+                    # Wyczerpany limit albo budżet nie minie przez ponowienie —
+                    # przerwij od razu. 402 („prepayment credits are depleted")
+                    # dołożone 24.09.2026: tego dnia widget ruchu nie odświeżył
+                    # się ANI RAZU w sześciu przebiegach, a log pokazywał wyłącznie
+                    # 503 „high demand" z trzema próbami co 20 s. Sprawdzenie klucza
+                    # wprost zwróciło 402 dla każdego modelu — kredyty konta Gemini
+                    # były wyczerpane. Trzy próby i minuta czekania nic tu nie dają.
+                    if any(
+                        marker in str(api_error)
+                        for marker in ("RESOURCE_EXHAUSTED", "429", "402", "credits are depleted")
+                    ):
                         raise
                     if attempt == self.MAX_ATTEMPTS:
                         raise
