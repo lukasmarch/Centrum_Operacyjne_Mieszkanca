@@ -60,7 +60,7 @@ async def run_traffic_job_async():
         if traffic_data.is_fallback:
             logger.error(
                 "  ✗ Gemini nie zwrócił danych — zachowuję poprzedni wpis w cache. "
-                "Sprawdź KREDYTY konta (402 „prepayment credits are depleted"), "
+                'Sprawdź KREDYTY konta (402 "prepayment credits are depleted"), '
                 "limit (429) i dostępność modelu (503). 24.09.2026 log pokazywał "
                 "wyłącznie 503, a klucz odpowiadał 402 — komunikat kierował więc "
                 "w złą stronę przez cały dzień."
