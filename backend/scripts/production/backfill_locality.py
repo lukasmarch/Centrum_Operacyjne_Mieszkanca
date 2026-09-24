@@ -23,10 +23,14 @@ w tekście → 2), a ponowne orzekanie w tę stronę kasowałoby oceny wystawion
 pełnej treści wpisami, które od tego czasu zostały przycięte do 300 znaków.
 
 ⚠️ Pyta model raz na wpis (gpt-4o-mini). Kandydatów jest rzędu kilkudziesięciu
-na miesiąc — bez `--apply` skrypt pokazuje ich listę i NIE woła modelu.
+na miesiąc. Trzy tryby, od najtańszego:
+  • bez flag   — sama lista kandydatów, model NIE jest wołany, zero kosztu
+  • --symuluj  — woła model i pokazuje, co by zmienił, ale NIC NIE ZAPISUJE
+  • --apply    — zapisuje
 
 Użycie:
-    cd backend && python -u -m scripts.production.backfill_locality [--days 30] [--apply]
+    cd backend && python -u -m scripts.production.backfill_locality \
+        [--days 30] [--symuluj | --apply]
 """
 import argparse
 import asyncio
@@ -47,7 +51,7 @@ from src.services.alert_policy import is_foreign_region, places_in  # noqa: E402
 from src.services.feed_policy import MIN_ARTICLE_LOCALITY  # noqa: E402
 
 
-async def backfill(days: int, apply: bool) -> int:
+async def backfill(days: int, apply: bool, symuluj: bool = False) -> int:
     cutoff = datetime.utcnow() - timedelta(days=days)
     podniesione = 0
 
@@ -73,12 +77,12 @@ async def backfill(days: int, apply: bool) -> int:
         print(f"Wpisów z oceną < {MIN_ARTICLE_LOCALITY} z {days} dni: {len(rows)}")
         print(f"Kandydatów (nazwa wsi w treści): {len(kandydaci)}\n")
 
-        if not apply:
+        if not apply and not symuluj:
             for art, src in kandydaci:
                 miejsca = "/".join(places_in(art.display_title or art.title, art.content))
                 print(f"  [{art.id}] loc={art.locality} {miejsca:<22} {src[:20]:<20} "
                       f"{(art.display_title or art.title)[:52]!r}")
-            print(f"\nBez --apply model nie jest wołany i nic nie zapisuję.")
+            print("\nBez --symuluj i --apply model nie jest wołany — zero kosztu.")
             return 0
 
         processor = ArticleProcessor()
@@ -100,13 +104,19 @@ async def backfill(days: int, apply: bool) -> int:
             if nowa >= MIN_ARTICLE_LOCALITY and art.locality < MIN_ARTICLE_LOCALITY:
                 print(f"  [{art.id}] loc {art.locality}→{nowa}  miejsca={miejsca}  "
                       f"{(art.display_title or art.title)[:50]!r}")
-                art.locality = nowa
+                # ⚠️ W trybie --symuluj NIE dotykamy obiektu ORM. Samo przypisanie
+                # wystarczyłoby, żeby autoflush przy następnym zapytaniu zapisał
+                # zmianę — a symulacja ma nie zostawiać śladu.
+                if apply:
+                    art.locality = nowa
                 podniesione += 1
             else:
                 print(f"  [{art.id}] bez zmian (loc={art.locality}, miejsca={miejsca})")
 
-        if podniesione:
+        if podniesione and apply:
             await session.commit()
+        elif podniesione:
+            print("\n(--symuluj: nic nie zapisano)")
 
     return podniesione
 
@@ -114,10 +124,12 @@ async def backfill(days: int, apply: bool) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Przeliczenie oceny lokalności wstecz")
     parser.add_argument("--days", type=int, default=30, help="ile dni wstecz (domyślnie 30)")
-    parser.add_argument("--apply", action="store_true", help="zapisz zmiany (bez tego tylko podgląd)")
+    parser.add_argument("--symuluj", action="store_true",
+                        help="zawołaj model i pokaż skutek, ale nic nie zapisuj")
+    parser.add_argument("--apply", action="store_true", help="zapisz zmiany")
     args = parser.parse_args()
 
-    podniesione = asyncio.run(backfill(args.days, args.apply))
+    podniesione = asyncio.run(backfill(args.days, args.apply, args.symuluj))
     print(f"\n{'Podniesiono' if args.apply else 'Do podniesienia'}: {podniesione} wpisów")
     return 0
 
