@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ClipboardList, MapPin, ArrowRight, Camera } from 'lucide-react';
-import { fetchReports, getImageUrl } from '../../src/services/reportsApi';
+import { fetchReports, getImageUrl, STATUS_CONFIG } from '../../src/services/reportsApi';
 import { Report } from '../../types';
 
 interface ReportsMiniProps {
@@ -24,13 +24,45 @@ interface ReportsMiniProps {
  */
 const MAX_REPORTS = 2;
 
+/**
+ * Po ilu dniach ZAŁATWIONE zgłoszenie schodzi ze strony głównej.
+ *
+ * 24.09.2026 kafel pokazywał dwa jedyne zgłoszenia, oba `resolved`:
+ * „Brak body — awaria sieci wodociągowej" (sprzed 22 dni) i „Brak Wody"
+ * (sprzed 33). Statusu nie było widać wcale, więc mieszkaniec czytał to jako
+ * TRWAJĄCĄ awarię wodociągu — przy tym akurat temacie najgorzej, jak można.
+ *
+ * Sprawa zamknięta jest dowodem, że zgłaszanie ma sens, i dlatego zostaje —
+ * ale tylko póki jest świeża. Ta sama zasada, co wygasanie alertu w feedzie.
+ *
+ * Miesiąc, nie dwa tygodnie (decyzja Łukasza 24.09): przy dwóch zgłoszeniach
+ * na gminę krótszy próg opróżniłby kafel całkiem, a strona główna straciłaby
+ * jedyny dowód, że ktoś z tej sekcji korzystał. Załatwiona sprawa z plakietką
+ * „Rozwiązane" mówi więcej niż zaproszenie do pustego miejsca.
+ */
+const RESOLVED_MAX_AGE_DAYS = 30;
+
+/** Sprawy zamknięte, których nie warto już pokazywać na stronie głównej. */
+const isStaleResolved = (report: Report): boolean => {
+    if (report.status !== 'resolved') return false;
+    const stamp = report.resolved_at || report.updated_at || report.created_at;
+    const days = (Date.now() - new Date(stamp).getTime()) / 86_400_000;
+    return days > RESOLVED_MAX_AGE_DAYS;
+};
+
 const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
     const [reports, setReports] = useState<Report[] | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        fetchReports({ limit: MAX_REPORTS, sort: 'newest' })
-            .then(res => { if (!cancelled) setReports(res.reports ?? []); })
+        // Z zapasem: część wpisów odpadnie na starzeniu, a kafel ma pokazać
+        // tyle świeżych, ile naprawdę jest — nie tyle, ile zostało z pierwszych dwóch.
+        fetchReports({ limit: MAX_REPORTS * 4, sort: 'newest' })
+            .then(res => {
+                if (cancelled) return;
+                const swieze = (res.reports ?? []).filter(r => !isStaleResolved(r));
+                setReports(swieze.slice(0, MAX_REPORTS));
+            })
             .catch(() => { if (!cancelled) setReports([]); });
         return () => { cancelled = true; };
     }, []);
@@ -105,8 +137,25 @@ const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
                                     )}
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                    <span className="text-[11px] font-medium text-neutral-500">
+                                    {/*
+                                      Status PRZY wieku, nie zamiast niego: „22d temu"
+                                      bez słowa „Rozwiązane" czyta się jak trwająca
+                                      awaria — a to właśnie zgłaszają mieszkańcy
+                                      (brak wody, brak prądu)
+                                    */}
+                                    <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-neutral-500">
                                         {timeAgo(report.created_at)}
+                                        {STATUS_CONFIG[report.status] && (
+                                            <span
+                                                className="rounded-full px-1.5 py-px text-[10px] font-semibold"
+                                                style={{
+                                                    color: STATUS_CONFIG[report.status].color,
+                                                    backgroundColor: `${STATUS_CONFIG[report.status].color}1f`,
+                                                }}
+                                            >
+                                                {STATUS_CONFIG[report.status].label}
+                                            </span>
+                                        )}
                                     </span>
                                     {/* Bez `block` — kasuje `line-clamp` (patrz NewsMini) */}
                                     <span className="mt-0.5 line-clamp-2 text-base font-medium leading-snug text-neutral-100">

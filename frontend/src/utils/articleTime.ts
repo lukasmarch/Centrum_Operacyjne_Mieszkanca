@@ -35,6 +35,22 @@ const dayDiff = (a: Date, b: Date) =>
 
 const DAY_WORDS: Record<number, string> = { '-1': 'wczoraj', 0: 'dziś', 1: 'jutro', 2: 'pojutrze' };
 
+/**
+ * Wpis BEZ godziny — w bazie stoi jako lokalna północ.
+ *
+ * Ta sama reguła, co `eventTime.ts::isAllDay` i `time_span.is_all_day`
+ * w backendzie. Kafle wiadomości miały własną, niezależną kopię licznika
+ * i jako jedyne jej nie dostały — z dwoma skutkami naraz (24.09.2026):
+ *  - „Iłowo-Osada przyjmuje wnioski" pokazywało „jutro 0:00", czyli zmyśloną
+ *    godzinę, której źródło nigdy nie podało;
+ *  - „Podróż do Japonii 24 września" pokazywało „1d temu" W DNIU wydarzenia,
+ *    bo start (dzisiejsza północ) już minął i licznik wracał do wieku publikacji.
+ *
+ * Podany koniec przeczy całodniowości — źródło znało ramy godzinowe.
+ */
+const isAllDayStart = (start: Date, end: Date | null): boolean =>
+    !end && start.getHours() === 0 && start.getMinutes() === 0;
+
 export interface ArticleTimes {
     publishedAt?: string | null;
     eventAt?: string | null;
@@ -52,13 +68,24 @@ export interface ArticleTimes {
 export function articleTimeLabel(article: ArticleTimes, now: Date = new Date()): string {
     const start = parseUtc(article.eventAt);
     const end = parseUtc(article.eventUntil);
+    const allDay = start ? isAllDayStart(start, end) : false;
 
-    if (start && !(end ? end < now : start < now)) {
+    // Wpis całodniowy jest aktualny do KOŃCA swojego dnia, nie od północy do
+    // północy z minutą — inaczej wydarzenie „na dziś" liczy się jako minione
+    // przez cały dzień, w którym się odbywa.
+    const afterEvent = start
+        ? (end ? end < now : (allDay ? dayDiff(start, now) < 0 : start < now))
+        : true;
+
+    if (start && !afterEvent) {
         if (end && start <= now && now <= end) return `trwa teraz, do ${hm(end)}`;
 
         const days = dayDiff(start, now);
         const word = DAY_WORDS[days];
-        if (word) return `${word} ${hm(start)}`;
+        // Bez godziny, gdy źródło jej nie podało: „jutro 0:00" to precyzja,
+        // której nie mamy — ta sama zasada, co „(cały dzień)" w backendzie,
+        // tylko krócej, bo plakietka dzieli wiersz z nazwą kategorii.
+        if (word) return allDay ? word : `${word} ${hm(start)}`;
         return start.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' });
     }
 
