@@ -168,7 +168,10 @@ def incident_of(title: Optional[str], content: Optional[str] = None) -> Optional
 # Wzorce działają na tekście bez ogonków (`_flat`).
 _PLACES: tuple[tuple[str, str], ...] = (
     ("Rybno", r"rybn(o|a|ie|em)"),
-    ("Dębień", r"debien(ia|iu)?"),
+    # „debienie" to BŁĘDNY mianownik, który model tworzy z „w Dębieniu" (znany
+    # błąd, opisany w prompcie). Wzorzec ma łapać formy, które realnie padają
+    # w tekście i w polu `event_places` — także te utworzone przez model.
+    ("Dębień", r"debien(ia|iu|ie)?"),
     ("Grabacz", r"grabacz(a|u|em)?"),
     ("Gralewo", r"gralew(o|a|ie|em)"),
     ("Gronowo", r"gronow(o|a|ie|em)"),

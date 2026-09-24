@@ -24,7 +24,9 @@ LOCALITY_DESCRIPTION = (
     "2 = sąsiednia gmina powiatu działdowskiego, mieszkaniec Rybna to odczuje "
     "(Działdowo, Lidzbark, Płośnica, Iłowo); "
     "1 = powiat lub region bez związku z gminą; "
-    "0 = poza powiatem (Żuromin, Mława, Olsztyn) albo temat ogólnopolski."
+    "0 = poza powiatem (Żuromin, Mława, Olsztyn) albo temat ogólnopolski. "
+    "Nie musisz pamiętać, które wsie należą do gminy — podaj rzetelnie "
+    "`event_place`, a resztę rozstrzygnie kod."
 )
 
 
@@ -77,6 +79,21 @@ class ArticleCategory(BaseModel):
             "produktu, promocja, cennik, zaproszenie na stoisko, 'polecamy', dane kontaktowe "
             "sprzedawcy. False dla komunikatów instytucji, ofert pracy, otwarcia nowej firmy "
             "i wszystkiego, co jest informacją, a nie ofertą sprzedaży."
+        )
+    )
+    event_places: List[str] = Field(
+        description=(
+            "Miejscowości, w których rzecz SIĘ DZIEJE — tak, jak padają w tekście "
+            "(forma odmieniona jest w porządku). NIE pochodzenie uczestników, NIE "
+            "siedziba organizatora, NIE miejscowość wspomniana mimochodem. "
+            "Zwykle jedna nazwa, ale wymień WSZYSTKIE, gdy rzecz dotyczy kilku "
+            "miejsc naraz: „droga Tuczki–Koszelewy” → [Tuczki, Koszelewy]; "
+            "„badania w Lidzbarku, Płośnicy i Rybnie” → [Lidzbark, Płośnica, Rybno]. "
+            "Przykłady pojedyncze: „Nocne Biegi w Kopaniarzach” → [Kopaniarze]; "
+            "„mieszkanki gminy Rybno wspierają akcję w Lubawie” → [Lubawa]. "
+            "POLE OBOWIĄZKOWE — wypełnij je zawsze, gdy z tekstu wynika, gdzie "
+            "rzecz się dzieje. Pusta lista TYLKO wtedy, gdy tekst naprawdę nie "
+            "wskazuje żadnego miejsca (np. porada ogólna albo komunikat krajowy)."
         )
     )
     locality: int = Field(

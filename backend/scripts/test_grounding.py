@@ -62,6 +62,10 @@ def category(**overrides) -> ArticleCategory:
         confidence=0.9,
         summary="s",
         display_title="Tytuł",
+        # Pole WYMAGANE w kontrakcie z modelem (24.09.2026): z `default_factory=list`
+        # model zostawiał je puste w 6 przypadkach na 13 i lokalność wracała do
+        # zgadywania. Tu domyślnie puste, bo większość przypadków testu jej nie dotyczy.
+        event_places=[],
     )
     base.update(overrides)
     return ArticleCategory(**base)

@@ -17,7 +17,7 @@ from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
 from src.services import alert_policy, time_span, energa, weather_alert
-from src.services.alert_policy import _flat, places_in
+from src.services.alert_policy import _flat, is_foreign_region, places_in
 from src.services.feed_policy import LOCAL_TZ
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
@@ -184,9 +184,44 @@ async def ground_categorization(
         logger.info(f"Grounding: usunięte lokalizacje spoza tekstu: {dropped}")
         output.locations_mentioned = grounded_locations
 
-    # 2. locality=3 wymaga nazwy z gminy Rybno wprost w tekście (ta sama lista
-    #    miejscowości co bramka alertów) — „to pewnie u nas" nie jest dowodem
-    if output.locality >= 3 and not places_in(source.title, source.body):
+    # 2. Lokalność: MIEJSCE ZDARZENIA od modelu, przynależność do gminy z kodu.
+    #
+    #    Podział ról, a nie prośba w prompcie. Pomiar 24.09.2026 na 13 spornych
+    #    wpisach z produkcji: model bezbłędnie rozpoznaje, GDZIE rzecz się dzieje
+    #    (akcja w Lubawie z udziałem mieszkanek gminy → 2, turniej Delfina Rybno
+    #    w Lubawie → 2, mieszkanka Hartowca na Pucharze Świata → 1), ale NIE WIE,
+    #    które wsie należą do gminy: „Droga Tuczki–Koszelewy", „Jubileusz OSP
+    #    Truszczyny" i „Spotkanie z seniorami w Dębieniu" dostawały uparcie 2.
+    #    Dopisanie pełnej listy 22 wsi do promptu wraz z DOSŁOWNYM przykładem tej
+    #    drogi nic nie dało — 6/13. To reguła sprawdzalna kodem, więc sprawdza ją
+    #    kod (ta sama zasada, co `ground_event` i punkt 4 niżej).
+    #
+    #    ⚠️ Podnosimy i obniżamy, ale wyłącznie na podstawie UZIEMIONEJ nazwy:
+    #    `event_place` musi paść w tekście, inaczej model mógłby dopisać dowolną
+    #    wieś i sam sobie wystawić locality=3.
+    #    Miejsc bywa kilka naraz: „droga Tuczki–Koszelewy", „badania w Lidzbarku,
+    #    Płośnicy i Rybnie". Wymuszenie JEDNEJ nazwy kosztowało 3 z 13 przypadków
+    #    w pomiarze — model zwracał wtedy pustkę zamiast wybierać arbitralnie.
+    #    Wystarczy, że NASZA wieś jest wśród miejsc: dla mieszkańca Rybna badania
+    #    w trzech miejscach, z których jedno jest u nas, są sprawą gminy.
+    places = [p.strip() for p in (output.event_places or []) if p and p.strip()]
+    grounded = [p for p in places if _mentioned_in_text(p, source.flat)]
+    if len(grounded) != len(places):
+        logger.info(f"Grounding: miejsca spoza tekstu odrzucone: {set(places) - set(grounded)}")
+        output.event_places = grounded
+
+    if grounded and not is_foreign_region(source.title, source.body):
+        if any(places_in(p) for p in grounded):
+            if output.locality < 3:
+                logger.info(
+                    f"Grounding: locality {output.locality}→3, zdarzenie dzieje się w {grounded}"
+                )
+                output.locality = 3
+        elif output.locality >= 3:
+            logger.info(f"Grounding: locality 3→2, zdarzenie dzieje się w {grounded} (spoza gminy)")
+            output.locality = 2
+    elif output.locality >= 3 and not places_in(source.title, source.body):
+        # Bez wskazanego miejsca zostaje dawna reguła: „to pewnie u nas" nie jest dowodem
         logger.info("Grounding: locality 3→2, w tekście nie pada nazwa z gminy")
         output.locality = 2
 

@@ -121,9 +121,8 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
 
 10. Oceń wpis dwiema liczbami 0-3 — decydują o kolejności w feedzie:
    **locality** — na ile to sprawa gminy Rybno:
-   3 = dzieje się w gminie Rybno (Rybno, Żabiny, Rumian, Koszelewy, Tuczki, Naguszewo,
-       Gronowo, Hartowiec, Truszczyny, Dębień, Grabacz, Wery, Jeglia, Kopaniarze…)
-       albo wprost jej dotyczy (decyzja urzędu, ZGK, szkoła w gminie)
+   3 = dzieje się w gminie Rybno albo wprost jej dotyczy (decyzja urzędu, ZGK,
+       szkoła w gminie)
    2 = sąsiednia gmina powiatu działdowskiego (Działdowo, Lidzbark, Płośnica, Iłowo,
        Rybno-okolice) — mieszkaniec Rybna to odczuje: droga, szpital, urząd powiatowy
    1 = powiat lub województwo bez związku z gminą
@@ -138,6 +137,20 @@ CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomo�
    0 = nie wnosi nic
    ⚠️ Oceniaj to, co JEST w tekście. Wpis bez nazwy miejscowości ma locality najwyżej 1,
      nawet jeśli źródło jest lokalne — nie zgaduj, że „to pewnie u nas".
+   ⚠️ **Nie musisz pamiętać, które wsie należą do gminy Rybno — od tego jest kod.**
+     Twoim zadaniem jest rzetelne `event_places`: miejscowości, w których rzecz
+     się dzieje. Zwykle jedna, ale wymień WSZYSTKIE, gdy rzecz dotyczy kilku naraz
+     („droga Tuczki–Koszelewy", „badania w Lidzbarku, Płośnicy i Rybnie"). Gdy
+     tekst nie wskazuje miejsca — zostaw pustą listę.
+   ⚠️ **Liczy się MIEJSCE ZDARZENIA, nie pochodzenie uczestników ani organizator.**
+     Sama obecność nazwy miejscowości nie wystarcza — zapytaj, GDZIE to się dzieje:
+     - „Nocne Biegi w Kopaniarzach" → 3 (dzieje się u nas)
+     - „Badania w Lidzbarku, Płośnicy i Rybnie" → 3 (Rybno jest jednym z miejsc)
+     - „Mieszkanki gminy Rybno wspierają akcję zdrowotną w Lubawie" → 2 (akcja jest
+       w Lubawie; nasi są gośćmi)
+     - „Turniej dzieci z Delfina Rybno w Lubawie" → 2 (nasza drużyna, cudze boisko)
+     - „Natalia Zakrzewska z Hartowca na Pucharze Świata" → 1 (nasza mieszkanka,
+       zawody gdzie indziej)
 11. Ustaw event_start, jeśli wpis ZAPOWIADA zdarzenie z konkretną datą:
    ✅ WYPEŁNIJ (format ISO "RRRR-MM-DDTGG:MM", czas lokalny):
    - festyn, dożynki, koncert, turniej, rajd — "27 sierpnia o 15:00" → "2026-08-27T15:00"
