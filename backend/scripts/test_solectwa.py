@@ -23,7 +23,7 @@ przez prawdziwe endpointy (ASGI, lokalna baza):
 Model i poczta są PODMIENIONE — nic nie wychodzi na zewnątrz i nic nie kosztuje.
 `--live` dokłada prawdziwy odczyt wygenerowanego pisma przez gpt-4o (~$0,01).
 
-Konta testowe (`@qa.rybnolive.pl`) i ich ślady są kasowane na końcu, także po błędzie.
+Konta testowe (`@test-solectwa.rybnolive.pl`) i ich ślady są kasowane na końcu, także po błędzie.
 
 Użycie:
     cd backend && python -m scripts.test_solectwa [--live]
@@ -48,7 +48,9 @@ from src.database.schema import (
 )
 from src.newsletter.email_service import EmailService
 
-TEST_DOMAIN = "@qa.rybnolive.pl"
+# Własna domena: sprzątanie na końcu kasuje WSZYSTKO z tej domeny, więc wspólna
+# `@qa.rybnolive.pl` zabierała konta z ręcznego testu w przeglądarce (27.09)
+TEST_DOMAIN = "@test-solectwa.rybnolive.pl"
 SCOPE = "Żabiny"
 sent_emails: list[dict] = []
 results: list[bool] = []
@@ -417,12 +419,18 @@ async def live_scan() -> None:
     importlib.reload(scan_reader)  # zdejmij podmianę z patch_outside_world
     from src.ai.scan_reader import ScanReader, shrink
     data, _ = shrink(letter_image())
-    result, tin, tout = await ScanReader().read([data], now=datetime(2026, 9, 27, 10, 0))
+    # Z dopiskiem, jak w formularzu — pierwsza wysyłka przez UI (27.09) z dopiskiem
+    # dała pusty tytuł i podsumowanie
+    result, tin, tout = await ScanReader().read(
+        [data], note="Proszę o publikację przed zebraniem", now=datetime(2026, 9, 27, 10, 0),
+    )
     print(f"   tokeny: {tin} + {tout}")
     print("   przedruk:\n      " + result.transcript.replace("\n", "\n      "))
     print(f"   tytuł: {result.title}\n   podsumowanie: {result.summary}")
     print(f"   dane osobowe: {result.personal_data}")
     check("rozpoznane jako pismo", result.is_document)
+    check("tytuł i podsumowanie niepuste", bool(result.title.strip() and result.summary.strip()),
+          f"{result.title!r} / {result.summary[:40]!r}")
     check("przedruk zawiera porządek zebrania", "funduszu sołeckiego" in result.transcript)
     check("PESEL wycięty", "85010112345" not in result.transcript)
     check("nazwisko osoby prywatnej wycięte", "Kowalsk" not in result.transcript)

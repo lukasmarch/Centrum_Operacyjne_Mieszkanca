@@ -270,7 +270,7 @@ export interface ReportMapItem {
   created_at: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'cinema' | 'council' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'cinema' | 'council' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies' | 'invite' | 'announcement';
 
 export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'zgloszenia';
 
@@ -473,6 +473,8 @@ export interface RegisterData {
   location: string;
   consent_terms: boolean;
   consent_marketing?: boolean;
+  // Kod z linku zaproszenia (/zaproszenie?kod=…) — konto powstaje od razu z rolą
+  invite_token?: string;
   // Skąd przyszedł ten człowiek — doklejane automatycznie w AuthContext
   // z pamięci przeglądarki (`rl_acq`). Pomiar, nigdy warunek rejestracji.
   acq?: {

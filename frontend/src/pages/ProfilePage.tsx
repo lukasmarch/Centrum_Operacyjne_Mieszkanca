@@ -9,13 +9,16 @@ import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import PricingCards from '../../components/PricingCards';
 import MyBusinessPanel from '../../components/MyBusinessPanel';
+import SolectwoPanel from '../../components/SolectwoPanel';
+import SolectwaAdminPanel from '../../components/SolectwaAdminPanel';
+import { MyRole, PERM_SOLECTWO_POST, fetchMyRoles } from '../services/solectwaApi';
 import { getAccessToken } from '../services/authApi';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 interface ProfilePageProps {
   onNavigate: (section: 'dashboard' | 'premium' | 'terms' | 'privacy' | 'business') => void;
-  initialTab?: 'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma';
+  initialTab?: 'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma' | 'solectwo' | 'solectwa-admin';
 }
 
 /** Ile pełnych dni okresu próbnego zostało; null, gdy trial nie działa.
@@ -158,7 +161,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
   const { status: pushStatus, isSubscribed: pushSubscribed, isSupported: pushSupported, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const [pushLoading, setPushLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma'>(initialTab ?? 'profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma' | 'solectwo' | 'solectwa-admin'>(initialTab ?? 'profile');
   const [referralData, setReferralData] = useState<{referral_code: string; referral_link: string; referrals_count: number; reward_per_referral: string} | null>(null);
   const [referralCopied, setReferralCopied] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -178,6 +181,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
   });
 
   const [localError, setLocalError] = useState('');
+
+  // Role z zakresem (sołtys). Zakładka „Sołectwo" istnieje tylko dla konta
+  // z uprawnieniem do ogłoszeń — reszta mieszkańców jej nie widzi.
+  const [roles, setRoles] = useState<MyRole[]>([]);
+  useEffect(() => {
+    fetchMyRoles().then(setRoles).catch(() => {});
+  }, [user?.id]);
+  const postingRole = roles.find((r) => r.permissions.includes(PERM_SOLECTWO_POST));
 
 
   // Fetch referral data when tab is active
@@ -405,6 +416,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               <h3 className="font-bold text-lg">{user.full_name}</h3>
               <p className="text-neutral-400 text-sm">{user.email}</p>
               <div className="mt-2">{getTierBadge(user.tier as UserTier)}</div>
+              {roles.map((r) => (
+                <p key={r.id} className="mt-2 text-xs font-semibold text-emerald-300">{r.signed_as}</p>
+              ))}
               {daysLeft !== null && user.trial_ends_at && (
                 <p className="mt-2 text-xs text-neutral-400 leading-relaxed">
                   do <span className="font-semibold text-neutral-200">{formatTrialEnd(user.trial_ends_at)}</span>
@@ -457,6 +471,30 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               >
                 Subskrypcja
               </button>
+              {postingRole && (
+                <button
+                  onClick={() => setActiveTab('solectwo')}
+                  className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'solectwo'
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-neutral-600 hover:bg-gray-950'
+                  }`}
+                >
+                  Sołectwo
+                </button>
+              )}
+              {user.is_admin && (
+                <button
+                  onClick={() => setActiveTab('solectwa-admin')}
+                  className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
+                    activeTab === 'solectwa-admin'
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-neutral-600 hover:bg-gray-950'
+                  }`}
+                >
+                  Redakcja sołectw
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('firma')}
                 className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
@@ -904,6 +942,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
               </div>
             </div>
           )}
+          {/* Sołectwo — ogłoszenia sołtysa (zdjęcie pisma → redakcja → strona) */}
+          {activeTab === 'solectwo' && (postingRole
+            ? <SolectwoPanel role={postingRole} />
+            : <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50 text-neutral-400">
+                To konto nie ma roli sołtysa. Link z zaproszeniem otrzymasz od redakcji RybnoLive.
+              </div>)}
+          {/* Redakcja sołectw — moderacja, zaproszenia, role (tylko admin) */}
+          {activeTab === 'solectwa-admin' && user.is_admin && <SolectwaAdminPanel />}
           {/* Moja firma — wizytówki przypisane do tego konta */}
           {activeTab === 'firma' && (
             <MyBusinessPanel

@@ -9,9 +9,13 @@ import { AVAILABLE_LOCATIONS } from '../../types';
 
 interface RegisterPageProps {
   onNavigate: (page: 'login' | 'dashboard' | 'terms' | 'privacy') => void;
+  /** Kod z zaproszenia (strona `/zaproszenie`) — konto powstaje od razu z rolą */
+  inviteToken?: string;
+  /** Po udanej rejestracji z zaproszeniem — zamiast powrotu na stronę główną */
+  onRegistered?: () => void;
 }
 
-const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
+const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, onRegistered }) => {
   const { register, isLoading, error, clearError } = useAuth();
 
   // Górny stopień lejka: ilu ludzi w ogóle otworzyło formularz. Bez tego
@@ -84,6 +88,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
         location: formData.location,
         consent_terms: consentTerms,
         consent_marketing: consentMarketing,
+        ...(inviteToken ? { invite_token: inviteToken } : {}),
       });
       // Mail powitalny obiecuje alerty o awariach i przypomnienie o wywozie — oba
       // jadą wyłącznie pushem, a ten wymaga zgody w przeglądarce. Do 21.08.2026
@@ -95,7 +100,8 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
       } catch {
         // tryb prywatny bez localStorage — baner po prostu się nie pokaże
       }
-      onNavigate('dashboard');
+      if (onRegistered) onRegistered();
+      else onNavigate('dashboard');
     } catch {
       // Error handled by AuthContext
     }
@@ -254,16 +260,30 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                 Do 20.08.2026 informacja o 30 dniach Premium istniała wyłącznie
                 w regulaminie: użytkownik dostawał pełny dostęp, nie wiedział,
                 że jest ograniczony, i nie miał powodu niczego kupować. */}
-            <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
-              <p className="text-xs font-bold text-amber-300">
-                30 dni planu Premium — bez karty płatniczej
-              </p>
-              <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
-                Poranny briefing na mail, asystent AI bez limitu i powiadomienia o awariach.
-                Potem konto przechodzi na darmowy plan Dla Każdego — nic nie pobieramy
-                automatycznie i uprzedzimy Cię mailem tydzień wcześniej.
-              </p>
-            </div>
+            {/* Konto z zaproszenia (sołtys) dostaje Premium BEZ terminu — obietnica
+                30 dni byłaby tu nieprawdą (backend: `roles.grant_role`) */}
+            {inviteToken ? (
+              <div className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3">
+                <p className="text-xs font-bold text-emerald-300">
+                  Plan Premium bez opłat — na czas pełnienia funkcji
+                </p>
+                <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
+                  Po założeniu konta od razu przejdziesz do panelu sołectwa,
+                  a na maila przyjdzie instrukcja dodawania ogłoszeń.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
+                <p className="text-xs font-bold text-amber-300">
+                  30 dni planu Premium — bez karty płatniczej
+                </p>
+                <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
+                  Poranny briefing na mail, asystent AI bez limitu i powiadomienia o awariach.
+                  Potem konto przechodzi na darmowy plan Dla Każdego — nic nie pobieramy
+                  automatycznie i uprzedzimy Cię mailem tydzień wcześniej.
+                </p>
+              </div>
+            )}
 
             {/* Submit */}
             <button

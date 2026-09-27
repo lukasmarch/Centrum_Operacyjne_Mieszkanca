@@ -35,6 +35,8 @@ interface AuthContextType {
   updateProfile: (data: UserUpdateData) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   clearError: () => void;
+  /** Ponowne pobranie konta — po zmianie planu z zewnątrz (np. przyjęcie roli sołtysa) */
+  refreshUser: () => Promise<void>;
 
   // Helpers
   isPremium: boolean;
@@ -208,6 +210,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      setUser(await authApi.getCurrentUser());
+    } catch {
+      // brak sesji — zostaje to, co było
+    }
+  }, []);
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
@@ -219,6 +229,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateProfile,
     changePassword,
     clearError,
+    refreshUser,
     isPremium,
     userLocation,
     dashboardLayout,

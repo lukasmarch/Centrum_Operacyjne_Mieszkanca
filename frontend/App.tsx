@@ -38,6 +38,8 @@ const PrivacyPage      = lazy(() => import('./src/pages/PrivacyPage'));
 const CookiePolicyPage = lazy(() => import('./src/pages/CookiePolicyPage'));
 const CheckoutPage     = lazy(() => import('./src/pages/CheckoutPage'));
 const CouncilPage      = lazy(() => import('./src/pages/CouncilPage'));
+const InvitePage       = lazy(() => import('./src/pages/InvitePage'));
+const SolectwoPostPage = lazy(() => import('./src/pages/SolectwoPostPage'));
 
 // Podmenu zakładki „Info". Odpady, autobus i kino dopisane razem z przebudową:
 // bez nich strony powstałe 11–12.08 były osiągalne WYŁĄCZNIE z kafla na stronie
@@ -79,6 +81,8 @@ const SECTION_TO_TAB: Record<AppSection, TabId> = {
     terms: 'home',
     privacy: 'home',
     cookies: 'home',
+    invite: 'home',
+    announcement: 'miasto',
 };
 
 // Default section for each tab
@@ -118,6 +122,11 @@ export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
     // patrz backend/src/api/endpoints/seo.py), tylko żeby dało się w niego
     // wysłać człowieka mailem: decyzja o wizytówce linkuje do /profil?zakladka=firma
     profile: '/profil',
+    // Jak profil: adresy do wysyłania ludzi linkiem, NIE do sitemapy.
+    // /zaproszenie?kod=… — link dla sołtysa po rozmowie telefonicznej;
+    // /ogloszenie?id=… — ogłoszenie sołectwa (link z feedu i z profilu FB sołtysa)
+    invite: '/zaproszenie',
+    announcement: '/ogloszenie',
 };
 
 const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PATH)
@@ -143,11 +152,14 @@ const normalizeUnknownPath = () => {
 type CheckoutSelection = { tier: string; frequency: Frequency };
 
 /** Zakładka profilu wskazana w adresie — `/profil?zakladka=firma` z maila
- *  o decyzji w sprawie wizytówki. */
-const tabFromUrl = (): 'firma' | undefined =>
-    new URLSearchParams(window.location.search).get('zakladka') === 'firma'
-        ? 'firma'
-        : undefined;
+ *  o decyzji w sprawie wizytówki, `solectwo` z instrukcji dla sołtysa,
+ *  `solectwa-admin` z dzwonka do redakcji. */
+type ProfileTab = 'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma' | 'solectwo' | 'solectwa-admin';
+const URL_TABS: ProfileTab[] = ['firma', 'solectwo', 'solectwa-admin'];
+const tabFromUrl = (): ProfileTab | undefined => {
+    const tab = new URLSearchParams(window.location.search).get('zakladka') as ProfileTab | null;
+    return tab && URL_TABS.includes(tab) ? tab : undefined;
+};
 
 const checkoutFromUrl = (): CheckoutSelection | null => {
     const params = new URLSearchParams(window.location.search);
@@ -163,11 +175,9 @@ const AppContent: React.FC = () => {
     });
     const [activeTab, setActiveTab] = useState<TabId>(() => SECTION_TO_TAB[sectionFromPath()]);
     const [initialQuery, setInitialQuery] = useState<string>('');
-    const { user, isAuthenticated, isLoading, logout } = useAuth();
+    const { user, isAuthenticated, isLoading, logout, refreshUser } = useAuth();
 
-    const [profileInitialTab, setProfileInitialTab] = useState<
-        'profile' | 'password' | 'preferences' | 'subscription' | 'polecaj' | 'firma' | undefined
-    >(() => tabFromUrl());
+    const [profileInitialTab, setProfileInitialTab] = useState<ProfileTab | undefined>(() => tabFromUrl());
     const [checkoutSelection, setCheckoutSelection] = useState<CheckoutSelection | null>(checkoutFromUrl);
 
     // Adres w pasku przeglądarki podąża za sekcją (tylko dla sekcji z SECTION_TO_PATH)
@@ -288,6 +298,18 @@ const AppContent: React.FC = () => {
         if (activeSection === 'register') {
             return <RegisterPage onNavigate={handleNavigate} />;
         }
+        if (activeSection === 'invite') {
+            // Po przyjęciu zaproszenia (nowe konto albo istniejące) — prosto do panelu sołectwa
+            const toPanel = () => {
+                refreshUser();
+                setProfileInitialTab('solectwo');
+                setActiveSection('profile');
+                setActiveTab(SECTION_TO_TAB['profile']);
+                syncUrl('profile');
+                window.scrollTo({ top: 0 });
+            };
+            return <InvitePage onDone={toPanel} onNavigate={handleNavigate} />;
+        }
 
         // Profile page (requires login)
         if (activeSection === 'profile') {
@@ -309,6 +331,8 @@ const AppContent: React.FC = () => {
                 return <CinemaPage />;
             case 'council':
                 return <CouncilPage />;
+            case 'announcement':
+                return <SolectwoPostPage />;
             case 'assistant':
                 return <AssistantPage initialQuery={initialQuery} onNavigate={handleNavigate} />;
             case 'news':

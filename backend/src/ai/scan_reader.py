@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, BinaryContent
+from pydantic_ai import Agent, BinaryContent, ModelRetry
 
 from src.ai.article_processor import SourceText, _event_date_grounded
 from src.config import settings
@@ -235,10 +235,27 @@ def shrink(image_bytes: bytes) -> tuple[bytes, str]:
     return out.getvalue(), "image/jpeg"
 
 
+def require_description(reading: ScanReading) -> ScanReading:
+    """Pismo bez tytułu i podsumowania nie nadaje się do moderacji.
+
+    27.09.2026, pierwsza wysyłka przez formularz: przedruk, termin i dane
+    osobowe przyszły poprawnie, a `title` i `summary` — puste. Pola mają
+    wartości domyślne (bo nie-pismo zostawia je puste), więc schemat tego
+    nie łapał. Jedna prośba o uzupełnienie kosztuje mniej niż redakcja
+    pisząca tytuł ręcznie.
+    """
+    if reading.is_document and (not reading.title.strip() or not reading.summary.strip()):
+        raise ModelRetry("Pismo rozpoznane, ale `title` albo `summary` jest puste — uzupełnij oba pola.")
+    return reading
+
+
 class ScanReader:
     def __init__(self):
         os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
-        self.agent = Agent(SCAN_MODEL, output_type=ScanReading, system_prompt=SCAN_PROMPT)
+        self.agent = Agent(
+            SCAN_MODEL, output_type=ScanReading, system_prompt=SCAN_PROMPT, output_retries=2,
+        )
+        self.agent.output_validator(require_description)
 
     async def read(
         self,
