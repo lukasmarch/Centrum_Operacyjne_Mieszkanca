@@ -15,6 +15,7 @@ from src.database.schema import Referral, SiteEvent, UserTier
 from src.config import settings
 from src.auth.dependencies import get_current_active_user
 from src.newsletter.subscriptions import ensure_subscription
+from src.services import roles as role_service
 from .jwt import (
     get_password_hash, verify_password,
     create_access_token, create_refresh_token, verify_token
@@ -90,6 +91,17 @@ async def register(
             detail="Email already registered"
         )
 
+    # Zaproszenie sprawdzamy PRZED założeniem konta: nieważny link ma dać
+    # komunikat, a nie konto zwykłego mieszkańca, które sołtys uzna za swoje.
+    invitation = None
+    if user_data.invite_token:
+        invitation = await role_service.find_invitation(session, user_data.invite_token)
+        if not invitation:
+            raise HTTPException(status_code=404, detail="Nie znaleziono zaproszenia")
+        state = role_service.invitation_state(invitation)
+        if state != "active":
+            raise HTTPException(status_code=410, detail=role_service.INVITATION_ERRORS[state])
+
     # Sprawdź polecającego (referral)
     referrer = None
     if user_data.referral_code:
@@ -137,6 +149,15 @@ async def register(
     ))
     await session.commit()
 
+    # Rola z zaproszenia. Sołtys dostaje Premium bez terminu (`grant_role`
+    # zeruje `trial_ends_at`), więc mail o 30-dniowym triale byłby nieprawdą —
+    # zamiast niego idzie instrukcja dla sołtysa.
+    granted_role = None
+    if invitation:
+        granted_role, _ = await role_service.accept_invitation(session, invitation, new_user)
+        await session.commit()
+        await session.refresh(new_user)
+
     # Jeśli jest polecający — zapisz referral i nagrodź +14 dni (jeśli polecający ma Premium)
     if referrer:
         referral = Referral(
@@ -164,14 +185,21 @@ async def register(
         await session.commit()
         await session.refresh(subscriber)
 
-        # Jedyny moment, w którym mówimy wprost, że Premium jest na 30 dni.
-        background_tasks.add_task(
-            _send_welcome_email,
-            new_user.email,
-            new_user.full_name,
-            new_user.trial_ends_at,
-            subscriber.unsubscribe_token,
-        )
+        if granted_role is None:
+            # Jedyny moment, w którym mówimy wprost, że Premium jest na 30 dni.
+            background_tasks.add_task(
+                _send_welcome_email,
+                new_user.email,
+                new_user.full_name,
+                new_user.trial_ends_at,
+                subscriber.unsubscribe_token,
+            )
+
+    # Instrukcja sołtysa to mail transakcyjny — idzie także do kogoś, kto kiedyś
+    # wypisał się z newslettera (wtedy `subscriber` jest None)
+    if granted_role is not None:
+        from src.api.endpoints.roles import send_role_welcome
+        background_tasks.add_task(send_role_welcome, new_user.id, granted_role.id)
 
     # Generate tokens
     token_data = {

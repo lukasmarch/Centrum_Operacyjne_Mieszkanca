@@ -94,3 +94,5 @@ automation/n8n/_backup/
 # Magazyn grafik postów — na produkcji to wolumen Dockera, lokalnie artefakt testów.
 # Arkusze obsady mają swoje źródło w backend/assets/social/cast/ i to ono jest w repo.
 backend/uploads/
+# Zdjęcia pism od sołtysów — prywatne, poza publicznym /uploads
+backend/private_uploads/

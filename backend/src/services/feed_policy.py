@@ -105,6 +105,10 @@ SOURCE_WEIGHTS: dict[str, float] = {
     "Facebook - Sołectwo Hartowiec": 1.20,
     "Facebook - Sołtys Żabiny": 1.20,
     "Facebook - Żłobek w Rybnie": 1.15,
+    # Ogłoszenia sołtysów przysłane do nas i zatwierdzone przez redakcję
+    # (`api/endpoints/solectwa.py`, 27.09.2026). Treść urzędowa sołectwa,
+    # sprawdzona przez człowieka — jak strona sołectwa, nie jak media.
+    "RybnoLive - Sołectwa": 1.30,
     "KPP Działdowo (RSS)": 1.30,
     "Facebook - Gmina Działdowo": 1.25,
     "Powiat Działdowski (RSS)": 1.20,
@@ -151,6 +155,7 @@ LOCAL_SOURCES: frozenset[str] = COUNTY_WIDE_SOURCES | {
     "Facebook - Żłobek w Rybnie",
     "Facebook - Sołectwo Hartowiec",
     "Facebook - Sołtys Żabiny",
+    "RybnoLive - Sołectwa",
     "Facebook - Panorama Regionu",
     "Facebook - Gmina Działdowo",
     "Moje Działdowo",
@@ -198,6 +203,7 @@ GMINA_SOURCES: frozenset[str] = frozenset({
     "Facebook - Żłobek w Rybnie",
     "Facebook - Sołectwo Hartowiec",
     "Facebook - Sołtys Żabiny",
+    "RybnoLive - Sołectwa",
 })
 
 

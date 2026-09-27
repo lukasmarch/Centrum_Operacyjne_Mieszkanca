@@ -26,6 +26,7 @@ from src.database.schema import (
     User, Subscription, UserTier, SubscriptionStatus, BusinessProfile,
     NewsletterSubscriber,
 )
+from src.services.roles import has_premium_role
 from src.utils.logger import setup_logger
 
 logger = setup_logger("TrialExpiryJob")
@@ -354,7 +355,13 @@ async def run_trial_expiry_async():
                         Subscription.id != sub.id,
                     )
                 )
-                if not other_result.scalars().first():
+                if other_result.scalars().first():
+                    pass
+                elif await has_premium_role(session, sub_user.id):
+                    # Sołtys z własnym Premium nie traci planu z końcem subskrypcji,
+                    # którą ewentualnie kupił obok — Premium z roli trwa do jej odebrania
+                    logger.info(f"Subscription expired: user {sub_user.id} keeps Premium from role")
+                else:
                     sub_user.tier = UserTier.FREE.value
                     session.add(sub_user)
                     logger.info(f"Subscription expired: user {sub_user.id} ({sub_user.email}) → downgraded to Free")

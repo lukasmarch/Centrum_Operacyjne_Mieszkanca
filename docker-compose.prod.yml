@@ -30,6 +30,8 @@ services:
     volumes:
       - uploads:/app/uploads
       - logs:/app/logs
+      # Zdjęcia pism od sołtysów — NIE montować do Caddy (w odróżnieniu od uploads)
+      - private_uploads:/app/private_uploads
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level warning
     stop_grace_period: 120s
     logging:
@@ -56,6 +58,7 @@ services:
 volumes:
   pgdata:
   uploads:
+  private_uploads:
   logs:
   caddy_data:
   caddy_config:

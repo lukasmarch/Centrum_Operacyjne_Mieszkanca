@@ -1308,3 +1308,91 @@ class SiteEvent(SQLModel, table=True):
     meta: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ======================
+# Role z zakresem i ogłoszenia sołtysów (2026-09-27)
+# ======================
+
+class UserRole(SQLModel, table=True):
+    """Kim jest konto i W JAKIM ZAKRESIE — „sołtys" + „Żabiny".
+
+    Rola to warstwa NAD kontem, nie rodzaj konta: sołtys jest też mieszkańcem
+    (briefing, push, odpady), a koniec kadencji odbiera rolę, nie konto.
+    Uprawnienia ról mieszkają w kodzie (`services/roles.py`), tu jest tylko
+    przypisanie. Firmy zostają przy `business_profiles`, admin przy `is_admin`.
+    """
+    __tablename__ = "user_roles"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    role: str = Field(max_length=30)
+    scope: str = Field(default="", max_length=100)
+    # pending → verified → revoked
+    status: str = Field(default="verified", max_length=20)
+    # invitation / manual / request
+    method: str = Field(default="manual", max_length=20)
+    verified_by: Optional[str] = Field(default=None, max_length=255)
+    verified_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class RoleInvitation(SQLModel, table=True):
+    """Link wręczany po rozmowie telefonicznej — weryfikacja dzieje się w rozmowie,
+    więc przyjęcie zaproszenia nadaje rolę od razu. Jednorazowy i z terminem."""
+    __tablename__ = "role_invitations"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(max_length=64, unique=True)
+    role: str = Field(max_length=30)
+    scope: str = Field(default="", max_length=100)
+    # Dla admina: „Jan K., tel. rozmowa 27.09" — żeby lista zaproszeń była czytelna
+    invitee_label: Optional[str] = Field(default=None, max_length=100)
+    created_by: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime
+    used_at: Optional[datetime] = None
+    used_by_user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    revoked_at: Optional[datetime] = None
+
+
+class SolectwoPost(SQLModel, table=True):
+    """Ogłoszenie sołtysa: zdjęcie pisma → odczyt modelem → moderacja → artykuł.
+
+    Zdjęcia są PRYWATNE (`private_uploads`, poza publicznym `/uploads`): na
+    skanie bywają podpisy, pieczęcie i dane osób trzecich. Publikujemy przedruk
+    z wyciętymi danymi osób prywatnych, a oryginał widzi wyłącznie redakcja
+    i znika po `IMAGE_RETENTION_DAYS` (`retention_job`).
+    """
+    __tablename__ = "solectwo_posts"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    role_id: Optional[int] = Field(default=None, foreign_key="user_roles.id")
+    solectwo: str = Field(max_length=100)
+    # Podpis w chwili wysyłki — zostaje przy ogłoszeniu po zmianie sołtysa
+    signed_as: str = Field(max_length=150)
+    # processing → pending → published / rejected; failed = odczyt się nie udał
+    status: str = Field(default="processing", max_length=20, index=True)
+    note: Optional[str] = None
+    image_files: list = Field(default_factory=list, sa_column=Column(JSONB))
+
+    title: Optional[str] = Field(default=None, max_length=200)
+    summary: Optional[str] = None
+    transcript: Optional[str] = None
+    doc_type: Optional[str] = Field(default=None, max_length=100)
+    event_at: Optional[datetime] = None
+    event_until: Optional[datetime] = None
+    personal_data: Optional[list] = Field(default=None, sa_column=Column(JSONB))
+    illegible: Optional[list] = Field(default=None, sa_column=Column(JSONB))
+    ai_error: Optional[str] = None
+
+    article_id: Optional[int] = Field(default=None, foreign_key="articles.id")
+    moderated_by: Optional[str] = Field(default=None, max_length=255)
+    moderated_at: Optional[datetime] = None
+    reject_reason: Optional[str] = Field(default=None, max_length=500)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    published_at: Optional[datetime] = None
+    images_deleted_at: Optional[datetime] = None

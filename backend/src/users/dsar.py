@@ -20,6 +20,7 @@ from sqlmodel import select
 from src.database.schema import (
     User, Subscription, NewsletterSubscriber, Report, PushSubscription,
     BusinessProfile, BusinessAnnouncement, CEIDGBusiness, BusinessClaimLog,
+    SolectwoPost, UserRole,
 )
 from src.database.vectors import Conversation, ChatMessage, APICostLog
 from src.utils.logger import setup_logger
@@ -137,6 +138,34 @@ async def export_user_data(session: AsyncSession, user: User) -> dict:
     )).one()
     ai_usage = {"total_requests": usage[0], "total_tokens": int(usage[1])}
 
+    # Role (sołtys) i ogłoszenia wysłane w tej roli
+    role_rows = (await session.execute(
+        select(UserRole).where(UserRole.user_id == user.id).order_by(UserRole.created_at)
+    )).scalars().all()
+    roles = [{
+        "role": r.role,
+        "scope": r.scope,
+        "status": r.status,
+        "method": r.method,
+        "verified_at": _iso(r.verified_at),
+        "revoked_at": _iso(r.revoked_at),
+    } for r in role_rows]
+    post_rows = (await session.execute(
+        select(SolectwoPost).where(SolectwoPost.user_id == user.id)
+        .order_by(SolectwoPost.created_at)
+    )).scalars().all()
+    solectwo_posts = [{
+        "signed_as": p.signed_as,
+        "status": p.status,
+        "title": p.title,
+        "summary": p.summary,
+        "transcript": p.transcript,
+        "note": p.note,
+        "images_kept": 0 if p.images_deleted_at else len(p.image_files or []),
+        "created_at": _iso(p.created_at),
+        "published_at": _iso(p.published_at),
+    } for p in post_rows]
+
     return {
         "format": "RODO art. 15/20 data export",
         "service": "rybnolive.pl",
@@ -148,6 +177,8 @@ async def export_user_data(session: AsyncSession, user: User) -> dict:
         "push_subscriptions": push_subscriptions,
         "newsletter": newsletter,
         "ai_usage": ai_usage,
+        "roles": roles,
+        "solectwo_posts": solectwo_posts,
     }
 
 
@@ -237,6 +268,32 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
     await session.execute(
         delete(BusinessClaimLog).where(BusinessClaimLog.user_id == user.id)
     )
+
+    # 5c. Role i ogłoszenia sołectwa.
+    #
+    # Rola znika z kontem (jest przypisaniem OSOBY do funkcji). Ogłoszenia
+    # opublikowane zostają — to komunikaty sołectwa podpisane funkcją
+    # („Sołtys sołectwa X"), nie nazwiskiem, i mieszkańcy mogą do nich wracać;
+    # tracą jedynie powiązanie z kontem. Nieopublikowane kasujemy w całości
+    # razem ze zdjęciami: nikt ich nie zobaczył, a skan bywa pełen danych.
+    from src.api.endpoints.solectwa import PUBLISHED, delete_images
+
+    own_posts = (await session.execute(
+        select(SolectwoPost).where(SolectwoPost.user_id == user.id)
+    )).scalars().all()
+    for post in own_posts:
+        delete_images(post)
+        if post.status == PUBLISHED:
+            post.user_id = None
+            post.role_id = None
+            post.note = None
+            post.image_files = []
+            post.images_deleted_at = post.images_deleted_at or datetime.utcnow()
+            session.add(post)
+        else:
+            await session.delete(post)
+    await session.flush()
+    await session.execute(delete(UserRole).where(UserRole.user_id == user.id))
 
     # 6. Anonimizacja rekordu users (FK z subscriptions/referrals pozostaje spójne)
     user.email = f"usuniete-{user.id}@anonimizacja.rybnolive.pl"

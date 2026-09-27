@@ -154,6 +154,13 @@ async def run_retention_async():
         )
         logger.info(f"site_events: usunięto {res.rowcount} wpisów")
 
+        # 8. Zdjęcia pism od sołtysów — oryginał jest materiałem roboczym
+        # redakcji, publikacją jest przedruk. Znika IMAGE_RETENTION_DAYS po
+        # decyzji (obietnica z instrukcji dla sołtysa).
+        from src.api.endpoints.solectwa import IMAGE_RETENTION_DAYS, purge_old_images
+        purged = await purge_old_images(session, now)
+        logger.info(f"solectwo_posts: skasowano zdjęcia {purged} ogłoszeń (> {IMAGE_RETENTION_DAYS} dni)")
+
         await session.commit()
 
     await engine.dispose()

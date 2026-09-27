@@ -142,6 +142,12 @@ app.include_router(newsletter_webhook_router)  # /api/newsletter/webhook/resend
 from src.api.endpoints.council import router as council_router
 app.include_router(council_router)  # /api/council/*
 
+# Role z zakresem (sołtys) i ogłoszenia sołectw — zdjęcie pisma → moderacja → artykuł
+from src.api.endpoints.roles import router as roles_router
+from src.api.endpoints.solectwa import router as solectwa_router
+app.include_router(roles_router)  # /api/roles/*
+app.include_router(solectwa_router)  # /api/solectwa/*
+
 @app.on_event("startup")
 async def startup_event():
     """Start scheduler and register AI agents on app startup"""

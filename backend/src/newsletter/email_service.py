@@ -788,6 +788,164 @@ class EmailService:
             html_content=html
         )
 
+    async def send_soltys_welcome(
+        self,
+        to_email: str,
+        recipient_name: Optional[str],
+        signed_as: str,
+        unsubscribe_token: Optional[str],
+        now: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Instrukcja dla sołtysa — tuż po nadaniu roli (rejestracja z zaproszenia
+        albo przyjęcie zaproszenia na istniejącym koncie).
+
+        Każde zdanie tej instrukcji opisuje coś, co działa w kodzie. Zmieniając
+        przepływ ogłoszeń (`api/endpoints/solectwa.py`), sprawdź, czy mail wciąż
+        mówi prawdę — ta sama zasada co przy liście `perks` powitania.
+        """
+        from src.api.endpoints.solectwa import IMAGE_RETENTION_DAYS, MAX_IMAGES
+
+        now = now or datetime.now()
+        context = self._common_context(to_email, unsubscribe_token or "", campaign="soltys")
+        if not unsubscribe_token:
+            # Konto wypisane z newslettera — stopka prowadzi do preferencji,
+            # a nie do wypisu, którego nie ma czym podpisać
+            context["unsubscribe_url"] = app_link("/profil", "soltys")
+        context.update({
+            "subject": f"{signed_as} — konto gotowe, tak dodasz ogłoszenie",
+            "preheader": "Zdjęcie pisma, jeden przycisk — resztę robimy my.",
+            "recipient_name": (recipient_name or "").split()[0] if recipient_name else None,
+            "date_header": self._date_label(now),
+            "status_line": (
+                "Twoje konto ma rolę sołtysa. Ogłoszenia, które wyślesz, zobaczą "
+                "mieszkańcy całej gminy — na stronie, a część z nich także w porannym "
+                "briefingu i w newsletterze."
+            ),
+            "signed_as": signed_as,
+            "url_panel": app_link("/profil?zakladka=solectwo", "soltys"),
+            "sections": [
+                {
+                    "title": "Jak dodać ogłoszenie",
+                    "numbered": True,
+                    "items": [
+                        {"title": "Zaloguj się na rybnolive.pl",
+                         "note": "najwygodniej telefonem, na którym robisz zdjęcia"},
+                        {"title": "Profil → zakładka „Sołectwo” → „Dodaj ogłoszenie”",
+                         "note": None},
+                        {"title": "Zrób zdjęcie pisma albo wybierz je z galerii",
+                         "note": f"do {MAX_IMAGES} stron; można dopisać jedno zdanie od siebie"},
+                        {"title": "Wyślij",
+                         "note": "odczytamy treść pisma, przygotujemy przedruk i krótkie podsumowanie"},
+                        {"title": "Redakcja sprawdza każde ogłoszenie przed publikacją",
+                         "note": "dostaniesz maila, gdy się ukaże — z linkiem, który możesz wkleić na Facebooku"},
+                    ],
+                },
+                {
+                    "title": "Co warto publikować",
+                    "numbered": False,
+                    "items": [
+                        {"title": "Pisma i obwieszczenia urzędowe", "note": "dotyczące sołectwa albo całej gminy"},
+                        {"title": "Zebrania wiejskie i fundusz sołecki", "note": "termin, miejsce, porządek zebrania"},
+                        {"title": "Wydarzenia w sołectwie", "note": "festyny, sprzątanie, zbiórki, spotkania"},
+                        {"title": "Utrudnienia", "note": "woda, droga, wywóz odpadów"},
+                    ],
+                },
+                {
+                    "title": "Czego nie wysyłaj",
+                    "numbered": False,
+                    "items": [
+                        {"title": "Danych prywatnych osób",
+                         "note": "listy nazwisk, adresy, numery PESEL — wycinamy je z przedruku, ale lepiej, żeby do nas nie trafiały"},
+                        {"title": "Reklam firm i agitacji wyborczej", "note": None},
+                        {"title": "Zdjęć ludzi bez ich zgody", "note": None},
+                    ],
+                },
+                {
+                    "title": "Jak ogłoszenie wygląda u nas",
+                    "numbered": False,
+                    "items": [
+                        {"title": "Tytuł i krótkie podsumowanie",
+                         "note": "oznaczone jako przygotowane automatycznie i sprawdzone przez redakcję"},
+                        {"title": "Pełny przedruk pisma", "note": "bez danych osób prywatnych"},
+                        {"title": f"Podpis: „{signed_as}”", "note": None},
+                        {"title": "Zdjęcie oryginału widzi tylko redakcja",
+                         "note": f"kasujemy je {IMAGE_RETENTION_DAYS} dni po decyzji"},
+                        {"title": "Ogłoszenie z terminem trafia też do kalendarza",
+                         "note": "przy najbliższym przebiegu, zwykle w ciągu kilku godzin"},
+                    ],
+                },
+            ],
+            "help_line": "Coś nie działa albo masz pytanie? Odpisz na tego maila — odpowiada człowiek.",
+        })
+
+        html = self.render_template("soltys_welcome.html", context)
+        return await self.send_email(
+            to_email=to_email,
+            subject=context["subject"],
+            html_content=html,
+            reply_to="biuro@lumargo.pl",
+            unsubscribe_url=context["unsubscribe_url"] if unsubscribe_token else None,
+        )
+
+    async def send_solectwo_post_decision(
+        self,
+        to_email: str,
+        title: str,
+        approved: bool,
+        post_url: Optional[str] = None,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Decyzja redakcji w sprawie ogłoszenia — do sołtysa, w obie strony.
+
+        Ta sama lekcja co przy wizytówkach: ogłoszenie, które znika bez słowa,
+        wygląda jak awaria serwisu. Przy publikacji link jest celem maila —
+        sołtys wkleja go na swój profil i to on niesie zasięg do nas.
+        """
+        if approved:
+            subject = f"✅ Opublikowane: {title}"
+            body = f"""
+            <h2>Ogłoszenie jest na stronie</h2>
+            <p><strong>{title}</strong> widzą już mieszkańcy gminy.</p>
+            <p>Link do ogłoszenia możesz wkleić na swoim profilu na Facebooku:</p>
+            <p><a href="{post_url}">{post_url}</a></p>
+            <a href="{post_url}" class="btn">Zobacz ogłoszenie</a>
+            """
+        else:
+            reason_html = f"<p>Powód: {reason}</p>" if reason else ""
+            subject = f"Ogłoszenie „{title}” — nie opublikowaliśmy go"
+            body = f"""
+            <h2>Nie opublikowaliśmy ogłoszenia</h2>
+            <p><strong>{title}</strong></p>
+            {reason_html}
+            <p>Odpisz na tę wiadomość, jeśli chcesz coś poprawić — pomożemy.</p>
+            """
+
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: sans-serif; line-height: 1.6; color: #333; }}
+                .btn {{ display: inline-block; background: #1e3a5f; color: white; padding: 12px 30px;
+                        text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            {body}
+            <p style="font-size: 12px; color: #888; margin-top: 30px;">
+                RybnoLive — ogłoszenia sołectw gminy Rybno
+            </p>
+        </body>
+        </html>
+        """
+        return await self.send_email(
+            to_email=to_email,
+            subject=subject,
+            html_content=html,
+            reply_to="biuro@lumargo.pl",
+        )
+
     async def send_business_claim_decision(
         self,
         to_email: str,

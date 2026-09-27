@@ -49,6 +49,8 @@ class UserCreate(BaseModel):
     consent_terms: bool = Field(default=False)      # akceptacja regulaminu + polityki prywatności (wymagana)
     consent_marketing: bool = Field(default=False)  # zgoda marketingowa (opcjonalna)
     acq: Optional[Acquisition] = None               # źródło wizyty (pomiar, nie warunek rejestracji)
+    # Kod z linku zaproszenia (`/zaproszenie?kod=…`) — konto powstaje od razu z rolą
+    invite_token: Optional[str] = Field(default=None, max_length=64)
 
     @field_validator("password")
     @classmethod
