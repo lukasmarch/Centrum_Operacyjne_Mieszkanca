@@ -13,10 +13,10 @@ interface PrivacyPageProps {
   onNavigate: (section: AppSection) => void;
 }
 
-export const PRIVACY_VERSION = '2026-08-26';
+export const PRIVACY_VERSION = '2026-09-29';
 
 const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
-  <LegalLayout title="Polityka prywatności" updated="26 sierpnia 2026">
+  <LegalLayout title="Polityka prywatności" updated="29 września 2026">
 
     <h2>1. Administrator danych</h2>
     <p>Administratorem danych osobowych jest <strong>Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: Żabiny 96, 13-220 Rybno (dalej: „Administrator"). Kontakt we wszystkich sprawach dotyczących danych osobowych: <strong>biuro@lumargo.pl</strong>, tel. <strong>+48 501 081 723</strong>.</p>
@@ -48,6 +48,16 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
           <td>art. 6 ust. 1 lit. a — zgoda przy wysyłce zgłoszenia</td>
         </tr>
         <tr>
+          <td>Rola sołtysa: przypisane sołectwo, data i sposób nadania roli (zaproszenie), data odebrania</td>
+          <td>nadanie i obsługa roli, podpisywanie ogłoszeń funkcją, bezpłatny plan Premium na czas pełnienia funkcji</td>
+          <td>art. 6 ust. 1 lit. b — wykonanie umowy</td>
+        </tr>
+        <tr>
+          <td>Materiały przekazane przez sołtysa: zdjęcia pism i ogłoszeń, dopisek, przedruk i podsumowanie</td>
+          <td>odczyt, moderacja i publikacja ogłoszeń sołectwa</td>
+          <td>art. 6 ust. 1 lit. b — wobec sołtysa; lit. f — wobec osób, których dane znajdują się w piśmie (informowanie społeczności lokalnej o sprawach sołectwa)</td>
+        </tr>
+        <tr>
           <td>E-mail (newsletter), subskrypcje push</td>
           <td>wysyłka newslettera i powiadomień</td>
           <td>art. 6 ust. 1 lit. a — zgoda (można ją cofnąć w każdej chwili)</td>
@@ -67,6 +77,7 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
       <li><strong>Publiczne wpisy z serwisu Facebook</strong> (profile informacyjne o charakterze publicznym — lokalne media, instytucje): kategorie danych — imiona i nazwiska, wizerunek, treści wpisów. Cel: informowanie społeczności lokalnej (art. 6 ust. 1 lit. f). Prezentujemy skróty z odesłaniem do oryginału.</li>
       <li><strong>CEIDG</strong> (Centralna Ewidencja i Informacja o Działalności Gospodarczej): dane przedsiębiorców — nazwa firmy, imię i nazwisko, adres wykonywania działalności (ulica i numer budynku, miejscowość, kod pocztowy), NIP, REGON, kody PKD i branża, status wpisu oraz data rozpoczęcia działalności. Cel: prowadzenie katalogu lokalnych firm (art. 6 ust. 1 lit. f). Źródło: rejestr publiczny CEIDG. Nie pobieramy ani nie przechowujemy danych kontaktowych z rejestru (adresu e-mail, telefonu, strony www) — telefon, e-mail i adres strony pojawiają się w katalogu wyłącznie wtedy, gdy firma poda je samodzielnie, przejmując swoją wizytówkę.</li>
       <li><strong>Lokalne portale informacyjne, strony urzędowe i BIP</strong>: dane zawarte w publikowanych tam materiałach prasowych i urzędowych.</li>
+      <li><strong>Pisma i ogłoszenia przekazane przez sołtysów</strong>: w treści pisma mogą występować imiona i nazwiska, adresy lub inne dane osób, których pismo dotyczy (np. wnioskodawców). Cel: informowanie mieszkańców o sprawach sołectwa (art. 6 ust. 1 lit. f). <strong>Dane osób prywatnych zastępujemy w publikowanym przedruku znacznikiem „[dane osobowe]"</strong>; pozostawiamy dane osób pełniących funkcje publiczne (wójt, sołtys, radni, pracownicy urzędu podpisani z funkcją) oraz dane instytucji. Zdjęcia oryginału nie publikujemy — widzi je wyłącznie redakcja, a plik usuwamy 30 dni po decyzji o publikacji.</li>
       <li><strong>Nagrania obrad Rady Gminy Rybno</strong> (galeria nagrań na gminarybno.pl): kategorie danych — imiona i nazwiska radnych, Wójta, sołtysów i urzędników, treść ich wypowiedzi na jawnych obradach. Cel: informowanie mieszkańców o działalności organu władzy publicznej (art. 6 ust. 1 lit. f). Podstawa jawności: art. 11b ust. 1 oraz art. 20 ust. 1b ustawy o samorządzie gminnym — obrady rady gminy są jawne, a gmina ma obowiązek je transmitować, utrwalać i udostępniać nagranie publicznie. Nagranie przepisujemy automatycznie (transkrypcja mowy na tekst — <strong>bez rozpoznawania głosu i bez identyfikacji mówcy po barwie głosu</strong>, nie przetwarzamy danych biometrycznych), a na podstawie zapisu powstaje skrót obrad. <strong>Transkrypt nie jest publikowany</strong> — służy wyłącznie sprawdzeniu, czy cytat w skrócie naprawdę padł. Publikujemy sam skrót, i to dopiero po sprawdzeniu i zatwierdzeniu przez człowieka. Wypowiedzi osób niepełniących funkcji publicznych (mieszkańców, gości) referujemy <strong>bez podawania nazwiska</strong>, a spraw prywatnych nie opisujemy w ogóle.</li>
     </ul>
     <p><strong>Skąd wiesz, że tu jesteś:</strong> art. 14 ust. 5 lit. b RODO zwalnia nas z zawiadamiania każdej osoby z osobna, gdy dane pochodzą ze źródła publicznego, a poinformowanie wszystkich wymagałoby niewspółmiernie dużego wysiłku — w zamian nakazuje podać te informacje publicznie. Ten akapit jest właśnie takim powiadomieniem.</p>
@@ -76,14 +87,14 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
     <p>Dane powierzamy wyłącznie w zakresie niezbędnym do działania Serwisu:</p>
     <ul>
       <li><strong>Hetzner Online GmbH</strong> (Niemcy, UE) — hosting serwera i bazy danych,</li>
-      <li><strong>OpenAI</strong> oraz <strong>Google (Gemini)</strong> — przetwarzanie zapytań do Asystenta AI, automatyczna kategoryzacja treści oraz transkrypcja i streszczanie nagrań obrad Rady Gminy (ścieżka dźwiękowa nagrania i powstały z niej tekst),</li>
+      <li><strong>OpenAI</strong> oraz <strong>Google (Gemini)</strong> — przetwarzanie zapytań do Asystenta AI, automatyczna kategoryzacja treści, transkrypcja i streszczanie nagrań obrad Rady Gminy (ścieżka dźwiękowa nagrania i powstały z niej tekst) oraz odczyt treści zdjęć pism przekazanych przez sołtysów (OpenAI),</li>
       <li><strong>PayPro S.A. (Przelewy24)</strong> — obsługa płatności (odrębny administrator danych transakcyjnych),</li>
       <li><strong>Resend</strong> — wysyłka wiadomości e-mail,</li>
       <li>dostawcy danych pogodowych i jakości powietrza (Airly i in.) — bez przekazywania danych osobowych.</li>
     </ul>
 
     <h2>5. Przekazywanie danych poza EOG</h2>
-    <p>W związku z korzystaniem z usług OpenAI i Google dane (treść zapytań do AI) mogą być przetwarzane na serwerach poza Europejskim Obszarem Gospodarczym, w szczególności w USA. Przekazanie odbywa się na podstawie <strong>standardowych klauzul umownych (SCC)</strong> zatwierdzonych przez Komisję Europejską oraz — w przypadku podmiotów certyfikowanych — decyzji o adekwatności EU-U.S. Data Privacy Framework.</p>
+    <p>W związku z korzystaniem z usług OpenAI i Google dane (treść zapytań do AI oraz zdjęcia pism przekazywane do odczytu) mogą być przetwarzane na serwerach poza Europejskim Obszarem Gospodarczym, w szczególności w USA. Przekazanie odbywa się na podstawie <strong>standardowych klauzul umownych (SCC)</strong> zatwierdzonych przez Komisję Europejską oraz — w przypadku podmiotów certyfikowanych — decyzji o adekwatności EU-U.S. Data Privacy Framework.</p>
 
     <h2>6. Okresy przechowywania</h2>
     <table>
@@ -98,6 +109,9 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
         <tr><td>Dane rozliczeniowe</td><td>5 lat od końca roku podatkowego (obowiązek ustawowy)</td></tr>
         <tr><td>Transkrypt nagrania obrad Rady Gminy (niepublikowany)</td><td>przez okres publikowania skrótu danej sesji — transkrypt jest jedynym materiałem pozwalającym sprawdzić, czy zacytowane zdanie naprawdę padło; usuwany razem ze skrótem</td></tr>
         <tr><td>Skrót obrad Rady Gminy (publikowany)</td><td>bezterminowo — pełni funkcję archiwum działalności organu władzy publicznej; usuwany na uzasadniony sprzeciw</td></tr>
+        <tr><td>Zdjęcia pism przekazanych przez sołtysów (niepublikowane)</td><td>30 dni od decyzji redakcji o publikacji lub odmowie</td></tr>
+        <tr><td>Opublikowane ogłoszenia sołectw (przedruk i podsumowanie)</td><td>bezterminowo — archiwum komunikatów sołectwa; usuwane na uzasadniony sprzeciw. Po usunięciu konta sołtysa ogłoszenie traci powiązanie z kontem</td></tr>
+        <tr><td>Nieopublikowane ogłoszenia sołectw i dane roli</td><td>do usunięcia konta</td></tr>
         <tr><td>Logi techniczne</td><td>do 90 dni</td></tr>
       </tbody>
     </table>
@@ -111,6 +125,7 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
     <ul>
       <li>Treści w Serwisie są automatycznie kategoryzowane i podsumowywane przez systemy AI; podsumowania oznaczamy jako wygenerowane przez AI.</li>
       <li>Asystent AI generuje odpowiedzi automatycznie — informacja o tym jest widoczna w interfejsie czatu (art. 50 AI Act).</li>
+      <li>Treść zdjęć pism przekazanych przez sołtysów odczytuje system AI (przedruk, podsumowanie, wskazanie danych osobowych do usunięcia). Każde ogłoszenie przed publikacją sprawdza człowiek, a podsumowanie jest oznaczone jako przygotowane automatycznie.</li>
       <li>Nie podejmujemy wobec Użytkowników decyzji opartych wyłącznie na zautomatyzowanym przetwarzaniu, które wywoływałyby skutki prawne (art. 22 RODO).</li>
     </ul>
 

@@ -30,7 +30,7 @@ COOKIE_SECURE = not settings.APP_URL.startswith("http://localhost")
 
 # Wersja dokumentów prawnych akceptowanych przy rejestracji.
 # Podbij przy każdej istotnej zmianie regulaminu/polityki prywatności.
-PRIVACY_POLICY_VERSION = "2026-07-07"
+PRIVACY_POLICY_VERSION = "2026-09-29"  # = PRIVACY_VERSION i TERMS_VERSION we froncie
 
 logger = logging.getLogger("Auth")
 

@@ -13,10 +13,10 @@ interface TermsPageProps {
   onNavigate: (section: AppSection) => void;
 }
 
-export const TERMS_VERSION = '2026-07-26';
+export const TERMS_VERSION = '2026-09-29';
 
 const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
-  <LegalLayout title="Regulamin serwisu RybnoLive.pl" updated="26 lipca 2026">
+  <LegalLayout title="Regulamin serwisu RybnoLive.pl" updated="29 września 2026">
 
     <h2>§ 1. Postanowienia ogólne</h2>
     <ol>
@@ -33,6 +33,9 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
       <li><strong>Plan płatny</strong> — odpłatny pakiet usług (Premium lub wyższy) opisany w cenniku dostępnym w Serwisie.</li>
       <li><strong>Asystent AI</strong> — funkcja Serwisu generująca odpowiedzi przy użyciu systemów sztucznej inteligencji.</li>
       <li><strong>Treści cyfrowe</strong> — usługi i treści dostarczane drogą elektroniczną w ramach Serwisu.</li>
+      <li><strong>Rola</strong> — dodatkowe uprawnienia przypisane Kontu przez Operatora w określonym zakresie (np. dla wskazanego sołectwa).</li>
+      <li><strong>Sołtys</strong> — Użytkownik, któremu Operator nadał Rolę sołtysa danego sołectwa Gminy Rybno.</li>
+      <li><strong>Ogłoszenie sołectwa</strong> — pismo, obwieszczenie lub ogłoszenie przekazane przez Sołtysa do publikacji w Serwisie, wraz z jego przedrukiem i podsumowaniem.</li>
     </ul>
 
     <h2>§ 3. Rodzaj i zakres usług</h2>
@@ -44,6 +47,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
           <li>harmonogram wywozu odpadów,</li>
           <li>Asystenta AI odpowiadającego na pytania o sprawy lokalne,</li>
           <li>moduł zgłoszeń mieszkańców,</li>
+          <li>publikację Ogłoszeń sołectw przekazywanych przez Sołtysów,</li>
           <li>newsletter, powiadomienia push, dane statystyczne (GUS) oraz katalog lokalnych firm (CEIDG).</li>
         </ul>
       </li>
@@ -87,7 +91,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
     <ol>
       <li>Odpowiedzi Asystenta AI są <strong>generowane automatycznie przez systemy sztucznej inteligencji</strong>. Użytkownik jest o tym informowany w interfejsie czatu (art. 50 rozporządzenia UE 2024/1689 — AI Act).</li>
       <li>Odpowiedzi AI mogą zawierać błędy, nieścisłości lub nieaktualne informacje. <strong>Nie stanowią porady prawnej, medycznej, finansowej ani urzędowej</strong> i nie zastępują informacji uzyskanej we właściwym urzędzie lub u specjalisty.</li>
-      <li>Automatycznie generowane podsumowania wiadomości są oznaczane jako treści wytworzone przez AI.</li>
+      <li>Automatycznie generowane podsumowania wiadomości są oznaczane jako treści wytworzone przez AI. Dotyczy to także przedruków i podsumowań Ogłoszeń sołectw, które przed publikacją sprawdza redakcja Serwisu (§ 11a).</li>
       <li>Operator dokłada starań, by odpowiedzi opierały się na zweryfikowanych lokalnych źródłach, których lista (odnośniki) prezentowana jest przy odpowiedzi.</li>
     </ol>
 
@@ -116,6 +120,18 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
       <li>Rozwiązanie umowy planu „Firma lokalna" następuje z końcem opłaconego okresu rozliczeniowego. Po wygaśnięciu planu wizytówka wraca do postaci podstawowej (dane rejestrowe).</li>
     </ol>
 
+    <h2>§ 11a. Ogłoszenia sołectw</h2>
+    <ol>
+      <li>Rolę Sołtysa Operator nadaje na podstawie zaproszenia — jednorazowego odnośnika ważnego 14 dni — przekazywanego po potwierdzeniu, że zapraszana osoba pełni funkcję sołtysa danego sołectwa (w szczególności w rozmowie telefonicznej). Przyjęcie zaproszenia przypisuje Rolę do Konta.</li>
+      <li>Przez czas posiadania Roli Konto Sołtysa korzysta bezpłatnie z planu Premium. Rola wygasa z chwilą zakończenia pełnienia funkcji albo jej odebrania przez Operatora (w szczególności po zmianie na stanowisku sołtysa lub w razie naruszenia Regulaminu); Konto wraca wówczas do planu bezpłatnego, chyba że Użytkownik ma opłacony Plan płatny. Sołtys powiadamia Operatora o zakończeniu pełnienia funkcji.</li>
+      <li>Sołtys może przekazywać do publikacji zdjęcia pism, obwieszczeń i ogłoszeń dotyczących sołectwa lub Gminy Rybno — w szczególności zawiadomień o zebraniach wiejskich, informacji o funduszu sołeckim, zapowiedzi wydarzeń i komunikatów o utrudnieniach. Przekazując materiał, Sołtys oświadcza, że jest uprawniony do jego udostępnienia, a jego publikacja nie narusza prawa ani praw osób trzecich.</li>
+      <li>Zabronione jest przekazywanie: danych osobowych osób prywatnych w zakresie wykraczającym poza niezbędny (w szczególności list nazwisk, adresów, numerów PESEL), reklam działalności gospodarczej, agitacji wyborczej, wizerunku osób bez ich zgody oraz treści bezprawnych lub obraźliwych.</li>
+      <li>Treść przekazanego materiału jest odczytywana automatycznie przy użyciu systemów AI, które przygotowują przedruk i krótkie podsumowanie. Dane osób prywatnych są w przedruku zastępowane znacznikiem „[dane osobowe]". Każde Ogłoszenie sołectwa przed publikacją sprawdza redakcja Serwisu, która może poprawić przedruk, tytuł i podsumowanie albo odmówić publikacji. O publikacji i o odmowie Sołtys jest informowany e-mailem.</li>
+      <li>Ogłoszenie sołectwa jest publikowane z podpisem wskazującym funkcję („Sołtys sołectwa …"), bez imienia i nazwiska Sołtysa. Może zostać zaprezentowane w wiadomościach, kalendarzu wydarzeń, porannym podsumowaniu i newsletterze Serwisu oraz udostępnione Asystentowi AI jako źródło odpowiedzi. Zdjęcie oryginału nie jest publikowane — dostęp do niego ma wyłącznie redakcja, a plik jest usuwany 30 dni po decyzji o publikacji lub odmowie.</li>
+      <li>W zakresie, w jakim przekazany materiał jest utworem Sołtysa, Sołtys udziela Operatorowi nieodpłatnej, niewyłącznej, nieograniczonej terytorialnie licencji na jego publikację w Serwisie i opracowanie (przedruk, podsumowanie, skrót) — na czas prezentowania Ogłoszenia sołectwa. Dokumenty i materiały urzędowe nie stanowią przedmiotu prawa autorskiego (art. 4 ustawy o prawie autorskim i prawach pokrewnych).</li>
+      <li>Po usunięciu Konta opublikowane Ogłoszenia sołectw pozostają w Serwisie jako komunikaty sołectwa podpisane funkcją, a nieopublikowane materiały są usuwane. Usunięcia opublikowanego Ogłoszenia sołectwa można żądać w trybie § 10 ust. 3.</li>
+    </ol>
+
     <h2>§ 12. Reklamacje</h2>
     <ol>
       <li>Reklamacje dotyczące działania Serwisu i płatności można składać e-mailem na adres biuro@lumargo.pl lub telefonicznie pod numerem +48 501 081 723.</li>
@@ -142,7 +158,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
       <li>Operator może zmienić Regulamin z ważnych przyczyn (zmiana przepisów, zakresu usług, względy bezpieczeństwa). O zmianach Użytkownicy zarejestrowani są informowani e-mailem lub komunikatem w Serwisie z co najmniej 14-dniowym wyprzedzeniem. Dalsze korzystanie z Serwisu po wejściu zmian w życie oznacza ich akceptację; Użytkownik może wypowiedzieć umowę usuwając Konto.</li>
       <li>Prawem właściwym jest prawo polskie. Spory z Konsumentami rozstrzygają sądy powszechne właściwe według przepisów ogólnych.</li>
       <li>Konsument może skorzystać z pozasądowych sposobów rozpatrywania reklamacji i dochodzenia roszczeń, m.in. z pomocy powiatowego (miejskiego) rzecznika konsumentów lub platformy ODR (https://ec.europa.eu/consumers/odr).</li>
-      <li>Regulamin obowiązuje od dnia 7 lipca 2026 r. (ostatnia zmiana: 26 lipca 2026 r. — uzupełnienie danych kontaktowych, metod płatności, terminu realizacji oraz dodanie Załącznika nr 1).</li>
+      <li>Regulamin obowiązuje od dnia 7 lipca 2026 r. (zmiany: 26 lipca 2026 r. — uzupełnienie danych kontaktowych, metod płatności, terminu realizacji oraz dodanie Załącznika nr 1; 29 września 2026 r. — Role i Ogłoszenia sołectw: definicje w § 2, § 3 ust. 1, § 8 ust. 3, nowy § 11a).</li>
     </ol>
 
     <h2>Załącznik nr 1 — wzór oświadczenia o odstąpieniu od umowy</h2>
