@@ -65,10 +65,19 @@ _GLOSSARY = (
     f"fundusz sołecki, wieloletnia prognoza finansowa."
 )
 
-# yt-dlp na YouTube, stan na 6.08.2026. Klienty web/tv/mweb zwracają „The page
-# needs to be reloaded" (YouTube wymusza SABR), ios żąda PO Tokena — zostaje
-# android_vr. Gdy pobieranie przestanie działać, zacznij od tego ustawienia.
-_YTDLP_ARGS = ("--extractor-args", "youtube:player_client=android_vr")
+# yt-dlp na YouTube, stan na 29.09.2026. Do 6.08 działał wyłącznie klient
+# android_vr; dziś to on żąda PO Tokena (formaty pomijane, „Requested format
+# is not available"), a domyślny zestaw klientów pobiera — pod warunkiem, że
+# yt-dlp ma runtime JS do rozwiązania wyzwania (EJS). Sprawdzone na nagraniu
+# XXIV z łącza domowego: yt-dlp 2026.08.19 + node, 138 MB w 34 s.
+# ⚠️ Wymaga yt-dlp ≥ 2025.11 — starszy nie zna `--js-runtimes`, a nowy nie
+# instaluje się na Pythonie 3.9 z `.venv`. Lokalnie: `uv tool install
+# "yt-dlp[default]"` i ~/.local/bin na początku PATH.
+# deno yt-dlp włącza sam; node trzeba wskazać. Gdy pobieranie przestanie
+# działać, zacznij od tego ustawienia.
+_YTDLP_ARGS: Tuple[str, ...] = (
+    ("--js-runtimes", "node") if shutil.which("node") else ()
+)
 
 # Ostatnia deska ratunku. Ścieżka 106 kbps sypie 403 przy natywnym pobieraniu,
 # a przez downloader ffmpeg schodzi — tyle że dławiona do ~20 kB/s, czyli
@@ -290,7 +299,7 @@ def video_metadata(video_url: str) -> dict:
     """
     result = _run(
         [
-            _tool("yt-dlp"), *_YTDLP_ARGS[:2], "--skip-download",
+            _tool("yt-dlp"), *_YTDLP_ARGS, "--skip-download",
             "--ignore-no-formats-error",
             "--print", "%(title)s\t%(duration)s\t%(upload_date)s\t%(live_status)s\t%(release_timestamp)s",
             video_url,
