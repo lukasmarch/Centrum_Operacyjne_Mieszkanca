@@ -1080,6 +1080,34 @@ Czwarta, `WYLACZNIE_W_FORMIE_SPOLKI` (25 zn., 5 firm), zmieściła się przypadk
   ma trafić do katalogu, nie wypaść z niego
 - Front: `statusLabel()` zamiast surowego ciągu z podkreśleniami na karcie
 
+## Sołtysi: role z zakresem i ogłoszenia ze zdjęcia pisma (2026-09-27)
+**Sołtys nie zmienia nawyku z Facebooka: zdjęcie pisma i „wyślij".** Cel: ogłoszenie
+sołectwa ma zobaczyć więcej osób niż na prywatnym profilu sołtysa.
+- **Rola to warstwa NAD kontem** (`user_roles`: rola + zakres, np. `soltys`/`Żabiny`).
+  Rejestracja jedna dla wszystkich. Definicje ról w KODZIE (`services/roles.py::ROLES`) —
+  nowa rola (urzędnik) = jeden wpis. Firmy zostają przy `business_profiles`, admin przy `is_admin`
+- **Zaproszenie** (`role_invitations`, `/zaproszenie?kod=`, 14 dni, jednorazowe) — Łukasz
+  dzwoni i wręcza link; przyjęcie = zweryfikowana rola. Panel: Profil → Redakcja sołectw
+- **Sołtys = Premium bez terminu** (`trial_ends_at = NULL`); `trial_expiry_job` nie zdejmuje
+  Premium z roli; odebranie roli zdejmuje, chyba że jest opłacona subskrypcja.
+  Zamiast maila o 30-dniowym triale idzie instrukcja (`soltys_welcome.html`) — każde zdanie
+  ma pokrycie w kodzie (limit zdjęć i retencja brane ze stałych)
+- **Przepływ:** `POST /api/solectwa/posts` → `ScanReader` (gpt-4o) w tle → `pending` + dzwonek
+  (`ADMIN_ALERT_EMAIL`) → moderacja → `articles` ze źródła „RybnoLive - Sołectwa” (feed,
+  briefing, newsletter, kalendarz, RAG — bez osobnej ścieżki). Strona: `/ogloszenie?id=`
+- ⚠️ **Dane osobowe WSKAZUJE model, WYCINA kod** (`scan_reader.redact_fragments`). Pomiar live:
+  przy poleceniu „zastąp znacznikiem" model zgłaszał wycięcie, a nazwisko i adres zostawały.
+  Model podaje mianownik („Anna Kowalska” przy „Anny Kowalskiej”) → druga próba po rdzeniach
+- ⚠️ **Raz na ~10 odczytów model się myli** (pusty wynik, pominięte dane) — dlatego moderacja
+  jest OBOWIĄZKOWA, a panel ma „Odczytaj ponownie”
+- ⚠️ **Zdjęcia NIE w `/app/uploads`** (publiczne przez FastAPI i Caddy) — wolumen
+  `private_uploads`, dostęp tylko admin, kasowane 30 dni po decyzji (`retention_job`)
+- DSAR: opublikowane zostaje bez konta (podpis funkcją), nieopublikowane i rola znikają
+- Prawo: regulamin § 11a + polityka prywatności (29.09, wersja robocza do prawnika)
+- Test: `python -m scripts.test_solectwa [--live]` — własna domena kont, bo sprzątanie
+  kasuje całą domenę (wspólna `@qa.rybnolive.pl` zabierała konta z ręcznego testu)
+- Po starcie sołtysa Żabin: wyłączyć źródło „Facebook - Sołtys Żabiny” (`ANNOUNCEMENT_ONLY_SOURCES`)
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
@@ -1200,4 +1228,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-09-14*
+*Ostatnia aktualizacja: 2026-09-29*
