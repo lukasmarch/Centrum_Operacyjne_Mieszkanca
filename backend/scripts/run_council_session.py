@@ -194,6 +194,8 @@ async def main() -> int:
     parser.add_argument("--name", default=None, help="Nazwa plików wynikowych")
     parser.add_argument("--save", action="store_true",
                         help="Zapisz skrót do kolejki akceptacji (tabela council_sessions)")
+    parser.add_argument("--transcript-only", action="store_true",
+                        help="Skończ na transkrypcie, bez skrótu — skrót zrobi serwer z --transcript")
     args = parser.parse_args()
 
     work_dir: Path = args.work_dir
@@ -238,6 +240,11 @@ async def main() -> int:
         transcript_path = work_dir / f"{name}.transcript.json"
         save_transcript(transcript, transcript_path)
         print(f"Transkrypt zapisany: {transcript_path} (Whisper ~${transcript.whisper_cost_usd:.3f})")
+        if args.transcript_only:
+            # Automat z MacBooka (`council_from_mac.sh`): skrót powstaje na serwerze.
+            # Robiony tu też, kosztował 30.09 drugie $0,18 i był drugim miejscem,
+            # w którym przebieg mógł paść po opłaconym Whisperze.
+            return 0
 
     if not transcript.segments:
         print("Transkrypt pusty — nagranie bez mowy?", file=sys.stderr)

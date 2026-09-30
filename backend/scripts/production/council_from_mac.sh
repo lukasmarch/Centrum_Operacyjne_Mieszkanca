@@ -25,7 +25,7 @@ STOP="${STOP:-2026-09-30 23:00}"
 INTERVAL="${INTERVAL:-900}"
 MAX_FAILS="${MAX_FAILS:-3}"
 DRY="${DRY:-0}"
-SERVER="root@91.99.142.30"
+SERVER="${SERVER:-root@91.99.142.30}"
 CONTAINER="centrum-backend-1"
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -51,6 +51,24 @@ tg() {
 from src.config import settings as s
 httpx.post(f\"https://api.telegram.org/bot{s.TELEGRAM_BOT_TOKEN}/sendMessage\",json={\"chat_id\":s.TELEGRAM_CHAT_ID,\"text\":sys.stdin.read()},timeout=20).raise_for_status()'" \
     >/dev/null 2>&1 || log "Telegram nie przyjął wiadomości: $1"
+}
+
+# Krok z zapamiętaną przyczyną porażki — trafia do ostrzeżenia na Telegram.
+# 30.09 alert mówił tylko „zajrzyj do logu", a log leży na MacBooku, do którego
+# z telefonu nie ma dostępu. Przyczyna = ostatnia linia błędu (dla wyjątku
+# Pythona to linia z typem i treścią, np. RateLimitError … credit_balance_exhausted).
+LAST_ERROR=""
+run_step() {
+  local what="$1"; shift
+  local out; out="$(mktemp -t council_step)"
+  "$@" 2>&1 | grep -v Deprecat | tee "$out"
+  local rc="${PIPESTATUS[0]}"
+  if [ "$rc" != "0" ]; then
+    LAST_ERROR="$what: $(grep -v '^[[:space:]]*$' "$out" | tail -1 | cut -c1-300)"
+    log "Nie wyszło — $LAST_ERROR"
+  fi
+  rm -f "$out"
+  return "$rc"
 }
 
 # 0 = gotowe do pobrania, 2 = jeszcze nie (zapowiedź/trwa/VOD w obróbce), 1 = błąd
@@ -79,18 +97,35 @@ print('DRY audio', round(p.stat().st_size/1e6,1), 'MB')
     return 0
   fi
 
-  python -u -m scripts.run_council_session --url "$URL" --name "$NAME" --work-dir "$WORK" 2>&1 \
-    | grep -v Deprecat
-  [ "${PIPESTATUS[0]}" = "0" ] || return 1
-  [ -s "$WORK/$NAME.transcript.json" ] || return 1
+  # Transkrypt już jest (poprzednia próba zapłaciła za Whisper i padła dalej)
+  # → nie liczymy go drugi raz. 30.09 ponowne próby startowały od zera; padły
+  # na braku kredytów od razu, ale przy innym błędzie każda to kolejne $1,10.
+  if [ -s "$WORK/$NAME.transcript.json" ]; then
+    log "Transkrypt już jest — Whisper pominięty"
+  else
+    # Audio i 13 kawałków mp3 w katalogu tymczasowym, nie w data/council.
+    TMP_WORK="$(mktemp -d -t council)"
+    run_step "Transkrypcja (Whisper)" python -u -m scripts.run_council_session \
+        --url "$URL" --name "$NAME" --work-dir "$TMP_WORK" --transcript-only \
+      || { rm -rf "$TMP_WORK"; return 1; }
+    [ -s "$TMP_WORK/$NAME.transcript.json" ] || { LAST_ERROR="brak pliku transkryptu"; rm -rf "$TMP_WORK"; return 1; }
+    mkdir -p "$WORK" && mv "$TMP_WORK/$NAME.transcript.json" "$WORK/" && rm -rf "$TMP_WORK"
+  fi
 
-  scp -o BatchMode=yes "$WORK/$NAME.transcript.json" "$SERVER:/tmp/" || return 1
-  ssh -o BatchMode=yes "$SERVER" "docker cp /tmp/$NAME.transcript.json $CONTAINER:/tmp/ \
+  # Skrót powstaje wyłącznie na serwerze — raz, tam gdzie jest zapisywany.
+  run_step "Wysłanie transkryptu" scp -o BatchMode=yes "$WORK/$NAME.transcript.json" "$SERVER:/tmp/" || return 1
+  run_step "Skrót i zapis (serwer)" ssh -o BatchMode=yes "$SERVER" "docker cp /tmp/$NAME.transcript.json $CONTAINER:/tmp/ \
     && docker exec $CONTAINER python -u -m scripts.run_council_session \
-         --transcript /tmp/$NAME.transcript.json --name $NAME --save" || return 1
+         --transcript /tmp/$NAME.transcript.json --name $NAME --work-dir /tmp/council_out --save" || return 1
+
+  # Pliki skrótu wracają na MacBooka — z nich druga sesja robi rolkę.
+  ssh -o BatchMode=yes "$SERVER" "docker cp $CONTAINER:/tmp/council_out/$NAME.skrot.md /tmp/ \
+    && docker cp $CONTAINER:/tmp/council_out/$NAME.transcript.txt /tmp/" \
+    && scp -q -o BatchMode=yes "$SERVER:/tmp/$NAME.skrot.md" "$SERVER:/tmp/$NAME.transcript.txt" "$WORK/" \
+    || log "Nie skopiowałem plików skrótu na MacBooka (skrót i tak czeka na akceptację)"
 
   # To samo powiadomienie co z joba: skrót, punkty, przycisk do akceptacji.
-  ssh -o BatchMode=yes "$SERVER" "docker exec $CONTAINER python -c '
+  run_step "Powiadomienie" ssh -o BatchMode=yes "$SERVER" "docker exec $CONTAINER python -c '
 import asyncio
 from sqlmodel import select
 from src.database.connection import async_session
@@ -125,7 +160,12 @@ while [ "$(date +%s)" -lt "$STOP_E" ]; do
     fails=$((fails + 1))
     log "Porażka $fails/$MAX_FAILS"
     if [ "$fails" -ge "$MAX_FAILS" ]; then
-      tg "⚠️ Automat sesji z MacBooka: $MAX_FAILS nieudane próby dla $URL. Log: ~/Library/Logs/rybnolive_sesja.log"
+      tg "⚠️ Automat sesji z MacBooka: $MAX_FAILS nieudane próby dla $URL.
+
+Przyczyna: ${LAST_ERROR:-nieznana}
+$([ -s "$WORK/$NAME.transcript.json" ] && echo "
+Transkrypt jest zapisany — kolejna próba nie zapłaci za Whisper.")
+Log: ~/Library/Logs/rybnolive_sesja.log"
       exit 1
     fi
   elif [ "$rc" = "1" ]; then

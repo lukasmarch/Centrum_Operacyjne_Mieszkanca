@@ -29,6 +29,7 @@ from src.scheduler.ceidg_job import run_ceidg_job
 from src.scheduler.bip_knowledge_job import run_bip_knowledge_job
 from src.scheduler.legal_acts_job import run_legal_acts_job
 from src.scheduler.council_job import run_council_job
+from src.scheduler.openai_credit_job import run_openai_credit_job
 from src.scheduler.embedding_job import run_embedding_job
 from src.scheduler.places_job import run_places_job
 from src.scheduler.health_job import run_health_job
@@ -407,6 +408,17 @@ def start_scheduler():
         trigger=CronTrigger(day_of_week='mon', hour=5, minute=0),
         id='places_update',
         name='Update local places (Gemini Maps)',
+        replace_existing=True
+    )
+
+    # Strażnik kredytów OpenAI — co godzinę o :40, więc wyczerpanie wychodzi
+    # najpóźniej o 4:40, przed briefingiem (5:00) i kategoryzacją (6:15).
+    # Alert na Telegram tylko przy zmianie stanu — patrz openai_credit_job.
+    scheduler.add_job(
+        func=run_openai_credit_job,
+        trigger=CronTrigger(minute=40),
+        id='openai_credit_probe',
+        name='Strażnik kredytów OpenAI (alert Telegram)',
         replace_existing=True
     )
 
