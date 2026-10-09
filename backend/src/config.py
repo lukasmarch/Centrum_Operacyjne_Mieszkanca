@@ -116,6 +116,10 @@ class Settings(BaseSettings):
     # z uvicornem i skryptami z scripts/. Ten sam mechanizm co przy mieszaniu
     # backend/.env z frontend/.env.
     ELEVENLABS_API_KEY: Optional[str] = None
+    # Higgsfield (REST, console.higgsfield.ai) — wideo do rolek. Pełny ciąg
+    # „KEY_ID:SECRET” skopiowany z konsoli; nagłówek `Authorization: Key …`.
+    # Pole z tego samego powodu co ELEVENLABS_API_KEY wyżej.
+    HF_API_KEY: Optional[str] = None
 
     # Pydantic v2 syntax
     model_config = SettingsConfigDict(
