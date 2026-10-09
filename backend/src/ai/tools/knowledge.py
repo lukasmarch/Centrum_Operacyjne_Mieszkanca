@@ -62,6 +62,7 @@ from src.services.feed_policy import (
     collapse_duplicates,
     story_key,
     is_truncated,
+    is_foreign_incident,
     publishable_conditions,
     time_label,
 )
@@ -350,7 +351,13 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
         .order_by(func.coalesce(Article.event_at, Article.published_at).desc())
         .limit(60)
     )
-    rows = list(result)
+    rows = [
+        row for row in result
+        if not is_foreign_incident(
+            row[0].category, row[0].title, row[0].content,
+            row[0].locality, row[0].display_title,
+        )
+    ]
 
     # Kolejność PRZED deduplikacją: `collapse_duplicates` zostawia wpis wcześniejszy
     # na liście, więc na nieposortowanej zostawiłaby przypadkowy.

@@ -314,6 +314,77 @@ def source_label(source_name: Optional[str]) -> Optional[str]:
 ENDED_EVENT_GRACE_H = 24
 
 
+# --- bramka SUBSTANCJI: wpis bez słów nie jest wiadomością ---------------------
+# 9.10.2026 briefing otworzył dzień nagłówkiem „Tajemniczy incydent w Rybnie —
+# brak szczegółów", bo wpis Syli (art. 6543) miał za całą treść „‼️‼️‼️" i link.
+# Kategoryzacja go nie przeczytała (próg krótkiej treści), a nic innego nie
+# pytało, czy w ogóle coś w nim JEST — wpis bez kategorii i bez oceny miejsca
+# dostał od źródła status „lokalny" i wygrał nagłówek. Model dostał zadanie
+# napisania nagłówka z niczego i napisał go z niczego.
+#
+# Reguła jest DETERMINISTYCZNA i stoi w polityce, więc obowiązuje feed,
+# briefing, newsletter, push i agentów naraz. Liczy się tekst po odjęciu
+# naszej doklejki „Pełna treść u źródła: …" — link nie jest treścią.
+_SOURCE_SUFFIX_RE = re.compile(r"\s*Pełna treść u źródła:.*$", re.DOTALL | re.IGNORECASE)
+_LETTERS_RE = re.compile(r"[A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
+_LETTER_RUN_SQL = "[A-Za-ząćęłńóśźżĄĆĘŁŃÓŚŹŻ]{3}"
+
+# Ile liter musi mieć wpis, żeby mógł otworzyć briefing. Krótszy wolno pokazać
+# w feedzie (liczy się tam sam fakt), ale nagłówek model musi z czegoś ułożyć.
+MIN_HEADLINE_LETTERS = 40
+
+
+def informative_letters(title: Optional[str], content: Optional[str]) -> int:
+    """Liczba liter w tytule i treści, bez emoji, linków i naszej doklejki."""
+    body = _SOURCE_SUFFIX_RE.sub("", content or "")
+    body = re.sub(r"https?://\S+", " ", body)
+    return len(_LETTERS_RE.findall(f"{title or ''} {body}"))
+
+
+_LETTER_RUN_RE = re.compile(_LETTER_RUN_SQL)
+
+
+def has_substance(title: Optional[str], content: Optional[str]) -> bool:
+    """Czy w wpisie jest choć jedno słowo — odpowiednik bramki SQL."""
+    body = _SOURCE_SUFFIX_RE.sub("", content or "")
+    return bool(_LETTER_RUN_RE.search(f"{title or ''} {body}"))
+
+
+def is_foreign_incident(
+    category: Optional[str],
+    title: Optional[str],
+    content: Optional[str] = None,
+    locality: Optional[int] = None,
+    display_title: Optional[str] = None,
+) -> bool:
+    """
+    Awaria spoza gminy Rybno — nie jest naszą sprawą i nie wchodzi do serwisu.
+
+    Do 9.10.2026 cudze wyłączenia prądu zostawały w feedzie jako „Powiat
+    i sąsiedzi" i w materiale briefingu (art. 6388: Księży Dwór, region Mława
+    — cytowany w briefingu rybnolive). Serwis dotyczy gminy; awaria w Działdowie
+    czy Mławie niczego nie mówi mieszkańcowi Rybna, a rozmywa to, co mówi.
+
+    Rodzaj czytamy z TEKSTU (`incident_of`) lub kategorii, miejsce z oceny
+    kategoryzacji (3 = gmina) albo z nazwy wsi w tekście. ⚠️ `locality < 3`
+    SAMO nie wystarcza: awaria wodociągu ZGK „na ul. Rzemieślniczej w Rybnie"
+    dostała ocenę 2 (art. 6317) i jest jak najbardziej nasza — dlatego nazwa
+    wsi z gminy ratuje wpis mimo niskiej oceny. Ostrzeżenia meteo są poza
+    regułą: IMGW ostrzega dla powiatu i nazwa gminy w komunikacie nie pada.
+    """
+    shown = display_title or title
+    if is_weather_alert(shown, content):
+        return False
+    is_incident = bool(incident_of(shown, content)) or "awari" in (category or "").lower()
+    if not is_incident:
+        return False
+    if is_foreign_region(shown, content):
+        return True
+    if locality is not None and locality >= MIN_ARTICLE_LOCALITY:
+        return False
+    return not places_in(shown, content)
+
+
 def publishable_conditions(article_model, now: Optional[datetime] = None):
     """
     Warunki SQL „to nadaje się do pokazania mieszkańcowi" — wspólne dla feedu,
@@ -349,9 +420,21 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
         Source.name.in_(sorted(ANNOUNCEMENT_ONLY_SOURCES))
     )
 
+    # Bramka substancji: tytuł + treść bez naszej doklejki muszą zawierać
+    # słowo. Ten sam warunek co `has_substance`, wyrażony w SQL.
+    visible_text = func.concat(
+        func.coalesce(article_model.title, ""),
+        " ",
+        func.regexp_replace(
+            func.coalesce(article_model.content, ""),
+            "Pełna treść u źródła:.*$", "", "i",
+        ),
+    )
+
     return [
         article_model.is_filler == False,        # noqa: E712 — SQLAlchemy
         article_model.is_promotional == False,   # noqa: E712
+        visible_text.op("~")(_LETTER_RUN_SQL),
         or_(
             article_model.source_id.notin_(announcement_only),
             article_model.category == OFFICIAL_CATEGORY,
@@ -447,6 +530,13 @@ def in_feed_window(article, now: Optional[datetime] = None) -> bool:
     content = getattr(article, "content", None)
     display = getattr(article, "display_title", None)
     category = (getattr(article, "category", None) or "").strip()
+
+    # Awarie spoza gminy nie należą do serwisu — ani w sekcji „Powiat
+    # i sąsiedzi", ani nigdzie indziej (`is_foreign_incident`).
+    if is_foreign_incident(
+        category, title, content, getattr(article, "locality", None), display
+    ):
+        return False
 
     if event_at is None:
         published = getattr(article, "published_at", None) or getattr(article, "scraped_at", None)

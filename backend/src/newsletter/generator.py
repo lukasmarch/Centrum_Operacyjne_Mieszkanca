@@ -24,6 +24,7 @@ from src.services.feed_policy import (
     collapse_duplicates,
     story_key,
     publishable_conditions,
+    is_foreign_incident,
     time_label,
     visible_event_conditions,
 )
@@ -576,7 +577,14 @@ class NewsletterGenerator:
             .order_by(Article.published_at.desc())
             .limit(40)
         )
-        rows = list(result)
+        # Awarie spoza gminy nie należą do maila (`feed_policy.is_foreign_incident`).
+        rows = [
+            row for row in result
+            if not is_foreign_incident(
+                row[0].category, row[0].title, row[0].content,
+                row[0].locality, row[0].display_title,
+            )
+        ]
         now_naive = datetime.utcnow()
         rows.sort(
             key=lambda row: article_score(

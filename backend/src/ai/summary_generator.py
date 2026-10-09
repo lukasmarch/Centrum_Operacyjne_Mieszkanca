@@ -25,6 +25,9 @@ from src.services.feed_policy import (
     visible_event_conditions,
     is_pinned_alert,
     publishable_conditions,
+    is_foreign_incident,
+    informative_letters,
+    MIN_HEADLINE_LETTERS,
     same_topic,
     strip_cta_tail,
     strip_foreign_cta,
@@ -192,6 +195,13 @@ _MEASUREMENT_RE = re.compile(
 )
 
 
+_NO_DATA_RE = re.compile(
+    r"tajemnicz|brak(?:u)?\s+szczegół|szczegół\w*\s+(?:nie\s+są|nie\s+zostały|jeszcze\s+nie)"
+    r"|nie\s+są\s+(?:jeszcze\s+)?znane|nieznan\w+\s+(?:zdarzeni|incydent)|zagadkow",
+    re.IGNORECASE,
+)
+
+
 @dataclass
 class SummaryRun:
     """Kontekst jednego przebiegu: co briefing MUSI i co WOLNO mu cytować."""
@@ -227,6 +237,20 @@ async def validate_summary(
             f"Nagłówek MUSI bazować na artykule [ID:{required}] wskazanym jako "
             f"WYMAGANY ARTYKUŁ NAGŁÓWKA, a jego ID musi być PIERWSZE w "
             f"cited_article_ids. Napisz headline o tym artykule."
+        )
+
+    # Nagłówek i wstęp nie mogą ogłaszać, że czegoś NIE WIEMY („tajemniczy
+    # incydent", „brak szczegółów"). To sygnał, że model dostał materiał bez
+    # treści i wypełnia lukę — 9.10.2026 mieszkańcy dostali takie zdanie o
+    # „zdarzeniu w Rybnie", którego nikt nie opisał. Materiał bez treści
+    # odcina kod (`feed_policy.has_substance`); to druga linia obrony.
+    match = _NO_DATA_RE.search(f"{output.headline} {output.highlights}")
+    if match:
+        raise ModelRetry(
+            f"W nagłówku lub wstępie stoi „{match.group(0)}” — zakazane. "
+            f"Nie piszesz o tym, czego nie wiemy. Oprzyj nagłówek wyłącznie "
+            f"na artykule z konkretną treścią; jeśli takiego nie ma, wybierz "
+            f"inny artykuł z materiału."
         )
 
     match = _MEASUREMENT_RE.search(output.highlights)
@@ -610,7 +634,23 @@ class SummaryGenerator:
             )
             .order_by(func.coalesce(Article.event_at, Article.published_at).desc())
         )
-        return list(result.scalars().all())
+        articles = list(result.scalars().all())
+
+        # Awarie spoza gminy Rybno nie wchodzą do briefingu wcale (nie tylko
+        # niżej w rankingu): art. 6388 (Księży Dwór, region Mława) i 6542
+        # (Przasnysz) stały 9.10.2026 wśród cytowań dnia. Miejsce czytamy z
+        # tekstu i oceny kategoryzacji — `feed_policy.is_foreign_incident`.
+        kept = [
+            a for a in articles
+            if not is_foreign_incident(
+                a.category, a.title, a.content, a.locality, a.display_title
+            )
+        ]
+        if len(kept) < len(articles):
+            self.logger.info(
+                f"Awarie spoza gminy odrzucone: {len(articles)} → {len(kept)}"
+            )
+        return kept
 
     # Ile poranków wstecz pamięta nagłówek. Trzy, bo zapowiedź wyłączenia potrafi
     # wracać z przerwą: to samo wyłączenie otworzyło briefing 7, 10 i 11.08.2026.
@@ -905,6 +945,15 @@ class SummaryGenerator:
 
         for category, arts in articles_by_category.items():
             for article in arts:
+                # Nagłówek wymaga TREŚCI, z której da się go ułożyć. Wpis będący
+                # samymi emoji (art. 6543, 9.10.2026) wygrał jako „lokalny" i
+                # model napisał nagłówek z niczego. Mniej niż
+                # `MIN_HEADLINE_LETTERS` liter nie otwiera briefingu — nigdy.
+                if informative_letters(
+                    getattr(article, "display_title", None) or article.title,
+                    article.content or article.summary,
+                ) < MIN_HEADLINE_LETTERS:
+                    continue
                 priority = self._headline_priority(category, article, now)
                 # Awaria, która JEST sprawą teraz, jest zwolniona z degradacji
                 # „po terminie": „nie ma prądu" opisuje stan gminy, a nie

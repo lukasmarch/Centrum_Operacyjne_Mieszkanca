@@ -47,6 +47,7 @@ def article(
     event_h: Optional[float] = None,
     until_h: Optional[float] = None,
     locality: Optional[int] = None,
+    content: str = "Treść wpisu testowego, wystarczająca do ułożenia nagłówka.",
 ) -> SimpleNamespace:
     """Wpis w postaci, jakiej potrzebuje wybór nagłówka. Godziny względem NOW."""
     return SimpleNamespace(
@@ -55,7 +56,10 @@ def article(
         source_name=source,
         category=category,
         title=title,
-        content="",
+        # Nagłówek wymaga treści (`feed_policy.MIN_HEADLINE_LETTERS`, 9.10.2026) —
+        # neutralne zdanie, bez nazw miejscowości i słów awarii, żeby nie
+        # zmieniać tego, co fabryka ma sprawdzać.
+        content=content,
         summary=None,
         published_at=NOW - timedelta(hours=published_h) if published_h is not None else None,
         scraped_at=NOW - timedelta(hours=published_h or 0),

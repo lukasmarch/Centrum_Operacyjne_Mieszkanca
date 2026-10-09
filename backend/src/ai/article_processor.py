@@ -47,6 +47,11 @@ _URGENT_WORDS = (
 
 def _looks_like_filler(title: str, content: str) -> bool:
     """Deterministyczny bezpiecznik dla postów powitalnych bez treści informacyjnej."""
+    # Wpis bez ani jednego słowa (same emoji + nasza doklejka z linkiem) to
+    # zapychacz niezależnie od tego, co powie model — art. 6543, 9.10.2026.
+    from src.services.feed_policy import has_substance
+    if not has_substance(title, content):
+        return True
     if not _GREETING_RE.match((title or '').strip()):
         return False
     haystack = f"{title}\n{content}".lower()

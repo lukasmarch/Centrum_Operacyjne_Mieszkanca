@@ -98,7 +98,21 @@ CASES = [
     (
         "zapowiedź, która właśnie trwa (art. 5887, wyłączenie 08:00–17:00)",
         dict(published_at=local(8, 9, 39), event_at=local(16, 8), event_until=local(16, 17),
-             locality=2, category="Awaria", title="Wyłączenie prądu — Lipówka"),
+             locality=3, category="Awaria", title="Wyłączenie prądu — Lipówka"),
+        True,
+    ),
+    (
+        # 9.10.2026: awarii spoza gminy nie śledzimy wcale — ani „Powiat
+        # i sąsiedzi", ani nigdzie. Ocena 2 + żadnej wsi z gminy w tekście.
+        "wyłączenie prądu poza gminą (art. 6388, Księży Dwór, locality=2): poza feedem",
+        dict(published_at=local(8, 9, 39), event_at=local(16, 8), event_until=local(16, 17),
+             locality=2, category="Awaria", title="Planowane wyłączenie prądu — Księży Dwór"),
+        False,
+    ),
+    (
+        "awaria wodociągu w Rybnie z oceną 2 (art. 6317) — nazwa wsi ratuje wpis",
+        dict(published_at=local(16, 6), locality=2, category="Awaria",
+             title="Awaria wodociągu na ulicy Rzemieślniczej w Rybnie"),
         True,
     ),
     (

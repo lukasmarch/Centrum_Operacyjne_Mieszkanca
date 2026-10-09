@@ -35,7 +35,12 @@ from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Article, Source
 from src.services.alert_policy import incident_of
-from src.services.feed_policy import article_scope, publishable_conditions, time_label
+from src.services.feed_policy import (
+    article_scope,
+    is_foreign_incident,
+    publishable_conditions,
+    time_label,
+)
 from src.utils.logger import setup_logger
 
 logger = setup_logger("AlertTools")
@@ -122,6 +127,12 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
 
     items = []
     for article, source_name in result:
+        # Awarii spoza gminy Rybno nie śledzimy — ani w serwisie, ani tutaj.
+        if is_foreign_incident(
+            article.category, article.title, article.content,
+            article.locality, article.display_title,
+        ):
+            continue
         stamp = article.event_at or article.published_at or now
         items.append({
             "tytul": article.display_title or article.title,
