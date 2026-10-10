@@ -105,7 +105,9 @@ fi
 
 # ---------- różnice schematu ----------
 echo "== Różnice schematu: obecna lokalna ($DB) vs produkcja ($TMP_DB)"
-Q="select table_name||'.'||column_name from information_schema.columns where table_schema='public' order by 1"
+# Bez obiektów rozszerzenia PostGIS: lokalny obraz (postgis/postgis) instaluje je sam, produkcja
+# go nie ma, a kod z niego nie korzysta — inaczej 19 fałszywych „ZNIKNIE lokalnie” (10.10.2026).
+Q="select table_name||'.'||column_name from information_schema.columns where table_schema='public' and table_name not in ('geometry_columns','geography_columns','spatial_ref_sys') order by 1"
 lpsql "-d $DB -tAc \"$Q\"" | sort > /tmp/sync_lokalna.txt
 lpsql "-d $TMP_DB -tAc \"$Q\"" | sort > /tmp/sync_prod.txt
 ONLY_LOCAL=$(comm -23 /tmp/sync_lokalna.txt /tmp/sync_prod.txt)
