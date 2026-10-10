@@ -88,6 +88,12 @@ comm -23 /tmp/local.txt /tmp/prod.txt   # co mamy ponad produkcję
 ```bash
 cd backend && python -m scripts.migrations.<nazwa>
 ```
+**Pełna synchronizacja danych prod → lokalnie** (od 10.10): `bash scripts/sync_prod_do_lokalnej.sh`
+(podgląd: zrzut do bazy tymczasowej + różnice schematu) → `--tak` (zamiana; stara baza zostaje jako
+`centrum_operacyjne_przed_sync`, cofnięcie `--przywroc`). Prod tylko odczyt, bez `push_subscriptions`,
+dane osobowe anonimizowane (lokalny `.env` ma klucze Resend/VAPID). Zrzuty: `~/rybnolive-zrzuty`.
+Ten sam plik zasila bazę audytową (`moj-projekt-audyt`, `ZRZUT=… przygotuj_srodowisko.sh --force`).
+
 ⚠️ **NIE odpalać wszystkich 34 hurtem** — część to operacje na DANYCH, nie na
 schemacie: `clean_database.py`, `remove_duplicate_events.py`,
 `disable_risky_sources.py`, `normalize_ceidg_casing.py`, `ceidg_minimalizacja_rodo.py`.
