@@ -169,6 +169,95 @@ def _mentioned_in_text(name: str, flat_text: str) -> bool:
     return True
 
 
+# --- tytuł: miejsce i stan sprawy muszą wynikać ze źródła ---------------------
+#
+# Audyt 11.10.2026 (F-009, T-04): `display_title` był jedynym polem modelu bez
+# sprawdzenia, a czytają go bramki miejsca (`is_foreign_incident`) i prompt
+# briefingu. Trzy wzorce porażki z produkcji:
+#   5936 „rypińskim szpitalu”           → „szpitalu w Rybnie”      (obce miejsce jako nasze)
+#   6328 awaria ZGK bez nazwy miejscowości → „… w Działdowie”       (własna awaria wycięta z briefingu)
+#   6577 „ZNALEZIONO TABLICĘ”           → „W znalezieniu … potrzebna pomoc” (odwrócony sens)
+# Miejsce bez pokrycia WYCINAMY z tytułu (zostaje „Awaria wodociągu na ulicy
+# Rzemieślniczej”); odwrócony stan sprawy — wraca tytuł źródłowy.
+
+# „w Rybnie”, „we Wrocławiu”, „koło Działdowa”, „z Iłowa”: przyimek + wielka litera.
+# Fałszywe trafienie (nazwa klubu, instytucji) kosztuje najwyżej mniej ładny tytuł.
+_TITLE_PLACE_RE = re.compile(
+    r"\s*\b(?i:w|we|z|ze|na|do|koło|kolo|pod|przy|obok)\s+"
+    r"([A-ZŁŚŻŹĆŃÓĘĄ][\wąćęłńóśźż-]+(?:[ -](?:[A-ZŁŚŻŹĆŃÓĘĄ][\wąćęłńóśźż-]+|nr \d+))*)"
+)
+
+# Stan sprawy, którego tytuł nie może zgubić ani odwrócić (rdzenie bez ogonków).
+# KEPT: stan wybity w NAGŁÓWKU źródła musi przetrwać w tytule — tylko w nagłówku,
+# bo w treści „znalazł się” czy „odwołanie alarmu” to zwykłe słowa, nie stan sprawy.
+_STATUS_KEPT = {
+    "znaleziono": r"\bznaleziono\b|\bznalezion[aey]\b",
+    "odwołano": r"\bodwolan[aoey]\w*",
+    "przełożono": r"\bprzelozon\w*",
+}
+# CLAIMED: stan, który tytuł ogłasza, musi mieć pokrycie w źródle (wzorzec
+# po stronie źródła szerszy — „szukamy właściciela” potwierdza „poszukiwany”).
+_STATUS_CLAIMED = {
+    "zaginięcie": (r"\bzagin\w*", r"\bzagin\w*"),
+    "poszukiwanie": (
+        r"\bposzukiw\w*|\bpotrzebna pomoc|\bpomoc\w* w znalezieniu",
+        r"\bszuka\w*|\bposzukiw\w*|\bzgubi\w*|\bzagin\w*",
+    ),
+}
+
+
+def _name_grounded(name: str, source: SourceText) -> bool:
+    """Nazwa z tytułu (w odmianie) ma pokrycie w źródle.
+
+    Wieś z gminy sprawdzają wzorce `alert_policy` — znają odmianę
+    („Hartowiec” / „w Hartowcu”). Reszta: prefiks każdego słowa bez trzech
+    ostatnich liter („dzialdowie” → „dzialdo”), w krótkich słowach bez
+    dwóch, nie mniej niż 3 („rybnie” → „rybn”, którego nie ma w „rypińskim”;
+    „wkre” → „wkr” jest we „wkra”).
+    """
+    ours = places_in(name)
+    if ours:
+        found = places_in(source.title, source.body)
+        return all(p in found for p in ours)
+    for word in re.split(r"[^0-9a-z]+", _flat(name)):
+        if not word:
+            continue
+        prefix = word[: len(word) - 3] if len(word) >= 7 else word[: max(3, len(word) - 2)]
+        if prefix not in source.flat:
+            return False
+    return True
+
+
+def _ground_title(display_title: str, source: SourceText) -> tuple[str, Optional[str]]:
+    """Tytuł zgodny ze źródłem → (tytuł, powód zmiany albo None)."""
+    title_flat = _flat(display_title)
+    headline_flat = _flat(source.title)
+    for name, pattern in _STATUS_KEPT.items():
+        if re.search(pattern, headline_flat) and not re.search(pattern, title_flat):
+            return _clean_title(source.title), f"tytuł zgubił stan „{name}”"
+    for name, (in_title, in_source) in _STATUS_CLAIMED.items():
+        if re.search(in_title, title_flat) and not re.search(in_source, source.flat):
+            return _clean_title(source.title), f"tytuł dopisał stan „{name}”"
+
+    stripped = display_title
+    dropped = []
+    for match in _TITLE_PLACE_RE.finditer(display_title):
+        if not _name_grounded(match.group(1), source):
+            stripped = stripped.replace(match.group(0), "", 1)
+            dropped.append(match.group(1))
+    # Wieś z gminy, która w tytule stoi bez przyimka („Rybno: awaria…”)
+    found = places_in(source.title, source.body)
+    for place in places_in(display_title):
+        if place not in found and not any(places_in(d) for d in dropped):
+            return _clean_title(source.title), f"tytuł dopisał miejscowość „{place}”"
+    if dropped:
+        stripped = _clean_title(stripped)
+        if len(stripped) >= 15:
+            return stripped, f"miejsce spoza tekstu wycięte: {dropped}"
+        return _clean_title(source.title), f"miejsce spoza tekstu: {dropped}"
+    return display_title, None
+
+
 async def ground_categorization(
     ctx: RunContext[SourceText], output: ArticleCategory
 ) -> ArticleCategory:
@@ -234,6 +323,13 @@ async def ground_categorization(
     cleaned = _clean_title(output.display_title)
     if cleaned and cleaned != output.display_title:
         output.display_title = cleaned
+
+    # 3b. Miejsce i stan sprawy w tytule muszą wynikać ze źródła (patrz `_ground_title`)
+    if output.display_title:
+        grounded_title, reason = _ground_title(output.display_title, source)
+        if reason:
+            logger.info(f"Grounding: {reason}: {output.display_title!r} → {grounded_title!r}")
+            output.display_title = grounded_title
 
     # 4. Termin zdarzenia musi mieć ślad w tekście (liczba dnia albo „jutro",
     #    „w sobotę"). 12.08.2026: Noc Perseidów bez żadnej daty w poście dostała

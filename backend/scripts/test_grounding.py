@@ -376,6 +376,36 @@ def main() -> int:
         ),
     ]
 
+    # --- Tytuł: miejsce i stan sprawy muszą wynikać ze źródła (audyt 11.10.2026, F-009)
+    def titled(display, src_title, src_body):
+        return run_grounding(category(display_title=display), src_title, src_body).display_title
+
+    t5936 = titled("Nowe schronienie przy szpitalu w Rybnie pod parkingiem",
+                   "Schronienie przy rypińskim szpitalu. Powstanie pod parkingiem",
+                   "Przy rypińskim szpitalu ma powstać miejsce doraźnego schronienia.")
+    t6328 = titled("Awaria wodociągu na ulicy Rzemieślniczej w Działdowie",
+                   "🚨 UWAGA! AWARIA SIECI WODOCIĄGOWEJ",
+                   "Na ulicy Rzemieślniczej doszło do awarii sieci wodociągowej.")
+    t6577 = titled("W znalezieniu tablicy rejestracyjnej między Tuczkami a Żabinami potrzebna pomoc",
+                   "🚨 ZNALEZIONO TABLICĘ REJESTRACYJNĄ! 🚗",
+                   "Na trasie między Tuczkami a Żabinami znaleziono tablicę. Może ktoś ją zgubił i szuka?")
+    t_ok = titled("Oktoberfest w Hartowcu połączył Polaków i Niemców",
+                  "OKTOBERFEST W HARTOWIEC", "Wspólna biesiada w świetlicy w Hartowcu.")
+    t_dz = titled("Kolizja w Działdowie spowodowana nieuwagą kierowcy",
+                  "Kolizja na ul. Wolności", "Do zdarzenia doszło w Działdowie na ulicy Wolności.")
+    checks += [
+        ("5936: „rypiński szpital” nie staje się szpitalem „w Rybnie”",
+         "Rybn" not in t5936 and "schronienie" in t5936.lower(), t5936),
+        ("6328: miejscowość spoza tekstu wycięta, reszta tytułu zostaje",
+         t6328 == "Awaria wodociągu na ulicy Rzemieślniczej", t6328),
+        ("6577: „znaleziono” w nagłówku źródła nie staje się „potrzebna pomoc”",
+         "ZNALEZIONO" in t6577.upper() and "pomoc" not in t6577.lower(), t6577),
+        ("odmiana: „w Hartowcu” przy „Hartowiec” w źródle zostaje",
+         t_ok == "Oktoberfest w Hartowcu połączył Polaków i Niemców", t_ok),
+        ("miejscowość obecna w treści zostaje",
+         t_dz == "Kolizja w Działdowie spowodowana nieuwagą kierowcy", t_dz),
+    ]
+
     failures = 0
     for name, passed, detail in checks:
         mark = "✓" if passed else "✗"
