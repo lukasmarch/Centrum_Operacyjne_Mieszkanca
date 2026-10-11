@@ -1,0 +1,685 @@
+{
+ "opis": "Pary z szarej strefy dedupu (cos 0,70–0,89 po wetach osi), 30 dni do 10.10.2026. Ocena ręczna 11.10.2026; 'niepewna' nie liczy się do wyniku. Wymóg: 0 sklejonych par 'inna'.",
+ "pary": [
+  {
+   "nr": 1,
+   "cos": 0.885,
+   "ocena": "inna",
+   "a": {
+    "id": 6398,
+    "tytul": "Wyłączenie prądu 1 października, 14:28–17:00 — Dwukoły",
+    "termin": "2026-10-01 12:28:00",
+    "tresc": "Trwa przerwa w dostawie energii elektrycznej w Iłowo-Osada, gmina wiejska. Wyłączenie prądu dotyczy obszaru Dwukoły i będzie trwało do godziny 17:00. ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej (wyłączenie prądu), 01.10.2026 14:28–17:00.  Iłowo-Osada gmina wiejska 01.10.2026 14:28-17:00 - Dwukoły."
+   },
+   "b": {
+    "id": 6399,
+    "tytul": "Wyłączenie prądu 1 października, 14:28–17:00 — Turza Mała",
+    "termin": "2026-10-01 12:28:00",
+    "tresc": "Trwa przerwa w dostawie energii elektrycznej w Płośnicy, która rozpoczęła się 1 października 2026 o 14:28. Planowane zakończenie awarii przewiduje się na godzinę 17:00. ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej (wyłączenie prądu), 01.10.2026 14:28–17:00.  Płośnica gmina wiejska 01.10.2026 14:28-17:00 - Turza Mała."
+   }
+  },
+  {
+   "nr": 2,
+   "cos": 0.878,
+   "ocena": "inna",
+   "a": {
+    "id": 6213,
+    "tytul": "Trening reagowania w OSP Rybno w sobotę 26 września 2026 r",
+    "termin": "2026-09-26 09:00:00",
+    "tresc": "W sobotę, 26 września 2026 r., w OSP Rybno odbędzie się trening reagowania na sytuacje zagrożenia. Mieszkańcy będą mieli okazję nauczyć się, jak postępować w przypadku alarmu i gdzie szukać bezpiecznych informacji. 🚨 W SOBOTĘ TRENING REAGOWANIA W OSP RYBNO! 🚒  Co zrobić, gdy usłyszysz sygnał alarmowy? Gdzie szukać sprawdzonych informacji? Jak zachować się w sytuacji zagrożenia "
+   },
+   "b": {
+    "id": 6248,
+    "tytul": "Dni Otwarte Strażnic w OSP Uzdowo z treningiem reagowania",
+    "termin": "2026-09-25 22:00:00",
+    "tresc": "W sobotę, 26 września 2026 r., w OSP Uzdowo odbędzie się trening reagowania podczas Dni Otwartych Strażnic. Mieszkańcy będą mogli zapoznać się z procedurami alarmowymi i ewakuacyjnymi. 🚒 TRENING REAGOWANIA – OSP UZDOWO! 🚒  Już w sobotę, 26 września 2026 r., w godz. 11:00–14:00, zapraszamy mieszkańców na „Dni Otwartych Strażnic – Trening Reagowania”.  📍 OSP Uzdowo – Uzdowo 52  P"
+   }
+  },
+  {
+   "nr": 3,
+   "cos": 0.867,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6517,
+    "tytul": "Festyn 'Mały Mistrz' w Hartowcu z udziałem siedmiu drużyn",
+    "termin": "2026-10-06 22:00:00",
+    "tresc": "7 października w Hartowcu odbył się festyn sportowy Mały Mistrz, w którym uczestniczyło siedem drużyn ze szkół podstawowych z Rybna, Rumiana i Żabin. Celem wydarzenia było promowanie aktywności fizycznej wśród dzieci. [RELACJA/ZDJĘCIA] Siedem drużyn i sportowa zabawa. Festyn „Mały Mistrz” w Hartowcu ⚽️🏀🏸  7 października w Szkoła Podstawowa im. Marii Konopnickiej w Hartowcu odby"
+   },
+   "b": {
+    "id": 6514,
+    "tytul": "Festyn sportowy w Hartowcu, dzieci z Rybna i okolic rywalizowały w zabawach",
+    "termin": null,
+    "tresc": "W Hartowcu odbył się festyn sportowy, w którym wzięło udział siedem drużyn ze szkół podstawowych z okolic Rybna. Uczestnicy mieli okazję spróbować różnych sportów, takich jak strzelanie z łuku, tor przeszkód czy jazda na gokartach. 🏆 Tak bawili się mali mistrzowie w Hartowcu! Siedem drużyn ze szkół podstawowych z Rybna, Rumiana, Żabin, Koszelew, Mroczna i Hartowca wzięło udział"
+   }
+  },
+  {
+   "nr": 4,
+   "cos": 0.863,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6512,
+    "tytul": "Kierowca ciągnika w Lidzbarku zatrzymany za jazdę w stanie nietrzeźwym",
+    "termin": null,
+    "tresc": "Po zgłoszeniu obywatelskim dzielnicowi z Lidzbarka zatrzymali kierującego ciągnikiem, który według zgłoszenia miał prowadzić pojazd bez wymaganych uprawnień i znajdować się pod działaniem alkoholu. W trakcie kontroli policjanci potwierdzili, że kierujący był nietrzeźwy i prowadził ciągnik na sądowym zakazie. 58-latek miał prawie 2 promile alkoholu w organizmie i przewoził dziec"
+   },
+   "b": {
+    "id": 6509,
+    "tytul": "Mieszkaniec Lidzbarka pijany prowadził ciągnik z dzieckiem",
+    "termin": null,
+    "tresc": "Miał zakaz prowadzenia pojazdów, był pijany i wiózł ciągnikiem dziecko. Mieszkaniec gminy Lidzbark odpowie przed sądem za prowadzenie ciągnika w stanie nietrzeźwości mimo sądowego zakazu prowadzenia pojazdów. Mężczyzna przewoził także 6-letnie dziecko. Policjanci zatrzymali 58-latka w rejonie Starego Dłutowa. Mężczyzna miał prawie 2 promile alkoholu w organizmie. Sprawdzenie go"
+   }
+  },
+  {
+   "nr": 5,
+   "cos": 0.86,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6217,
+    "tytul": "Otwarcie drogi Tuczki–Koszelewy, inwestycja za 3,6 mln zł",
+    "termin": "2026-09-22 22:00:00",
+    "tresc": "W dniu 23 września otwarto nowy odcinek drogi powiatowej nr 1255N łączącej miejscowości Tuczki i Koszelewy. Inwestycja kosztowała 3,6 miliona złotych i wyniosła 3,6 km nowej nawierzchni. Ponad 3,6 km nowej drogi za 3,6 mln zł. Trasa Tuczki–Koszelewy oficjalnie otwarta 🚗  Jedna z większych tegorocznych inwestycji drogowych Powiatu Działdowskiego została zakończona. W środę, 23 w"
+   },
+   "b": {
+    "id": 6216,
+    "tytul": "Otwarcie przebudowanej drogi Tuczki–Koszelewy o wartości 3,6 mln zł",
+    "termin": null,
+    "tresc": "Otwarta została przebudowana trasa Tuczki–Koszelewy o długości ponad 3,6 km, której koszt wyniósł 3,6 mln zł. W ceremonii wzięli udział przedstawiciele różnych instytucji oraz mieszkańcy. 🎥 Ponad 3,6 km przebudowanej drogi za ponad 3,6 mln zł – trasa Tuczki–Koszelewy została oficjalnie otwarta! 🚗 W uroczystości uczestniczyli przedstawiciele administracji rządowej, parlamentu, s"
+   }
+  },
+  {
+   "nr": 6,
+   "cos": 0.844,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6271,
+    "tytul": "Rolnicy mają czas do 30 września 2026 r. na uzyskanie certyfikatu QMP",
+    "termin": "2026-09-29 22:00:00",
+    "tresc": "Rolnicy, którzy w tegorocznym wniosku o dopłaty bezpośrednie do opasów lub mamek zadeklarowali praktykę QMP, mają obowiązek uzyskać certyfikat do 30 września 2026 roku. Informacja dotyczy osób nieposiadających certyfikatu. Certyfikat QMP — termin uzyskania upływa 30 września 2026 r. Informujemy, że rolnicy, którzy w tegorocznym wniosku o dopłaty bezpośrednie do opasów lub mamek"
+   },
+   "b": {
+    "id": 6308,
+    "tytul": "Rolnicy muszą zdobyć certyfikaty QMP do 30 września 2026 roku",
+    "termin": "2026-09-29 22:00:00",
+    "tresc": "Rolnicy ubiegający się o certyfikat QMP muszą go uzyskać do 30 września 2026 roku. Niedopełnienie terminu skutkuje brakiem dopłaty. Ważne jest skontaktowanie się z wybraną jednostką certyfikującą. Drukuj Certyfikat QMP - termin uzyskania upływa 30 września 2026 r. Opublikowano 2026-09-28 11:46:12. Artykuł wyświetlono: 61 razy. Informujemy, że rolnicy, którzy w tegorocznym wnios"
+   }
+  },
+  {
+   "nr": 7,
+   "cos": 0.842,
+   "ocena": "odslona",
+   "a": {
+    "id": 6478,
+    "tytul": "Otwarto nową pływalnię \"Mazurska Fala\" w Działdowie",
+    "termin": null,
+    "tresc": "Mieszkańcy Działdowa w końcu doczekali się krytej pływalni. W poniedziałek otwarty został nowy kompleks rekreacyjny pod nazwą „Mazurska Fala”. To kilka basenów, strefa dla dzieci, sauny i wiele innych miejsc, w których od teraz będzie można aktywnie spędzać czas wolny. Jak podkreślił burmistrz Działdowa Grzegorz Mrowiński, mieszkańcy wzmianki o basenie słyszeli od dawna. Tak na"
+   },
+   "b": {
+    "id": 6549,
+    "tytul": "Otwarcie krytej pływalni Mazurska Fala w Działdowie jutro",
+    "termin": "2026-10-08 22:00:00",
+    "tresc": "Otwarcie krytej pływalni \"Mazurska Fala\" w Działdowie zaplanowane jest na 9 października 2026 roku. Burmistrz Grzegorz Mrowiński zaprasza mieszkańców na to wydarzenie. Już jutro wielkie otwarcie krytej pływalni Mazurska Fala w Działdowie! Znamy cennik i ofertę zajęć 🌬🌊  Już jutro, 9 października 2026 roku, odbędzie się oficjalne otwarcie krytej pływalni „Mazurska Fala” w Działd"
+   }
+  },
+  {
+   "nr": 8,
+   "cos": 0.812,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6342,
+    "tytul": "Odsłonięcie obelisku upamiętniającego ofiary obozu Soldau w Działdowie",
+    "termin": null,
+    "tresc": "W Działdowie upamiętniono ofiary niemieckiego obozu Soldau. Wczoraj (29 września) na cmentarzu parafialnym odsłonięto obelisk poświęcony osobom zamordowanym w obozie. Nowe upamiętnienie ufundował gdański oddział Instytutu Pamięci Narodowej. Jak informuje jego przedstawicielka Katarzyna Lisiecka, napis na obelisku jednoznacznie wskazuje zarówno ofiary, jak i miejsce ich kaźni – "
+   },
+   "b": {
+    "id": 6417,
+    "tytul": "Uroczystość upamiętniająca Ofiary Obozu Zagłady w Działdowie",
+    "termin": null,
+    "tresc": "W Działdowie odbyła się uroczystość upamiętniająca Ofiary Obozu Zagłady Soldau. Mieszkańcy oraz przedstawiciele władz wspólnie oddali hołd zamordowanym, podkreślając znaczenie pamięci o tragicznych wydarzeniach. Wydarzenie to zwraca uwagę na potrzebę przekazywania historii kolejnym pokoleniom. W uroczystości udział wzięli nie tylko przedstawiciele władz i instytucji ale również"
+   }
+  },
+  {
+   "nr": 9,
+   "cos": 0.81,
+   "ocena": "inna",
+   "a": {
+    "id": 6556,
+    "tytul": "Zatrzymanie 17-latka z Sierpca po groźbie ataku w szkole",
+    "termin": null,
+    "tresc": "Groźba ataku w jednej z sierpeckich szkół. 17-latek miał zapowiadać, że zrobi „coś złego”. O niepokojących słowach nastolatka policjantów poinformował nauczyciel. Wcześniej informację przekazali mu uczniowie, którzy usłyszeli o planach swojego rówieśnika. Funkcjonariusze weszli do mieszkania 17-latka i go zatrzymali – informuje podinsp. Katarzyna Kucharska z Komendy Wojewódzkie"
+   },
+   "b": {
+    "id": 6542,
+    "tytul": "Zatrzymanie 17-latka po groźbach ataków na szkoły w Przasnyszu",
+    "termin": null,
+    "tresc": "W Przasnyszu policja zatrzymała 17-latka w związku z groźbami ataku na szkoły, co wzbudziło strach wśród uczniów i rodziców. Incydent zdarzył się 8 października, a sytuacja jest poważnie traktowana przez służby. Ku przestrodze: Groźby ataków na szkoły i „krwawy piątek”. Policja zatrzymała 17-latka! 🛑🛑  Niepokojące nagranie zapowiadające przemoc wobec uczniów jednej ze szkół w P"
+   }
+  },
+  {
+   "nr": 10,
+   "cos": 0.809,
+   "ocena": "odslona",
+   "a": {
+    "id": 6424,
+    "tytul": "Gala wolontariatu w Morawach dla społecznych liderów",
+    "termin": "2026-10-02 22:00:00",
+    "tresc": "Ludzie, którzy działają na rzecz swoich miejscowości, spotkają się jutro (3 października) w Morawach. W hali sportowej odbędzie się Gala Wolontariatu „Społeczni Liderzy Mazowsza”. Wydarzenie skierowane jest do osób zaangażowanych w życie gminy Stupsk – m.in. członków kół gospodyń wiejskich, strażaków ochotników, stowarzyszeń i fundacji, sołtysów, radnych oraz nieformalnych grup"
+   },
+   "b": {
+    "id": 6450,
+    "tytul": "Liderzy wolontariatu spotkali się w Morawach",
+    "termin": null,
+    "tresc": "Ludzie, którzy na co dzień działają na rzecz swoich miejscowości, spotkali się w Morawach. Gala Wolontariatu „Społeczni Liderzy Mazowsza” zgromadziła przedstawicieli kół gospodyń wiejskich, ochotniczych straży pożarnych, stowarzyszeń, fundacji i lokalnych grup. Takich osób jest wokół nas bardzo dużo – mówi posłanka Maria Koźlakiewicz. &#160; Podczas gali rozmawiano m.in. o wspó"
+   }
+  },
+  {
+   "nr": 11,
+   "cos": 0.799,
+   "ocena": "inna",
+   "a": {
+    "id": 6228,
+    "tytul": "Dni Otwarte Strażnic w Działdowie, Iłowie i Rybnie 26 września",
+    "termin": "2026-09-25 22:00:00",
+    "tresc": "Jak rozpoznać sygnały alarmowe, gdzie szukać wiarygodnych informacji i jak znaleźć bezpieczne schronienie? Tego będzie można dowiedzieć się podczas sobotnich spotkań w jednostkach straży pożarnej na Warmii i Mazurach. Treningi reagowania zaplanowano w ponad stu oddziałach ochotniczej i państwowej straży pożarnej. To okazja, aby nie tylko odwiedzić strażaków, ale przede wszystki"
+   },
+   "b": {
+    "id": 6248,
+    "tytul": "Dni Otwarte Strażnic w OSP Uzdowo z treningiem reagowania",
+    "termin": "2026-09-25 22:00:00",
+    "tresc": "W sobotę, 26 września 2026 r., w OSP Uzdowo odbędzie się trening reagowania podczas Dni Otwartych Strażnic. Mieszkańcy będą mogli zapoznać się z procedurami alarmowymi i ewakuacyjnymi. 🚒 TRENING REAGOWANIA – OSP UZDOWO! 🚒  Już w sobotę, 26 września 2026 r., w godz. 11:00–14:00, zapraszamy mieszkańców na „Dni Otwartych Strażnic – Trening Reagowania”.  📍 OSP Uzdowo – Uzdowo 52  P"
+   }
+  },
+  {
+   "nr": 12,
+   "cos": 0.797,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6148,
+    "tytul": "Zakończenie turnieju \"Gram na moim Orliku\" z wygraną Delfina Rybno",
+    "termin": null,
+    "tresc": "Zakończył się turniej \"Gram na moim Orliku\", w którym brały udział drużyny z różnych miejscowości. Zwyciężył Delfin Rybno, który zdobył także tytuł MVP dla Jakuba Licznerskiego. Wydarzenie było okazją do sportowej rywalizacji i integracji mieszkańców. Ostatni dzień turniejowy \" Gram na moim Orliku\" za nami⚽️🏆👏 3 dni sportu, integracji i dobrej zabawy⚽️👍 Kategoria PRO (kluby) 🏆 "
+   },
+   "b": {
+    "id": 6138,
+    "tytul": "GSZS Delfin Rybno zwyciężył w turnieju piłkarskim w Działdowie",
+    "termin": null,
+    "tresc": "Drużyna GSZS Delfin Rybno zdobyła 1. miejsce w turnieju \"Gram na moim Orliku\". Wydarzenie trwało trzy dni i odbyło się na terenie gminy Działdowo, przynosząc duży sukces młodym piłkarzom. GSZS Delfin Rybno najlepszy w turnieju „Gram na moim Orliku” 🔴🔵  Duży sukces młodych piłkarzy z gminy Rybno! Drużyna GSZS Delfin Rybno zajęła 1. miejsce w kategorii PRO podczas turnieju „Gram "
+   }
+  },
+  {
+   "nr": 13,
+   "cos": 0.795,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6379,
+    "tytul": "Stypendia Naukowe Starosty Działdowskiego wręczone za osiągnięcia w edukacji",
+    "termin": null,
+    "tresc": "Artykuł Uroczyste wręczenie Stypendiów Naukowych Starosty Działdowskiego za wybitne osiągnięcia w nauce w roku szkolnym 2025/2026 pochodzi z serwisu Powiat Działdowski. <p>Artykuł <a href=\"https://powiatdzialdowski.pl/uroczyste-wreczenie-stypendiow-naukowych-starosty-dzialdowskiego-za-wybitne-osiagniecia-w-nauce-w-roku-szkolnym-2025-2026/\" rel=\"nofollow\">Uroczyste wręczenie Sty"
+   },
+   "b": {
+    "id": 6447,
+    "tytul": "Wręczenie 152 stypendiów dla uczniów w Działdowie i okolicy",
+    "termin": null,
+    "tresc": "Podczas uroczystości wręczono 152 stypendia dla uczniów z Działdowa, Iłowa-Osady, Lidzbarka oraz Malinowa za osiągnięcia w olimpiadach i wysokie wyniki na maturach. Starosta Działdowski Paweł Cieśliński uhonorował także nauczycieli, którzy przyczynili się do sukcesów swoich uczniów. 12 uczniów zostało wyróżnionych za sukcesy w ogólnopolskich olimpiadach oraz konkursach przedmio"
+   }
+  },
+  {
+   "nr": 14,
+   "cos": 0.792,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6469,
+    "tytul": "Uroczyste otwarcie krytej pływalni Mazurska Fala w Działdowie",
+    "termin": null,
+    "tresc": "Dzisiaj odbyło się uroczyste otwarcie krytej pływalni Mazurska Fala w Działdowie. Nowy obiekt ma z pewnością przyciągnąć mieszkańców regionu, a uczestnicy mieli okazję podziwiać jego nowoczesny wygląd. 🏊‍♂️🌊 Mieliśmy dziś przyjemność uczestniczyć w uroczystym otwarciu krytej pływalni  Mazurska Fala w Działdowie! Serdecznie dziękujemy za zaproszenie – obiekt prezentuje się napra"
+   },
+   "b": {
+    "id": 6488,
+    "tytul": "Otwarcie Pływalni Mazurska Fala w Działdowie z filmem",
+    "termin": null,
+    "tresc": "Artykuł Oficjalne otwarcie Pływalni Mazurska Fala w Działdowie (film) pochodzi z serwisu Powiat Działdowski. <p>Artykuł <a href=\"https://powiatdzialdowski.pl/oficjalne-otwarcie-plywalni-mazurska-fala-w-dzialdowie-film/\" rel=\"nofollow\">Oficjalne otwarcie Pływalni Mazurska Fala w Działdowie (film)</a> pochodzi z serwisu <a href=\"https://powiatdzialdowski.pl\" rel=\"nofollow\">Powiat"
+   }
+  },
+  {
+   "nr": 15,
+   "cos": 0.791,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6478,
+    "tytul": "Otwarto nową pływalnię \"Mazurska Fala\" w Działdowie",
+    "termin": null,
+    "tresc": "Mieszkańcy Działdowa w końcu doczekali się krytej pływalni. W poniedziałek otwarty został nowy kompleks rekreacyjny pod nazwą „Mazurska Fala”. To kilka basenów, strefa dla dzieci, sauny i wiele innych miejsc, w których od teraz będzie można aktywnie spędzać czas wolny. Jak podkreślił burmistrz Działdowa Grzegorz Mrowiński, mieszkańcy wzmianki o basenie słyszeli od dawna. Tak na"
+   },
+   "b": {
+    "id": 6488,
+    "tytul": "Otwarcie Pływalni Mazurska Fala w Działdowie z filmem",
+    "termin": null,
+    "tresc": "Artykuł Oficjalne otwarcie Pływalni Mazurska Fala w Działdowie (film) pochodzi z serwisu Powiat Działdowski. <p>Artykuł <a href=\"https://powiatdzialdowski.pl/oficjalne-otwarcie-plywalni-mazurska-fala-w-dzialdowie-film/\" rel=\"nofollow\">Oficjalne otwarcie Pływalni Mazurska Fala w Działdowie (film)</a> pochodzi z serwisu <a href=\"https://powiatdzialdowski.pl\" rel=\"nofollow\">Powiat"
+   }
+  },
+  {
+   "nr": 16,
+   "cos": 0.788,
+   "ocena": "odslona",
+   "a": {
+    "id": 6488,
+    "tytul": "Otwarcie Pływalni Mazurska Fala w Działdowie z filmem",
+    "termin": null,
+    "tresc": "Artykuł Oficjalne otwarcie Pływalni Mazurska Fala w Działdowie (film) pochodzi z serwisu Powiat Działdowski. <p>Artykuł <a href=\"https://powiatdzialdowski.pl/oficjalne-otwarcie-plywalni-mazurska-fala-w-dzialdowie-film/\" rel=\"nofollow\">Oficjalne otwarcie Pływalni Mazurska Fala w Działdowie (film)</a> pochodzi z serwisu <a href=\"https://powiatdzialdowski.pl\" rel=\"nofollow\">Powiat"
+   },
+   "b": {
+    "id": 6555,
+    "tytul": "Otwarcie pływalni Mazurska Fala w Działdowie 9 października",
+    "termin": "2026-10-09 07:30:00",
+    "tresc": "Nowa kryta pływalnia „Mazurska Fala” w Działdowie zostanie otwarta dla mieszkańców. Jutro (9 października) zaplanowano oficjalne rozpoczęcie działalności obiektu, a później z basenu będą mogli skorzystać pierwsi goście. Otwarcie rozpocznie się o godz. 9:30. Jedną z atrakcji będzie pokaz pływania synchronicznego w wykonaniu zawodników KS Synchro Warszawa. Dla pierwszych mieszkań"
+   }
+  },
+  {
+   "nr": 17,
+   "cos": 0.788,
+   "ocena": "odslona",
+   "a": {
+    "id": 6353,
+    "tytul": "Decyzje dotyczące zadłużenia gminy Rybno na jutrzejszej sesji rady",
+    "termin": "2026-09-30 08:00:00",
+    "tresc": "Jutro o godz. 10:00 podczas XXV sesji Rady Gminy Rybno odbędzie się kluczowe głosowanie dotyczące zadłużenia gminy. Radni zdecydują, czy zadłużenie wzrośnie do 45 milionów złotych. Jutro o godz. 10:00 podczas XXV sesji Rady Gminy Rybno odbędzie się jedno z najważniejszych głosowań ostatnich lat. Radni zadecydują, czy zadłużenie gminy wzrośnie do 45 mln.  Pełna treść u źródła: h"
+   },
+   "b": {
+    "id": 6371,
+    "tytul": "Debata radnych w Rybnie o pożyczce 32,4 mln zł z Funduszu Bezpieczeństwa",
+    "termin": null,
+    "tresc": "W Rybnie odbyła się XXV sesja Rady Gminy, podczas której radni debatują nad zaciągnięciem pożyczki w wysokości 32,4 mln zł. Dyskusja trwała ponad godzinę i została poprzedzona głosowaniem nad odpowiednią uchwałą. 🎥 Ponad godzina debaty o pożyczce 32,4 mln zł. Zobacz dyskusję i głosowanie  Ponad godzinę trwała debata radnych i wójta podczas dzisiejszej XXV sesji Rady Gminy Rybno"
+   }
+  },
+  {
+   "nr": 18,
+   "cos": 0.786,
+   "ocena": "odslona",
+   "a": {
+    "id": 6378,
+    "tytul": "XXV sesja Rady Gminy Rybno z ważnym głosowaniem o zadłużeniu",
+    "termin": "2026-09-30 08:00:00",
+    "tresc": "Dziś o godz. 10:00 odbędzie się XXV sesja Rady Gminy Rybno, gdzie radni zdecydują o zwiększeniu zadłużenia gminy do 45 mln. Transmisja dostępna online. Już dziś o godz. 10:00 podczas XXV sesji Rady Gminy Rybno odbędzie się jedno z najważniejszych głosowań ostatnich lat. Radni zadecydują, czy zadłużenie gminy wzrośnie do 45 mln. Link do transmisji: https://www.youtube.com/watch?"
+   },
+   "b": {
+    "id": 6371,
+    "tytul": "Debata radnych w Rybnie o pożyczce 32,4 mln zł z Funduszu Bezpieczeństwa",
+    "termin": null,
+    "tresc": "W Rybnie odbyła się XXV sesja Rady Gminy, podczas której radni debatują nad zaciągnięciem pożyczki w wysokości 32,4 mln zł. Dyskusja trwała ponad godzinę i została poprzedzona głosowaniem nad odpowiednią uchwałą. 🎥 Ponad godzina debaty o pożyczce 32,4 mln zł. Zobacz dyskusję i głosowanie  Ponad godzinę trwała debata radnych i wójta podczas dzisiejszej XXV sesji Rady Gminy Rybno"
+   }
+  },
+  {
+   "nr": 19,
+   "cos": 0.776,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6006,
+    "tytul": "27-latek ranił policjanta w czasie interwencji w aptece",
+    "termin": null,
+    "tresc": "Zaatakował policjanta, który w czasie wolnym od służby wyprowadził go z apteki. Agresor wcześniej awanturował się w aptece, będąc pod działaniem alkoholu. Świadkiem zdarzenia był funkcjonariusz. Mimo ostrzeżenia, że ma do czynienia z policjantem, nietrzeźwy 27-latek rozbił szklaną butelkę i ranił funkcjonariusza w nogę. Mężczyzna odpowie za czynną napaść na funkcjonariusza. "
+   },
+   "b": {
+    "id": 6020,
+    "tytul": "27-latek ranił policjanta w aptece w Działdowie",
+    "termin": null,
+    "tresc": "Zatrzymano 27-latka, który zaatakował policjanta po służbie w Działdowie. Funkcjonariusz próbował wyprowadzić z apteki awanturującego się mężczyznę. Ten rozbił butelkę i zranił policjanta w nogę. Mężczyzna miał ponad 2 promile alkoholu w organizmie. Jak ustalili policjanci, wiedział, że atakuje funkcjonariusza. &#8211; Działdowianin wkrótce odpowie za czynną napaść na funkcjona"
+   }
+  },
+  {
+   "nr": 20,
+   "cos": 0.766,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6125,
+    "tytul": "Planowana inwestycja w Dębieniu budzi obawy mieszkańców",
+    "termin": null,
+    "tresc": "Mieszkaniec Dębienia podnosi kwestie związane z planowaną inwestycją wydobycia piasku, żwiru i kamienia. Obawy dotyczą transportu ciężarowego, bezpieczeństwa na drogach i hałasu związanych z tą inwestycją. 📢 WAŻNY TEMAT DLA MIESZKAŃCÓW DĘBIENIA  Udostępniamy post jednego z mieszkańców Dębienia dotyczący planowanej inwestycji związanej z wydobyciem piasku, żwiru i kamienia w tej"
+   },
+   "b": {
+    "id": 6119,
+    "tytul": "Protest mieszkańców Dębienia przeciwko wydobyciu kruszywa",
+    "termin": null,
+    "tresc": "Mieszkańcy Dębienia protestują przeciwko planom wydobycia kruszywa, które mają wpłynąć na zwiększenie ruchu ciężarówek oraz bliskość zabudowań. Ich sprzeciw dotyczy przede wszystkim planów związanych z wydobywaniem piasku, żwiru i kamienia. 🛑 Mieszkańcy Dębienia sprzeciwiają się planom wydobycia kruszywa ⤵  Plany związane z możliwością wydobywania piasku, żwiru i kamienia w Dęb"
+   }
+  },
+  {
+   "nr": 21,
+   "cos": 0.763,
+   "ocena": "odslona",
+   "a": {
+    "id": 6187,
+    "tytul": "Otwarcie drogi Tuczki–Koszelewy 23 września po zakończeniu przebudowy",
+    "termin": "2026-09-22 22:00:00",
+    "tresc": "Zakończyła się przebudowa drogi powiatowej Tuczki–Koszelewy. Odbiory zostały już przeprowadzone, a jutro (23 września) odbędzie się oficjalne otwarcie trasy. To ważna droga dla mieszkańców tej części powiatu – mówi starosta działdowski Paweł Cieśliński. &#160; W ramach inwestycji wykonano nową nawierzchnię oraz chodnik z kostki brukowej. Przebudowa ma przede wszystkim poprawić "
+   },
+   "b": {
+    "id": 6216,
+    "tytul": "Otwarcie przebudowanej drogi Tuczki–Koszelewy o wartości 3,6 mln zł",
+    "termin": null,
+    "tresc": "Otwarta została przebudowana trasa Tuczki–Koszelewy o długości ponad 3,6 km, której koszt wyniósł 3,6 mln zł. W ceremonii wzięli udział przedstawiciele różnych instytucji oraz mieszkańcy. 🎥 Ponad 3,6 km przebudowanej drogi za ponad 3,6 mln zł – trasa Tuczki–Koszelewy została oficjalnie otwarta! 🚗 W uroczystości uczestniczyli przedstawiciele administracji rządowej, parlamentu, s"
+   }
+  },
+  {
+   "nr": 22,
+   "cos": 0.762,
+   "ocena": "inna",
+   "a": {
+    "id": 6033,
+    "tytul": "Spotkania policji z uczniami o bezpieczeństwie drogowym",
+    "termin": null,
+    "tresc": "O tym, jak się zachować w drodze do i ze szkoły, by było bezpiecznie z uczniami Szkoły Podstawowej nr 1 im. T. Kościuszki w Lidzbarku i z młodzieżą Zespołu Szkół nr 1 w Działdowie rozmawiały dzielnicowa z Komisariatu Policji w Lidzbarku i policjantki z Komendy Powiatowej Policji w Działdowie. W trakcie spotkań przypomniano zasady poruszania się rowerami i hulajnogami elektryczn"
+   },
+   "b": {
+    "id": 6064,
+    "tytul": "Policjanci w Rumianie i Żabinach promują bezpieczeństwo wśród uczniów",
+    "termin": null,
+    "tresc": "Policjanci z gminy Rybno przeprowadzili spotkania z uczniami szkół podstawowych w Rumianie i Żabinach, w ramach akcji \"Bezpieczna Droga do Szkoły.\" Uczniowie zostali poinformowani o zasadach bezpieczeństwa na drodze, szczególnie w kontekście zachowania na przejściach dla pieszych. 👮‍♀️👮 Policjanci z terenu gminy Rybno odwiedzili uczniów szkół podstawowych w Rumianie i Żabinach "
+   }
+  },
+  {
+   "nr": 23,
+   "cos": 0.76,
+   "ocena": "inna",
+   "a": {
+    "id": 6033,
+    "tytul": "Spotkania policji z uczniami o bezpieczeństwie drogowym",
+    "termin": null,
+    "tresc": "O tym, jak się zachować w drodze do i ze szkoły, by było bezpiecznie z uczniami Szkoły Podstawowej nr 1 im. T. Kościuszki w Lidzbarku i z młodzieżą Zespołu Szkół nr 1 w Działdowie rozmawiały dzielnicowa z Komisariatu Policji w Lidzbarku i policjantki z Komendy Powiatowej Policji w Działdowie. W trakcie spotkań przypomniano zasady poruszania się rowerami i hulajnogami elektryczn"
+   },
+   "b": {
+    "id": 6059,
+    "tytul": "Spotkania z uczniami w Rumianie i Żabinach w ramach akcji \"Bezpieczna droga do szkoły\"",
+    "termin": null,
+    "tresc": "Dzielnicowa i dzielnicowy z terenu Rybna i Gminy Rybno odwiedzili uczniów ze szkół podstawowych w Rumianie i w Żabinach. Spotkania odbyły się w ramach prowadzonych przez Policję działań &quot;Bezpieczna droga do szkoły&quot;. "
+   }
+  },
+  {
+   "nr": 24,
+   "cos": 0.758,
+   "ocena": "inna",
+   "a": {
+    "id": 6454,
+    "tytul": "Oferty pracy w budownictwie w Rybnie i okolicach",
+    "termin": null,
+    "tresc": "Firmy BUD-MASTER oraz BUDIR w Rybnie poszukują pracowników budowlanych do prac przy dociepleniach. Oferują umowę o pracę oraz możliwość przyuczenia. 🏗️ PRACA W BUDOWNICTWIE – RYBNO I OKOLICE! 🏗️  Firmy BUD-MASTER Michał Truszczyński oraz BUDIR Ireneusz Ziółkowski z siedzibą w Rybnie zatrudnią pracowników budowlanych do prac przy dociepleniach.  ✅ umowa o pracę ✅ stabilne zatrud"
+   },
+   "b": {
+    "id": 6496,
+    "tytul": "JARBUD zatrudnia pracowników budowlanych – atrakcyjne zarobki",
+    "termin": null,
+    "tresc": "Firma Remontowo-Budowlana JARBUD poszukuje pracowników budowlanych z doświadczeniem. Oferują stabilne zatrudnienie oraz atrakcyjne zarobki dla kandydatów z branży budowlanej. 🏗️ PRACA W BRANŻY BUDOWLANEJ – JARBUD ZATRUDNIA! 👷‍♂️  Firma Remontowo-Budowlana JARBUD poszukuje pracowników budowlanych. Jeśli masz doświadczenie w branży, szukasz stabilnej pracy i zależy Ci na dobrych "
+   }
+  },
+  {
+   "nr": 25,
+   "cos": 0.749,
+   "ocena": "inna",
+   "a": {
+    "id": 6381,
+    "tytul": "Błąkający się pies w Kurkach, właściciel poszukiwany",
+    "termin": null,
+    "tresc": "W miejscowości Kurki od kilku dni błąka się pies. Poszukiwany jest jego właściciel, a osoby, które go rozpoznają, proszone są o kontakt pod podanym numerem telefonu. 🐶 POSZUKIWANY WŁAŚCICIEL PSA!  Informujemy, że od kilku dni w miejscowości Kurki błąka się pies. 🐾  Jeśli ktoś rozpoznaje swojego pupila lub wie, kto jest jego właścicielem, prosimy o kontakt pod numerem:  📞 23 697"
+   },
+   "b": {
+    "id": 6402,
+    "tytul": "Zgubiony owczarek niemiecki w Rybnie, prosimy o pomoc w odnalezieniu",
+    "termin": null,
+    "tresc": "W Rybnie uciekł owczarek niemiecki w okolicach ul. Sportowej. Właściciele proszą o pomoc w jego odnalezieniu. 🐕 UWAGA! UCIEKŁ PIES W RYBNIE!  W okolicach ul. Sportowej w Rybnie uciekł widoczny na zdjęciu pies – owczarek niemiecki.  Właściciele bardzo proszą o pomoc w jego odnalezieniu. Jeśli ktoś widział psa lub wie, gdzie obecnie może przebywać, prosimy o kontakt.  Prosimy o u"
+   }
+  },
+  {
+   "nr": 26,
+   "cos": 0.745,
+   "ocena": "odslona",
+   "a": {
+    "id": 6082,
+    "tytul": "Ogólnopolskie działania Policji w dniu 17 września dotyczące prędkości",
+    "termin": "2026-09-16 22:00:00",
+    "tresc": "17 września 2026 r. Policja przeprowadzi ogólnopolskie działania kontrolno-prewencyjne pn. „PRĘDKOŚĆ”, realizowane w ramach kampanii ROADPOL Safety Days (Dni Bezpieczeństwa Ruchu Drogowego). Celem akcji jest egzekwowanie od kierujących pojazdami przestrzegania ograniczeń prędkości. "
+   },
+   "b": {
+    "id": 6111,
+    "tytul": "Podsumowanie działań „Prędkość” w powiecie działdowskim bez wypadków",
+    "termin": null,
+    "tresc": "Policyjne działania „Prędkość” w powiecie działdowskim w ramach tygodnia ROADPOL spełniły zakładaną na ten dzień „wizję zero”. Funkcjonariusze nie odnotowali żadnych wypadków i zdarzeń z udziałem uczestników ruchu drogowego, które zagrażałyby ich życiu. "
+   }
+  },
+  {
+   "nr": 27,
+   "cos": 0.742,
+   "ocena": "inna",
+   "a": {
+    "id": 5990,
+    "tytul": "KS Dekorglass Działdowo przegrał z Orliczem Suchedniów w Lotto Superlidze",
+    "termin": null,
+    "tresc": "KS Dekorglass Działdowo odniósł bolesną porażkę w 3. kolejce Lotto Superligi w starciu z Orliczem Suchedniów Dekorglass grał bez Yuhiego Sakai, który startuje w turnieju w Bułgarii. Był on kluczowym zawodnikiem w ostatniej kolejce. Jiri Vrablik, Mateusz Sakowicz i Patryk Lewandowski ulegli swoim rywalom bez wyrwania chociaż jednego seta. Warty odnotowania jest jednak występ jun"
+   },
+   "b": {
+    "id": 6041,
+    "tytul": "Dekorglass Działdowo przegrywa z Dojlidami Białystok w Lotto Superlidze",
+    "termin": "2026-10-22 22:00:00",
+    "tresc": "W meczu Lotto Superligi drużyna Dekorglass Działdowo przegrała z Dojlidami Białystok, uzyskując jedynie jeden punkt. W następnej kolejce zespół rozegra mecz u siebie 23 października przeciwko KS Villa Verde Olesno. Po porażce Dekorglass zajmuje 11. miejsce w tabeli. W kolejnych grach Mateusz Sakowicz i Jiri Vrablik ponieśli porażki po 1:3 z naszym byłym zawodnikiem Samuelem Kul"
+   }
+  },
+  {
+   "nr": 28,
+   "cos": 0.741,
+   "ocena": "inna",
+   "a": {
+    "id": 5990,
+    "tytul": "KS Dekorglass Działdowo przegrał z Orliczem Suchedniów w Lotto Superlidze",
+    "termin": null,
+    "tresc": "KS Dekorglass Działdowo odniósł bolesną porażkę w 3. kolejce Lotto Superligi w starciu z Orliczem Suchedniów Dekorglass grał bez Yuhiego Sakai, który startuje w turnieju w Bułgarii. Był on kluczowym zawodnikiem w ostatniej kolejce. Jiri Vrablik, Mateusz Sakowicz i Patryk Lewandowski ulegli swoim rywalom bez wyrwania chociaż jednego seta. Warty odnotowania jest jednak występ jun"
+   },
+   "b": {
+    "id": 6075,
+    "tytul": "Dekorglass Działdowo przegrywa z Dojlidami Białystok w Lotto Superlidze",
+    "termin": null,
+    "tresc": "KS Dekorglass Działdowo ponownie przegrywa w Lotto Superlidze. Tym razem lepsza okazała się drużyna Dojlidy Białystok. Początek rywalizacji był obiecujący dla gospodarzy. Jiri Vrablik pokonał Piotra Chodorskiego w pełnym dystansie meczowym. Niestety była to ostatnia wygrana potyczka dla Dekorglassu. Mateusz Sakowicz uległ byłemu zawodnikowi Dekorglassu, Samuelowi Kulczyckiemu 1"
+   }
+  },
+  {
+   "nr": 29,
+   "cos": 0.741,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6374,
+    "tytul": "Radni gminy Rybno zablokowali pożyczkę na 32,4 mln zł",
+    "termin": null,
+    "tresc": "Radni gminy Rybno podczas XXV Sesji zablokowali uchwałę o zaciągnięcie pożyczki na 32,4 miliona złotych. Głosowanie zakończyło się wynikiem 10 głosów za blokadą pożyczki. 🔴 RADNI ZABLOKOWALI POŻYCZKĘ NA 32,4 MLN ZŁ!  Podczas dzisiejszej, XXV Sesji Rady Gminy Rybno, radni głosowali nad uchwałą w sprawie zaciągnięcia pożyczki z Funduszu Bezpieczeństwa i Obronności w wysokości 32 "
+   },
+   "b": {
+    "id": 6401,
+    "tytul": "Radni Rybna odrzucili projekt pożyczki wójta na inwestycję drogową",
+    "termin": null,
+    "tresc": "Radni w gminie Rybno zdecydowali o odrzuceniu propozycji wójta Tomasza Węgrzynowskiego, który chciał zaciągnąć pożyczkę na kwotę 32,4 miliona złotych. Środki miały być przeznaczone na inwestycję drogową. Radni w Rybnie powiedzieli „nie” kolejnej pożyczce wójta 🛑  Wójt gminy Rybno Tomasz Węgrzynowski przedłożył radnym projekt uchwały dotyczący zaciągnięcia 32,4 mln zł pożyczki, "
+   }
+  },
+  {
+   "nr": 30,
+   "cos": 0.733,
+   "ocena": "inna",
+   "a": {
+    "id": 6161,
+    "tytul": "Szkolenie z ochrony ludności dla samorządowców w Sierpcu",
+    "termin": null,
+    "tresc": "W Komendzie Powiatowej Państwowej Straży Pożarnej w Sierpcu rozpoczęło się szkolenie z zakresu ochrony ludności i obrony cywilnej. Uczestniczą w nim pracownicy samorządów i jednostek im podległych. Szkolenie ma przygotować urzędników do działania w sytuacjach zagrożenia. Uczestnicy poznają zasady organizacji ewakuacji, ostrzegania i alarmowania mieszkańców oraz zapewnienia ciąg"
+   },
+   "b": {
+    "id": 6181,
+    "tytul": "Warsztaty reagowania na zagrożenia dla młodzieży w Żurominie",
+    "termin": null,
+    "tresc": "Uczniowie szkół średnich poznają zasady zachowania w sytuacjach zagrożenia. Wczoraj (21 września) w Zespole Szkół Techniczno-Zawodowych im. Jana Pawła II w Żurominie rozpoczęły się warsztaty z ochrony ludności i obrony cywilnej. Młodzież poznaje zasady alarmowania i ostrzegania ludności, udzielania pierwszej pomocy oraz właściwego reagowania w sytuacjach kryzysowych. Zajęcia ma"
+   }
+  },
+  {
+   "nr": 31,
+   "cos": 0.729,
+   "ocena": "inna",
+   "a": {
+    "id": 6346,
+    "tytul": "Warsztaty o mediach dla dzieci w Żurominie",
+    "termin": null,
+    "tresc": "Powiatowo-Miejska Biblioteka Publiczna w Żurominie przygotowała cykl warsztatów dla dzieci i młodzieży. Zajęcia odbędą się w ramach programu „Kompas młodego obywatela” pod hasłem „Media pod lupą”. Uczestnicy będą uczyć się m.in. jak rozpoznawać fake newsy i dezinformację, jak opowiadać historie w mediach oraz jak radzić sobie z hejtem. Zaplanowano też warsztaty „Cyfrowy kącik” "
+   },
+   "b": {
+    "id": 6431,
+    "tytul": "Warsztaty o bezpieczeństwie dla uczniów w Żurominie",
+    "termin": null,
+    "tresc": "238 uczniów weźmie udział w warsztatach dotyczących bezpieczeństwa i reagowania w sytuacjach kryzysowych. Zajęcia dla dzieci i młodzieży już się rozpoczęły. Uczestnicy uczą się, jak zachować się podczas katastrof naturalnych, awarii infrastruktury czy długotrwałych przerw w dostawach prądu i innych mediów. Poznają również zasady alarmowania i prawidłowego wzywania pomocy. Młodz"
+   }
+  },
+  {
+   "nr": 32,
+   "cos": 0.72,
+   "ocena": "inna",
+   "a": {
+    "id": 6509,
+    "tytul": "Mieszkaniec Lidzbarka pijany prowadził ciągnik z dzieckiem",
+    "termin": null,
+    "tresc": "Miał zakaz prowadzenia pojazdów, był pijany i wiózł ciągnikiem dziecko. Mieszkaniec gminy Lidzbark odpowie przed sądem za prowadzenie ciągnika w stanie nietrzeźwości mimo sądowego zakazu prowadzenia pojazdów. Mężczyzna przewoził także 6-letnie dziecko. Policjanci zatrzymali 58-latka w rejonie Starego Dłutowa. Mężczyzna miał prawie 2 promile alkoholu w organizmie. Sprawdzenie go"
+   },
+   "b": {
+    "id": 6540,
+    "tytul": "Kierowcy zatrzymani w Działdowie i Lidzbarku za przestępstwa drogowe",
+    "termin": null,
+    "tresc": "Policjanci z Działdowa zatrzymali do kontroli drogowej kierującego, który posiada dwa zakazy prowadzenia pojazdów. Z kolei funkcjonariusze z Lidzbarka zatrzymali 22-latka kierującego Audi, który był nietrzeźwy, a do tego był osobą poszukiwaną. Obaj nieodpowiedzialni kierujący trafią przed oblicze sądu. "
+   }
+  },
+  {
+   "nr": 33,
+   "cos": 0.713,
+   "ocena": "niepewna",
+   "a": {
+    "id": 6129,
+    "tytul": "Drugi dzień turnieju na Orliku zakończony zwycięstwem drużyn",
+    "termin": null,
+    "tresc": "Dziś na Orliku odbył się drugi dzień turnieju sportowego, w którym rywalizowały dzikie drużyny. W kategorii chłopców zwyciężyła drużyna Chłopaki z Wichury, a wśród dziewczyn najlepsze okazały się dziewczyny z Pocztowej. ⚽🏆 Drugi dzień turnieju za nami!  Dzisiaj na naszym Orliku do gry wkroczyły „dzikie drużyny”! 🔥 Nie zabrakło emocji, pięknych bramek, sportowej rywalizacji i św"
+   },
+   "b": {
+    "id": 6148,
+    "tytul": "Zakończenie turnieju \"Gram na moim Orliku\" z wygraną Delfina Rybno",
+    "termin": null,
+    "tresc": "Zakończył się turniej \"Gram na moim Orliku\", w którym brały udział drużyny z różnych miejscowości. Zwyciężył Delfin Rybno, który zdobył także tytuł MVP dla Jakuba Licznerskiego. Wydarzenie było okazją do sportowej rywalizacji i integracji mieszkańców. Ostatni dzień turniejowy \" Gram na moim Orliku\" za nami⚽️🏆👏 3 dni sportu, integracji i dobrej zabawy⚽️👍 Kategoria PRO (kluby) 🏆 "
+   }
+  },
+  {
+   "nr": 34,
+   "cos": 0.711,
+   "ocena": "ta_sama",
+   "a": {
+    "id": 6293,
+    "tytul": "GSZS Delfin Rybno pokonał lidera MLKS Olimpię Kisielice 4:2",
+    "termin": null,
+    "tresc": "Trampkarze GSZS Delfin Rybno odnieśli zwycięstwo nad liderem rozgrywek - MLKS Olimpią Kisielice, pokonując ich 4:2. Bohaterem spotkania został Jakub Licznerski, który z okazji urodzin zdobył hat-trick. Mecz odbył się na stadionie w Rybnie. [ZDJĘCIA] GSZS Delfin Rybno pokonał lidera! Urodzinowy hat-trick Jakuba Licznerskiego 🎂  Bardzo dobre spotkanie rozegrali dziś trampkarze GS"
+   },
+   "b": {
+    "id": 6292,
+    "tytul": "Wygrana GSZS Delfin Rybno nad liderem 4:2 przed własną publicznością",
+    "termin": null,
+    "tresc": "Młodzi zawodnicy GSZS Delfin Rybno odnieśli zwycięstwo 4:2 nad liderem, ciesząc się radością przed własną publicznością. To zwycięstwo z pewnością na długo pozostanie w pamięci drużyny oraz lokalnych kibiców. ⚽🐬 Radość młodych zawodników GSZS Delfin Rybno po zwycięstwie 4:2 nad liderem! 💪🔥 Tak smakuje wygrana przed własną publicznością! 👏💙  Pełna treść u źródła: https://www.fac"
+   }
+  },
+  {
+   "nr": 35,
+   "cos": 0.709,
+   "ocena": "inna",
+   "a": {
+    "id": 6003,
+    "tytul": "Dekorglass Działdowo przegrywa 1:3 w Superlidze tenisistów stołowych",
+    "termin": null,
+    "tresc": "Na pierwsze zwycięstwo w Superlidze tenisistów stołowych czeka beniaminek Energa Morliny Ostródzianka Ostróda. Ostródzianie mierzyli się ostatnio u siebie z mistrzem Polski &#8211; Olimpią Grudziądz i przegrali 1:3, ale pozostawili po sobie dobre wrażenie. Potwierdzają to słowa trenera Ostródzianki &#8211; Tomasza Sposoba. Dekorglass Działdowo z kolei dziś podejmował Dojlidy Bi"
+   },
+   "b": {
+    "id": 6041,
+    "tytul": "Dekorglass Działdowo przegrywa z Dojlidami Białystok w Lotto Superlidze",
+    "termin": "2026-10-22 22:00:00",
+    "tresc": "W meczu Lotto Superligi drużyna Dekorglass Działdowo przegrała z Dojlidami Białystok, uzyskując jedynie jeden punkt. W następnej kolejce zespół rozegra mecz u siebie 23 października przeciwko KS Villa Verde Olesno. Po porażce Dekorglass zajmuje 11. miejsce w tabeli. W kolejnych grach Mateusz Sakowicz i Jiri Vrablik ponieśli porażki po 1:3 z naszym byłym zawodnikiem Samuelem Kul"
+   }
+  },
+  {
+   "nr": 36,
+   "cos": 0.707,
+   "ocena": "inna",
+   "a": {
+    "id": 6295,
+    "tytul": "Dni Otwartych Strażnic w OSP Rybno dla mieszkańców",
+    "termin": "2026-09-25 22:00:00",
+    "tresc": "W OSP Rybno w godz. 11:00–14:00 odbędą się \"Dni Otwartych Strażnic – Trening Reagowania\" dla mieszkańców. Uczestnicy dowiedzą się jak rozpoznawać sygnały alarmowe i zdobyć wiedzę na temat zabezpieczeń. 🚨🚒 TO JUŻ DZIŚ W OSP RYBNO!  Dziś, 26 września, w godz. 11:00–14:00, OSP Rybno zaprasza mieszkańców gminy Rybno na „Dni Otwartych Strażnic – Trening Reagowania”.  📍 OSP Rybno, ul"
+   },
+   "b": {
+    "id": 6321,
+    "tytul": "Trening reagowania na zagrożenia w Działdowie z udziałem strażaków",
+    "termin": null,
+    "tresc": "Jak zachować się w sytuacji zagrożenia, udzielić pierwszej pomocy i prawidłowo korzystać z czujek? Mieszkańcy powiatu działdowskiego mogli zdobyć praktyczną wiedzę podczas specjalnego Treningu Reagowania. Strażacy Państwowej i Ochotniczych Straży Pożarnych spotkali się z mieszkańcami w sześciu punktach na terenie powiatu. Jednym z nich była Komenda Powiatowa Państwowej Straży P"
+   }
+  },
+  {
+   "nr": 37,
+   "cos": 0.705,
+   "ocena": "niepewna",
+   "a": {
+    "id": 6115,
+    "tytul": "Zakończenie emocjonującego turnieju sportowego",
+    "termin": null,
+    "tresc": "Zakończył się turniej, który dostarczył uczestnikom wiele emocji i radości. Organizatorem była Nina Patalon, która zainicjowała wydarzenie i wniosła dużo energii w jego przebieg. 🏆 Ale to był TURNIEJ! 🏆  Za nami dzień pełen niesamowitych emocji, sportowej rywalizacji, uśmiechów, nagród i przede wszystkim wspaniałej zabawy! ⚽🔥👏  Ogromne podziękowania kierujemy do Niny Patalon – "
+   },
+   "b": {
+    "id": 6148,
+    "tytul": "Zakończenie turnieju \"Gram na moim Orliku\" z wygraną Delfina Rybno",
+    "termin": null,
+    "tresc": "Zakończył się turniej \"Gram na moim Orliku\", w którym brały udział drużyny z różnych miejscowości. Zwyciężył Delfin Rybno, który zdobył także tytuł MVP dla Jakuba Licznerskiego. Wydarzenie było okazją do sportowej rywalizacji i integracji mieszkańców. Ostatni dzień turniejowy \" Gram na moim Orliku\" za nami⚽️🏆👏 3 dni sportu, integracji i dobrej zabawy⚽️👍 Kategoria PRO (kluby) 🏆 "
+   }
+  },
+  {
+   "nr": 38,
+   "cos": 0.705,
+   "ocena": "inna",
+   "a": {
+    "id": 6375,
+    "tytul": "Błąkający się piesek przy Zespole Szkół w Rybnie, szuka właściciela",
+    "termin": null,
+    "tresc": "W okolicy Zespołu Szkół w Rybnie znaleziono błąkającego się pieska. Piesek został zaopiekowany, a właściciela prosimy o kontakt z dyrekcją szkoły, aby mógł wrócić do domu. 🐶 CZY KTOŚ ROZPOZNAJE TEGO PIESKA?  Od rana w okolicy Zespołu Szkół w Rybnie błąka się piesek widoczny na zdjęciu. 🐾  Psinka jest już zaopiekowana – dostała wodę i jedzenie. ❤️ Teraz najważniejsze, żeby jak n"
+   },
+   "b": {
+    "id": 6402,
+    "tytul": "Zgubiony owczarek niemiecki w Rybnie, prosimy o pomoc w odnalezieniu",
+    "termin": null,
+    "tresc": "W Rybnie uciekł owczarek niemiecki w okolicach ul. Sportowej. Właściciele proszą o pomoc w jego odnalezieniu. 🐕 UWAGA! UCIEKŁ PIES W RYBNIE!  W okolicach ul. Sportowej w Rybnie uciekł widoczny na zdjęciu pies – owczarek niemiecki.  Właściciele bardzo proszą o pomoc w jego odnalezieniu. Jeśli ktoś widział psa lub wie, gdzie obecnie może przebywać, prosimy o kontakt.  Prosimy o u"
+   }
+  },
+  {
+   "nr": 39,
+   "cos": 0.702,
+   "ocena": "inna",
+   "a": {
+    "id": 6003,
+    "tytul": "Dekorglass Działdowo przegrywa 1:3 w Superlidze tenisistów stołowych",
+    "termin": null,
+    "tresc": "Na pierwsze zwycięstwo w Superlidze tenisistów stołowych czeka beniaminek Energa Morliny Ostródzianka Ostróda. Ostródzianie mierzyli się ostatnio u siebie z mistrzem Polski &#8211; Olimpią Grudziądz i przegrali 1:3, ale pozostawili po sobie dobre wrażenie. Potwierdzają to słowa trenera Ostródzianki &#8211; Tomasza Sposoba. Dekorglass Działdowo z kolei dziś podejmował Dojlidy Bi"
+   },
+   "b": {
+    "id": 6075,
+    "tytul": "Dekorglass Działdowo przegrywa z Dojlidami Białystok w Lotto Superlidze",
+    "termin": null,
+    "tresc": "KS Dekorglass Działdowo ponownie przegrywa w Lotto Superlidze. Tym razem lepsza okazała się drużyna Dojlidy Białystok. Początek rywalizacji był obiecujący dla gospodarzy. Jiri Vrablik pokonał Piotra Chodorskiego w pełnym dystansie meczowym. Niestety była to ostatnia wygrana potyczka dla Dekorglassu. Mateusz Sakowicz uległ byłemu zawodnikowi Dekorglassu, Samuelowi Kulczyckiemu 1"
+   }
+  },
+  {
+   "nr": 40,
+   "cos": 0.702,
+   "ocena": "inna",
+   "a": {
+    "id": 5990,
+    "tytul": "KS Dekorglass Działdowo przegrał z Orliczem Suchedniów w Lotto Superlidze",
+    "termin": null,
+    "tresc": "KS Dekorglass Działdowo odniósł bolesną porażkę w 3. kolejce Lotto Superligi w starciu z Orliczem Suchedniów Dekorglass grał bez Yuhiego Sakai, który startuje w turnieju w Bułgarii. Był on kluczowym zawodnikiem w ostatniej kolejce. Jiri Vrablik, Mateusz Sakowicz i Patryk Lewandowski ulegli swoim rywalom bez wyrwania chociaż jednego seta. Warty odnotowania jest jednak występ jun"
+   },
+   "b": {
+    "id": 6003,
+    "tytul": "Dekorglass Działdowo przegrywa 1:3 w Superlidze tenisistów stołowych",
+    "termin": null,
+    "tresc": "Na pierwsze zwycięstwo w Superlidze tenisistów stołowych czeka beniaminek Energa Morliny Ostródzianka Ostróda. Ostródzianie mierzyli się ostatnio u siebie z mistrzem Polski &#8211; Olimpią Grudziądz i przegrali 1:3, ale pozostawili po sobie dobre wrażenie. Potwierdzają to słowa trenera Ostródzianki &#8211; Tomasza Sposoba. Dekorglass Działdowo z kolei dziś podejmował Dojlidy Bi"
+   }
+  }
+ ]
+}

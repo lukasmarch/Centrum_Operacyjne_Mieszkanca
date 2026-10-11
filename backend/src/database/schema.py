@@ -257,6 +257,13 @@ class Article(SQLModel, table=True):
     # („trwa do 30 września") przy każdym przebiegu, bo wpis, który nie jest
     # wydarzeniem, nie zostawia po sobie nic w `events`.
     event_checked_at: Optional[datetime] = Field(default=None)
+    # Sprawa, do której należy wpis (audyt 11.10.2026, E3c): id NAJSTARSZEGO wpisu
+    # sprawy, ustawiane przez sędziego (`services/story_judge.py`) po osadzeniu.
+    # Dwie redakcje tego samego wypadku i zapowiedź + relacja tej samej imprezy
+    # mają wspólny `story_id`; feed pokazuje je raz (`feed_policy.same_story`).
+    # Migracja `add_article_story` (FK ON DELETE SET NULL).
+    story_id: Optional[int] = Field(default=None)
+    story_checked_at: Optional[datetime] = Field(default=None)
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"

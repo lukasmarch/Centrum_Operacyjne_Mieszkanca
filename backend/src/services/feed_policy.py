@@ -1450,6 +1450,9 @@ class StoryKey:
     event_until: Optional[datetime] = None
     places: frozenset[str] = frozenset()
     embedding: Optional[tuple[float, ...]] = None
+    # Sprawa rozstrzygnięta przez sędziego (`articles.story_id`, E3c) — jeśli jest
+    # wspólna, to JEST ta sama sprawa, niezależnie od osi
+    story: Optional[int] = None
 
 
 def story_key(
@@ -1468,6 +1471,7 @@ def story_key(
             getattr(article, "content", None),
         )),
         embedding=tuple(embedding) if embedding is not None else None,
+        story=getattr(article, "story_id", None),
     )
 
 
@@ -1600,6 +1604,11 @@ def same_story(a: StoryKey, b: StoryKey) -> bool:
     dzisiejsze zachowanie nie zmieniło się tam, gdzie działa; dowód semantyczny
     dokłada się WYŁĄCZNIE do wpisów o zgodnym terminie.
     """
+    # Werdykt sędziego zapisany w bazie (E3c) — rozstrzygnięty z pełną treścią
+    # obu wpisów, po wetach osi, więc nie liczymy go drugi raz
+    if a.story is not None and a.story == b.story:
+        return True
+
     term = _term_axis(a, b)
     if term is False:
         return False

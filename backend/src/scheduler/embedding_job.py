@@ -204,6 +204,15 @@ async def run_embedding_job_async():
         articles_count = await _embed_articles(session)
         events_count = await _embed_events(session)
 
+    # Sędzia sprawy (E3c) — dopiero teraz wpisy mają osadzenia, czyli szarą strefę.
+    # Osobna sesja i własny `try`: błąd sędziego nie może cofnąć osadzeń.
+    try:
+        from src.services.story_judge import link_new_stories
+        async with async_session() as session:
+            await link_new_stories(session)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Sędzia sprawy nie przeszedł: {exc}")
+
     await engine.dispose()
 
     elapsed = (datetime.utcnow() - start).total_seconds()
