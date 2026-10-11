@@ -569,8 +569,53 @@ def run_window() -> int:
     return failures
 
 
+def run_fallback() -> int:
+    """
+    Zapas z wczoraj, gdy dziś nie ma sprawy z gminy (audyt 11.10.2026, F-012).
+
+    Odtworzenie historii tego nie pokaże: lokalne posty z FB trafiają do bazy
+    nazajutrz, a `scraped_at` jest nadpisywany przy re-scrapie (brak
+    `first_seen_at`). Stąd test na wpisach podstawionych pod produkcyjne
+    `_gather_material`: dziś 10 regionalnych, wczoraj jeden z gminy.
+    """
+    print()
+    print("=" * 78)
+    print("Zapas z wczoraj, gdy dziś nie ma sprawy z gminy")
+    print("=" * 78)
+
+    today = [
+        article(100 + i, "Bezpieczeństwo", f"Kolizja w Działdowie nr {i}", KPP, published_h=2 + i, locality=1)
+        for i in range(10)
+    ]
+    yesterday_local = article(200, "Kultura", "Festyn w Rybnie", RYBNO, published_h=20, locality=3)
+    window_start = NOW - timedelta(hours=12)
+
+    async def fake_fetch(session, start, end, now=None):
+        return list(today) + ([yesterday_local] if start < window_start else [])
+
+    failures = 0
+    for label, extend_flag, expected_local in (
+        ("reguła z 11.10: dziś bez gminy → sięga po wczoraj", True, True),
+        ("reguła sprzed 11.10: 10 wpisów wystarcza → nagłówek spoza gminy", False, False),
+    ):
+        gen = _generator({})
+        gen.EXTEND_WHEN_NO_LOCAL = extend_flag
+        gen._fetch_articles = fake_fetch
+        articles, extended = asyncio.run(gen._gather_material(
+            None, NOW, window_start, NOW, NOW, NOW, 10
+        ))
+        top = gen._select_top_article(_by_category(articles), NOW, [])
+        ok = (top is not None and gen._is_local(top)) == expected_local
+        failures += not ok
+        print(f"{'✓' if ok else '✗'} {label:.<66} {top.id if top else None} (+wczoraj: {extended})")
+
+    print("-" * 78)
+    print(f"{2 - failures}/2 zgodnych z oczekiwaniem")
+    return failures
+
+
 if __name__ == "__main__":
-    failed = run_cases() + run_window()
+    failed = run_cases() + run_window() + run_fallback()
     if "--db" in sys.argv:
         asyncio.run(run_db())
     sys.exit(1 if failed else 0)

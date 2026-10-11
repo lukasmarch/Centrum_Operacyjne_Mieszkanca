@@ -268,6 +268,11 @@ async def validate_summary(
 class SummaryGenerator:
     """Serwis do generowania dziennych podsumowań"""
 
+    # Zapas z wczoraj także wtedy, gdy dziś nie ma ani jednej sprawy z gminy
+    # (audyt 11.10.2026, F-012). Przełącznik tylko dla pomiaru przed/po
+    # w `scripts/replay_briefing_headline.py --przed`.
+    EXTEND_WHEN_NO_LOCAL = True
+
     # Atrybut KLASY, nie tylko instancji: testy wyboru nagłówka budują generator
     # przez `__new__` (bez klienta OpenAI). Od 9.10.2026 (`1f43bcd`) ścieżka
     # wyboru woła `self.logger` i `test_summary_headline --db` padał na
@@ -347,56 +352,12 @@ class SummaryGenerator:
         source_rows = (await session.execute(select(Source.id, Source.name))).all()
         self._source_names = {row.id: row.name for row in source_rows}
 
-        # 1. Pobierz artykuły z dziś (tylko przetworzone i nadające się do publikacji)
-        articles = await self._fetch_articles(session, window_start, window_end)
-
-        # Fallback: jeśli mało artykułów z dziś, rozszerz okno o wczoraj.
-        # Doba wstecz liczona od granicy LOKALNEJ, nie od klucza dnia.
-        extended = False
-        if len(articles) < MIN_ARTICLES_THRESHOLD and date_start == today_start:
-            yesterday_start, _ = local_day_bounds(now=now - timedelta(days=1))
-            self.logger.info(
-                f"Only {len(articles)} articles for today – extending window to yesterday ({yesterday_start.date()})"
-            )
-            articles = await self._fetch_articles(session, yesterday_start, window_end)
-            extended = True
-
+        articles, extended = await self._gather_material(
+            session, now, window_start, window_end, date_start, today_start, MIN_ARTICLES_THRESHOLD
+        )
         if not articles:
             self.logger.warning(f"No articles found for {date_start.date()}")
             return None
-
-        # Ostrzeżenie meteo po terminie ważności nie jest ostrzeżeniem. Post
-        # z 1.08 („dziś, w godzinach 15:00–01:00") wisiał w briefingu 2.08 o 11:30
-        # jako obowiązujący alert burzowy, a prognoza obok dawała zero opadów.
-        before_expiry = len(articles)
-        articles = [
-            article for article in articles
-            if not weather_alert.expired(
-                article.title,
-                article.content,
-                article.published_at,
-                getattr(article, "event_until", None),
-                now,
-            )
-        ]
-        if len(articles) < before_expiry:
-            self.logger.info(
-                f"Expired weather alerts dropped: {before_expiry} → {len(articles)} articles"
-            )
-
-        # Ten sam materiał z dwóch źródeł idzie do AI raz — inaczej wraca
-        # w briefingu jako dwie osobne „wiadomości"
-        before_collapse = len(articles)
-        articles = collapse_duplicates(articles, key_of=story_key)
-        if len(articles) < before_collapse:
-            self.logger.info(
-                f"Duplicates collapsed: {before_collapse} → {len(articles)} articles"
-            )
-
-        if extended:
-            self.logger.info(f"Extended window: {len(articles)} articles (today + yesterday)")
-
-        self._mark_local_articles(articles)
 
         # 2. Pogrupuj artykuły po kategoriach
         articles_by_category = {}
@@ -581,6 +542,89 @@ class SummaryGenerator:
     _source_names: dict = {}
     _local_article_ids: set = set()
 
+    async def _gather_material(
+        self,
+        session: AsyncSession,
+        now: datetime,
+        window_start: datetime,
+        window_end: datetime,
+        date_start: datetime,
+        today_start: datetime,
+        min_articles: int,
+    ) -> tuple[list, bool]:
+        """
+        Materiał briefingu: okno dnia, zapas z wczoraj, bramki, dedup, lokalność.
+
+        Wydzielone 11.10.2026 z `generate_daily_summary`, żeby dało się je
+        odtworzyć dla dowolnej chwili (`now`) bez modelu — audyt nie umiał
+        powtórzyć wyboru nagłówka wiarygodniej niż w 18–21 dniach na 31 (F-017).
+        Ustawia `self._local_article_ids` dla wyboru nagłówka. Zwraca
+        (materiał, czy sięgnięto po wczoraj).
+        """
+        MIN_ARTICLES_THRESHOLD = min_articles
+        # 1. Pobierz artykuły z dziś (tylko przetworzone i nadające się do publikacji)
+        articles = await self._fetch_articles(session, window_start, window_end, now)
+
+        # Fallback: rozszerz okno o wczoraj, gdy z dziś jest mało materiału ALBO
+        # nie ma w nim ani jednej sprawy z gminy. Doba wstecz liczona od granicy
+        # LOKALNEJ, nie od klucza dnia.
+        #
+        # Drugi warunek od 11.10.2026 (audyt, F-012): 4 na 31 nagłówków było spoza
+        # gminy (Elbląg, Działdowo, powiat), bo zapas liczył WSZYSTKIE wpisy —
+        # 9.10 było ich ponad 10, wszystkie regionalne. Lokalne wpisy dnia
+        # przychodzą strukturalnie później: Facebook pobieramy raz dziennie, więc
+        # post z popołudnia jest w bazie dopiero nazajutrz o 6:00. Wczorajsza
+        # sprawa z gminy jest lepszym nagłówkiem niż dzisiejsza z Elbląga.
+        self._mark_local_articles(articles)
+        no_local = self.EXTEND_WHEN_NO_LOCAL and not self._local_article_ids
+        extended = False
+        if (len(articles) < MIN_ARTICLES_THRESHOLD or no_local) and date_start == today_start:
+            yesterday_start, _ = local_day_bounds(now=now - timedelta(days=1))
+            self.logger.info(
+                f"{len(articles)} articles for today"
+                + (", none from the gmina" if no_local else "")
+                + f" – extending window to yesterday ({yesterday_start.date()})"
+            )
+            articles = await self._fetch_articles(session, yesterday_start, window_end, now)
+            extended = True
+
+        if not articles:
+            return [], extended
+
+        # Ostrzeżenie meteo po terminie ważności nie jest ostrzeżeniem. Post
+        # z 1.08 („dziś, w godzinach 15:00–01:00") wisiał w briefingu 2.08 o 11:30
+        # jako obowiązujący alert burzowy, a prognoza obok dawała zero opadów.
+        before_expiry = len(articles)
+        articles = [
+            article for article in articles
+            if not weather_alert.expired(
+                article.title,
+                article.content,
+                article.published_at,
+                getattr(article, "event_until", None),
+                now,
+            )
+        ]
+        if len(articles) < before_expiry:
+            self.logger.info(
+                f"Expired weather alerts dropped: {before_expiry} → {len(articles)} articles"
+            )
+
+        # Ten sam materiał z dwóch źródeł idzie do AI raz — inaczej wraca
+        # w briefingu jako dwie osobne „wiadomości"
+        before_collapse = len(articles)
+        articles = collapse_duplicates(articles, key_of=story_key)
+        if len(articles) < before_collapse:
+            self.logger.info(
+                f"Duplicates collapsed: {before_collapse} → {len(articles)} articles"
+            )
+
+        if extended:
+            self.logger.info(f"Extended window: {len(articles)} articles (today + yesterday)")
+
+        self._mark_local_articles(articles)
+        return articles, extended
+
     @staticmethod
     def _material_window(
         now: datetime,
@@ -615,6 +659,7 @@ class SummaryGenerator:
         session: AsyncSession,
         window_start: datetime,
         window_end: datetime,
+        now: Optional[datetime] = None,
     ) -> list:
         """
         Materiał do briefingu: to, co opublikowano w oknie, PLUS to, co dopiero
@@ -629,7 +674,11 @@ class SummaryGenerator:
         result = await session.execute(
             select(Article)
             .where(Article.processed == True)  # noqa: E712
-            .where(*publishable_conditions(Article))
+            .where(*publishable_conditions(Article, now=now))
+            # Wpis, którego jeszcze nie było. Na produkcji bez skutku — ale bez
+            # tego odtworzenie dnia (`replay_briefing_headline`) widziało
+            # zapowiedzi opublikowane później i wybierało je na nagłówek.
+            .where(or_(Article.published_at.is_(None), Article.published_at <= (now or window_end)))
             .where(
                 or_(
                     (Article.published_at >= window_start)

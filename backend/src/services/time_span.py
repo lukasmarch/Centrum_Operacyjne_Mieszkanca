@@ -73,6 +73,15 @@ def from_epoch(seconds: float) -> datetime:
 
 _DAY_WORDS = {-1: "wczoraj", 0: "dziś", 1: "jutro", 2: "pojutrze"}
 
+# Dzień tygodnia liczy KOD, nie model (audyt 11.10.2026, F-013): etykieta
+# „16.09” zmuszała model do kalendarza w pamięci i 6 z 17 wzmianek w briefingach
+# miało zły dzień („czwartek, 16 września” — była środa) w płatnym mailu.
+WEEKDAYS_PL = ("poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota", "niedziela")
+
+
+def _dated(local: datetime) -> str:
+    return f"{WEEKDAYS_PL[local.weekday()]} {local:%d.%m}"
+
 
 def local_now(now: Optional[datetime] = None) -> datetime:
     """Teraz w czasie lokalnym (naiwny). `now` — naiwny UTC, jak wszędzie."""
@@ -192,7 +201,8 @@ def when_label(
     all_day: bool = True,
 ) -> str:
     """
-    Rdzeń etykiety czasu: „dziś (cały dzień)", „jutro 11:00–13:00", „12.09 15:00".
+    Rdzeń etykiety czasu: „dziś (cały dzień)", „jutro 11:00–13:00",
+    „sobota 12.09 15:00" (dalej niż pojutrze — zawsze z dniem tygodnia).
 
     Sam mówi KIEDY. Co z tego wynika — „TRWA TERAZ", „JUŻ PO", „AWARIA SPRZED
     DOBY" — dokłada wołający, bo każdy kanał ma własne brzmienie i briefing
@@ -213,9 +223,9 @@ def when_label(
         # Zakres dni („od 5 do 11 października”): koniec to północ PO ostatnim
         # dniu, więc ostatni dzień = koniec minus minuta
         last_day = to_local(end) - timedelta(minutes=1)
-        return f"{local_start:%d.%m}–{last_day:%d.%m}"
+        return f"{_dated(local_start)} – {_dated(last_day)}"
     offset = (local_start.date() - to_local(now or datetime.utcnow()).date()).days
-    word = _DAY_WORDS.get(offset) or f"{local_start:%d.%m}"
+    word = _DAY_WORDS.get(offset) or _dated(local_start)
 
     if all_day and is_all_day(start, end):
         return f"{word} (cały dzień)"

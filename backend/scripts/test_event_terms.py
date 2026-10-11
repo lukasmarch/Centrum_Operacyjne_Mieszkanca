@@ -239,7 +239,7 @@ def run_dates() -> int:
     from src.services.feed_policy import time_label
     start, end = parse_date_span(DATE_CASES[-7][1], DATE_CASES[-7][2])
     label = time_label(None, start, end, datetime(2026, 10, 10, 10, 0))
-    ok = label == "ZDARZENIE 05.10–11.10 — TRWA TERAZ"
+    ok = label == "ZDARZENIE poniedziałek 05.10 – niedziela 11.10 — TRWA TERAZ"
     failures += not ok
     print(f"{'✓' if ok else '✗'} {'ROADPOL 10.10 12:00 → etykieta „TRWA TERAZ”':.<58} {label}")
     label = time_label(None, start, end, datetime(2026, 10, 12, 10, 0))
@@ -309,7 +309,7 @@ def run_timezone() -> int:
                    when_label(datetime(2026, 9, 5, 7, 0), datetime(2026, 9, 5, 12, 0), SOBOTA),
                    "dziś 09:00–14:00"))
     checks.append(("dalszy termin — data dzienna",
-                   when_label(datetime(2026, 9, 16, 6, 0), None, SOBOTA), "16.09 08:00"))
+                   when_label(datetime(2026, 9, 16, 6, 0), None, SOBOTA), "środa 16.09 08:00"))
 
     # d) zapowiedź całodniowa trwa do końca SWOJEJ doby
     checks.append(("w sobotę bieg jeszcze nie jest „po”",
