@@ -16,7 +16,55 @@ on:
       - '.github/workflows/deploy.yml'
 
 jobs:
+  # Bramka przed deployem (audyt 11.10.2026, F-031). Do tej pory push szedł na
+  # produkcję bez uruchomienia ANI JEDNEGO testu — strażnik nagłówka briefingu
+  # był zepsuty od 9.10 i nikt się o tym nie dowiedział.
+  # Tylko testy bez bazy i bez modelu: schematu produkcji nie da się zbudować
+  # z modeli (ręczne migracje, F-034), a model kosztuje. Sekrety poniżej to
+  # atrapy wymaganych pól konfiguracji — żaden test nie może dzięki nim wyjść
+  # do sieci (OpenAI odpowie 401, baza na porcie 1 odmówi połączenia).
+  # Nowy test bez bazy i modelu → dopisz go do listy.
+  tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:1/brak
+      OPENAI_API_KEY: sk-ci-atrapa
+      OPENWEATHER_API_KEY: ci-atrapa
+      JWT_SECRET: ci-atrapa-ci-atrapa-ci-atrapa-ci-atrapa
+      TZ: Europe/Warsaw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Testy bez bazy i modelu
+        run: |
+          set -u
+          failed=""
+          for t in \
+            test_access_control:--no-db \
+            test_agent_tools test_alert_policy test_bip_knowledge test_content_gate \
+            test_content_score test_council_sessions test_council_store test_council_summary \
+            test_event_dedup test_event_gate test_event_terms test_feed_dedup test_feed_window \
+            test_gmina_facts test_grounding test_legal_acts test_newsletter_tense \
+            test_provenance test_road_context test_storm_policy test_summary_context \
+            test_summary_headline test_timezone_guard
+          do
+            name="${t%%:*}"; args=""; [ "$name" != "$t" ] && args="${t#*:}"
+            echo "::group::$name $args"
+            if python -u -m "scripts.$name" $args </dev/null; then echo "OK $name"; else failed="$failed $name"; fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then echo "::error::Czerwone:$failed"; exit 1; fi
+
   deploy:
+    needs: tests
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH

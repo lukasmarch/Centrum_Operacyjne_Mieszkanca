@@ -268,6 +268,12 @@ async def validate_summary(
 class SummaryGenerator:
     """Serwis do generowania dziennych podsumowań"""
 
+    # Atrybut KLASY, nie tylko instancji: testy wyboru nagłówka budują generator
+    # przez `__new__` (bez klienta OpenAI). Od 9.10.2026 (`1f43bcd`) ścieżka
+    # wyboru woła `self.logger` i `test_summary_headline --db` padał na
+    # AttributeError — strażnik był zepsuty dwa dni bez sygnału (audyt, F-031).
+    logger = logger
+
     def __init__(self):
         import os
 

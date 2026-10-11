@@ -16,7 +16,8 @@
 ## Git Workflow (PRODUKCJA)
 ```
 main   ← aktywna gałąź, zmiany idą tu bezpośrednio
-        push → GitHub Actions → SSH deploy backend na VPS
+        push → GitHub Actions: job `tests` (24 testy bez bazy i modelu) → `deploy` (needs: tests)
+        (od 11.10: czerwony test = brak deployu; nowy test bez bazy/modelu dopisz do listy w deploy.yml)
         (od 3.09: klucz deploy na serwerze, `set -e`, HEAD musi równać się github.sha,
          zdrowie = API przez Caddy; zielony job ZNACZY wdrożone)
         

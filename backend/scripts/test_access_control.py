@@ -16,8 +16,11 @@ jednego i drugiego czerwieni test — decyzja o publiczności ma być świadoma.
 
 Bez modelu i bez wysyłek (push i Whisper podmienione). Baza lokalna: konta
 `@test-dostep.rybnolive.pl` i rozmowy z tytułem `QA-DOSTEP` są kasowane na końcu.
+`--no-db` (CI w GitHub Actions) uruchamia wyłącznie sekcje bez bazy: Whisper,
+Swagger/compose i strażnika tras — schematu produkcji nie da się dziś zbudować
+z modeli (ręczne migracje, audyt F-034), więc bazy w CI nie ma.
 
-    cd backend && python -m scripts.test_access_control
+    cd backend && python -m scripts.test_access_control [--no-db]
 """
 import asyncio
 import os
@@ -266,20 +269,25 @@ async def cleanup() -> None:
 
 
 async def main() -> int:
-    await cleanup()
+    with_db = "--no-db" not in sys.argv
+    if with_db:
+        await cleanup()
     from src.api.main import app
     transport = httpx.ASGITransport(app=app)
     try:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            await section_history(client)
-            await section_push(client)
-            await section_weather(client)
+            if with_db:
+                await section_history(client)
+                await section_push(client)
+                await section_weather(client)
             await section_voice(app)
-            await section_embedding()
+            if with_db:
+                await section_embedding()
             await section_docs(client)
             section_route_guard(app)
     finally:
-        await cleanup()
+        if with_db:
+            await cleanup()
     failed = results.count(False)
     print(f"\n{'✅' if not failed else '❌'} {len(results) - failed}/{len(results)} sprawdzeń")
     return 1 if failed else 0
