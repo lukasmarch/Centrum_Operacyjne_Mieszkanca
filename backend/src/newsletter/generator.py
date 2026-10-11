@@ -22,6 +22,9 @@ from src.services.time_span import local_day_bounds, to_local, when_label
 from src.services.feed_policy import (
     article_score,
     collapse_duplicates,
+    content_factor,
+    locality_factor,
+    source_weight,
     story_key,
     publishable_conditions,
     is_foreign_incident,
@@ -30,6 +33,59 @@ from src.services.feed_policy import (
 )
 
 logger = logging.getLogger("Newsletter")
+
+WEEKLY_WINDOW_DAYS = 7
+WEEKLY_ARTICLES = 10
+
+
+async def select_weekly_articles(
+    session: AsyncSession, now: Optional[datetime] = None, limit: int = WEEKLY_ARTICLES,
+) -> List[Article]:
+    """
+    Materiał tygodnika: te same bramki co feed i newsletter dzienny, inny ranking.
+
+    Do 11.10.2026 (audyt, F-021) tygodnik był jedyną ścieżką z własnym
+    zapytaniem: 20 najnowszych wpisów bez `publishable_conditions`, bez
+    lokalności i bez dedupu, z czego model dostawał 10 pierwszych — czyli
+    „podsumowanie tygodnia" z ostatnich 19 godzin, w tym zapychacze i wpisy
+    przed kategoryzacją. Szło do WSZYSTKICH subskrybentów.
+
+    Bramki są wspólne (`publishable_conditions`, `is_foreign_incident`,
+    `collapse_duplicates`). Ranking NIE jest `article_score`: ten ma półtrwanie
+    świeżości 18 h, więc w oknie siedmiu dni wybrałby znowu wczoraj. Tydzień
+    waży miejsce i jakość — waga źródła × ocena treści × lokalność — a przy
+    remisie wygrywa nowsza publikacja.
+    """
+    now = now or datetime.utcnow()
+    since = now - timedelta(days=WEEKLY_WINDOW_DAYS)
+    result = await session.execute(
+        select(Article, Source.name)
+        .join(Source, Article.source_id == Source.id)
+        .where(Article.published_at >= since)
+        .where(Article.published_at <= now)
+        # Wpis sprzed kategoryzacji nie ma kategorii ani lokalności — bramki
+        # i ranking widziałyby pustkę jako neutralną
+        .where(Article.processed == True)  # noqa: E712
+        .where(*publishable_conditions(Article, now=now))
+    )
+    rows = [
+        row for row in result
+        if not is_foreign_incident(
+            row[0].category, row[0].title, row[0].content,
+            row[0].locality, row[0].display_title,
+        )
+    ]
+    rows.sort(
+        key=lambda row: (
+            source_weight(row[1])
+            * content_factor(row[0].content_score)
+            * locality_factor(row[0].locality, row[1], row[0].title, row[0].content),
+            row[0].published_at,
+        ),
+        reverse=True,
+    )
+    rows = collapse_duplicates(rows, key_of=lambda row: story_key(row[0]))
+    return [article for article, _ in rows[:limit]]
 
 # Własny pomiar pogody mają tylko dwie lokalizacje (`weather_job`): Rybno i Działdowo.
 # Konto może wskazać dowolną z 24 miejscowości gminy — wtedy pogodę bierzemy z Rybna.
@@ -284,16 +340,13 @@ class NewsletterGenerator:
         """
         logger.info(f"Generating weekly newsletter for {location}")
 
-        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_ago = datetime.utcnow() - timedelta(days=WEEKLY_WINDOW_DAYS)
 
-        # Get articles
-        result = await session.execute(
-            select(Article)
-            .where(Article.published_at >= week_ago)
-            .order_by(Article.published_at.desc())
-            .limit(20)
+        articles = await select_weekly_articles(session)
+        logger.info(
+            "Weekly: skład %s",
+            [(a.id, a.locality) for a in articles],
         )
-        articles = result.scalars().all()
 
         # Get upcoming events (next 10 days)
         result = await session.execute(
@@ -446,7 +499,7 @@ class NewsletterGenerator:
 
         # Generate with AI
         prompt = WEEKLY_NEWSLETTER_PROMPT.format(
-            articles=articles_data[:10],
+            articles=articles_data,
             events=events_data,
             weather=weather_data,
             summaries=summaries_data,
