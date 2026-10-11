@@ -31,10 +31,16 @@ rybnolive.pl {
 
     encode gzip
 
+    # HSTS i Permissions-Policy od 11.10.2026 (audyt, F-030). HSTS bez
+    # `includeSubDomains`: nie każda subdomena musi stać za Caddy. Uprawnienia
+    # przeglądarki tylko te, których strona używa — mikrofon (pytanie głosem),
+    # lokalizacja i aparat (Zgłoszenia 24); resztę wyłączamy.
     header {
         X-Content-Type-Options nosniff
         X-Frame-Options DENY
         Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000"
+        Permissions-Policy "microphone=(self), geolocation=(self), camera=(self), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()"
     }
 
     # Cache-Control celuje w konkretne ścieżki, a NIE globalnie. Dwie pułapki,
@@ -96,10 +102,16 @@ api.rybnolive.pl {
         file_server
         root * /app/uploads
     }
+    # HSTS i Permissions-Policy od 11.10.2026 (audyt, F-030). HSTS bez
+    # `includeSubDomains`: nie każda subdomena musi stać za Caddy. Uprawnienia
+    # przeglądarki tylko te, których strona używa — mikrofon (pytanie głosem),
+    # lokalizacja i aparat (Zgłoszenia 24); resztę wyłączamy.
     header {
         X-Content-Type-Options nosniff
         X-Frame-Options DENY
         Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000"
+        Permissions-Policy "microphone=(self), geolocation=(self), camera=(self), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()"
     }
 
     # Log API — osobny plik, bo dopiero on pokazuje, co się dzieje PO wejściu.

@@ -9,6 +9,7 @@ Endpointy:
 - PATCH /api/reports/{id}/upvote - Głosowanie
 - PATCH /api/reports/{id}/status - Zmiana statusu (admin)
 """
+from html import escape as html_escape
 import os
 import uuid
 import shutil
@@ -27,6 +28,7 @@ from src.database.schema import Report, ReportStatus, ReportCategory
 from src.auth.dependencies import get_optional_user, get_admin_user
 from src.utils.logger import setup_logger
 from src.services.time_span import to_local
+from src.services.rate_limit import DailyLimit, client_key
 
 logger = setup_logger("ReportsAPI")
 
@@ -41,6 +43,15 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Każde zgłoszenie to Gemini + Nominatim + mail do redakcji. Do 11.10.2026
+# (audyt, F-025/F-010) anonimowy POST nie miał żadnej granicy. Mieszkaniec
+# zgłasza kilka spraw w tygodniu, nie kilkanaście dziennie — 5 z jednego
+# adresu wystarcza z zapasem; sufit chroni rachunek przy rozproszonej pętli.
+REPORT_LIMIT = DailyLimit(
+    "Zgłoszenia 24", per_key=5, total=60,
+    message="Dzienny limit zgłoszeń wyczerpany — w pilnej sprawie zadzwoń: 112",
+)
 
 
 # ==================== Geocoding Helper ====================
@@ -254,6 +265,7 @@ async def get_report(report_id: int, user=Depends(get_optional_user)):
 
 @router.post("", response_model=ReportResponse, status_code=201)
 async def create_report(
+    request: Request,
     title: str = Form(...),
     description: str = Form(...),
     author_name: Optional[str] = Form(None),
@@ -294,14 +306,28 @@ async def create_report(
                 detail="Plik jest za duży. Maksymalny rozmiar: 10MB"
             )
 
-        # Save file
+        # Zdjęcie trafia do PUBLICZNEGO `/uploads/reports/`. Prosto z telefonu
+        # niesie EXIF z GPS — współrzędne domu zgłaszającego, często dokładniejsze
+        # niż adres, który podał (audyt, F-030). `shrink` to ta sama droga, co
+        # zdjęcia pism sołtysów: poprawna orientacja, JPEG, bez metadanych.
+        # Przy okazji walidacja: plik, który nie jest obrazem, nie przejdzie.
+        from src.ai.scan_reader import shrink
+        try:
+            image_bytes, image_mime = shrink(image_bytes)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Plik nie jest prawidłowym zdjęciem")
+        ext = ".jpg"
+
+    # Po walidacji wejścia, przed pierwszym kosztem (Nominatim, Gemini, mail)
+    REPORT_LIMIT.hit(client_key(request))
+
+    if image_bytes is not None:
         filename = f"{uuid.uuid4().hex}{ext}"
         filepath = UPLOAD_DIR / filename
         with open(filepath, "wb") as f:
             f.write(image_bytes)
 
         image_url = f"/uploads/reports/{filename}"
-        image_mime = image.content_type or "image/jpeg"
         logger.info(f"Image saved: {filepath}")
 
     # Geocode for precise street-level position
@@ -445,11 +471,14 @@ async def _notify_admin_new_report(report: Report) -> None:
         pilne = category in _URGENT_CATEGORIES
         kiedy = f"{to_local(report.created_at):%H:%M}" if report.created_at else "teraz"
 
-        kontakt = " · ".join(filter(None, [
+        # Wszystko, co wpisał zgłaszający, idzie do HTML-a escapowane: formularz
+        # jest anonimowy, a mail czyta redakcja w kliencie poczty (audyt, F-010)
+        e = html_escape  # import pod inną nazwą: zmienna lokalna `html` niżej zasłania moduł
+        kontakt = e(" · ".join(filter(None, [
             report.author_name,
             report.author_email,
             report.author_phone,
-        ])) or "zgłoszenie anonimowe"
+        ])) or "zgłoszenie anonimowe")
 
         subject = (
             f"{'🔴 PILNE · ' if pilne else ''}Nowe zgłoszenie: {report.title} "
@@ -465,10 +494,10 @@ async def _notify_admin_new_report(report: Report) -> None:
           </p>
           <div style="background:#f1f5f9;padding:16px;border-radius:8px;
                       border-left:4px solid {'#dc2626' if pilne else '#1d4ed8'}">
-            <strong style="font-size:16px">{report.title}</strong><br>
-            <span style="color:#334155">{report.description or ''}</span><br>
+            <strong style="font-size:16px">{e(report.title or '')}</strong><br>
+            <span style="color:#334155">{e(report.description or '')}</span><br>
             <span style="color:#64748b;font-size:13px">
-              📍 {report.location_name or report.address or 'brak lokalizacji'}
+              📍 {e(report.location_name or report.address or 'brak lokalizacji')}
             </span>
           </div>
           <p style="font-size:13px;color:#64748b">Zgłaszający: {kontakt}</p>
@@ -602,15 +631,16 @@ async def _notify_report_author(report: Report, new_status: str) -> None:
     try:
         from src.newsletter.email_service import EmailService
         subject, body = STATUS_NOTIFICATIONS[new_status]
+        e = html_escape  # import pod inną nazwą: zmienna lokalna `html` niżej zasłania moduł
         html = f"""
         <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
           <h2 style="color:#1d4ed8">Zgłoszenia 24 · RybnoLive</h2>
-          <p>Cześć{f" {report.author_name}" if report.author_name else ""}!</p>
+          <p>Cześć{f" {e(report.author_name)}" if report.author_name else ""}!</p>
           <p><strong>{subject}</strong></p>
           <p>{body}</p>
           <p style="background:#f1f5f9;padding:12px 16px;border-radius:8px">
-            📋 <strong>{report.title}</strong><br>
-            <span style="color:#64748b;font-size:13px">{report.location_name or ""}</span>
+            📋 <strong>{e(report.title or "")}</strong><br>
+            <span style="color:#64748b;font-size:13px">{e(report.location_name or "")}</span>
           </p>
           <p><a href="https://rybnolive.pl" style="color:#1d4ed8">Zobacz na rybnolive.pl →</a></p>
           <p style="color:#94a3b8;font-size:12px">Otrzymujesz tę wiadomość, bo podałeś adres

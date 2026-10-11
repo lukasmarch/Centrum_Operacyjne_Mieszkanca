@@ -5,14 +5,11 @@ Działa na wszystkich przeglądarkach (Chrome iOS, Firefox, Safari)
 """
 import tempfile
 import os
-from collections import defaultdict
-from datetime import date
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from openai import AsyncOpenAI
 
-from src.api.endpoints.chat import _hash_ip
-from src.services.time_span import local_now
+from src.services.rate_limit import DailyLimit, client_key
 from src.utils.logger import setup_logger
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
@@ -49,36 +46,12 @@ EXTENSION_MAP = {
 
 
 # Limit kosztu Whispera (audyt 11.10.2026, F-025). Endpoint jest publiczny
-# z wyboru — mikrofon w pasku pytania działa też bez konta — ale do tej pory
-# nie miał ŻADNEJ granicy: pętla żądań po 10 MB mogła wypalić kredyty OpenAI,
-# a bez kredytów staje cała kategoryzacja (precedens 2.09).
-# Licznik w pamięci, nie w bazie: jeden worker (`--workers 1`), a restart
-# zerujący liczniki to akceptowalna cena za brak migracji. Na sztywno, bez
-# rozróżnienia zalogowanych: front wysyła nagranie bez tokenu.
-# ⚠️ Działa per osoba dopiero z `--forwarded-allow-ips` w compose — bez tego
-# każdy ma IP Caddy i pierwsze PER_IP nagrań gminy blokuje mikrofon wszystkim.
-VOICE_PER_IP_DAILY = 20
-VOICE_GLOBAL_DAILY = 300
-_voice_day: Optional[date] = None
-_voice_per_ip: dict = defaultdict(int)
-_voice_total = 0
-
-
-def _check_voice_limit(request: Request) -> None:
-    global _voice_day, _voice_total
-    today = local_now().date()
-    if _voice_day != today:
-        _voice_day = today
-        _voice_per_ip.clear()
-        _voice_total = 0
-    key = _hash_ip(request.client.host if request.client else "unknown")
-    if _voice_total >= VOICE_GLOBAL_DAILY:
-        logger.warning(f"Whisper: dzienny sufit {VOICE_GLOBAL_DAILY} wyczerpany")
-        raise HTTPException(status_code=429, detail="Dzienny limit nagrań wyczerpany — wpisz pytanie")
-    if _voice_per_ip[key] >= VOICE_PER_IP_DAILY:
-        raise HTTPException(status_code=429, detail="Dzienny limit nagrań wyczerpany — wpisz pytanie")
-    _voice_per_ip[key] += 1
-    _voice_total += 1
+# z wyboru — mikrofon w pasku pytania działa też bez konta. Front wysyła
+# nagranie bez tokenu, więc limit nie rozróżnia zalogowanych.
+VOICE_LIMIT = DailyLimit(
+    "Whisper", per_key=20, total=300,
+    message="Dzienny limit nagrań wyczerpany — wpisz pytanie",
+)
 
 
 @router.post("/transcribe")
@@ -99,7 +72,7 @@ async def transcribe_audio(request: Request, audio: UploadFile = File(...)):
         raise HTTPException(status_code=413, detail="Plik audio zbyt duży (max 10MB)")
 
     # Po walidacji: odrzucone nagranie nie kosztuje nic, więc nie zjada limitu
-    _check_voice_limit(request)
+    VOICE_LIMIT.hit(client_key(request))
 
     client = _get_client()
 

@@ -40,35 +40,18 @@ async def subscribe(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Subscribe to the newsletter.
+    Zapis na newsletter samym adresem (stopka newslettera, mail powitalny).
 
-    - Free users can only subscribe to weekly
-    - Premium users can subscribe to daily
-    - Sends confirmation email
+    Każda ścieżka kończy się TĄ SAMĄ odpowiedzią i — tam, gdzie zapis się
+    zmienia — mailem z potwierdzeniem. Do 11.10.2026 (audyt, F-027 / T-03):
+    - wypisany adres wracał na listę od razu, bez potwierdzenia, i to PRZED
+      sprawdzeniem planu (Free mógł tak wrócić na daily); `confirmed_at` zostawało,
+      więc job wysyłał do niego tygodnik — wbrew wypisowi, na żądanie kogokolwiek,
+      kto znał adres;
+    - różne odpowiedzi („już zapisany” / „wznowiono” / „sprawdź pocztę”)
+      zdradzały, czy adres jest na liście.
     """
-    # Check if already subscribed
-    result = await session.execute(
-        select(NewsletterSubscriber).where(NewsletterSubscriber.email == data.email)
-    )
-    existing = result.scalar_one_or_none()
-
-    if existing:
-        if existing.status == NewsletterStatus.ACTIVE.value:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already subscribed to newsletter"
-            )
-        else:
-            # Reactivate existing subscription
-            existing.status = NewsletterStatus.ACTIVE.value
-            existing.unsubscribed_at = None
-            existing.frequency = data.frequency
-            existing.location = data.location
-            existing.updated_at = datetime.utcnow()
-            await session.commit()
-            return MessageResponse(message="Newsletter subscription reactivated")
-
-    # Check if daily is allowed (Premium only)
+    # Plan sprawdzamy, zanim dotkniemy istniejącego wpisu
     if data.frequency == NewsletterFrequency.DAILY.value:
         if not current_user or current_user.tier not in [UserTier.PREMIUM.value, UserTier.BUSINESS.value]:
             raise HTTPException(
@@ -76,32 +59,46 @@ async def subscribe(
                 detail="Daily newsletter requires Premium subscription"
             )
 
-    # Create new subscriber
-    confirmation_token = generate_token()
-    unsubscribe_token = generate_token()
+    accepted = MessageResponse(message="Check your email to confirm subscription")
 
-    subscriber = NewsletterSubscriber(
-        email=data.email,
-        user_id=current_user.id if current_user else None,
-        frequency=data.frequency,
-        location=data.location,
-        confirmation_token=confirmation_token,
-        unsubscribe_token=unsubscribe_token
+    result = await session.execute(
+        select(NewsletterSubscriber).where(NewsletterSubscriber.email == data.email)
     )
+    existing = result.scalar_one_or_none()
 
-    session.add(subscriber)
+    if existing and existing.status == NewsletterStatus.ACTIVE.value and existing.confirmed_at:
+        # Już na liście — nic nie zmieniamy i nie wysyłamy (inaczej formularz
+        # służyłby do zasypywania cudzej skrzynki mailami)
+        return accepted
+
+    confirmation_token = generate_token()
+    if existing:
+        # Wypisany albo niepotwierdzony: wraca dopiero po kliknięciu w link.
+        # Job wysyła wyłącznie do `confirmed_at IS NOT NULL`.
+        existing.status = NewsletterStatus.ACTIVE.value
+        existing.unsubscribed_at = None
+        existing.confirmed_at = None
+        existing.confirmation_token = confirmation_token
+        existing.frequency = data.frequency
+        existing.location = data.location
+        existing.updated_at = datetime.utcnow()
+    else:
+        session.add(NewsletterSubscriber(
+            email=data.email,
+            user_id=current_user.id if current_user else None,
+            frequency=data.frequency,
+            location=data.location,
+            confirmation_token=confirmation_token,
+            unsubscribe_token=generate_token(),
+        ))
     await session.commit()
 
-    # Send confirmation email
     email_service = EmailService()
     await email_service.send_confirmation_email(
         to_email=data.email,
         confirmation_token=confirmation_token
     )
-
-    return MessageResponse(
-        message="Check your email to confirm subscription"
-    )
+    return accepted
 
 
 @router.post("/confirm", response_model=MessageResponse)

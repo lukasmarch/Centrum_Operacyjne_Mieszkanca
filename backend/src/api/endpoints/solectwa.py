@@ -19,6 +19,7 @@ Przebieg:
 AI Act art. 50: podsumowanie jest oznaczone na stronie jako przygotowane
 automatycznie i sprawdzone przez redakcję (front, `SolectwoPostPage`).
 """
+from html import escape as html_escape
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -122,19 +123,22 @@ async def _notify_admin(post: SolectwoPost) -> None:
         if not admin_email:
             logger.warning("Nowe ogłoszenie sołectwa bez dzwonka — brak ADMIN_ALERT_EMAIL")
             return
+        # Tytuł, streszczenie i dane osobowe pochodzą z odczytu zdjęcia przez model —
+        # tekst z cudzego pisma nie może stać się HTML-em w skrzynce redakcji
+        e = html_escape  # import pod inną nazwą: zmienna lokalna `html` niżej zasłania moduł
         warning = (
-            f"<p style='color:#b91c1c'>⚠️ {post.ai_error}</p>" if post.ai_error else ""
+            f"<p style='color:#b91c1c'>⚠️ {e(post.ai_error)}</p>" if post.ai_error else ""
         )
         pii = (
-            "<p>Wykryte dane osobowe: " + ", ".join(post.personal_data) + "</p>"
+            "<p>Wykryte dane osobowe: " + e(", ".join(post.personal_data)) + "</p>"
             if post.personal_data else ""
         )
         html = f"""
         <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
           <h2 style="color:#1d4ed8;margin-bottom:4px">Ogłoszenie sołectwa czeka na moderację</h2>
-          <p style="color:#64748b;font-size:13px;margin-top:0">{post.signed_as}</p>
+          <p style="color:#64748b;font-size:13px;margin-top:0">{e(post.signed_as or '')}</p>
           <div style="background:#f1f5f9;padding:16px;border-radius:8px">
-            <strong>{post.title or '(bez tytułu)'}</strong><br>{post.summary or ''}
+            <strong>{e(post.title or '(bez tytułu)')}</strong><br>{e(post.summary or '')}
           </div>
           {warning}{pii}
           <p><a href="{settings.APP_URL.rstrip('/')}/profil?zakladka=solectwa-admin">

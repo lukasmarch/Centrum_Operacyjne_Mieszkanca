@@ -126,7 +126,10 @@ class ProfileUpdateRequest(BaseModel):
     email: Optional[str] = None
     www: Optional[str] = None
     godziny: Optional[str] = None
-    logo_url: Optional[str] = None
+    # `logo_url` celowo NIE ma tu miejsca — ustawia go wyłącznie upload logo.
+    # Do 11.10.2026 (audyt, F-029) właściciel mógł wpisać dowolną ścieżkę,
+    # a następny upload kasował „stary plik” spod niej: `../../…` sięgało
+    # poza katalog logotypów, a kontener działa jako root.
 
 
 class ManualBusinessRequest(BaseModel):
@@ -1195,7 +1198,7 @@ async def update_business_profile(
         if profile.claim_status != "verified":
             raise HTTPException(status_code=403, detail="Wizytówka czeka na weryfikację")
 
-        for field in ("description", "telefon", "email", "www", "godziny", "logo_url"):
+        for field in ("description", "telefon", "email", "www", "godziny"):
             value = getattr(request, field)
             if value is not None:
                 setattr(profile, field, value.strip() or None)
@@ -1245,12 +1248,17 @@ async def upload_business_logo(
         await session.commit()
 
         # Sprzątanie starego pliku (best-effort — nie blokuje odpowiedzi)
+        # Kasujemy wyłącznie plik leżący W katalogu logotypów — wartość z bazy
+        # mogła powstać, zanim `logo_url` zniknął z edycji profilu
         if old_logo_url and old_logo_url.startswith("/uploads/business_logos/"):
-            old_filename = old_logo_url.removeprefix("/uploads/business_logos/")
-            try:
-                (LOGO_UPLOAD_DIR / old_filename).unlink(missing_ok=True)
-            except OSError:
-                pass
+            old_path = (LOGO_UPLOAD_DIR / old_logo_url.removeprefix("/uploads/business_logos/")).resolve()
+            if old_path.parent == LOGO_UPLOAD_DIR.resolve():
+                try:
+                    old_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            else:
+                logger.warning(f"Logo spoza katalogu pominięte przy sprzątaniu: {old_logo_url!r}")
 
         logger.info(f"Logo uploaded for business={business_id} by {user.email}")
         return {"status": "ok", "logo_url": profile.logo_url}

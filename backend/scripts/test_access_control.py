@@ -25,6 +25,7 @@ z modeli (ręczne migracje, audyt F-034), więc bazy w CI nie ma.
 import asyncio
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 backend_path = Path(__file__).parent.parent
@@ -35,6 +36,7 @@ os.environ["API_DOCS_ENABLED"] = "false"
 
 import httpx
 from sqlalchemy import text
+from sqlmodel import select
 
 from src.auth.jwt import create_access_token
 from src.database.connection import async_session
@@ -181,8 +183,10 @@ async def section_voice(app) -> None:
 
     class FakeClient:
         audio = type("A", (), {"transcriptions": FakeTranscriptions()})()
+    from src.api.endpoints.chat import _hash_ip
     voice._get_client = lambda: FakeClient()
-    voice._voice_day = None  # wymusza świeży dzień
+    limit = voice.VOICE_LIMIT
+    limit.reset()  # wymusza świeży dzień
 
     audio = {"audio": ("a.webm", b"\x00" * 2000, "audio/webm")}
 
@@ -191,18 +195,18 @@ async def section_voice(app) -> None:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
             return (await c.post("/api/voice/transcribe", files=audio)).status_code
 
-    codes = [await post_from("10.0.0.1") for _ in range(voice.VOICE_PER_IP_DAILY)]
-    check(f"{voice.VOICE_PER_IP_DAILY} nagrań z jednego IP przechodzi", set(codes) == {200}, set(codes))
+    codes = [await post_from("10.0.0.1") for _ in range(limit.per_key)]
+    check(f"{limit.per_key} nagrań z jednego IP przechodzi", set(codes) == {200}, set(codes))
     check("kolejne z tego IP → 429", await post_from("10.0.0.1") == 429)
     check("inne IP ma własny licznik", await post_from("10.0.0.2") == 200)
     transport = httpx.ASGITransport(app=app, client=("10.0.0.3", 5000))
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.post("/api/voice/transcribe", files={"audio": ("a.webm", b"\x00" * 10, "audio/webm")})
     check("za krótkie nagranie → 400, bez zjadania limitu",
-          r.status_code == 400 and voice._voice_per_ip[voice._hash_ip("10.0.0.3")] == 0, r.status_code)
-    voice._voice_total = voice.VOICE_GLOBAL_DAILY
+          r.status_code == 400 and limit.used(_hash_ip("10.0.0.3")) == 0, r.status_code)
+    limit._total = limit.total
     check("dzienny sufit globalny → 429", await post_from("10.0.0.4") == 429)
-    voice._voice_day = None
+    limit.reset()
 
 
 async def section_embedding() -> None:
@@ -257,6 +261,132 @@ def section_route_guard(app) -> None:
     check("lista wyjątków bez martwych wpisów", not stale, stale)
 
 
+async def section_newsletter(client: httpx.AsyncClient) -> None:
+    print("\n8️⃣  Ponowny zapis na newsletter wymaga potwierdzenia (F-027)")
+    from src.database.schema import NewsletterSubscriber
+    from src.newsletter.email_service import EmailService
+    sent: list[str] = []
+
+    async def fake_confirm(self, to_email, confirmation_token):
+        sent.append(to_email)
+        return {"status": "sent"}
+    EmailService.send_confirmation_email = fake_confirm
+
+    gone, active = f"wypisany{TEST_DOMAIN}", f"aktywny{TEST_DOMAIN}"
+    async with async_session() as session:
+        session.add(NewsletterSubscriber(
+            email=gone, frequency="weekly", status="unsubscribed", unsubscribe_token="qa-dostep-1",
+            confirmed_at=datetime.utcnow(), unsubscribed_at=datetime.utcnow()))
+        session.add(NewsletterSubscriber(
+            email=active, frequency="weekly", status="active", unsubscribe_token="qa-dostep-2",
+            confirmed_at=datetime.utcnow()))
+        await session.commit()
+
+    async def row(email):
+        async with async_session() as session:
+            return (await session.execute(
+                select(NewsletterSubscriber).where(NewsletterSubscriber.email == email))).scalar_one()
+
+    r1 = await client.post("/api/newsletter/subscribe", json={"email": gone, "frequency": "weekly"})
+    sub = await row(gone)
+    check("wypisany: confirmed_at = NULL do kliknięcia w link",
+          sub.confirmed_at is None and sub.confirmation_token, sub.confirmed_at)
+    check("wypisany: poszedł mail z potwierdzeniem", gone in sent, sent)
+    r2 = await client.post("/api/newsletter/subscribe", json={"email": active, "frequency": "weekly"})
+    check("aktywny: bez maila (formularz nie zasypie cudzej skrzynki)", active not in sent, sent)
+    r3 = await client.post("/api/newsletter/subscribe", json={"email": f"nowy{TEST_DOMAIN}", "frequency": "weekly"})
+    check("ta sama odpowiedź dla wypisanego, aktywnego i nowego (bez zgadywania listy)",
+          r1.status_code == r2.status_code == r3.status_code == 201 and r1.json() == r2.json() == r3.json(),
+          [r1.status_code, r2.status_code, r3.status_code])
+    sent.clear()
+    r = await client.post("/api/newsletter/subscribe", json={"email": gone, "frequency": "daily"})
+    check("daily bez Premium → 403, zanim ruszy istniejący wpis", r.status_code == 403 and not sent, r.status_code)
+
+
+def tiny_jpeg_with_gps() -> bytes:
+    import io
+    from PIL import Image
+    img = Image.new("RGB", (64, 48), "white")
+    exif = Image.Exif()
+    exif[0x8825] = {1: "N", 2: (53.0, 23.0, 0.0), 3: "E", 4: (19.0, 55.0, 0.0)}  # GPSInfo
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", exif=exif)
+    return buf.getvalue()
+
+
+async def section_reports(app) -> None:
+    print("\n9️⃣  Zgłoszenia 24: limit, EXIF, HTML w mailu (F-010, F-030)")
+    import io
+    from PIL import Image
+    from src.ai import report_analyzer
+    from src.api.endpoints import reports
+    from src.api.endpoints.chat import _hash_ip
+    from src.newsletter.email_service import EmailService
+
+    async def fake_analyze(**kw):
+        return {"category": "other", "summary": "qa", "severity": "low", "is_spam": False,
+                "spam_reason": None, "detected_objects": [], "condition": "", "suggested_title": ""}
+    report_analyzer.analyze_report = fake_analyze
+
+    async def fake_geocode(address, location_name=None):
+        return None, None
+    reports.geocode_address = fake_geocode
+    mails: list[str] = []
+
+    async def capture(self, to_email, subject, html_content, **kw):
+        mails.append(html_content)
+        return {"status": "sent"}
+    EmailService.send_email = capture
+    reports.REPORT_LIMIT.reset()
+    from src.config import settings
+    settings.ADMIN_ALERT_EMAIL = settings.ADMIN_ALERT_EMAIL or f"redakcja{TEST_DOMAIN}"
+
+    gps = tiny_jpeg_with_gps()
+    check("plik testowy ma GPS w EXIF", 0x8825 in Image.open(io.BytesIO(gps)).getexif())
+
+    async def post(ip, title="QA-DOSTEP zgłoszenie", with_image=False):
+        transport = httpx.ASGITransport(app=app, client=(ip, 5000))
+        files = {"image": ("x.jpg", gps, "image/jpeg")} if with_image else None
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            return await c.post("/api/reports", data={"title": title, "description": "<b>opis</b>"}, files=files)
+
+    r = await post("10.1.0.1", title="QA-DOSTEP <script>x</script>", with_image=True)
+    check("zgłoszenie ze zdjęciem przyjęte", r.status_code == 201, r.status_code)
+    url = r.json().get("image_url") if r.status_code == 201 else None
+    saved = reports.UPLOAD_DIR / url.rsplit("/", 1)[-1] if url else None
+    if saved and saved.exists():
+        check("zapisane zdjęcie BEZ GPS/EXIF", 0x8825 not in Image.open(saved).getexif())
+        saved.unlink()
+    else:
+        check("zapisane zdjęcie istnieje", False, url)
+    html_mail = mails[-1] if mails else ""
+    check("mail do redakcji: tytuł escapowany", "&lt;script&gt;" in html_mail and "<script>" not in html_mail)
+
+    for _ in range(reports.REPORT_LIMIT.per_key - 1):
+        await post("10.1.0.1")
+    r = await post("10.1.0.1")
+    check(f"{reports.REPORT_LIMIT.per_key + 1}. zgłoszenie z tego IP → 429", r.status_code == 429, r.status_code)
+    r = await post("10.1.0.2")
+    check("inne IP zgłasza dalej", r.status_code == 201, r.status_code)
+    transport = httpx.ASGITransport(app=app, client=("10.1.0.3", 5000))
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.post("/api/reports", data={"title": "QA-DOSTEP", "description": "x"},
+                         files={"image": ("x.jpg", b"to nie jest obraz", "image/jpeg")})
+    check("plik, który nie jest zdjęciem → 400 bez zjadania limitu",
+          r.status_code == 400 and reports.REPORT_LIMIT.used(_hash_ip("10.1.0.3")) == 0, r.status_code)
+    reports.REPORT_LIMIT.reset()
+
+
+def section_static() -> None:
+    print("\n🔟 Logo i Caddy — sprawdzenia bez bazy (F-029, F-026, F-030)")
+    from src.api.endpoints.business import ProfileUpdateRequest
+    check("edycja wizytówki nie przyjmuje `logo_url`", "logo_url" not in ProfileUpdateRequest.model_fields)
+    caddy = (backend_path.parent / "Caddyfile").read_text()
+    check("Caddyfile bez `trusted_proxies` (Caddy nadpisuje podrobiony X-Forwarded-For)",
+          "trusted_proxies" not in caddy)
+    check("HSTS w obu blokach header", caddy.count("Strict-Transport-Security") == 2)
+
+
 async def cleanup() -> None:
     async with async_session() as session:
         await session.execute(text(
@@ -264,6 +394,8 @@ async def cleanup() -> None:
             "(SELECT id FROM conversations WHERE title = :t)"), {"t": CONV_TITLE})
         await session.execute(text("DELETE FROM conversations WHERE title = :t"), {"t": CONV_TITLE})
         await session.execute(text("DELETE FROM document_embeddings WHERE source_type = :s"), {"s": EMB_SOURCE})
+        await session.execute(text("DELETE FROM newsletter_subscribers WHERE email LIKE :d"), {"d": f"%{TEST_DOMAIN}"})
+        await session.execute(text("DELETE FROM reports WHERE title LIKE 'QA-DOSTEP%'"))
         await session.execute(text("DELETE FROM users WHERE email LIKE :d"), {"d": f"%{TEST_DOMAIN}"})
         await session.commit()
 
@@ -285,6 +417,10 @@ async def main() -> int:
                 await section_embedding()
             await section_docs(client)
             section_route_guard(app)
+            section_static()
+            if with_db:
+                await section_newsletter(client)
+                await section_reports(app)
     finally:
         if with_db:
             await cleanup()
