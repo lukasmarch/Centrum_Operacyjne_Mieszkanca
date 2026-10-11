@@ -69,7 +69,8 @@ export const VoiceMicButton: React.FC<Props> = ({
           id={inputId}
           type="file"
           accept="audio/*,video/mp4"
-          capture="microphone"
+          // „microphone” spoza typów DOM (user/environment) — tak nagrywa iOS
+          capture={'microphone' as unknown as 'user'}
           onChange={handleFile}
           disabled={isProc}
           style={{ position: 'fixed', top: -9999, left: -9999, opacity: 0, width: 1, height: 1 }}

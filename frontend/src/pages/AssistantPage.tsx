@@ -166,7 +166,7 @@ const AssistantPage: React.FC<AssistantPageProps> = ({ initialQuery, onNavigate,
               ) : (
                 <div className={`w-full h-full bg-gradient-to-br ${activeAgent.color} flex items-center justify-center`}>
                   <div className="opacity-25">
-                    {React.cloneElement(activeAgent.icon as React.ReactElement, { size: 64 })}
+                    {React.cloneElement(activeAgent.icon as React.ReactElement<{ size?: number }>, { size: 64 })}
                   </div>
                 </div>
               )}
@@ -279,7 +279,7 @@ const AssistantPage: React.FC<AssistantPageProps> = ({ initialQuery, onNavigate,
                         />
                       ) : (
                         <div className={`w-full h-full rounded-full bg-gradient-to-br ${agent.color} flex items-center justify-center text-white`}>
-                          {React.cloneElement(agent.icon as React.ReactElement, { size: 24 })}
+                          {React.cloneElement(agent.icon as React.ReactElement<{ size?: number }>, { size: 24 })}
                         </div>
                       )}
                     </div>

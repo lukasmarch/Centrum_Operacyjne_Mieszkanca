@@ -91,6 +91,7 @@ export interface GUSVariableValue {
 export interface GUSOverviewResponse {
   variables: Record<string, GUSVariableValue>;
   user_tier: UserTier;
+  latest_year: number;
   last_refresh: string;
 }
 

@@ -21,7 +21,7 @@ interface KPICardProps {
   trend?: number; // Year-over-year change percentage
   sparklineData?: Array<{ year: number; value: number }>; // Optional 5-year trend
   icon?: LucideIcon;
-  formatType?: 'integer' | 'decimal' | 'percentage' | 'currency';
+  formatType?: 'integer' | 'decimal' | 'float' | 'percentage' | 'currency';
   level?: 'gmina' | 'powiat';
   className?: string;
 }
