@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import StaleDataNotice from './StaleDataNotice';
 import { ChevronDown, ChevronUp, MapPin, Clock, Calendar } from 'lucide-react';
 import { useEvents } from '../src/hooks/useEvents';
-import { TimedEvent, endOf, isAllDay } from '../src/utils/eventTime';
+import { TimedEvent, endOf, isAllDay, phaseOf } from '../src/utils/eventTime';
 import { Event } from '../types';
 
 /* ── Category chip / badge colors ── */
@@ -187,7 +187,16 @@ const EventCard: React.FC<{ event: TimedEvent }> = ({ event }) => {
 const VISIBLE_CHIPS = 5;
 
 const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory }) => {
-    const { events, loading, error, fetchedAt } = useEvents(100);
+    const { events: allEvents, loading, error, fetchedAt } = useEvents(100);
+    // „Nadchodzące” bez tego, co już się skończyło (audyt F-038). API oddaje
+    // wydarzenia od początku dzisiejszej doby — kafle strony głównej potrzebują
+    // porannych, żeby powiedzieć „dziś już po wszystkim”. Koniec liczy `endOf`,
+    // ta sama reguła co backend (`time_span.event_end`). `fetchedAt` w zależnościach:
+    // lista przelicza się z każdym odświeżeniem, więc 10:00 nie wisi do wieczora
+    const events = useMemo(
+        () => (allEvents ? allEvents.filter(e => phaseOf(e) !== 'past') : null),
+        [allEvents, fetchedAt],
+    );
     const [activeCategory, setActiveCategory] = useState<string>(initialCategory || 'Wszystkie');
     const [chipsExpanded, setChipsExpanded] = useState(false);
 

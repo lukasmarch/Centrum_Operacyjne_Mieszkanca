@@ -364,9 +364,16 @@ CASES: List[Tuple[str, List[SimpleNamespace], List[str], int]] = [
 # (opis, artykuł, oczekiwana etykieta) — model czyta znacznik czasu przy wpisie
 # i to on decyduje o czasie gramatycznym w briefingu
 LABEL_CASES = [
-    ("termin minął — model musi to wiedzieć",
+    # Od 11.10.2026 jedna reguła końca (`time_span.phase`, F-004): termin z godziną
+    # bez końca trwa 3 h. Półtorej godziny po starcie to „zaczęło się”, nie „już po”
+    # — model nadal nie napisze o nim w czasie przyszłym (lekcja z 26.08), a jako
+    # NAGŁÓWEK i tak odpada (`_event_is_over` — surowszy warunek tej samej fazy).
+    ("termin wystartował, koniec nieznany — model musi to wiedzieć",
      article(1, "Urząd", "Posiedzenie komisji", published_h=120, event_h=-1.5),
-     "[ZDARZENIE dziś 12:30 — JUŻ PO]"),
+     "[ZDARZENIE dziś 12:30 — ZACZĘŁO SIĘ, KONIEC NIEZNANY]"),
+    ("termin minął — model musi to wiedzieć",
+     article(1, "Urząd", "Posiedzenie komisji", published_h=120, event_h=-4),
+     "[ZDARZENIE dziś 10:00 — JUŻ PO]"),
     ("zdarzenie trwa",
      article(2, "Awaria", "Wyłączenie", ENERGA, 3, -2, 3),
      "[ZDARZENIE dziś 12:00–17:00 — TRWA TERAZ]"),

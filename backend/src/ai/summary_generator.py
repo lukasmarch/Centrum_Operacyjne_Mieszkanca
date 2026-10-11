@@ -18,6 +18,7 @@ from src.ai.prompts import DAILY_SUMMARY_PROMPT
 from src.database.schema import Article, Event, AirQuality, DailySummary, Source, Weather
 from src.services import energa, weather_alert
 from src.services.feed_policy import (
+    phase_suffix,
     collapse_duplicates,
     story_key,
     is_local_article,
@@ -39,7 +40,9 @@ from src.services.feed_policy import (
 # przy wydarzeniach z kalendarza.
 from src.services.time_span import (
     LOCAL_TZ,
+    end_is_known,
     is_all_day,
+    phase,
     local_day_bounds,
     to_local,
     when_label,
@@ -104,14 +107,14 @@ def _event_is_over(article, now: datetime) -> bool:
     start = getattr(article, "event_at", None)
     if start is None:
         return False
-
     end = getattr(article, "event_until", None)
-    if end is not None:
-        return end < now
 
-    if is_all_day(start, end):
-        return _local(now).date() > _local(start).date()
-    return start < now
+    # Faza z jednej reguły (`time_span.phase`, F-004). Surowość nagłówka to
+    # osobny, NAZWANY warunek, nie osobna reguła końca: zdarzenie z godziną,
+    # którego koniec jest domysłem, przestaje się nadawać na nagłówek
+    # w chwili startu — nie da się już na nie zdążyć.
+    p = phase(start, end, now)
+    return p == "ended" or (p == "ongoing" and not end_is_known(start, end))
 
 
 def _time_label(article, now: datetime) -> str:
@@ -128,11 +131,8 @@ def _time_label(article, now: datetime) -> str:
     if event_at:
         end = getattr(article, "event_until", None)
         when = when_label(event_at, end, now)
-        if end and event_at <= now <= end:
-            return f"[ZDARZENIE {when} — TRWA TERAZ]"
-        if _event_is_over(article, now):
-            return f"[ZDARZENIE {when} — JUŻ PO]"
-        return f"[ZDARZENIE {when}]"
+        # Ta sama faza i te same dopiski co etykieta feedu (`feed_policy.phase_suffix`)
+        return f"[ZDARZENIE {when}{phase_suffix(event_at, end, now, ended='JUŻ PO')}]"
 
     if not article.published_at:
         return "[bez daty]"

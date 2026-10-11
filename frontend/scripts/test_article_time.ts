@@ -6,6 +6,7 @@
  * lokalna północ startu → lokalna północ PO ostatnim dniu.
  */
 import { articleTimeLabel, clockLabel } from '../src/utils/articleTime.ts';
+import { phaseOf } from '../src/utils/eventTime.ts';
 
 let failed = 0;
 const check = (name: string, got: string, want: string) => {
@@ -39,6 +40,19 @@ check('całodniowy bez końca', articleTimeLabel({ eventAt: '2026-10-11T22:00:00
 // Godzinowe przez kilka dni — koniec nie jest „dziś o 16:00”
 check('kilka dni z godzinami', articleTimeLabel(
     { eventAt: '2026-10-09T06:00:00', eventUntil: '2026-10-13T14:00:00' }, at('2026-10-11T12:00:00+02:00')), 'trwa do 13 paź 16:00');
+
+// Godzina bez końca: trwa DEFAULT_DURATION_H (3 h) — ta sama reguła co kalendarz i backend (F-004)
+const noEnd = { eventAt: '2026-10-11T07:00:00', publishedAt: '2026-10-08T10:00:00' }; // 9:00 lokalnie
+check('bez końca, przed startem', articleTimeLabel(noEnd, at('2026-10-11T08:00:00+02:00')), 'dziś 9:00');
+check('bez końca, godzinę po starcie — trwa, bez zmyślonego końca',
+    articleTimeLabel(noEnd, at('2026-10-11T10:00:00+02:00')), 'trwa od 9:00');
+check('bez końca, 3 h po starcie — wiek ogłoszenia',
+    articleTimeLabel(noEnd, at('2026-10-11T12:05:00+02:00')), '3d temu');
+const calEvent = { id: '1', title: 't', date: '2026-10-11T07:00:00Z', location: '', category: '' };
+check('kalendarz: ten sam wpis godzinę po starcie trwa',
+    phaseOf(calEvent, at('2026-10-11T10:00:00+02:00')), 'ongoing');
+check('kalendarz: 3 h po starcie — po wszystkim',
+    phaseOf(calEvent, at('2026-10-11T12:05:00+02:00')), 'past');
 
 // Chwila odczytu niesie dzień, gdy nie jest dzisiejsza
 const now = at('2026-10-11T08:00:00+02:00');

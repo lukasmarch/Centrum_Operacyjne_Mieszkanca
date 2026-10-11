@@ -30,7 +30,11 @@ from src.services.alert_policy import (
     span_from_text,
 )
 from src.services.time_span import (
+    DEFAULT_EVENT_DURATION_H as _DEFAULT_EVENT_DURATION_H,
+    end_is_known,
+    event_end as _event_end_py,
     is_all_day,
+    phase,
     local_day_bounds,
     sql_is_all_day,
     sql_local_day_end,
@@ -83,7 +87,8 @@ MAX_PINNED = 3
 # (art. 5342, tego dnia o 19:00) NIE ISTNIAŁY w feedzie: ogłoszone 12.08,
 # `event_until` puste, więc żaden z trzech warunków okna ich nie przepuścił.
 # W rankingu wyszłyby drugie w całym feedzie (1,41 wobec 1,69 wyłączenia prądu).
-DEFAULT_EVENT_DURATION_H = 3
+# Wartość mieszka w `time_span` (jedna reguła końca, F-004) — tu alias dla SQL niżej
+DEFAULT_EVENT_DURATION_H = _DEFAULT_EVENT_DURATION_H
 
 DEFAULT_WEIGHT = 1.0
 
@@ -636,20 +641,11 @@ def event_end(
     event_until: Optional[datetime] = None,
 ) -> Optional[datetime]:
     """
-    Koniec zdarzenia w Pythonie — ta sama reguła, co `_event_end` w SQL, i stoi
-    tuż obok niej z tego samego powodu, co `sql_is_all_day` obok `is_all_day`:
-    rozjazd bierze się z odległości.
-
-    Deklarowany `event_until`; dla zapowiedzi całodniowej koniec jej doby
-    LOKALNEJ; dla reszty `DEFAULT_EVENT_DURATION_H`.
+    Koniec zdarzenia w Pythonie — ta sama reguła, co `_event_end` w SQL.
+    Od 11.10.2026 mieszka w `time_span.event_end` (razem z `phase`), bo
+    potrzebują jej też Strażnik i briefing, a nie tylko feed.
     """
-    if event_until is not None:
-        return event_until
-    if event_at is None:
-        return None
-    if is_all_day(event_at, event_until):
-        return local_day_bounds(day=to_local(event_at))[1]
-    return event_at + timedelta(hours=DEFAULT_EVENT_DURATION_H)
+    return _event_end_py(event_at, event_until)
 
 
 def source_window_order(article_model, now: Optional[datetime] = None):
@@ -916,6 +912,34 @@ def _local(value: datetime) -> datetime:
     return value.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ)
 
 
+def phase_suffix(
+    event_at: datetime,
+    event_until: Optional[datetime],
+    now: datetime,
+    ended: str,
+) -> str:
+    """Skutek fazy zdarzenia dopisywany do etykiety dla modelu.
+
+    Jedna reguła (`time_span.phase`) dla etykiet feedu i briefingu:
+      - trwa i znamy koniec → „TRWA TERAZ”; całodniowe dziś → bez dopisku
+        („dziś (cały dzień)” mówi już wszystko);
+      - trwa, a koniec jest domysłem → „ZACZĘŁO SIĘ, KONIEC NIEZNANY”. Do 11.10
+        zdarzenie z godziną było „już po” w minucie startu — posiedzenie o 9:00
+        o 9:05 opisywane jako zakończone;
+      - po końcu → `ended` (każde miejsce ma swoje brzmienie).
+    """
+    p = phase(event_at, event_until, now)
+    if p == "ongoing":
+        if event_until is not None:
+            return " — TRWA TERAZ"
+        if is_all_day(event_at, event_until):
+            return ""
+        return " — ZACZĘŁO SIĘ, KONIEC NIEZNANY"
+    if p == "ended":
+        return f" — {ended}"
+    return ""
+
+
 def time_label(
     published_at: Optional[datetime],
     event_at: Optional[datetime] = None,
@@ -940,16 +964,7 @@ def time_label(
 
     if event_at:
         when = when_label(event_at, event_until, now)
-        if event_until and event_at <= now <= event_until:
-            return f"ZDARZENIE {when} — TRWA TERAZ"
-        # Zapowiedź bez godziny trwa do końca SWOJEJ doby lokalnej — inaczej
-        # dożynki byłyby „zakończone" o 00:01 w dniu dożynek.
-        if is_all_day(event_at, event_until):
-            if _local(now).date() > _local(event_at).date():
-                return f"ZDARZENIE {when} — już się zakończyło"
-        elif (event_until or event_at) < now:
-            return f"ZDARZENIE {when} — już się zakończyło"
-        return f"ZDARZENIE {when}"
+        return f"ZDARZENIE {when}{phase_suffix(event_at, event_until, now, ended='już się zakończyło')}"
 
     if not published_at:
         return "bez daty"

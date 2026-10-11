@@ -13,6 +13,8 @@
  * Ta sama pułapka co w `AlertOfTheDay.parseUtc` i `useDailySummary.parseUtc`.
  */
 
+import { DEFAULT_DURATION_H } from './eventTime.ts';
+
 /** Naiwny UTC z backendu → Date. */
 export const parseUtc = (raw?: string | null): Date | null => {
     if (!raw) return null;
@@ -115,8 +117,13 @@ export function articleTimeLabel(article: ArticleTimes, now: Date = new Date()):
     // Wpis całodniowy jest aktualny do KOŃCA swojego dnia, nie od północy do
     // północy z minutą — inaczej wydarzenie „na dziś" liczy się jako minione
     // przez cały dzień, w którym się odbywa.
+    // Zdarzenie z godziną bez końca trwa `DEFAULT_DURATION_H` — ta sama reguła co
+    // kalendarz i backend (F-004). Do 11.10.2026 plakietka przechodziła na wiek
+    // ogłoszenia („1d temu”) w MINUCIE startu
     const afterEvent = start
-        ? (end ? end < now : (allDay ? dayDiff(start, now) < 0 : start < now))
+        ? (end
+            ? end < now
+            : (allDay ? dayDiff(start, now) < 0 : start.getTime() + DEFAULT_DURATION_H * 3_600_000 <= now.getTime()))
         : true;
 
     if (start && !afterEvent) {
@@ -125,6 +132,8 @@ export function articleTimeLabel(article: ArticleTimes, now: Date = new Date()):
         if (end && start <= now && now <= end && (multiDay || !allDay)) {
             return untilLabel(end, allDay, now);
         }
+        // Wystartowało, koniec nieznany — bez zmyślonej godziny końca
+        if (!end && !allDay && start <= now) return `trwa od ${hm(start)}`;
 
         // Przed startem — cały zakres, bo „5 października” gubi, że to
         // nie jednodniowe wydarzenie

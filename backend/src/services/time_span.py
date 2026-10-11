@@ -144,6 +144,54 @@ def is_multi_day(start: Optional[datetime], end: Optional[datetime]) -> bool:
     return (s.hour, s.minute) == (0, 0) and (e.hour, e.minute) == (0, 0) and (e.date() - s.date()).days >= 2
 
 
+# ── Koniec i faza zdarzenia — JEDNA reguła (audyt 11.10.2026, F-004) ────────
+#
+# Do 11.10 projekt miał pięć odpowiedzi na „kiedy to się kończy”: feed liczył
+# +3 h od startu, etykieta dla modelu i Strażnik — 0 h (zdarzenie z godziną
+# „kończyło się” w chwili startu), front kalendarza +2 h, plakietka wpisu 0 h.
+# Strażnik nie znał w ogóle wpisów całodniowych: 147 z 202 terminów z 30 dni
+# było „minionych” od 00:00 dnia, w którym się odbywały, a okno „6 h po
+# zakończeniu” usuwało je z jego materiału o 6:00 rano.
+#
+# Front ma tę samą regułę w `frontend/src/utils/eventTime.ts::endOf` — ta sama
+# stała, ten sam porządek przypadków.
+
+# Ile trwa zdarzenie z godziną, które nie podało końca. Brak deklarowanego
+# końca nie znaczy ani „wiecznie”, ani „natychmiast” (to samo mówi
+# `weather_alert.validity_or_default`).
+DEFAULT_EVENT_DURATION_H = 3
+
+
+def event_end(start: Optional[datetime], end: Optional[datetime] = None) -> Optional[datetime]:
+    """Koniec zdarzenia (naiwny UTC): podany koniec → koniec doby LOKALNEJ dla
+    wpisu całodniowego → start + `DEFAULT_EVENT_DURATION_H`."""
+    if end is not None:
+        return end
+    if start is None:
+        return None
+    if is_all_day(start, end):
+        return local_day_bounds(day=to_local(start))[1]
+    return start + timedelta(hours=DEFAULT_EVENT_DURATION_H)
+
+
+def end_is_known(start: Optional[datetime], end: Optional[datetime] = None) -> bool:
+    """Czy koniec pochodzi ze źródła (podany albo „cały dzień”), a nie z domysłu
+    `DEFAULT_EVENT_DURATION_H`. Etykieta nie może podawać zgadniętej godziny końca."""
+    return end is not None or is_all_day(start, end)
+
+
+def phase(start: Optional[datetime], end: Optional[datetime], now: datetime) -> Optional[str]:
+    """`upcoming` / `ongoing` / `ended` — albo None, gdy wpis nie ma terminu.
+
+    Całodniowe dziś = `ongoing` (dożynki trwają przez całą swoją dobę).
+    """
+    if start is None:
+        return None
+    if now < start:
+        return "upcoming"
+    return "ongoing" if now < event_end(start, end) else "ended"
+
+
 # ── To samo, ale dla zapytania ──────────────────────────────────────────────
 #
 # Baza odpowiada na te same trzy pytania co funkcje wyżej i nie umie wykonać

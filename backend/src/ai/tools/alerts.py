@@ -36,11 +36,13 @@ from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import Article, Source
 from src.services.alert_policy import incident_of
 from src.services.feed_policy import (
+    _event_end,
     article_scope,
     is_foreign_incident,
     publishable_conditions,
     time_label,
 )
+from src.services.time_span import phase
 from src.utils.logger import setup_logger
 
 logger = setup_logger("AlertTools")
@@ -72,11 +74,11 @@ def _kind(event_at: Optional[datetime], event_until: Optional[datetime],
     """
     if not event_at:
         return "zgloszone"
-    if event_until and event_at <= now <= event_until:
-        return "trwa"
-    if (event_until or event_at) < now:
-        return "minione"
-    return "zapowiedziane"
+    # Jedna reguła końca (`time_span.phase`, F-004). Do 11.10 całodniowe
+    # wyłączenie było tu „minione” od 00:00 dnia, w którym trwało
+    return {"upcoming": "zapowiedziane", "ongoing": "trwa", "ended": "minione"}[
+        phase(event_at, event_until, now)
+    ]
 
 
 async def active_alerts(ctx: ToolContext) -> ToolResult:
@@ -102,10 +104,10 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
                 & (Article.published_at >= now - timedelta(days=PUBLISHED_WINDOW_D)),
                 Article.event_at.is_not(None)
                 & (Article.event_at <= now + timedelta(hours=EVENT_LOOKAHEAD_H))
-                & (
-                    func.coalesce(Article.event_until, Article.event_at)
-                    >= now - timedelta(hours=EVENT_KEEP_AFTER_H)
-                ),
+                # Od KOŃCA zdarzenia, nie od startu: całodniowe ma start
+                # o lokalnej północy, więc `coalesce(event_until, event_at)`
+                # wyrzucało je z materiału o 6:00 rano w dniu zdarzenia (F-004)
+                & (_event_end(Article) >= now - timedelta(hours=EVENT_KEEP_AFTER_H)),
             )
         )
         # ⚠️ ORDER BY jest tu WARUNKIEM POPRAWNOŚCI, nie kosmetyką. Do 5.09.2026

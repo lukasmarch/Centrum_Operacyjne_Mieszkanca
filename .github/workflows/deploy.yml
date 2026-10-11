@@ -51,7 +51,7 @@ jobs:
             test_access_control:--no-db \
             test_agent_tools test_alert_policy test_bip_knowledge test_content_gate \
             test_content_score test_council_sessions test_council_store test_council_summary \
-            test_event_dedup test_event_gate test_event_terms test_feed_dedup test_feed_window \
+            test_event_dedup test_event_gate test_event_phase test_event_terms test_feed_dedup test_feed_window \
             test_gmina_facts test_grounding test_job_runs test_legal_acts test_newsletter_tense test_password_reset \
             test_provenance test_road_context test_source_health test_storm_policy test_summary_context \
             test_summary_headline test_timezone_guard

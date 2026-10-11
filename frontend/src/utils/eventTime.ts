@@ -10,10 +10,14 @@
  * godzinami, a `useEvents` odświeża dane co 5 minut, więc status policzony
  * na serwerze zestarzałby się w karcie.
  */
-import { Event } from '../../types';
+import type { Event } from '../../types';
 
-/** Ile trwa wydarzenie, które nie podało końca. */
-const DEFAULT_DURATION_H = 2;
+/**
+ * Ile trwa wydarzenie, które nie podało końca. TA SAMA liczba co backend
+ * (`time_span.DEFAULT_EVENT_DURATION_H`) — do 11.10.2026 front liczył 2 h,
+ * feed 3 h, a etykiety dla modelu 0 h (audyt F-004).
+ */
+export const DEFAULT_DURATION_H = 3;
 
 export type EventPhase =
     | 'past'      // już po wszystkim
