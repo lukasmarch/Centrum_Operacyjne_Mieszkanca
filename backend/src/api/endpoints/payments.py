@@ -19,7 +19,7 @@ from src.config import settings
 from src.database import get_session
 from src.database.schema import User, Subscription, UserTier, SubscriptionStatus, BusinessProfile
 from src.auth.dependencies import get_current_active_user
-from src.services.p24_service import p24_service, SUBSCRIPTION_PRICES
+from src.services.p24_service import p24_service, SUBSCRIPTION_PRICES, VerifyResult
 
 logger = logging.getLogger("PaymentsAPI")
 
@@ -67,6 +67,32 @@ class SubscriptionStatusResponse(BaseModel):
 # Helper: upgrade user tier
 # =======================
 
+async def renewal_start(
+    session: AsyncSession, user_id: int, tier: str, p24_session_id: str,
+    now: Optional[datetime] = None,
+) -> datetime:
+    """Od kiedy liczy się nowy okres: od końca opłaconego planu TEGO SAMEGO rodzaju.
+
+    Do 11.10.2026 przedłużenie liczyło się od dziś (F-023): kto kupił drugi miesiąc
+    dziesięć dni przed końcem pierwszego, tracił te dziesięć opłaconych dni.
+    Plan anulowany (`cancelled`) też się liczy — dostęp trwa do końca opłaconego
+    okresu. Zmiana rodzaju planu (Premium → Firma) startuje od dziś: to zakup
+    innej usługi, nie przedłużenie.
+    """
+    now = now or datetime.utcnow()
+    result = await session.execute(
+        select(Subscription.expires_at).where(
+            Subscription.user_id == user_id,
+            Subscription.tier == tier,
+            Subscription.status.in_([SubscriptionStatus.ACTIVE.value, SubscriptionStatus.CANCELLED.value]),
+            Subscription.p24_session_id != p24_session_id,
+            Subscription.expires_at > now,
+        )
+    )
+    ends = [row for row in result.scalars().all() if row is not None]
+    return max([now, *ends])
+
+
 async def _activate_subscription(
     session: AsyncSession,
     user: User,
@@ -91,7 +117,7 @@ async def _activate_subscription(
         existing.cancelled_at = datetime.utcnow()
         existing.updated_at = datetime.utcnow()
 
-    expires_at = datetime.utcnow() + timedelta(days=PERIOD_DAYS[period])
+    expires_at = await renewal_start(session, user.id, tier, p24_session_id) + timedelta(days=PERIOD_DAYS[period])
 
     # Rekord `pending` powstał już przy /create-transaction — aktywujemy JEGO, zamiast
     # zakładać drugi z tym samym `p24_session_id`. Pierwsza prawdziwa płatność
@@ -245,7 +271,7 @@ async def create_transaction(
     await session.commit()
 
     try:
-        result = p24_service.register_transaction(
+        result = await p24_service.register_transaction(
             session_id=session_id,
             amount=amount,
             email=user.email,
@@ -264,6 +290,14 @@ async def create_transaction(
     )
 
 
+def _plan_from_session_id(session_id: str, fallback_tier: str) -> tuple:
+    """Rodzaj i okres planu z `session_id` (format: COM-{user_id}-{tier}-{period}-{hex})."""
+    parts = session_id.split("-")
+    tier = parts[2] if len(parts) >= 4 else fallback_tier
+    period = parts[3] if len(parts) >= 5 else "monthly"
+    return tier, period
+
+
 @router.post("/webhook")
 async def p24_webhook(
     request: Request,
@@ -271,8 +305,15 @@ async def p24_webhook(
 ):
     """
     IPN Webhook od Przelewy24 (server-to-server).
-    P24 wysyła POST po potwierdzeniu/odrzuceniu płatności.
-    Endpoint musi zwrócić HTTP 200 żeby P24 uznał że IPN dotarł.
+
+    Kontrakt z P24: 200 = „doręczone, nie ponawiaj”. Każdy inny kod = P24 ponowi
+    IPN później. Stąd trzy zasady (audyt 11.10.2026, F-023):
+      - weryfikacja bez odpowiedzi (timeout, 5xx) → 503 i BEZ zmiany stanu —
+        do 11.10 kończyła się `expired` + 200, czyli opłaconym zakupem bez planu;
+      - powtórzony IPN tej samej płatności → 200 bez zmian i bez drugiego maila;
+      - dwa IPN-y naraz nie aktywują planu dwa razy: wiersz subskrypcji jest
+        blokowany (`FOR UPDATE`) na czas weryfikacji, drugi czeka i widzi
+        gotową aktywację.
     """
     try:
         body = await request.json()
@@ -281,7 +322,10 @@ async def p24_webhook(
 
     session_id = body.get("sessionId", "")
     order_id = str(body.get("orderId", ""))
-    amount = int(body.get("amount", 0))
+    try:
+        amount = int(body.get("amount", 0))
+    except (TypeError, ValueError):
+        amount = 0
     currency = body.get("currency", "PLN")
 
     logger.info(f"P24 IPN received: session_id={session_id}, order_id={order_id}, amount={amount}")
@@ -290,39 +334,61 @@ async def p24_webhook(
         logger.warning("P24 IPN: brak sessionId lub orderId")
         return {"status": "ok"}
 
-    # Znajdź pending subscription po session_id
+    # Najstarszy wiersz sesji (konta sprzed 20.08 bywają z parą) — zablokowany
+    # do końca tej transakcji, czyli do commita aktywacji
     result = await session.execute(
-        select(Subscription).where(Subscription.p24_session_id == session_id)
+        select(Subscription)
+        .where(Subscription.p24_session_id == session_id)
+        .order_by(Subscription.id)
+        .with_for_update()
     )
-    sub = result.scalar_one_or_none()
+    sub = result.scalars().first()
     if not sub:
         logger.warning(f"P24 IPN: brak subskrypcji dla session_id={session_id}")
         return {"status": "ok"}
 
-    # Pobierz usera
-    user_result = await session.execute(
-        select(User).where(User.id == sub.user_id)
-    )
-    user = user_result.scalar_one_or_none()
+    if sub.status == SubscriptionStatus.ACTIVE.value and sub.p24_order_id == order_id:
+        logger.info(f"P24 IPN: powtórka już aktywnej płatności session_id={session_id} — bez zmian")
+        await session.rollback()
+        return {"status": "ok"}
+
+    user = await session.get(User, sub.user_id)
     if not user:
         logger.error(f"P24 IPN: brak usera id={sub.user_id}")
+        await session.rollback()
         return {"status": "ok"}
 
-    # Weryfikuj transakcję z P24
-    verified = p24_service.verify_transaction(session_id, order_id, amount, currency)
-    if not verified:
-        logger.error(f"P24 IPN: weryfikacja nieudana dla session_id={session_id}")
-        sub.status = SubscriptionStatus.EXPIRED.value
-        sub.updated_at = datetime.utcnow()
-        await session.commit()
+    tier, period = _plan_from_session_id(session_id, sub.tier)
+    expected = p24_service.get_price(tier, period)
+    if period not in PERIOD_DAYS or amount != expected or currency != "PLN":
+        # Kwota z IPN nie pasuje do ceny planu — nie aktywujemy. 200, bo ponowienie
+        # tego samego IPN-a niczego nie zmieni; sprawa do ręcznego wyjaśnienia
+        logger.error(
+            f"P24 IPN: kwota {amount} {currency} ≠ cena planu {tier}/{period} ({expected}) "
+            f"session_id={session_id} — bez aktywacji"
+        )
+        await session.rollback()
         return {"status": "ok"}
 
-    # Wyciągnij tier i period z session_id (format: COM-{user_id}-{tier}-{period}-{hex})
-    parts = session_id.split("-")
-    tier = parts[2] if len(parts) >= 4 else sub.tier
-    period = parts[3] if len(parts) >= 5 else "monthly"
+    verified = await p24_service.verify_transaction(session_id, order_id, amount, currency)
 
-    # Aktywuj subskrypcję
+    if verified == VerifyResult.ERROR:
+        await session.rollback()
+        logger.error(f"P24 IPN: weryfikacja bez odpowiedzi session_id={session_id} — 503, P24 ponowi")
+        raise HTTPException(status_code=503, detail="Weryfikacja chwilowo niedostępna")
+
+    if verified == VerifyResult.REJECTED:
+        logger.error(f"P24 IPN: weryfikacja odrzucona dla session_id={session_id}")
+        # Tylko oczekująca płatność może wygasnąć — odrzucony fałszywy IPN nie może
+        # zgasić planu, który już działa
+        if sub.status == SubscriptionStatus.PENDING.value:
+            sub.status = SubscriptionStatus.EXPIRED.value
+            sub.updated_at = datetime.utcnow()
+            await session.commit()
+        else:
+            await session.rollback()
+        return {"status": "ok"}
+
     activated = await _activate_subscription(session, user, tier, period, session_id, order_id)
 
     # Potwierdzenie zawarcia umowy — regulamin §6.4 obiecuje je wprost, a pierwsza

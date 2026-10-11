@@ -5,10 +5,10 @@ Dokumentacja API: https://developers.przelewy24.pl/
 import hashlib
 import uuid
 import logging
+from enum import Enum
 from typing import Optional
 
-import requests
-from requests.auth import HTTPBasicAuth
+import httpx
 
 from src.config import settings
 
@@ -23,6 +23,19 @@ SUBSCRIPTION_PRICES = {
     "premium": {"monthly": 999, "yearly": 8400},    # 9.99 PLN | 84 PLN
     "business": {"monthly": 4900, "yearly": 49000}, # Firma lokalna: 49 PLN | 490 PLN (B2B)
 }
+
+
+class VerifyResult(str, Enum):
+    """Wynik weryfikacji płatności w P24 (audyt 11.10.2026, F-023).
+
+    Do 11.10 `verify_transaction` zwracało bool, więc timeout albo 5xx po stronie
+    P24 wyglądały jak ODMOWA: webhook oznaczał zapłaconą subskrypcję jako
+    wygasłą i odpowiadał 200 — P24 uznawał IPN za doręczony i nie ponawiał.
+    Klient płacił i nie dostawał planu. Błąd transportu to „nie wiem”, nie „nie”.
+    """
+    VERIFIED = "verified"   # P24 potwierdziło płatność
+    REJECTED = "rejected"   # P24 odpowiedziało, że transakcja nie przechodzi
+    ERROR = "error"         # brak odpowiedzi / 5xx — stan nieznany, P24 ma ponowić IPN
 
 
 class P24Service:
@@ -40,9 +53,9 @@ class P24Service:
         """Czy komplet kluczy z panelu P24 jest w środowisku (bez nich nie da się zarejestrować transakcji)"""
         return bool(self.merchant_id and self.crc_key and self.api_key)
 
-    def _auth(self) -> HTTPBasicAuth:
+    def _auth(self) -> httpx.BasicAuth:
         """Basic Auth: pos_id jako login, api_key jako hasło"""
-        return HTTPBasicAuth(str(self.pos_id), self.api_key)
+        return httpx.BasicAuth(str(self.pos_id), self.api_key)
 
     def _sign_transaction(self, session_id: str, amount: int, currency: str = "PLN") -> str:
         """Generuje podpis SHA384 dla transakcji P24"""
@@ -64,7 +77,7 @@ class P24Service:
         prices = SUBSCRIPTION_PRICES.get(tier, {})
         return prices.get(period, 0)
 
-    def register_transaction(
+    async def register_transaction(
         self,
         session_id: str,
         amount: int,
@@ -106,16 +119,18 @@ class P24Service:
         if client_name:
             payload["client"] = client_name[:50]
 
+        # Asynchronicznie: synchroniczne `requests` w trasie async blokowało CAŁY
+        # backend (jeden worker) na czas odpowiedzi P24 — do 15 s (F-023)
         try:
-            resp = requests.post(
-                f"{self.base_url}/api/v1/transaction/register",
-                json=payload,
-                auth=self._auth(),
-                timeout=15,
-            )
-            # Przy 4xx P24 opisuje przyczynę w treści odpowiedzi — bez niej zostaje
-            # samo "400 Bad Request" i nie wiadomo, które pole jest wadliwe
-            if not resp.ok:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    f"{self.base_url}/api/v1/transaction/register",
+                    json=payload,
+                    auth=self._auth(),
+                )
+            if not resp.is_success:
+                # Przy 4xx P24 opisuje przyczynę w treści odpowiedzi — bez niej zostaje
+                # samo "400 Bad Request" i nie wiadomo, które pole jest wadliwe
                 logger.error(f"P24 register HTTP {resp.status_code}: {resp.text[:500]}")
                 raise RuntimeError(f"Przelewy24 odrzuciło zamówienie (HTTP {resp.status_code}): {resp.text[:200]}")
 
@@ -133,19 +148,17 @@ class P24Service:
                 "redirect_url": redirect_url,
                 "session_id": session_id,
             }
-        except requests.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error(f"P24 register request failed: {e}")
             raise RuntimeError(f"Błąd połączenia z Przelewy24: {e}")
 
-    def verify_transaction(self, session_id: str, order_id: str, amount: int, currency: str = "PLN") -> bool:
-        """
-        Weryfikuje transakcję po otrzymaniu IPN od P24.
-
-        Returns:
-            True jeśli transakcja zweryfikowana poprawnie
-        """
+    async def verify_transaction(
+        self, session_id: str, order_id: str, amount: int, currency: str = "PLN"
+    ) -> VerifyResult:
+        """Weryfikuje transakcję po otrzymaniu IPN od P24. Trzy stany — patrz `VerifyResult`."""
         if not self.is_configured():
-            raise RuntimeError("Przelewy24 nie jest skonfigurowane")
+            logger.error("P24 verify: brak kluczy — stan nieznany")
+            return VerifyResult.ERROR
 
         sign = self._sign_verify(session_id, order_id, amount, currency)
 
@@ -160,39 +173,51 @@ class P24Service:
         }
 
         try:
-            resp = requests.put(
-                f"{self.base_url}/api/v1/transaction/verify",
-                json=payload,
-                auth=self._auth(),
-                timeout=15,
-            )
-            resp.raise_for_status()
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.put(
+                    f"{self.base_url}/api/v1/transaction/verify",
+                    json=payload,
+                    auth=self._auth(),
+                )
+        except httpx.HTTPError as e:
+            logger.error(f"P24 verify: brak odpowiedzi ({type(e).__name__}: {e})")
+            return VerifyResult.ERROR
+
+        # 5xx i 429 = P24 nie rozstrzygnęło; 4xx = rozstrzygnęło, że nie
+        if resp.status_code >= 500 or resp.status_code == 429:
+            logger.error(f"P24 verify HTTP {resp.status_code}: {resp.text[:300]}")
+            return VerifyResult.ERROR
+        if resp.status_code >= 400:
+            logger.error(f"P24 verify odrzucone HTTP {resp.status_code}: {resp.text[:300]}")
+            return VerifyResult.REJECTED
+
+        try:
             data = resp.json()
+        except ValueError:
+            logger.error(f"P24 verify: odpowiedź nie jest JSON-em: {resp.text[:300]}")
+            return VerifyResult.ERROR
 
-            if data.get("error"):
-                logger.error(f"P24 verify error: {data}")
-                return False
+        if data.get("error"):
+            logger.error(f"P24 verify error: {data}")
+            return VerifyResult.REJECTED
+        if data.get("data", {}).get("status", "") == "success":
+            return VerifyResult.VERIFIED
+        logger.error(f"P24 verify: nieoczekiwana odpowiedź {data}")
+        return VerifyResult.REJECTED
 
-            status = data.get("data", {}).get("status", "")
-            return status == "success"
-        except requests.RequestException as e:
-            logger.error(f"P24 verify request failed: {e}")
-            return False
-
-    def get_transaction_status(self, session_id: str) -> Optional[dict]:
+    async def get_transaction_status(self, session_id: str) -> Optional[dict]:
         """Sprawdza status transakcji po session_id"""
         if not self.is_configured():
             return None
         try:
-            resp = requests.get(
-                f"{self.base_url}/api/v1/transaction/{session_id}",
-                auth=self._auth(),
-                timeout=10,
-            )
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"{self.base_url}/api/v1/transaction/by/sessionId/{session_id}",
+                    auth=self._auth(),
+                )
             resp.raise_for_status()
-            data = resp.json()
-            return data.get("data")
-        except requests.RequestException as e:
+            return resp.json().get("data")
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"P24 status request failed: {e}")
             return None
 
