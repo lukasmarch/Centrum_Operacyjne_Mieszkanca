@@ -11,6 +11,7 @@ do CI (CI nie ma bazy) — uruchamia się go przed każdą zmianą płatności.
   3. powtórzony IPN: 200, bez zmian, bez drugiego maila,
   4. dwa IPN-y naraz: jedna aktywacja, jeden mail,
   5. P24 bez odpowiedzi → 503 i pending (P24 ponowi), potem sukces → active.
+  6. plan roczny: kwota roczna, okres 366 dni; kwota miesięczna na sesji rocznej odrzucona,
   +  kwota inna niż cena planu → bez aktywacji; odrzucony IPN nie gasi działającego planu.
 
 Konto testowe ma WŁASNĄ domenę i jest kasowane na końcu (także po błędzie).
@@ -199,6 +200,22 @@ async def scenario_timeout(user_id: int) -> None:
     check("ponowiony IPN aktywuje", r.status_code == 200 and sub.status == "active", (r.status_code, sub.status))
 
 
+async def scenario_yearly(user_id: int) -> None:
+    print("\n6️⃣  Plan roczny")
+    mails.clear()
+    yearly = SUBSCRIPTION_PRICES["premium"]["yearly"]
+    sid = await pending(user_id, period="yearly")
+    r = await ipn(sid, "1101", amount=PRICE)
+    [sub] = await subs_of(sid)
+    check("kwota MIESIĘCZNA na sesji rocznej → bez aktywacji", sub.status == "pending", sub.status)
+    r = await ipn(sid, "1101", amount=yearly)
+    [sub] = await subs_of(sid)
+    check("kwota roczna aktywuje", r.status_code == 200 and sub.status == "active", (r.status_code, sub.status))
+    days = (sub.expires_at - datetime.utcnow()).days
+    check("okres 366 dni", days in (365, 366), days)
+    check("mail potwierdzenia", mails == [sid], mails)
+
+
 async def scenario_guards(user_id: int) -> None:
     print("\n➕ Bezpieczniki")
     sid = await pending(user_id)
@@ -232,6 +249,8 @@ async def main() -> int:
         await scenario_parallel(user_id)
         await scenario_timeout(user_id)
         await scenario_guards(user_id)
+        # osobne konto: roczny bez wcześniejszego planu, żeby okres liczył się od dziś
+        await scenario_yearly(await make_user())
     finally:
         await cleanup()
     passed = sum(results)
