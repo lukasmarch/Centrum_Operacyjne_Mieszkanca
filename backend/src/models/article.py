@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, field_validator
+
+from src.utils.text_clean import clean_feed_text
 
 class ArticleInput(BaseModel):
     source_id: int
@@ -44,6 +46,13 @@ class ArticleOutput(BaseModel):
     # z wczorajszą datą (Apify raz dziennie), więc sekcję „Dzisiaj" otwierały
     # zawsze trzy RSS-y z powiatu, choć ranking miał je na 5., 11. i 15. miejscu.
     scope: str = "region"
+
+    # Encje HTML i stopka WordPressa wycinane przy WYDAWANIU — wpisy pobrane przed
+    # 11.10.2026 wyglądają poprawnie bez przepisywania bazy (F-040)
+    @field_validator("title", "display_title", "summary")
+    @classmethod
+    def _clean_text(cls, value):
+        return clean_feed_text(value)
 
     class Config:
         from_attributes = True

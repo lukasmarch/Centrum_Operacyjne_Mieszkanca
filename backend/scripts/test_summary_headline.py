@@ -621,8 +621,82 @@ def run_fallback() -> int:
     return failures
 
 
+def run_story_repeat() -> int:
+    """F-014: powtórka nagłówka = ta sama SPRAWA, nie te same słowa tytułu.
+
+    15 i 16.09.2026 dwa briefingi z rzędu otworzyło to samo zebranie wiejskie
+    (5502, 5856) — tytuły ze źródła miały za mało wspólnych słów dla sygnatury.
+    Para syntetyczna: ten sam termin, ta sama wieś, osadzenia bliskie (0,95),
+    słowa tytułów różne. Para kontrolna: inne zebranie w innej wsi.
+    """
+    from src.ai.summary_generator import RecentHeadline
+    from src.services.feed_policy import story_key, topic_signature
+
+    print("\n" + "=" * 78 + "\nPowtórka nagłówka: ta sama sprawa, inne słowa (F-014)\n" + "=" * 78)
+    gen = SummaryGenerator.__new__(SummaryGenerator)
+    base = [1.0] + [0.0] * 9
+    near = [0.95, 0.31] + [0.0] * 8
+    far = [0.0, 1.0] + [0.0] * 8
+    yesterday = article(1, "Społeczność", "Zebranie wiejskie w Rybnie 17 września w sprawie funduszu",
+                        event_h=30, content="Sołtys zaprasza na zebranie wiejskie w Rybnie.")
+    today = article(2, "Społeczność", "Mieszkańcy zdecydują o pieniądzach sołectwa — spotkanie",
+                    event_h=30, content="Spotkanie mieszkańców Rybna w świetlicy.")
+    other = article(3, "Społeczność", "Mieszkańcy zdecydują o pieniądzach sołectwa — spotkanie",
+                    event_h=30, content="Spotkanie mieszkańców Żabin w świetlicy.")
+    recent = [RecentHeadline(signature=topic_signature(yesterday.title), article_id=1,
+                             key=story_key(yesterday, base))]
+    gen._candidate_embeddings = {2: near, 3: far}
+    cases = [
+        ("sygnatura tytułu sama tego NIE widzi", not any(
+            __import__("src.services.feed_policy", fromlist=["same_topic"]).same_topic(
+                topic_signature(today.title), r.signature) for r in recent), True),
+        ("ta sama sprawa innymi słowami → powtórka", gen._repeats_recent_headline(today, recent), True),
+        ("inne zebranie w innej wsi → nie powtórka", gen._repeats_recent_headline(other, recent), False),
+        ("dawna pamięć (same sygnatury) działa jak wcześniej",
+         gen._repeats_recent_headline(yesterday, [topic_signature(yesterday.title)]), True),
+    ]
+    failed = 0
+    for label, got, want in cases:
+        ok = got == want
+        failed += 0 if ok else 1
+        print(f"{'✓' if ok else '✗'} {label}{'.' * max(1, 60 - len(label))} {got}")
+    print("-" * 78 + f"\n{len(cases) - failed}/{len(cases)} zgodnych z oczekiwaniem")
+    return failed
+
+
+async def run_story_repeat_db() -> None:
+    """Prawdziwe pary z audytu na lokalnej bazie (dane do 10.10.2026)."""
+    from sqlalchemy import select as sa_select
+    from src.ai.summary_generator import RecentHeadline
+    from src.database.connection import async_session
+    from src.database.schema import Article
+    from src.services.feed_policy import fetch_article_embeddings, story_key, topic_signature
+
+    print("\nPrawdziwe powtórki z audytu (F-014):")
+    async with async_session() as session:
+        for prev_id, cand_id, label in ((5502, 5856, "zebranie wiejskie 17.09"), (5707, 5745, "mammografia 20.09")):
+            rows = {a.id: a for a in (await session.execute(
+                sa_select(Article).where(Article.id.in_([prev_id, cand_id])))).scalars()}
+            if len(rows) < 2:
+                print(f"  – {label}: brak wpisów w tej bazie")
+                continue
+            emb = await fetch_article_embeddings(session, [prev_id, cand_id])
+            gen = SummaryGenerator.__new__(SummaryGenerator)
+            gen._candidate_embeddings = emb
+            prev = rows[prev_id]
+            recent = [RecentHeadline(signature=topic_signature(prev.title), article_id=prev_id,
+                                     key=story_key(prev, emb.get(prev_id)))]
+            hit = gen._repeats_recent_headline(rows[cand_id], recent)
+            print(f"  {'✓' if hit else '✗'} {label}: {cand_id} po {prev_id} → powtórka={hit}")
+
+
 if __name__ == "__main__":
-    failed = run_cases() + run_window() + run_fallback()
+    failed = run_cases() + run_window() + run_fallback() + run_story_repeat()
     if "--db" in sys.argv:
-        asyncio.run(run_db())
+        async def _db() -> None:
+            # Jedna pętla: pula połączeń `async_session` jest przywiązana do pętli,
+            # w której powstała — drugie `asyncio.run` zastałoby ją martwą
+            await run_db()
+            await run_story_repeat_db()
+        asyncio.run(_db())
     sys.exit(1 if failed else 0)

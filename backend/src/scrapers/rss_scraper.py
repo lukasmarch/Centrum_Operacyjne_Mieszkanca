@@ -3,6 +3,7 @@ RSS Feed Scraper - Uniwersalny scraper dla kanałów RSS
 
 Obsługuje standardowe formaty RSS 2.0 i Atom.
 """
+from src.utils.text_clean import clean_feed_text
 import feedparser
 from datetime import datetime
 from typing import List, Dict, Optional
@@ -163,7 +164,8 @@ class RSSFeedScraper(BaseScraper):
         """
         try:
             # Wymagane pola
-            title = entry.get('title', '').strip()
+            # Encje HTML i stopka WordPressa — patrz `utils/text_clean` (F-040)
+            title = clean_feed_text(entry.get('title', '').strip()) or ''
             link = entry.get('link', '').strip()
 
             if not title or not link:
@@ -209,7 +211,7 @@ class RSSFeedScraper(BaseScraper):
         # Usuń HTML tags (feedparser czasem zostawia)
         if summary:
             import re
-            summary = re.sub(r'<[^>]+>', '', summary).strip()
+            summary = clean_feed_text(re.sub(r'<[^>]+>', '', summary).strip())
             # Ogranicz długość
             if len(summary) > 1000:
                 summary = summary[:997] + '...'

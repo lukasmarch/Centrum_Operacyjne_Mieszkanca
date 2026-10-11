@@ -33,6 +33,9 @@ from src.services.feed_policy import (
     strip_cta_tail,
     strip_foreign_cta,
     topic_signature,
+    fetch_article_embeddings,
+    same_story,
+    story_key,
 )
 # Baza trzyma naiwny UTC, mieszkaniec myśli czasem lokalnym. Konwersja,
 # pojęcie doby i etykieta „kiedy" mieszkają w JEDNYM miejscu — briefing był
@@ -78,6 +81,14 @@ def _article_title(article) -> str:
     przepisanym z posta co do znaku razem z lupą i wykrzyknikiem.
     """
     return strip_cta_tail(article.display_title or article.title or "")
+
+
+@dataclass
+class RecentHeadline:
+    """Wczorajszy (i wcześniejszy) nagłówek: sygnatura tytułu + klucz sprawy."""
+    signature: frozenset
+    article_id: Optional[int] = None
+    key: Optional[object] = None  # feed_policy.StoryKey, gdy wpis jeszcze istnieje
 
 
 def _article_body(article) -> str:
@@ -411,6 +422,10 @@ class SummaryGenerator:
             )
 
         # 5. Przygotuj dane wejściowe dla AI
+        # Osadzenia kandydatów — dowód semantyczny reguły powtórki (`same_story`)
+        self._candidate_embeddings = await fetch_article_embeddings(
+            session, [a.id for group in articles_by_category.values() for a in group]
+        )
         recent_topics = await self._recent_headline_topics(session, date_start)
         top_article = self._select_top_article(
             articles_by_category, now, recent_topics
@@ -744,22 +759,52 @@ class SummaryGenerator:
             .order_by(DailySummary.date.desc())
         )
         topics = []
+        cited_ids = {}
         for previous in result.scalars().all():
             cited = (previous.content or {}).get("cited_articles")
             if not cited:
                 continue
             signature = topic_signature(cited[0].get("title"))
-            if signature:
-                topics.append(signature)
+            topics.append(RecentHeadline(signature=signature, article_id=cited[0].get("id")))
+            if cited[0].get("id"):
+                cited_ids[cited[0]["id"]] = None
+
+        # Klucz SPRAWY wczorajszego nagłówka (audyt 11.10.2026, F-014): sygnatura
+        # tytułu nie widziała, że „Zebranie wiejskie w Rybnie 17 września…”
+        # i „Zebranie wiejskie w Rybnie dotyczące Funduszu Sołeckiego” to jedno
+        # zebranie (15 i 16.09 otworzyły dwa briefingi z rzędu; tak samo
+        # mammografia 18 i 19.09). Ta sama reguła co feed: `same_story`.
+        if cited_ids:
+            rows = await session.execute(select(Article).where(Article.id.in_(list(cited_ids))))
+            articles = {a.id: a for a in rows.scalars().all()}
+            embeddings = await fetch_article_embeddings(session, list(articles))
+            for topic in topics:
+                article = articles.get(topic.article_id)
+                if article is not None:
+                    topic.key = story_key(article, embeddings.get(article.id))
         return topics
 
-    @staticmethod
-    def _repeats_recent_headline(article, recent_topics) -> bool:
-        """Czy wpis mówi o tym samym, co któryś z ostatnich nagłówków."""
+    def _repeats_recent_headline(self, article, recent_topics) -> bool:
+        """Czy wpis mówi o tej samej SPRAWIE, co któryś z ostatnich nagłówków.
+
+        Dwa dowody: dawna sygnatura tytułu (odświeżenia Energi pod nowymi ID)
+        i pełna reguła feedu `same_story` — termin, miejsce, tekst, semantyka.
+        """
         if not recent_topics:
             return False
         signature = topic_signature(article.title)
-        return any(same_topic(signature, seen) for seen in recent_topics)
+        key = None
+        for seen in recent_topics:
+            seen_signature = seen.signature if isinstance(seen, RecentHeadline) else seen
+            if same_topic(signature, seen_signature):
+                return True
+            if isinstance(seen, RecentHeadline) and seen.key is not None:
+                if key is None:
+                    embeddings = getattr(self, "_candidate_embeddings", None) or {}
+                    key = story_key(article, embeddings.get(article.id))
+                if same_story(key, seen.key):
+                    return True
+        return False
 
     def _mark_local_articles(self, articles: list) -> None:
         """
