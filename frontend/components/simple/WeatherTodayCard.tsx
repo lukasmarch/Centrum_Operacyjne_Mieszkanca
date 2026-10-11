@@ -4,6 +4,7 @@ import {
     CloudRain, CloudSnow, CloudSun, Moon, Sun, LucideIcon,
 } from 'lucide-react';
 import type { WeatherFull } from '../../src/hooks/useWeather';
+import { clockLabel, parseUtc } from '../../src/utils/articleTime';
 
 /**
  * Pogoda w sekcji „Na dziś" — kafel, nie podpis.
@@ -54,20 +55,39 @@ function conditionLook(main: string | undefined, icon: string | undefined): Cond
     }
 }
 
+/**
+ * Wygląd, zanim przyjdą dane. Do 11.10.2026 brak danych wpadał w gałąź
+ * `default` i kafel pokazywał „słonecznie” ze słońcem — także w deszczu,
+ * przy wolnym łączu albo awarii API (audyt V11). Pustka nie jest pogodą.
+ */
+const NO_DATA_LOOK: ConditionLook = { Icon: Cloud, glow: '#64748b', label: '' };
+
+/** Pomiar starszy niż tyle — kafel mówi, z której godziny jest (job chodzi co godzinę) */
+const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
+
 const WIND_DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
 interface WeatherTodayCardProps {
     weather: WeatherFull | null;
+    /** Pierwsze ładowanie — „Ładuję…” zamiast pustego kafla */
+    loading?: boolean;
     /** Jakość powietrza słowem — liczby i jednostki dopiero na stronie pogody */
     airLabel: string | null;
     onClick: () => void;
 }
 
-const WeatherTodayCard: React.FC<WeatherTodayCardProps> = ({ weather, airLabel, onClick }) => {
+const WeatherTodayCard: React.FC<WeatherTodayCardProps> = ({ weather, loading = false, airLabel, onClick }) => {
     const look = useMemo(
-        () => conditionLook(weather?.main, weather?.icon),
-        [weather?.main, weather?.icon],
+        () => (weather ? conditionLook(weather.main, weather.icon) : NO_DATA_LOOK),
+        [weather],
     );
+
+    // Godzina pomiaru tylko wtedy, gdy jest stary — świeży nie potrzebuje podpisu
+    const staleAt = useMemo(() => {
+        const at = parseUtc(weather?.fetched_at);
+        if (!at || Date.now() - at.getTime() < STALE_AFTER_MS) return null;
+        return clockLabel(at);
+    }, [weather?.fetched_at]);
 
     // Wiatr i odczuwalna: dwie liczby, które zmieniają decyzję „w czym wyjść".
     // Kierunek wiatru tylko wtedy, gdy backend go zna — „9 km/h undefined"
@@ -82,7 +102,9 @@ const WeatherTodayCard: React.FC<WeatherTodayCardProps> = ({ weather, airLabel, 
         return parts.join(' · ');
     }, [weather]);
 
-    const description = weather?.description ?? look.label;
+    const description = weather
+        ? weather.description || look.label
+        : loading ? 'Ładuję…' : 'brak danych';
     const { Icon } = look;
 
     return (
@@ -144,7 +166,8 @@ const WeatherTodayCard: React.FC<WeatherTodayCardProps> = ({ weather, airLabel, 
 
                 <span className="mt-1 block text-[13px] leading-snug text-neutral-400 lg:text-xs">
                     {details ?? 'Prognoza i jakość powietrza dla gminy'}
-                    {details && airLabel && <span className="text-neutral-500"> · {airLabel}</span>}
+                    {details && airLabel && <span className="text-neutral-400"> · {airLabel}</span>}
+                    {staleAt && <span className="block text-amber-300/90">pomiar z {staleAt}</span>}
                 </span>
             </span>
 

@@ -46,10 +46,30 @@ self.addEventListener('push', (event: PushEvent) => {
 
 // ==================== Notification Click ====================
 
+/**
+ * Adres z powiadomienia — WYŁĄCZNIE w obrębie naszej strony.
+ *
+ * Treść pusha przychodzi z backendu, a do 11.10.2026 klient planu „Firma”
+ * mógł rozesłać dowolny push do wszystkich (audyt F-024). Gdyby taka droga
+ * się otworzyła ponownie, kliknięcie w powiadomienie z logo RybnoLive nie
+ * może prowadzić na obcą stronę (phishing pod naszą marką). Adres spoza
+ * originu — i każdy nieparsowalny — zamienia się w stronę główną.
+ */
+function sameOriginUrl(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw) return '/';
+  try {
+    const target = new URL(raw, self.location.origin);
+    return target.origin === self.location.origin ? target.href : '/';
+  } catch {
+    return '/';
+  }
+}
+
+
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close();
 
-  const url = event.notification.data?.url || '/';
+  const url = sameOriginUrl(event.notification.data?.url);
 
   event.waitUntil(
     self.clients

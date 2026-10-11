@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import StaleDataNotice from './StaleDataNotice';
 import { ChevronDown, ChevronUp, AlertTriangle, Megaphone, ExternalLink, MapPin, Globe, Map as MapIcon } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
 import ArticleImage, { getCategoryTheme } from './ArticleImage';
@@ -24,7 +25,7 @@ type ScopeGroup = typeof SCOPE_GROUPS[number];
 const SCOPE_GROUP_LABELS: Record<ScopeGroup, { label: string; icon: React.ReactNode }> = {
   gmina: { label: 'Gmina Rybno', icon: <MapPin size={12} className="text-blue-400" /> },
   okolice: { label: 'Powiat i sąsiedzi', icon: <MapIcon size={12} className="text-neutral-500" /> },
-  region: { label: 'Dalej w regionie', icon: <Globe size={12} className="text-neutral-600" /> },
+  region: { label: 'Dalej w regionie', icon: <Globe size={12} className="text-neutral-400" /> },
 };
 
 const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
@@ -45,13 +46,13 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
         />
         {/* Category badge overlay */}
         <div className="absolute top-3 left-3">
-          <span className={`backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border bg-gray-950/70 ${theme.badge}`}>
+          <span className={`backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide border bg-gray-950/80 ${theme.badge}`}>
             {article.category || 'INFO'}
           </span>
         </div>
         {/* Time badge */}
         <div className="absolute top-3 right-3">
-          <span className="backdrop-blur-md bg-gray-950/70 text-neutral-300 px-2 py-1 rounded-lg text-[9px] font-medium border border-white/10">
+          <span className="backdrop-blur-md bg-gray-950/70 text-neutral-100 px-2 py-1 rounded-lg text-[13px] font-semibold border border-white/10">
             {/* Etykietę składa `useArticles` przez `utils/articleTime` — dla
                 zapowiedzi liczy się TERMIN, nie wiek ogłoszenia */}
             {article.timestamp}
@@ -63,7 +64,7 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
       <div className="flex-1 flex flex-col p-4">
         {article.sourceLabel && (
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-wide">
+            <span className="text-xs text-neutral-400 font-bold uppercase tracking-wide">
               {article.sourceLabel}
             </span>
           </div>
@@ -96,7 +97,7 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
 const VISIBLE_CHIPS = 4;
 
 const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
-  const { articles, loading, error } = useArticles({ limit: 50, perSource: 5 });
+  const { articles, loading, error, fetchedAt } = useArticles({ limit: 50, perSource: 5 });
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory || 'Wszystkie');
   const [chipsExpanded, setChipsExpanded] = useState(false);
   const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
@@ -158,30 +159,13 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
       return articles.filter(a => a.category === activeCategory);
     }
 
-    // Widok "Wszystkie": przeplatamy kategorie (Awaria pierwsza), biorąc po jednym
-    // artykule z każdej na rundę. Góra feedu jest zróżnicowana, a żaden artykuł
-    // nie znika — dzięki temu licznik w nagłówku zgadza się z sumą chipów.
-    const byCategory = new Map<string, Article[]>();
-    articles.forEach(a => {
-      const cat = a.category || 'Inne';
-      if (!byCategory.has(cat)) byCategory.set(cat, []);
-      byCategory.get(cat)!.push(a);
-    });
-
-    const interleaved: Article[] = [];
-    for (let round = 0; interleaved.length < articles.length; round++) {
-      let addedInRound = false;
-      for (const cat of sortedCategories) {
-        const list = byCategory.get(cat);
-        if (list && round < list.length) {
-          interleaved.push(list[round]);
-          addedInRound = true;
-        }
-      }
-      if (!addedInRound) break;
-    }
-    return interleaved;
-  }, [articles, activeCategory, sortedCategories]);
+    // Widok "Wszystkie" = kolejność z backendu. Do 11.10.2026 front przeplatał
+    // tu kategorie (po jednym wpisie z każdej na rundę) i niszczył ranking:
+    // na szczyt sekcji „Powiat i sąsiedzi" trafiał wpis bez kategorii, a lokalny
+    // z czołówki spadał o kilka miejsc (audyt F-011). Różnorodność robi już
+    // `diversify` w backendzie — druga polityka we froncie tylko ją psuła.
+    return articles;
+  }, [articles, activeCategory]);
 
   // Schema.org ItemList — inject JSON-LD into <head> for Google rich results
   useEffect(() => {
@@ -242,16 +226,18 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
     </div>
   );
 
-  if (error) return <div className="text-center p-8 text-red-500">Błąd: {error}</div>;
+  // Błąd bez żadnych danych — przy danych lista zostaje, a nad nią `StaleDataNotice`
+  if (error && !articles) return <div className="text-center p-8 text-neutral-400">Nie udało się pobrać wiadomości. Sprawdź połączenie i spróbuj za chwilę.</div>;
   if (!articles || articles.length === 0) return <div className="text-center p-8 text-neutral-500">Brak wiadomości.</div>;
 
   return (
     <div className="space-y-6">
+      {error && <StaleDataNotice fetchedAt={fetchedAt} />}
       {/* Title */}
       <div className="flex items-center gap-3">
         <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Aktualności</h2>
         {/* Licznik pokazuje to, co widać na ekranie — inaczej suma chipów nie zgadza się z nagłówkiem */}
-        <span className="text-xs font-bold text-neutral-600 bg-gray-900/50 px-2 py-0.5 rounded-full">{filteredArticles.length} artykułów</span>
+        <span className="text-xs font-bold text-neutral-400 bg-gray-900/50 px-2 py-0.5 rounded-full">{filteredArticles.length} artykułów</span>
       </div>
 
       {/* Categories – compact chips with overflow */}
@@ -312,11 +298,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
       {/* Ogłoszenia firm (plan Firma lokalna) — oznaczone jako materiał reklamowy */}
       {announcements.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
             <span className="h-px flex-1 bg-white/5" />
             <Megaphone size={12} className="text-amber-500" />
             Ogłoszenia firm
-            <span className="text-[9px] text-neutral-600 normal-case font-medium">materiał reklamowy</span>
+            <span className="text-xs text-neutral-400 normal-case font-medium">materiał reklamowy</span>
             <span className="h-px flex-1 bg-white/5" />
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -325,13 +311,13 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <p className="text-sm font-bold text-neutral-100">{a.title}</p>
                   {a.type === 'okazja' && a.valid_until && (
-                    <span className="text-[10px] text-amber-400 font-medium whitespace-nowrap">
+                    <span className="text-xs text-amber-300 font-medium whitespace-nowrap">
                       do {new Date(a.valid_until).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-neutral-400 leading-relaxed">{a.body}</p>
-                <p className="text-[11px] text-neutral-500 mt-2">
+                <p className="text-[13px] text-neutral-400 mt-2">
                   {a.nazwa} · {a.miasto}
                   {a.telefon && <> · 📞 {a.telefon}</>}
                 </p>
@@ -348,11 +334,11 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
         const groupInfo = SCOPE_GROUP_LABELS[group];
         return (
           <div key={group} className="space-y-4">
-            <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-2">
+            <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
               <span className="h-px flex-1 bg-white/5" />
               {groupInfo.icon}
               {groupInfo.label}
-              <span className="text-neutral-600 font-medium">({groupArticles.length})</span>
+              <span className="text-neutral-400 font-medium">({groupArticles.length})</span>
               <span className="h-px flex-1 bg-white/5" />
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

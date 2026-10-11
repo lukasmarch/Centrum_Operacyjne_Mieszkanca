@@ -33,6 +33,18 @@ const startOfDay = (d: Date) => {
 const dayDiff = (a: Date, b: Date) =>
     Math.round((startOfDay(a).getTime() - startOfDay(b).getTime()) / 86_400_000);
 
+/**
+ * Chwila pomiaru/odczytu: „14:05”, „wczoraj 22:01”, „9 paź 06:03”.
+ * Sama godzina przy nieświeżych danych kłamie — „ostatni odczyt z 22:01”
+ * rano czyta się jak dzisiejszy wieczór, a był wczorajszy.
+ */
+export function clockLabel(at: Date, now: Date = new Date()): string {
+    const days = dayDiff(now, at);
+    if (days === 0) return hm(at);
+    if (days === 1) return `wczoraj ${hm(at)}`;
+    return `${at.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }).replace('.', '')} ${hm(at)}`;
+}
+
 const DAY_WORDS: Record<number, string> = { '-1': 'wczoraj', 0: 'dziś', 1: 'jutro', 2: 'pojutrze' };
 
 /**
@@ -48,8 +60,38 @@ const DAY_WORDS: Record<number, string> = { '-1': 'wczoraj', 0: 'dziś', 1: 'jut
  *
  * Podany koniec przeczy całodniowości — źródło znało ramy godzinowe.
  */
+const isMidnight = (d: Date) => d.getHours() === 0 && d.getMinutes() === 0;
+
 const isAllDayStart = (start: Date, end: Date | null): boolean =>
-    !end && start.getHours() === 0 && start.getMinutes() === 0;
+    isMidnight(start) && (!end || isMidnight(end));
+
+/**
+ * Zakres DNI („od 5 do 11 października”) — backend zapisuje go od 11.10.2026
+ * (`time_span`, audyt F-002) jako lokalną północ startu i północ PO ostatnim
+ * dniu. Plakietka pokazywała wtedy „trwa teraz, do 0:00” — godzinę, której
+ * źródło nie podało, i koniec, który brzmiał jak „dziś o północy”.
+ */
+const lastDayOf = (end: Date) => new Date(end.getTime() - 1);
+
+const shortDay = (d: Date) => d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }).replace('.', '');
+
+/** „5–11 paź” albo „30 wrz – 2 paź” */
+const dayRange = (start: Date, last: Date): string =>
+    start.getMonth() === last.getMonth()
+        ? `${start.getDate()}–${shortDay(last)}`
+        : `${shortDay(start)} – ${shortDay(last)}`;
+
+/** Koniec trwającego zdarzenia: godzina, gdy kończy się dziś, inaczej dzień */
+function untilLabel(end: Date, allDay: boolean, now: Date): string {
+    if (allDay) {
+        const days = dayDiff(lastDayOf(end), now);
+        if (days <= 0) return 'trwa — ostatni dzień';
+        if (days === 1) return 'trwa do jutra';
+        return `trwa do ${shortDay(lastDayOf(end))}`;
+    }
+    if (dayDiff(end, now) === 0) return `trwa teraz, do ${hm(end)}`;
+    return `trwa do ${shortDay(end)} ${hm(end)}`;
+}
 
 export interface ArticleTimes {
     publishedAt?: string | null;
@@ -78,7 +120,15 @@ export function articleTimeLabel(article: ArticleTimes, now: Date = new Date()):
         : true;
 
     if (start && !afterEvent) {
-        if (end && start <= now && now <= end) return `trwa teraz, do ${hm(end)}`;
+        // Jeden dzień zapisany jako północ–północ to zwykły wpis całodniowy („dziś”)
+        const multiDay = !!end && allDay && dayDiff(lastDayOf(end), start) >= 1;
+        if (end && start <= now && now <= end && (multiDay || !allDay)) {
+            return untilLabel(end, allDay, now);
+        }
+
+        // Przed startem — cały zakres, bo „5 października” gubi, że to
+        // nie jednodniowe wydarzenie
+        if (multiDay && end) return dayRange(start, lastDayOf(end));
 
         const days = dayDiff(start, now);
         const word = DAY_WORDS[days];

@@ -10,9 +10,25 @@ import {
   RegisterData,
   UserUpdateData,
 } from '../../types';
+import { ApiError, toApiError } from './apiError';
 
 // Use env var with fallback to localhost (for development)
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+const OFFLINE_MESSAGE = 'Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie.';
+
+/** `fetch` rzuca TypeError („Failed to fetch”) bez sieci — po angielsku i bez sensu dla ludzi */
+const postJson = async (url: string, body: unknown): Promise<Response> => {
+  try {
+    return await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(OFFLINE_MESSAGE, 0);
+  }
+};
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'access_token';
@@ -98,15 +114,10 @@ const authFetch = async (
  * Register a new user
  */
 export const register = async (data: RegisterData): Promise<AuthResponse> => {
-  const response = await fetch(`${API_BASE_URL}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
+  const response = await postJson(`${API_BASE_URL}/auth/register`, data);
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Registration failed');
+    throw await toApiError(response, 'Nie udało się założyć konta. Spróbuj ponownie za chwilę.');
   }
 
   const result: AuthResponse = await response.json();
@@ -118,15 +129,10 @@ export const register = async (data: RegisterData): Promise<AuthResponse> => {
  * Login user
  */
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials),
-  });
+  const response = await postJson(`${API_BASE_URL}/auth/login`, credentials);
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Login failed');
+    throw await toApiError(response, 'Nie udało się zalogować. Spróbuj ponownie za chwilę.');
   }
 
   const result: AuthResponse = await response.json();

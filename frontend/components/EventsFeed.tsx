@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import StaleDataNotice from './StaleDataNotice';
 import { ChevronDown, ChevronUp, MapPin, Clock, Calendar } from 'lucide-react';
 import { useEvents } from '../src/hooks/useEvents';
+import { TimedEvent, endOf, isAllDay } from '../src/utils/eventTime';
 import { Event } from '../types';
 
 /* ── Category chip / badge colors ── */
@@ -29,21 +31,32 @@ function getCategoryChip(cat: string) {
     return DEFAULT_CHIP;
 }
 
-/* ── Google Calendar & ICS ── */
-function generateGoogleCalendarUrl(event: Event): string {
-    const startDate = new Date(event.date);
-    const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+/* ── Google Calendar ── */
+// Wpis całodniowy idzie jako DZIEŃ (YYYYMMDD/następny dzień), nie jako
+// 00:00–02:00 — tak wpadał do kalendarza mieszkańca do 11.10.2026 (audyt F-038).
+// Koniec z `endOf`: ta sama reguła co kafle (podany koniec albo 2 h).
+function generateGoogleCalendarUrl(event: TimedEvent): string {
+    const start = new Date(event.date);
+    let dates: string;
+    if (isAllDay(event)) {
+        const day = (d: Date) =>
+            `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+        const next = new Date(start);
+        next.setDate(next.getDate() + 1);
+        dates = `${day(start)}/${day(next)}`;
+    } else {
+        const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        dates = `${fmt(start)}/${fmt(endOf(event))}`;
+    }
     const params = new URLSearchParams({
         action: 'TEMPLATE',
         text: event.title,
-        dates: `${fmt(startDate)}/${fmt(endDate)}`,
+        dates,
         details: event.description || '',
         location: event.location || '',
     });
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
-
 
 /* ── Month group helpers ── */
 const MONTH_NAMES = [
@@ -67,103 +80,114 @@ function getMonthLabel(key: string): string {
 }
 
 /* ── Single event card ── */
-const EventCard: React.FC<{ event: Event }> = ({ event }) => {
+/**
+ * Karta wydarzenia — układ pod telefon 375 px (audyt V13, F-043).
+ *
+ * Do 11.10.2026 w jednym wierszu stały: data, miniatura, treść i przycisk
+ * „Google Cal”, więc na tytuł zostawało 54 px, a terminy i źródło miały
+ * 7–11 px przy kontraście 1,9–2,5:1 — „kiedy” i „skąd” były nieczytelne
+ * dla starszych mieszkańców. Do tego cała karta była linkiem z przyciskiem
+ * w środku (zagnieżdżone elementy interaktywne).
+ * Dziś: górny wiersz to data + treść (miniatura dopiero od `sm`), dolny —
+ * źródło i „Dodaj do kalendarza”; linkiem jest tytuł. Metadane ≥ 13 px.
+ */
+const EventCard: React.FC<{ event: TimedEvent }> = ({ event }) => {
     const d = new Date(event.date);
     const chip = getCategoryChip(event.category || '');
-    const h = d.getHours();
-    const m = d.getMinutes();
-    const timeStr = (h === 0 && m === 0) ? 'cały dzień' : `${h}:${m.toString().padStart(2, '0')}`;
+    const timeStr = isAllDay(event)
+        ? 'cały dzień'
+        : d.toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' });
 
-    const inner = (
-        <>
-            {/* Date badge */}
-            <div className="shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-xl bg-white/5 border border-white/10 group-hover:border-blue-500/20 group-hover:bg-blue-500/8 transition-colors">
-                <span className="text-[8px] text-neutral-500 font-bold uppercase leading-none">
-                    {d.toLocaleDateString('pl-PL', { month: 'short' }).replace('.', '')}
-                </span>
-                <span className="text-xl font-black text-neutral-200 leading-none group-hover:text-blue-300 transition-colors">
-                    {d.getDate()}
-                </span>
-                <span className="text-[7px] text-neutral-600 font-medium capitalize">
-                    {d.toLocaleDateString('pl-PL', { weekday: 'short' })}
-                </span>
-            </div>
-
-            {/* Image thumbnail */}
-            {event.imageUrl && (
-                <div className="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-white/5">
-                    <img
-                        src={event.imageUrl}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
+    return (
+        <div className="group rounded-2xl border border-white/5 bg-gray-900/40 p-4 transition-all hover:border-white/10 hover:bg-gray-900/60">
+            <div className="flex gap-3 sm:gap-4">
+                {/* Data — pierwsze, czego szuka się w kalendarzu */}
+                <div className="flex h-16 w-14 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/5">
+                    <span className="text-xs font-bold uppercase leading-none text-neutral-300">
+                        {d.toLocaleDateString('pl-PL', { month: 'short' }).replace('.', '')}
+                    </span>
+                    <span className="my-0.5 text-2xl font-black leading-none text-neutral-100">
+                        {d.getDate()}
+                    </span>
+                    <span className="text-xs font-medium leading-none text-neutral-400">
+                        {d.toLocaleDateString('pl-PL', { weekday: 'short' }).replace('.', '')}
+                    </span>
                 </div>
-            )}
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-                {event.category && (
-                    <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border mb-1 ${chip.badge}`}>
-                        {event.category}
-                    </span>
-                )}
-                <h4 className="text-sm font-bold text-neutral-200 group-hover:text-blue-300 transition-colors leading-snug mb-1.5 line-clamp-2">
-                    {event.title}
-                </h4>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
-                    <span className="flex items-center gap-1">
-                        <Clock size={10} className="shrink-0" />
-                        {timeStr}
-                    </span>
-                    {event.location && (
-                        <span className="flex items-center gap-1 truncate max-w-[160px]">
-                            <MapPin size={10} className="shrink-0" />
-                            {event.location}
+                <div className="min-w-0 flex-1">
+                    {event.category && (
+                        <span className={`mb-1 inline-block rounded border px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide ${chip.badge}`}>
+                            {event.category}
                         </span>
                     )}
+                    <h4 className="mb-1.5 text-base font-bold leading-snug text-neutral-100">
+                        {event.externalUrl ? (
+                            <a
+                                href={event.externalUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="transition-colors hover:text-blue-300"
+                            >
+                                {event.title}
+                            </a>
+                        ) : event.title}
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-neutral-300">
+                        <span className="flex items-center gap-1">
+                            <Clock size={13} className="shrink-0 text-neutral-400" aria-hidden />
+                            {timeStr}
+                        </span>
+                        {event.location && (
+                            <span className="flex min-w-0 items-center gap-1">
+                                <MapPin size={13} className="shrink-0 text-neutral-400" aria-hidden />
+                                <span className="truncate">{event.location}</span>
+                            </span>
+                        )}
+                    </div>
+                    {event.description && (
+                        <p className="mt-1.5 line-clamp-2 text-sm text-neutral-400">{event.description}</p>
+                    )}
                 </div>
-                {event.description && (
-                    <p className="text-xs text-neutral-500 mt-1.5 line-clamp-2">{event.description}</p>
-                )}
-                {event.sourceName && (
-                    <p className="text-[10px] text-neutral-600 mt-1.5">
-                        <span>Źródło:</span> <span className="font-medium text-neutral-500">{event.sourceName}</span>
-                    </p>
+
+                {/* Miniatura poza kolumną tekstu: na telefonie jej nie ma —
+                    zabierała tytułowi 56 px z i tak wąskiego wiersza */}
+                {event.imageUrl && (
+                    <div className="hidden h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-white/5 sm:block">
+                        <img
+                            src={event.imageUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                    </div>
                 )}
             </div>
 
-            {/* Google Calendar button */}
-            <div className="shrink-0 flex items-start">
-                <button
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(generateGoogleCalendarUrl(event), '_blank'); }}
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors whitespace-nowrap"
-                    title="Dodaj do Google Calendar"
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-2">
+                <p className="min-w-0 truncate text-[13px] text-neutral-400">
+                    {event.sourceName && (
+                        <>Źródło: <span className="font-medium text-neutral-300">{event.sourceName}</span></>
+                    )}
+                </p>
+                <a
+                    href={generateGoogleCalendarUrl(event)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-blue-300 transition-colors hover:bg-blue-500/10 hover:text-blue-200"
                 >
-                    <Calendar size={10} />
-                    Google Cal
-                </button>
+                    <Calendar size={14} aria-hidden />
+                    Dodaj do kalendarza
+                </a>
             </div>
-        </>
+        </div>
     );
-
-    const cardClass = "flex gap-4 p-4 rounded-2xl bg-gray-900/40 border border-white/5 hover:bg-gray-900/60 hover:border-white/10 transition-all group";
-
-    if (event.externalUrl) {
-        return (
-            <a href={event.externalUrl} target="_blank" rel="noopener noreferrer" className={cardClass}>
-                {inner}
-            </a>
-        );
-    }
-    return <div className={cardClass}>{inner}</div>;
 };
 
 /* ── Main Component ── */
 const VISIBLE_CHIPS = 5;
 
 const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory }) => {
-    const { events, loading, error } = useEvents(100);
+    const { events, loading, error, fetchedAt } = useEvents(100);
     const [activeCategory, setActiveCategory] = useState<string>(initialCategory || 'Wszystkie');
     const [chipsExpanded, setChipsExpanded] = useState(false);
 
@@ -222,7 +246,8 @@ const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory })
         </div>
     );
 
-    if (error) return <div className="text-center p-8 text-red-500">Błąd: {error}</div>;
+    // Błąd bez żadnych danych — przy danych lista zostaje, a nad nią `StaleDataNotice`
+    if (error && !events) return <div className="text-center p-8 text-neutral-400">Nie udało się pobrać wydarzeń. Sprawdź połączenie i spróbuj za chwilę.</div>;
     if (!events || events.length === 0) return (
         <div className="text-center p-12 text-neutral-500">
             <div className="text-4xl mb-3">📅</div>
@@ -232,12 +257,13 @@ const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory })
 
     return (
         <div className="space-y-5">
+            {error && <StaleDataNotice fetchedAt={fetchedAt} />}
             {/* ── Title ── */}
             <div className="flex items-center gap-3">
                 <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
                     Nadchodzące Wydarzenia
                 </h2>
-                <span className="text-xs font-bold text-neutral-600 bg-gray-900/50 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-bold text-neutral-400 bg-gray-900/50 px-2 py-0.5 rounded-full">
                     {filteredEvents.length} {activeCategory !== 'Wszystkie' ? `/ ${events.length}` : ''}
                 </span>
             </div>
@@ -302,11 +328,11 @@ const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory })
                             {/* Month header */}
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="w-1 h-4 rounded-full bg-gradient-to-b from-purple-400 to-pink-400" />
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-500">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-300">
                                     {getMonthLabel(monthKey)}
                                 </h3>
                                 <div className="flex-1 h-px bg-white/5" />
-                                <span className="text-[10px] text-neutral-700">
+                                <span className="text-xs text-neutral-400">
                                     {monthEvents.length} {monthEvents.length === 1 ? 'wydarzenie' : monthEvents.length < 5 ? 'wydarzenia' : 'wydarzeń'}
                                 </span>
                             </div>

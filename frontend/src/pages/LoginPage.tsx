@@ -10,7 +10,9 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
-  const { login, isLoading, error, clearError } = useAuth();
+  const { login, error, clearError } = useAuth();
+  // Stan wysyłki lokalnie — globalny `isLoading` odmontowywał formularz (F-036)
+  const [isLoading, setIsLoading] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,11 +28,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
       return;
     }
 
+    setIsLoading(true);
     try {
       await login({ email, password });
       onNavigate('dashboard');
     } catch {
-      // Error is handled by AuthContext
+      // Komunikat trzyma AuthContext (`error`), pola zostają wypełnione
+    } finally {
+      setIsLoading(false);
     }
   };
 

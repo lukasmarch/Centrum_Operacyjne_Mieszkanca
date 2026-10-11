@@ -5,6 +5,8 @@ import ArticleImage, { getCategoryTheme } from '../ArticleImage';
 
 interface NewsMiniProps {
     articles: Article[];
+    /** Pierwsze ładowanie — bez tego pusty kafel udawał „nic nowego w gminie” */
+    loading?: boolean;
     onShowAll: () => void;
 }
 
@@ -25,9 +27,20 @@ interface NewsMiniProps {
  * Zdjęcie ma dziś jeden wpis na cztery, więc miniatura NIE może zależeć od zdjęcia:
  * `ArticleImage` podstawia gradient z ikoną kategorii i lista zostaje równa.
  */
-const NewsMini: React.FC<NewsMiniProps> = ({ articles, onShowAll }) => (
+const NewsMini: React.FC<NewsMiniProps> = ({ articles, loading = false, onShowAll }) => (
     <section aria-label="Ostatnie wiadomości" className="rounded-2xl border border-white/10 bg-[#0d1117] p-5">
         <h3 className="text-lg font-bold text-white">Ostatnio w gminie</h3>
+        {loading && (
+            <ul className="mt-3 space-y-3" aria-hidden>
+                {[1, 2, 3].map(i => <li key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}
+            </ul>
+        )}
+        {!loading && articles.length === 0 && (
+            <p className="mt-3 text-base leading-snug text-neutral-300">
+                W ostatnich dniach nie pojawiło się nic nowego z gminy Rybno.
+                Wiadomości z okolicy są w pełnym feedzie.
+            </p>
+        )}
         <ul className="mt-3 divide-y divide-white/5">
             {articles.map(article => {
                 const theme = getCategoryTheme(article.category);

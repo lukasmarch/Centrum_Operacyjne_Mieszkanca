@@ -9,6 +9,7 @@ import WasteWidget from './WasteWidget';
 import WasteWidgetPaywall from './WasteWidgetPaywall';
 
 import { useWasteSchedule } from '../src/hooks/useWasteSchedule';
+import { resolveWasteTown } from '../src/utils/wasteTown';
 import { useAuth } from '../src/context/AuthContext';
 import { AppSection } from '../types';
 
@@ -30,7 +31,7 @@ import { DASHBOARD_LAYOUTS, TileId } from '../src/config/dashboardLayouts';
 
 const Dashboard: React.FC<{ onNavigate?: (section: AppSection) => void; onQuerySubmit?: (query: string) => void }> = ({ onNavigate, onQuerySubmit }) => {
   const { user, isPremium, userLocation, dashboardLayout } = useAuth();
-  const wasteEvents = useWasteSchedule(userLocation);
+  const wasteEvents = useWasteSchedule(resolveWasteTown(userLocation));
 
   const today = new Date();
   const holiday = getHoliday(today);

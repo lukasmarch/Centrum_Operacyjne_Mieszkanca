@@ -44,6 +44,22 @@ const firstSentences = (text: string, count = 3): string => {
     return sentences.join(' ').trim();
 };
 
+/**
+ * Dzień briefingu słowami. API oddaje NAJNOWSZY wiersz, więc przed pierwszym
+ * przebiegiem dnia (albo gdy przebieg padł) na stronie stoi wczorajszy — a bez
+ * daty czytał się jak dzisiejszy (audyt F-016). Wczorajszy i starszy dostają
+ * wyróżnienie: to nie jest drobiazg, tylko informacja, że treść może być nieaktualna.
+ */
+export const briefingDay = (generated: Date, now: Date): { label: string; stale: boolean } => {
+    const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const days = Math.round((startOf(now) - startOf(generated)) / 86_400_000);
+    if (days <= 0) return { label: 'dziś', stale: false };
+    if (days === 1) return { label: 'wczoraj', stale: true };
+    return {
+        label: generated.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' }),
+        stale: true,
+    };
+};
 
 interface BriefingCardProps {
     onShowAll: () => void;
@@ -58,13 +74,18 @@ const BriefingCard: React.FC<BriefingCardProps> = ({ onShowAll }) => {
     // Godzina zegarowa, nie „5h temu": briefing powstaje o 7:00 i jest odświeżany
     // o 13:30, więc dopiero konkretna godzina mówi, którą wersję masz przed sobą
     const updated = lastUpdated?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    const day = lastUpdated ? briefingDay(lastUpdated, new Date()) : null;
 
     return (
         <section aria-label="Briefing dnia" className="rounded-2xl border border-white/10 bg-[#0d1117] p-5 lg:p-6">
             <div className="flex items-center gap-2">
                 <Sparkles size={14} className="text-blue-400" aria-hidden />
                 <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Briefing dnia</span>
-                {updated && <span className="text-xs text-neutral-500">· {updated}</span>}
+                {updated && day && (
+                    <span className={`text-sm ${day.stale ? 'font-semibold text-amber-300' : 'text-neutral-400'}`}>
+                        · {day.label}, {updated}
+                    </span>
+                )}
             </div>
 
             <h2 className="mt-3 text-xl lg:text-2xl font-bold leading-snug text-white">

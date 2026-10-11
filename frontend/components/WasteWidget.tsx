@@ -48,8 +48,8 @@ const WasteWidget: React.FC<WasteWidgetProps> = ({ events, town }) => {
     const [modalOpen, setModalOpen] = useState(false);
     const upcomingEvents = events.slice(0, 4);
 
-    // Map town name the same way as useWasteSchedule does
-    const mappedTown = town === 'Rybno' ? 'Rybno R1' : town;
+    // Bez cichego „Rybno” → R1: nazwa musi być pozycją harmonogramu (F-039)
+    const mappedTown = town;
 
     // Build full schedule grouped by month from raw wasteData
     const fullSchedule = useMemo(() => {

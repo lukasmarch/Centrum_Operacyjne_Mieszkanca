@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { track } from '../services/analytics';
 import { AVAILABLE_LOCATIONS } from '../../types';
+import { ApiError } from '../services/apiError';
 
 interface RegisterPageProps {
   onNavigate: (page: 'login' | 'dashboard' | 'terms' | 'privacy') => void;
@@ -16,7 +17,10 @@ interface RegisterPageProps {
 }
 
 const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, onRegistered }) => {
-  const { register, isLoading, error, clearError } = useAuth();
+  const { register, error, clearError } = useAuth();
+  // Stan wysyłki lokalnie: globalny `isLoading` z AuthContext steruje ekranem
+  // ładowania całej aplikacji, więc formularz znikał i wracał pusty (F-036)
+  const [isLoading, setIsLoading] = useState(false);
 
   // Górny stopień lejka: ilu ludzi w ogóle otworzyło formularz. Bez tego
   // „zero rejestracji" nie odróżnia się od „nikt tu nie doszedł".
@@ -32,12 +36,21 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
   const [consentTerms, setConsentTerms] = useState(false);
   const [consentMarketing, setConsentMarketing] = useState(false);
   const [localError, setLocalError] = useState('');
+  // Komunikat PRZY polu — ogólne „Popraw dane” nad formularzem nie mówi, które
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Poprawiane pole traci swój komunikat od razu, reszta zostaje
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   };
 
   const validatePassword = (password: string): string | null => {
@@ -56,22 +69,18 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError('');
+    setFieldErrors({});
     clearError();
 
-    // Validate
-    if (!formData.email || !formData.password || !formData.full_name) {
-      setLocalError('Wypełnij wszystkie wymagane pola');
-      return;
-    }
-
+    const errors: Record<string, string> = {};
+    if (formData.full_name.trim().length < 2) errors.full_name = 'Podaj imię i nazwisko (min. 2 znaki).';
+    if (!formData.email.trim()) errors.email = 'Podaj adres e-mail.';
     const passwordError = validatePassword(formData.password);
-    if (passwordError) {
-      setLocalError(passwordError);
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setLocalError('Hasła nie są identyczne');
+    if (passwordError) errors.password = passwordError;
+    else if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'Hasła nie są identyczne.';
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      setLocalError('Popraw zaznaczone pola.');
       return;
     }
 
@@ -80,6 +89,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
       return;
     }
 
+    setIsLoading(true);
     try {
       await register({
         email: formData.email,
@@ -102,10 +112,21 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
       }
       if (onRegistered) onRegistered();
       else onNavigate('dashboard');
-    } catch {
-      // Error handled by AuthContext
+    } catch (err) {
+      // Ogólny komunikat trzyma AuthContext (`error`); tu tylko przypięcie do pól
+      if (err instanceof ApiError) setFieldErrors(err.fields);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const fieldClass = (name: string) =>
+    `w-full px-4 py-3 rounded-xl border ${fieldErrors[name] ? 'border-red-500' : 'border-gray-700'} bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all`;
+
+  const fieldError = (name: string) =>
+    fieldErrors[name] ? (
+      <p id={`${name}-error`} role="alert" className="mt-1 text-sm text-red-400">{fieldErrors[name]}</p>
+    ) : null;
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-8">
@@ -123,8 +144,10 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
         <div className="bg-gray-950 rounded-3xl p-8 shadow-sm border border-gray-800/50">
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Error message */}
-            {(error || localError) && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm">
+            {/* Komunikat ogólny — chyba że to ten sam, który stoi już przy polu
+                („Ten adres ma już konto” przy e-mailu), wtedy raz wystarczy */}
+            {(error || localError) && !Object.values(fieldErrors).includes(error || localError) && (
+              <div role="alert" className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm">
                 {error || localError}
               </div>
             )}
@@ -140,9 +163,12 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
                 value={formData.full_name}
                 onChange={handleChange}
                 placeholder="Jan Kowalski"
-                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className={fieldClass('full_name')}
+                aria-invalid={!!fieldErrors.full_name}
+                aria-describedby={fieldErrors.full_name ? 'full_name-error' : undefined}
                 disabled={isLoading}
               />
+              {fieldError('full_name')}
             </div>
 
             {/* Email */}
@@ -156,9 +182,12 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="twoj@email.pl"
-                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className={fieldClass('email')}
+                aria-invalid={!!fieldErrors.email}
+                aria-describedby={fieldErrors.email ? 'email-error' : undefined}
                 disabled={isLoading}
               />
+              {fieldError('email')}
             </div>
 
             {/* Location */}
@@ -195,9 +224,12 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className={fieldClass('password')}
+                aria-invalid={!!fieldErrors.password}
+                aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                 disabled={isLoading}
               />
+              {fieldError('password')}
               <p className="text-xs text-neutral-400 mt-1">
                 Min. 8 znaków, wielka litera i cyfra
               </p>
@@ -214,9 +246,12 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className={fieldClass('confirmPassword')}
+                aria-invalid={!!fieldErrors.confirmPassword}
+                aria-describedby={fieldErrors.confirmPassword ? 'confirmPassword-error' : undefined}
                 disabled={isLoading}
               />
+              {fieldError('confirmPassword')}
             </div>
 
             {/* Zgody RODO */}

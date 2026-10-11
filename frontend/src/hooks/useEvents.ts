@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TimedEvent } from '../utils/eventTime';
 
 // Backend API response
@@ -13,14 +13,21 @@ const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000
 
 export function useEvents(limit: number = 50) {
     const [events, setEvents] = useState<TimedEvent[] | null>(null);
+    // `loading` tylko przy PIERWSZYM ładowaniu; odświeżenie w tle i błąd nie
+    // kasują listy — ta sama zasada co w `useArticles` (audyt F-035)
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
+    const hasData = useRef(false);
 
     useEffect(() => {
+        const controller = new AbortController();
+        hasData.current = false;
+        setLoading(true);
+
         const fetchEvents = async () => {
             try {
-                setLoading(true);
-                const response = await fetch(`${API_URL}/events?limit=${limit}`);
+                const response = await fetch(`${API_URL}/events?limit=${limit}`, { signal: controller.signal });
 
                 if (!response.ok) {
                     throw new Error('Nie udało się pobrać wydarzeń');
@@ -52,12 +59,15 @@ export function useEvents(limit: number = 50) {
                 }));
 
                 setEvents(mappedEvents);
+                setFetchedAt(new Date());
                 setError(null);
+                hasData.current = true;
             } catch (err) {
+                if (controller.signal.aborted) return;
                 setError(err instanceof Error ? err.message : 'Błąd pobierania wydarzeń');
-                setEvents(null);
+                if (!hasData.current) setEvents(null);
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
 
@@ -66,8 +76,11 @@ export function useEvents(limit: number = 50) {
         // Refresh every 5 minutes
         const interval = setInterval(fetchEvents, 5 * 60 * 1000);
 
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            controller.abort();
+        };
     }, [limit]);
 
-    return { events, loading, error };
+    return { events, loading, error, fetchedAt };
 }

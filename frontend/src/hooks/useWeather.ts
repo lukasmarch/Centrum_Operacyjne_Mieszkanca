@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useDataCache } from '../context/DataCacheContext';
+import { parseUtc } from '../utils/articleTime';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -45,7 +46,9 @@ export function useWeather(location: string = 'Rybno') {
       if (cached) {
         try {
           const parsed: WeatherFull = JSON.parse(cached);
-          const age = Date.now() - new Date(parsed.fetched_at).getTime();
+          // `fetched_at` to naiwny UTC — bez `parseUtc` przeglądarka czytała go
+          // jako czas lokalny i każdy wpis wyglądał na 2 h starszy (cache nie działał)
+          const age = Date.now() - (parseUtc(parsed.fetched_at)?.getTime() ?? 0);
           if (age < 30 * 60 * 1000) { // 30 min
             setWeatherState(parsed);
             setLoading(false);

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useArticles } from '../hooks/useArticles';
 import { useWeather } from '../hooks/useWeather';
 import { useWasteSchedule } from '../hooks/useWasteSchedule';
+import { resolveWasteTown } from '../utils/wasteTown';
 import { useEvents } from '../hooks/useEvents';
 import {
     dayLabel,
@@ -64,10 +65,11 @@ interface SimpleHomePageProps {
 
 const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubmit }) => {
     const { user } = useAuth();
-    const town = user?.location || 'Rybno';
+    // Pozycja harmonogramu albo `null` — „Rybno” bez rejonu to niewiadoma, nie R1 (F-039)
+    const town = resolveWasteTown(user?.location);
 
-    const { articles } = useArticles({ limit: 12, location: user?.location });
-    const { weather } = useWeather('Rybno');
+    const { articles, loading: articlesLoading } = useArticles({ limit: 20, location: user?.location });
+    const { weather, loading: weatherLoading } = useWeather('Rybno');
     const wasteEvents = useWasteSchedule(town);
     const { events } = useEvents(30);
     const [airLevel, setAirLevel] = useState<string | null>(null);
@@ -129,8 +131,12 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
      * alertu pokazuje jeden, a odfiltrowanie „tego jednego" wpuszczało drugi
      * na szczyt kafla „Ostatnio w gminie". Ekran mówił trzy razy to samo.
      */
+    // Kafel nazywa się „Ostatnio w gminie”, więc bierze WYŁĄCZNIE wpisy z gminy.
+    // Do 11.10.2026 brał trzy pierwsze z feedu — 10.10 dwa z nich były z regionu
+    // (audyt F-011). Lista z 20 wpisów, bo filtr zjada część czołówki; gdy z gminy
+    // nie ma nic, kafel mówi to wprost zamiast podsuwać Działdowo jako „gminę”.
     const newsArticles = useMemo(
-        () => (articles ?? []).filter(a => !a.isPinnedAlert).slice(0, 3),
+        () => (articles ?? []).filter(a => !a.isPinnedAlert && a.scope === 'gmina').slice(0, 3),
         [articles],
     );
 
@@ -174,8 +180,9 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
     }, [events]);
 
     const wasteSubtitle = useMemo(() => {
+        if (!town) return 'Wybierz miejscowość — pokażemy termin wywozu';
         const next = wasteEvents[0];
-        if (!next) return 'Sprawdź termin dla swojej miejscowości';
+        if (!next) return `${town}: brak zaplanowanych odbiorów`;
         const [day, month] = next.originalDateString.split('.');
         // Dzień tygodnia liczymy z `daysRemaining`, nie z „dzień.miesiąc + bieżący
         // rok": w grudniu styczniowy odbiór wypadał wtedy o rok wstecz i karta
@@ -187,8 +194,9 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
             next.daysRemaining === 0 ? 'dziś'
             : next.daysRemaining === 1 ? 'jutro'
             : `${WEEKDAYS[date.getDay()]} ${day}.${month}`;
-        return `${next.type} — ${when}`;
-    }, [wasteEvents]);
+        // Nazwa miejscowości przy terminie: czytelnik widzi, CZYJ to termin
+        return `${next.type} — ${when} · ${town}`;
+    }, [wasteEvents, town]);
 
     /**
      * Autobus mówi jedno zdanie: jedzie / za ile odjeżdża / kiedy następny.
@@ -196,7 +204,7 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
      * szkoły i lekarza; kurs powrotny pokazujemy, gdy akurat jest w trasie.
      */
     const busSubtitle = useMemo(() => {
-        if (!bus) return 'Rozkład i pozycja kursu na żywo';
+        if (!bus) return 'Rozkład jazdy i najbliższy kurs';
         const out = bus.directions.RYBNO_DZIALDOWO;
         const back = bus.directions.DZIALDOWO_RYBNO;
         const stopName = (id?: string) =>
@@ -208,8 +216,8 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
             if (dir.is_active && dir.active_bus) {
                 const where = stopName(dir.active_bus.next_stop_id);
                 return where
-                    ? `Jedzie ${label} — zbliża się do: ${where}`
-                    : `Jedzie ${label} — kurs w trasie`;
+                    ? `Wg rozkładu jedzie ${label} — zbliża się do: ${where}`
+                    : `Wg rozkładu jedzie ${label}`;
             }
         }
 
@@ -278,6 +286,7 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
                         z odległości ręki. Powierzchnia bez zmian — jedno pole */}
                     <WeatherTodayCard
                         weather={weather}
+                        loading={weatherLoading}
                         airLabel={airLevel ? AIR_WORDS[airLevel] ?? null : null}
                         onClick={() => onNavigate('weather')}
                     />
@@ -330,7 +339,11 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
                     hasWeekendEvents={weekendSubtitle !== null}
                     onOpenEvents={() => onNavigate('events')}
                 />
-                <NewsMini articles={newsArticles} onShowAll={() => onNavigate('news')} />
+                <NewsMini
+                    articles={newsArticles}
+                    loading={articlesLoading && !articles}
+                    onShowAll={() => onNavigate('news')}
+                />
             </div>
 
             {/* Wypoczynek — na razie samo kino. Kafel sam się chowa, gdy nie ma

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Article } from '../../types';
 import { articleTimeLabel } from '../utils/articleTime';
 
@@ -53,19 +53,29 @@ export function useArticles(options: UseArticlesOptions = {}) {
   const { limit = 50, perSource = 5, location = null } = options;
 
   const [articles, setArticles] = useState<Article[] | null>(null);
+  // `loading` = PIERWSZE ładowanie (nie ma czego pokazać). Do 11.10.2026 flaga
+  // włączała się też przy odświeżaniu co 5 min, więc lista co 5 min zamieniała
+  // się w szkielet i gubiła przewinięcie, a chwilowy brak zasięgu kasował treść
+  // (audyt F-035). Dziś odświeżenie idzie w tle, a błąd zostawia starą listę
+  // z `error` + `fetchedAt` — widok sam decyduje, jak powiedzieć „dane z HH:MM”.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
+  const hasData = useRef(false);
 
   useEffect(() => {
+    const controller = new AbortController();
+    hasData.current = false;
+    setLoading(true);
+
     const fetchArticles = async () => {
       try {
-        setLoading(true);
         const query = new URLSearchParams({
           limit: String(limit),
           per_source: String(perSource),
         });
         if (location) query.set('location', location);
-        const response = await fetch(`${API_URL}/articles?${query}`);
+        const response = await fetch(`${API_URL}/articles?${query}`, { signal: controller.signal });
 
         if (!response.ok) {
           throw new Error('Nie udało się pobrać artykułów');
@@ -105,12 +115,16 @@ export function useArticles(options: UseArticlesOptions = {}) {
         }));
 
         setArticles(mappedArticles);
+        setFetchedAt(new Date());
         setError(null);
+        hasData.current = true;
       } catch (err) {
+        if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : 'Błąd pobierania artykułów');
-        setArticles(null);
+        // Stara lista ZOSTAJE — nieaktualna treść z datą jest lepsza niż pusty ekran
+        if (!hasData.current) setArticles(null);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
@@ -119,9 +133,12 @@ export function useArticles(options: UseArticlesOptions = {}) {
     // Refresh every 5 minutes
     const interval = setInterval(fetchArticles, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      controller.abort();
+    };
   }, [limit, perSource, location]);
 
-  return { articles, loading, error };
+  return { articles, loading, error, fetchedAt };
 }
 

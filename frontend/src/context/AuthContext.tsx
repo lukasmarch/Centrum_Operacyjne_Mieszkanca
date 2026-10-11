@@ -112,18 +112,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Login user
    */
   const login = useCallback(async (credentials: LoginCredentials) => {
-    setIsLoading(true);
+    // ⚠️ Bez globalnego `isLoading`: ta flaga steruje ekranem ładowania CAŁEJ
+    // aplikacji (App.tsx), więc wysłanie formularza odmontowywało formularz
+    // i po błędzie mieszkaniec wracał do pustych pól (audyt F-036). Stan
+    // „wysyłam” trzyma formularz u siebie.
     setError(null);
 
     try {
       const response = await authApi.login(credentials);
       setUser(response.user);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed';
+      const message = err instanceof Error ? err.message : 'Nie udało się zalogować.';
       setError(message);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
@@ -131,7 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Register new user
    */
   const register = useCallback(async (data: RegisterData) => {
-    setIsLoading(true);
+    // Bez globalnego `isLoading` — patrz `login`
     setError(null);
 
     try {
@@ -140,11 +141,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authApi.register({ ...data, acq: getAcquisition() });
       setUser(response.user);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Registration failed';
+      const message = err instanceof Error ? err.message : 'Nie udało się założyć konta.';
       setError(message);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 

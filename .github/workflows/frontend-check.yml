@@ -29,3 +29,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npx tsc --noEmit
+      # Testy bez runnera: Node czyta TypeScript sam (strip-types). Strefa jak
+      # u mieszkańca — etykiety czasu liczą dobę LOKALNĄ
+      - run: node --experimental-strip-types scripts/test_article_time.ts
+        env:
+          TZ: Europe/Warsaw

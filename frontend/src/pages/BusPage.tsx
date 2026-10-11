@@ -4,7 +4,8 @@ import { AppSection } from '../../types';
 import BusTrackerWidget from '../../components/BusTrackerWidget';
 
 /**
- * Autobus Rybno–Działdowo: rozkład, mapa i pozycja kursu na żywo.
+ * Autobus Rybno–Działdowo: rozkład, mapa i pozycja kursu liczona z rozkładu
+ * (bez GPS — „na żywo” było obietnicą bez pokrycia, audyt F-039).
  * Cel „rozwiń" z karty na stronie głównej — sama karta mówi tylko,
  * czy autobus jedzie i o której najbliższy.
  */
@@ -19,7 +20,7 @@ const BusPage: React.FC<{ onNavigate: (section: AppSection) => void }> = ({ onNa
         </button>
 
         <h1 className="text-2xl lg:text-3xl font-bold text-white">Autobus Rybno – Działdowo</h1>
-        <p className="mt-1 text-sm text-neutral-400">Rozkład jazdy, przystanki i pozycja kursu na żywo</p>
+        <p className="mt-1 text-sm text-neutral-400">Rozkład jazdy, przystanki i pozycja kursu według rozkładu</p>
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1117] overflow-hidden">
             <BusTrackerWidget />

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Construction, Route } from 'lucide-react';
+import { Construction, Route, CircleHelp } from 'lucide-react';
+import { clockLabel, parseUtc } from '../../src/utils/articleTime';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -38,15 +39,27 @@ const isDisrupted = (road: Road) =>
 
 const RoadStatusStrip: React.FC = () => {
     const [roads, setRoads] = useState<Road[] | null>(null);
+    // Odczyt nieaktualny = brak wiedzy, nie „przejezdne”. 9–10.10.2026 pasek
+    // przez 16 h pokazywał zielone „bez utrudnień” z odczytu, który wygasł
+    // (audyt F-018): backend oddawał `is_expired`, front go nie czytał.
+    const [stale, setStale] = useState(false);
+    const [readAt, setReadAt] = useState<Date | null>(null);
 
     useEffect(() => {
         let cancelled = false;
         fetch(`${API_URL}/traffic`)
             .then(res => (res.ok ? res.json() : null))
-            .then(data => { if (!cancelled) setRoads(data?.roads ?? []); })
+            .then(data => {
+                if (cancelled) return;
+                setRoads(data?.roads ?? []);
+                setStale(Boolean(data?.is_expired || data?.is_fallback));
+                setReadAt(parseUtc(data?.fetched_at));
+            })
             .catch(() => { if (!cancelled) setRoads([]); });
         return () => { cancelled = true; };
     }, []);
+
+    const readTime = readAt ? clockLabel(readAt) : null;
 
     const trouble = useMemo(
         () => (roads ?? []).filter(r => LOCAL_ROUTES.test(r.name) && isDisrupted(r)),
@@ -60,6 +73,20 @@ const RoadStatusStrip: React.FC = () => {
     /* Ikona w kaflu, tak jak w kartach „Na dziś" — sama ikona 16 px na tle
        paska ginęła na desktopie i była praktycznie niewidoczna na telefonie.
        Kolorowe tło daje jej powierzchnię i od razu niesie stan: zielony/bursztyn */
+    if (stale && !trouble.length) {
+        return (
+            <p className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                    <CircleHelp size={20} className="text-neutral-300" aria-hidden />
+                </span>
+                <span className="text-[15px] leading-snug text-neutral-200">
+                    Brak aktualnego odczytu dróg
+                    {readTime && <span className="text-neutral-400"> — ostatni z {readTime}</span>}
+                </span>
+            </p>
+        );
+    }
+
     if (!trouble.length) {
         return (
             <p className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-4 py-3">
@@ -94,6 +121,11 @@ const RoadStatusStrip: React.FC = () => {
                     </span>
                 </p>
             ))}
+            {stale && (
+                <p className="pl-12 text-sm text-neutral-400">
+                    Odczyt{readTime ? ` z ${readTime}` : ''} — może być już nieaktualny
+                </p>
+            )}
         </div>
     );
 };

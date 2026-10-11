@@ -2,12 +2,11 @@ import { useMemo } from 'react';
 import { wasteData } from '../data/wasteSchedule';
 import { WasteEvent } from '../../types';
 
-export const useWasteSchedule = (town: string): WasteEvent[] => {
+// `town` musi być pozycją harmonogramu (`utils/wasteTown`). Nieznana nazwa —
+// także samo „Rybno”, które ma dwa rejony — daje pustą listę, nie cudzy termin.
+export const useWasteSchedule = (town: string | null): WasteEvent[] => {
     return useMemo(() => {
-        // Map 'Rybno' to 'Rybno R1' as default
-        const mappedTown = town === 'Rybno' ? 'Rybno R1' : town;
-
-        const schedule = wasteData[mappedTown];
+        const schedule = town ? wasteData[town] : undefined;
         if (!schedule) {
             return [];
         }
