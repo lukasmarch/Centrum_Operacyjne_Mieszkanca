@@ -18,6 +18,9 @@ coverage/
 
 # Production secrets (never in repo)
 backend/.env.production
+# Kopie robione ręcznie na serwerze (.bak-*, .save) — 11.10.2026 leżało ich tam
+# pięć z żywymi sekretami, widocznych dla `git add -A`. Kopie trzymamy w /root/env-kopie
+backend/.env.production.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
