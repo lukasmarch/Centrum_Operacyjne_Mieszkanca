@@ -1174,6 +1174,22 @@ rozsyłał dowolny push do wszystkich (F-024), ręczne odświeżanie pogody był
   stary (11.10: reload „udany”, nagłówków brak). Kilka sekund przerwy, certyfikaty w `caddy_data`
 - Swagger wyłączony na produkcji (`API_DOCS_ENABLED: "false"` w compose); lokalnie `/docs` działa
 
+## Scheduler: dziennik i nadrabianie po restarcie (2026-10-11)
+**Harmonogram żyje w pamięci, więc każdy deploy gubił joby z czasu przerwy** — 11.10
+pięć deployów: pogoda >2 h bez odświeżenia, ruch z 10:00 przepadł (audyt F-033).
+- `job_runs` (migracja `add_job_runs`): przebieg = wiersz `running → ok/error`, `missed`;
+  restart zamienia wiszące `running` na `interrupted`. Raport: `python -u -m scripts.job_runs_report [--days 7]`
+- `scheduler/job_runs.plan_catch_up`: po starcie joby z terminem w ostatnich **2 h** bez
+  udanego przebiegu idą RAZ, po kolei według terminów (`__catch_up__`, jeden wątek);
+  cykliczne ruszają po 30 s, gdy minął interwał
+- ⚠️ Pierwszy start z pustą tabelą nic nie nadrabia — `__scheduler__` to początek pamięci
+- ⚠️ `NO_RETRY_IF_STARTED` (push wieczorny, raport firm, alert push): przerwany po starcie
+  NIE jest ponawiany — mógł już dojść do części odbiorców
+- Newsletter: commit po każdym odbiorcy + `already_sent` (briefing: dziś, tygodnik: 6 dni) —
+  dopiero to czyni ponowienie bezpiecznym (F-022)
+- `/health` robi `SELECT 1` (503 przy martwej bazie) i podaje stan schedulera
+- Test: `python -m scripts.test_job_runs [--db]` (16 w CI, 24 z bazą — sekcja 6 na atrapach jobów)
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
@@ -1294,4 +1310,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-09-29*
+*Ostatnia aktualizacja: 2026-10-11*
