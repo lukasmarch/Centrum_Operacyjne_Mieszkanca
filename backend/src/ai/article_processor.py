@@ -428,11 +428,13 @@ class ArticleProcessor:
             # w czwartek, bo liczył się wiek ogłoszenia.
             # Energa i meteo mają pierwszeństwo: ich termin pochodzi z komunikatu,
             # nie z odczytu modelu.
+            model_set_term = False
             if article.event_at is None and article.event_until is None:
                 start = _parse_event_time(
                     category_data.event_start, article.published_at
                 )
                 if start:
+                    model_set_term = True
                     article.event_at = start
                     article.event_until = _parse_event_time(
                         category_data.event_end, article.published_at
@@ -464,6 +466,19 @@ class ArticleProcessor:
                     f"Event {article.id}: termin z tekstu {code_start} (UTC)"
                     + (f" do {code_end}" if code_end else "")
                 )
+            elif (
+                # ZAKRES DNI z tekstu wygrywa z jednym dniem od modelu (audyt
+                # 11.10.2026, F-002/F-005): „Od 5 do 11 października” model
+                # zapisywał jako 11.10 bez końca i trwająca akcja była „jutro”.
+                # Tylko gdy dzień modelu leży W zakresie — inaczej to dwie
+                # różne informacje i nie wiemy, która jest terminem.
+                model_set_term
+                and time_span.is_multi_day(code_start, code_end)
+                and code_start <= article.event_at < code_end
+                and (article.event_until is None or article.event_until <= code_end)
+            ):
+                article.event_at, article.event_until = code_start, code_end
+                self.logger.info(f"Event {article.id}: zakres dni z tekstu {code_start}–{code_end} (UTC)")
             elif (
                 article.event_at is not None
                 and article.event_until is None

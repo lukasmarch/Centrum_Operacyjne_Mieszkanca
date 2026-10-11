@@ -193,6 +193,30 @@ DATE_CASES = [
      datetime(2026, 9, 1, 12, 0), None, None),
     ("brak publikacji → nic",
      "16 września 2026", None, None, None),
+    # Zakresy dni (audyt 11.10.2026, F-002) — prawdziwe streszczenia RSS.
+    # Koniec = lokalna północ PO ostatnim dniu; start sprzed publikacji wolno,
+    # bo akcja jeszcze trwa.
+    ("ZAKRES 6491 ROADPOL: „Od 5 do 11 października” — był start 11.10 bez końca",
+     "Od 5 do 11 października 2026 r. europejskie służby drogowe przeprowadzą kolejną akcję ROADPOL.",
+     datetime(2026, 10, 6, 10, 0), datetime(2026, 10, 4, 22, 0), datetime(2026, 10, 11, 22, 0)),
+    ("ZAKRES 6183: „od 1 do 30 września br.” — trwa w dniu publikacji",
+     "w okresie od 1 do 30 września br., Policja przeprowadzi akcję pn. „Zwalniaj przy szkołach”.",
+     datetime(2026, 9, 22, 6, 0), datetime(2026, 8, 31, 22, 0), datetime(2026, 9, 30, 22, 0)),
+    ("ZAKRES 6184: „W dniach 16-22 września 2026 r.”",
+     "W dniach 16-22 września 2026 r. – podczas Europejskiego Tygodnia Mobilności",
+     datetime(2026, 9, 22, 6, 0), datetime(2026, 9, 15, 22, 0), datetime(2026, 9, 22, 22, 0)),
+    ("ZAKRES numeryczny „5.10.2026 - 11.10.2026” — był start bez końca",
+     "Akcja potrwa 5.10.2026 - 11.10.2026 na drogach powiatu.",
+     datetime(2026, 10, 6, 10, 0), datetime(2026, 10, 4, 22, 0), datetime(2026, 10, 11, 22, 0)),
+    ("ZAKRES przez miesiące i zmianę czasu (25.10) — 6156",
+     "W dniach od 21 września do 28 października br. odbędzie się akcja Bezpieczni 60+",
+     datetime(2026, 9, 21, 10, 0), datetime(2026, 9, 20, 22, 0), datetime(2026, 10, 28, 23, 0)),
+    ("ZAKRES już zakończony w dniu publikacji → relacja, nie termin",
+     "W dniach od 1 do 30 września trwała akcja Zwalniaj przy szkołach.",
+     datetime(2026, 10, 6, 10, 0), None, None),
+    ("data PRZED zakresem w tekście wygrywa",
+     "Zebranie 3 października o 18:00, a akcja od 5 do 11 października.",
+     datetime(2026, 10, 1, 10, 0), datetime(2026, 10, 3, 16, 0), None),
 ]
 
 
@@ -211,8 +235,20 @@ def run_dates() -> int:
         detail = f"{got[0]} → {got[1]}" + ("" if ok else f" (oczekiwano {exp_start} → {exp_end})")
         print(f"{'✓' if ok else '✗'} {label:.<58} {detail}")
 
+    # Skutek dla mieszkańca: ROADPOL 10.10 w południe TRWA, a nie „jutro”
+    from src.services.feed_policy import time_label
+    start, end = parse_date_span(DATE_CASES[-7][1], DATE_CASES[-7][2])
+    label = time_label(None, start, end, datetime(2026, 10, 10, 10, 0))
+    ok = label == "ZDARZENIE 05.10–11.10 — TRWA TERAZ"
+    failures += not ok
+    print(f"{'✓' if ok else '✗'} {'ROADPOL 10.10 12:00 → etykieta „TRWA TERAZ”':.<58} {label}")
+    label = time_label(None, start, end, datetime(2026, 10, 12, 10, 0))
+    ok = label.endswith("już się zakończyło")
+    failures += not ok
+    print(f"{'✓' if ok else '✗'} {'ROADPOL 12.10 → „już się zakończyło”':.<58} {label}")
+
     print("-" * 78)
-    print(f"{len(DATE_CASES) - failures}/{len(DATE_CASES)} zgodnych z oczekiwaniem")
+    print(f"{len(DATE_CASES) + 2 - failures}/{len(DATE_CASES) + 2} zgodnych z oczekiwaniem")
     return failures
 
 

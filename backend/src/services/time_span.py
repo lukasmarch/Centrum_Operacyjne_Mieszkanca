@@ -125,6 +125,16 @@ def is_all_day(start: Optional[datetime], end: Optional[datetime] = None) -> boo
     return (local.hour, local.minute) == (0, 0)
 
 
+def is_multi_day(start: Optional[datetime], end: Optional[datetime]) -> bool:
+    """Zakres pełnych dni: od lokalnej północy do lokalnej północy ≥ dobę później
+    (tak zapisuje go `parse_date_span`). Jedna doba (00:00–00:00 nazajutrz)
+    i zakres godzin przez północ („22:00–02:00”) nim nie są."""
+    if start is None or end is None:
+        return False
+    s, e = to_local(start), to_local(end)
+    return (s.hour, s.minute) == (0, 0) and (e.hour, e.minute) == (0, 0) and (e.date() - s.date()).days >= 2
+
+
 # ── To samo, ale dla zapytania ──────────────────────────────────────────────
 #
 # Baza odpowiada na te same trzy pytania co funkcje wyżej i nie umie wykonać
@@ -199,6 +209,11 @@ def when_label(
         return "bez daty"
 
     local_start = to_local(start)
+    if is_multi_day(start, end):
+        # Zakres dni („od 5 do 11 października”): koniec to północ PO ostatnim
+        # dniu, więc ostatni dzień = koniec minus minuta
+        last_day = to_local(end) - timedelta(minutes=1)
+        return f"{local_start:%d.%m}–{last_day:%d.%m}"
     offset = (local_start.date() - to_local(now or datetime.utcnow()).date()).days
     word = _DAY_WORDS.get(offset) or f"{local_start:%d.%m}"
 
@@ -345,6 +360,79 @@ _SENTENCE_END_RE = re.compile(r"[.!?]\s+(?=[a-z])|\n\s*(?=[a-z])")
 # `article_processor._parse_event_time` dla odczytu modelu (pół roku).
 MAX_AHEAD_DAYS = 180
 
+# --- zakres dni ---------------------------------------------------------------
+#
+# 11.10.2026 (audyt, F-002): „Od 5 do 11 października” zapisywało się jako
+# start 11.10 bez końca — pierwsza liczba nie ma miesiąca, więc `_DATE_RE`
+# łapał dopiero „11 października”. Akcja ROADPOL, która TRWAŁA, wisiała w feedzie
+# jako „jutro”; „5.10.2026 - 11.10.2026” dawało start 5.10 i gubiło koniec.
+# Zakres jest osobnym zdaniem gramatyki, sprawdzanym PRZED pojedynczą datą.
+_RANGE_RES = (
+    # „od 5 do 11 października”, „od 28 września do 4 października 2026”
+    re.compile(
+        rf"\bod\s+(\d{{1,2}})(?:\s+({_MONTH_ALT}))?(?:\s+(\d{{4}}))?"
+        rf"\s+do\s+(\d{{1,2}})\s+({_MONTH_ALT})(?:\s+(\d{{4}}))?\b"
+    ),
+    # „5–11 października”, „28 września – 4 października 2026”
+    re.compile(
+        rf"\b(\d{{1,2}})(?:\s+({_MONTH_ALT}))?(?:\s+(\d{{4}}))?"
+        rf"\s*{_SEP}\s*(\d{{1,2}})\s+({_MONTH_ALT})(?:\s+(\d{{4}}))?\b"
+    ),
+)
+# „5.10.2026 - 11.10.2026”, „5.10-11.10.2026”, „od 5.10.2026 do 11.10.2026”.
+# Koniec WYMAGA roku — inaczej „8.00-16.00” (godziny ZGK) byłoby zakresem dni.
+_RANGE_NUM_RE = re.compile(
+    rf"\b(\d{{1,2}})\.(\d{{1,2}})(?:\.(\d{{4}}))?\s*(?:{_SEP}|do)\s*(\d{{1,2}})\.(\d{{1,2}})\.(\d{{4}})\b"
+)
+# Dłuższy „zakres” to raczej dwie niezależne daty niż jedno zdarzenie
+MAX_RANGE_DAYS = 120
+
+
+def _range_dates(d1, m1, y1, d2, m2, y2, published_day):
+    """Liczby z dopasowania → (pierwszy dzień, ostatni dzień) albo None."""
+    m1 = m1 or m2
+    years = [y2] if y2 else [published_day.year, published_day.year + 1]
+    for end_year in years:
+        start_year = y1 or (end_year if m1 <= m2 else end_year - 1)
+        try:
+            first = datetime(start_year, m1, d1).date()
+            last = datetime(end_year, m2, d2).date()
+        except ValueError:
+            return None
+        if last < published_day:
+            continue  # zakres za nami (relacja) — może następny rok
+        if first > last or (last - first).days > MAX_RANGE_DAYS:
+            return None
+        if (last - published_day).days > MAX_AHEAD_DAYS:
+            return None
+        return first, last
+    return None
+
+
+def _find_range(text_flat: str, published_day):
+    """Pierwszy zakres dni, który się jeszcze nie skończył → (pozycja, koniec dopasowania, pierwszy, ostatni)."""
+    found = []
+    for pattern in _RANGE_RES:
+        for m in pattern.finditer(text_flat):
+            d1, mon1, y1, d2, mon2, y2 = m.groups()
+            dates = _range_dates(
+                int(d1), _MONTHS[mon1] if mon1 else None, int(y1) if y1 else None,
+                int(d2), _MONTHS[mon2], int(y2) if y2 else None, published_day,
+            )
+            if dates:
+                found.append((m.start(), m.end(), *dates))
+                break
+    for m in _RANGE_NUM_RE.finditer(text_flat):
+        d1, mo1, y1, d2, mo2, y2 = m.groups()
+        dates = _range_dates(
+            int(d1), int(mo1), int(y1) if y1 else None,
+            int(d2), int(mo2), int(y2), published_day,
+        )
+        if dates:
+            found.append((m.start(), m.end(), *dates))
+            break
+    return min(found) if found else None
+
 
 def parse_date_span(
     text: Optional[str],
@@ -365,14 +453,22 @@ def parse_date_span(
     Sama data bez godziny → lokalna PÓŁNOC, jak zapisuje kategoryzacja
     (zapowiedź całodniowa trwa do końca swojej doby — patrz `_event_is_over`).
     Godziny bierzemy wyłącznie z okna tuż za datą.
+
+    ZAKRES DNI („od 5 do 11 października”) → (lokalna północ pierwszego dnia,
+    lokalna północ PO ostatnim dniu). Wyjątek od reguły „nie za nami”: zakres
+    zaczęty przed publikacją się liczy, o ile jeszcze trwa — to akcja w toku,
+    nie relacja. Wygrywa to, co w tekście stoi WCZEŚNIEJ: zakres albo data.
     """
     if not reference_at or not text:
         return None, None
 
     text_flat = flat(text)
     published_day = to_local(reference_at).date()
+    span = _find_range(text_flat, published_day)
 
     for match in _DATE_RE.finditer(text_flat):
+        if span and match.start() >= span[0]:
+            break  # zakres stoi wcześniej albo ta data jest jego częścią
         if match.group(2):
             day, month = int(match.group(1)), _MONTHS[match.group(2)]
             year = int(match.group(3)) if match.group(3) else None
@@ -416,4 +512,9 @@ def parse_date_span(
                 end = None
         return to_utc(start), (to_utc(end) if end else None)
 
+    if span:
+        _, _, first, last = span
+        start_local = datetime(first.year, first.month, first.day)
+        end_local = datetime(last.year, last.month, last.day) + timedelta(days=1)
+        return to_utc(start_local), to_utc(end_local)
     return None, None
