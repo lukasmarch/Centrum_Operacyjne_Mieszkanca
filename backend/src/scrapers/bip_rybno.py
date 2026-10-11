@@ -349,6 +349,13 @@ class BipRybnoScraper(BaseScraper):
 
                 except Exception as e:
                     self.logger.error(f"Error scraping BIP page {page_num}: {e}")
+                    # Pierwsza strona to całe źródło: błąd = źródło nie odpowiada.
+                    # Do 11.10.2026 `break` zwracał pustą listę i job zapisywał
+                    # sukces — BIP od lipca odpowiada 403, a w bazie stał jako
+                    # „zeskanowany dziś” (audyt, F-019). Dalsze strony to tylko
+                    # głębokość: częściowy wynik jest wynikiem.
+                    if page_num == 1:
+                        raise
                     break
 
         return all_saved_ids

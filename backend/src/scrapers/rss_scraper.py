@@ -50,8 +50,9 @@ class RSSFeedScraper(BaseScraper):
             feed = await self._fetch_feed(url)
 
             if not feed:
-                self.logger.error("Failed to fetch RSS feed")
-                return []
+                # Błąd pobrania to NIE pusty kanał — job ma to zapisać jako
+                # porażkę źródła, nie jako „zeskanowane” (audyt 11.10.2026, F-019)
+                raise RuntimeError("Failed to fetch RSS feed")
 
             # feedparser jest tolerancyjny - sprawdź czy są entries mimo błędów
             if feed.bozo:
@@ -104,7 +105,7 @@ class RSSFeedScraper(BaseScraper):
 
         except Exception as e:
             self.logger.error(f"RSS scraping failed: {e}")
-            return []
+            raise
 
     async def _fetch_feed(self, url: str) -> feedparser.FeedParserDict:
         """

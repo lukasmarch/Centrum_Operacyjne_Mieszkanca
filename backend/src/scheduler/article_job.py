@@ -14,6 +14,8 @@ from src.scrapers.registry import get_scraper, list_scrapers
 from src.scrapers.rss_scraper import RSSFeedScraper
 from src.scrapers.bip_rybno import BipRybnoScraper
 from src.utils.logger import setup_logger
+from src.services import source_health
+from src.services.admin_telegram import send_admin_telegram
 
 logger = setup_logger("ArticleScheduler")
 
@@ -97,6 +99,7 @@ async def update_articles_job(
     total_updated = 0
     total_sources = 0
     failed_sources = []
+    health_changes: list = []  # (źródło, zmiana stanu, błąd) — alarm na końcu przebiegu
 
     async with async_session() as session:
         # Fetch active sources (optionally filtered by name)
@@ -120,7 +123,10 @@ async def update_articles_job(
                 "name": s.name,
                 "type": s.type,
                 "url": s.url,
-                "scraping_config": s.scraping_config
+                "scraping_config": s.scraping_config,
+                # Poprzedni stan — alarm idzie tylko przy jego zmianie
+                "last_success_at": s.last_success_at,
+                "last_error_at": s.last_error_at,
             }
             for s in sources_orm
         ]
@@ -219,20 +225,29 @@ async def update_articles_job(
                 total_saved += new_count
                 total_updated += updated_count
 
-                # Update last_scraped timestamp
-                await session.execute(
-                    update(Source)
-                    .where(Source.id == source_id)
-                    .values(last_scraped=datetime.utcnow())
-                )
-                await session.commit()
+                # Próba ORAZ sukces — źródło odpowiedziało (pusty wynik też)
+                change = await source_health.record(session, source, ok=True)
+                if change:
+                    health_changes.append((source_name, change, None))
 
             except Exception as e:
                 logger.error(f"✗ Failed to scrape {source_name}: {e}")
                 failed_sources.append(f"{source_name} ({str(e)[:50]})")
                 await session.rollback()
+                # Do 11.10.2026 porażka nie zostawiała śladu w `sources` (audyt, F-019)
+                try:
+                    change = await source_health.record(session, source, ok=False, error=str(e))
+                    if change:
+                        health_changes.append((source_name, change, str(e)))
+                except Exception as record_error:  # noqa: BLE001 — zapis stanu nie wywraca przebiegu
+                    logger.error(f"Nie zapisano stanu źródła {source_name}: {record_error}")
+                    await session.rollback()
 
     await engine.dispose()
+
+    message = source_health.alert_text(health_changes)
+    if message:
+        send_admin_telegram(message)
 
     # Summary
     logger.info("\n" + "=" * 60)

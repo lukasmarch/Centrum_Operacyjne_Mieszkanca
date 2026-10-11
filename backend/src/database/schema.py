@@ -196,7 +196,12 @@ class Source(SQLModel, table=True):
     type: str = Field(max_length=50)
     url: Optional[str] = None
     scraping_config: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
-    last_scraped: Optional[datetime] = None
+    last_scraped: Optional[datetime] = None  # ostatnia PRÓBA (także nieudana)
+    # Ostatni przebieg, w którym źródło odpowiedziało — także bez nowych wpisów.
+    # Do 11.10.2026 nie było czym odróżnić ciszy od awarii (audyt, F-019).
+    last_success_at: Optional[datetime] = None
+    last_error: Optional[str] = Field(default=None, max_length=300)
+    last_error_at: Optional[datetime] = None
     status: str = Field(default="active", max_length=20)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

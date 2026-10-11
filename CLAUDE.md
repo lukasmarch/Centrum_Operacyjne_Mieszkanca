@@ -868,6 +868,20 @@ surowym `strftime` na UTC, a obok, w bloku SPORT, ten sam bieg miał poprawne
 - Testy: `test_timezone_guard`, `test_event_terms` sekcja 5 (16 sprawdzeń na
   prawdziwym rekordzie biegu), `test_summary_headline` 36 + 9 (okno vs klucz)
 
+## Stan źródeł: próba ≠ sukces (2026-10-11)
+**BIP od lipca odpowiada 403, a w bazie stał jako „zeskanowany dziś”** — scraper połykał
+błąd, zwracał pustą listę, a job zapisywał `last_scraped` (audyt, F-019).
+- `sources.last_scraped` = ostatnia PRÓBA; `last_success_at` = źródło ODPOWIEDZIAŁO (pusty
+  wynik też — cisza profilu to poprawny stan); `last_error`, `last_error_at`
+  (migracja `add_source_freshness`)
+- RSS i BIP (pierwsza strona) RZUCAJĄ przy błędzie pobrania; dalsze strony BIP to głębokość
+- `services/source_health`: alarm na Telegram WYŁĄCZNIE przy zmianie stanu (działa↔leży),
+  jedna wiadomość na przebieg — BIP z blokadą nie spamuje dwa razy dziennie
+- Telegram także dla padniętego jobu schedulera i nieudanych wysyłek newslettera
+  (wcześniej tylko Resend — przy awarii poczty cisza); nieudana wysyłka = wiersz `failed`
+- Sprawdzenie: `select name, last_success_at, last_error_at, last_error from sources order by last_success_at nulls first`
+- Test: `python -m scripts.test_source_health` (w CI)
+
 ## Zapis znaczników czasu: strefa procesu (2026-10-11)
 **Kontener ma `TZ=Europe/Warsaw`, więc każda konwersja „przez strefę procesu” zapisywała
 czas LOKALNY do kolumny naiwnego UTC.** Audyt (F-003, H-3):

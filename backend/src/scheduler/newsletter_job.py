@@ -16,6 +16,7 @@ from src.database import (
 from src.newsletter.generator import NewsletterGenerator
 from src.newsletter.email_service import EmailService
 from src.config import settings
+from src.services.admin_telegram import send_admin_telegram
 
 logger = logging.getLogger("Scheduler.Newsletter")
 
@@ -36,6 +37,20 @@ async def _marketing_consent(session, subscriber) -> bool:
     if not user or not user.consent_marketing:
         return False
     return user.tier == UserTier.FREE.value
+
+
+def _alert_failures(kind: str, stats: dict, generation_failed: list) -> None:
+    """Jedna wiadomość na Telegram, gdy cokolwiek nie doszło (audyt 11.10.2026, F-020).
+
+    Kanał niezależny od poczty — przy awarii Resend mail o awarii Resend nie dojdzie.
+    """
+    if not stats.get("failed") and not generation_failed:
+        return
+    lines = [f"⚠️ {kind}: wysłano {stats.get('sent', 0)}, nieudanych {stats.get('failed', 0)}"]
+    if generation_failed:
+        lines.append("Bez treści (nikt z tej miejscowości nie dostał maila):")
+        lines += [f"• {item}" for item in generation_failed]
+    send_admin_telegram("\n".join(lines))
 
 
 async def send_weekly_newsletter():
@@ -82,6 +97,8 @@ async def send_weekly_newsletter():
                 content = await generator.generate_weekly(session)
             except Exception as e:
                 logger.error(f"Failed to generate weekly newsletter: {str(e)}")
+                # Do 11.10.2026 ta porażka kończyła job „sukcesem” bez śladu (audyt, F-020)
+                send_admin_telegram(f"🔴 Tygodnik się nie wygenerował — nikt go dziś nie dostał: {str(e)[:300]}")
                 return stats
 
             # Sekcja „Polecane firmy" (plan Firma lokalna) — reklama w newsletterze.
@@ -123,6 +140,12 @@ async def send_weekly_newsletter():
                     elif result["status"] == "failed":
                         stats["failed"] += 1
                         logger.error(f"Failed to send to {subscriber.email}: {result.get('error')}")
+                        session.add(NewsletterLog(
+                            subscriber_id=subscriber.id,
+                            newsletter_type="weekly",
+                            subject=content.get("subject", "Weekly Newsletter"),
+                            status="failed",
+                        ))
 
                     else:
                         stats["skipped"] += 1
@@ -136,6 +159,7 @@ async def send_weekly_newsletter():
         await engine.dispose()
 
     logger.info(f"Weekly newsletter job completed: {stats}")
+    _alert_failures("Tygodnik", stats, [])
     return stats
 
 
@@ -157,6 +181,7 @@ async def send_daily_newsletter():
         "failed": 0,
         "skipped": 0
     }
+    generation_failed: list = []
 
     try:
         async with async_session() as session:
@@ -219,6 +244,7 @@ async def send_daily_newsletter():
                         content["weekly_card"] = weekly_card
                 except Exception as e:
                     logger.error(f"Failed to generate daily for {location}: {str(e)}")
+                    generation_failed.append(f"{location} ({len(subs)} odb.): {str(e)[:120]}")
                     continue
 
                 for subscriber, user in subs:
@@ -260,6 +286,12 @@ async def send_daily_newsletter():
 
                         elif result["status"] == "failed":
                             stats["failed"] += 1
+                            session.add(NewsletterLog(
+                                subscriber_id=subscriber.id,
+                                newsletter_type="daily",
+                                subject=content.get("subject", "Daily Briefing"),
+                                status="failed",
+                            ))
 
                         else:
                             stats["skipped"] += 1
@@ -273,6 +305,7 @@ async def send_daily_newsletter():
         await engine.dispose()
 
     logger.info(f"Daily newsletter job completed: {stats}")
+    _alert_failures("Briefing dzienny", stats, generation_failed)
     return stats
 
 

@@ -53,7 +53,7 @@ _alert_lock = threading.Lock()
 
 def _send_admin_alert(job_id: str, exception: Exception, traceback_str: str) -> None:
     """
-    Wyślij email do admina gdy job schedulera crasha.
+    Alarm do admina, gdy job schedulera crasha: Telegram, potem e-mail.
 
     SYNC — wywoływana z wątku APScheduler (nie może używać async/await).
     Rate limit: max 1 email/job/ADMIN_ALERT_RATE_LIMIT_HOURS godzin.
@@ -61,12 +61,6 @@ def _send_admin_alert(job_id: str, exception: Exception, traceback_str: str) -> 
     """
     try:
         from src.config import settings
-
-        if not settings.ADMIN_ALERT_EMAIL:
-            return
-        if not settings.RESEND_API_KEY:
-            logger.warning("ADMIN_ALERT_EMAIL ustawiony ale brak RESEND_API_KEY — alert pominięty")
-            return
 
         now = datetime.now()
         rate_limit = timedelta(hours=settings.ADMIN_ALERT_RATE_LIMIT_HOURS)
@@ -84,6 +78,18 @@ def _send_admin_alert(job_id: str, exception: Exception, traceback_str: str) -> 
 
         exc_type = type(exception).__name__
         exc_message = str(exception)
+
+        # Telegram NIEZALEŻNIE od poczty (audyt 11.10.2026, F-020): alarm szedł
+        # wyłącznie przez Resend, więc awaria poczty (31.08) albo jobu wysyłki
+        # newslettera nie dawała sygnału żadnym kanałem.
+        from src.services.admin_telegram import send_admin_telegram
+        send_admin_telegram(f"🔴 Job „{job_id}” padł: {exc_type}: {exc_message[:300]}")
+
+        if not settings.ADMIN_ALERT_EMAIL:
+            return
+        if not settings.RESEND_API_KEY:
+            logger.warning("ADMIN_ALERT_EMAIL ustawiony ale brak RESEND_API_KEY — alert pominięty")
+            return
         tb_snippet = traceback_str[-2000:] if len(traceback_str) > 2000 else traceback_str
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
 

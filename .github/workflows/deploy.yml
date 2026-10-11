@@ -53,7 +53,7 @@ jobs:
             test_content_score test_council_sessions test_council_store test_council_summary \
             test_event_dedup test_event_gate test_event_terms test_feed_dedup test_feed_window \
             test_gmina_facts test_grounding test_legal_acts test_newsletter_tense \
-            test_provenance test_road_context test_storm_policy test_summary_context \
+            test_provenance test_road_context test_source_health test_storm_policy test_summary_context \
             test_summary_headline test_timezone_guard
           do
             name="${t%%:*}"; args=""; [ "$name" != "$t" ] && args="${t#*:}"
