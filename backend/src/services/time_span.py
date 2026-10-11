@@ -48,6 +48,17 @@ def to_local(utc_naive: datetime) -> datetime:
     return utc_naive.replace(tzinfo=ZoneInfo("UTC")).astimezone(LOCAL_TZ).replace(tzinfo=None)
 
 
+def from_epoch(seconds: float) -> datetime:
+    """Unix timestamp → naiwny UTC, niezależnie od strefy procesu.
+
+    `datetime.fromtimestamp` bez `tz` daje czas LOKALNY procesu, a kontener
+    produkcyjny ma `TZ=Europe/Warsaw`. Do 11.10.2026 (audyt, F-003/H-3) posty
+    z Facebooka stały przez to w bazie +2 h latem, a wpisy RSS (`time.mktime`
+    na krotce UTC) +1 h — Energa ogłaszała wyłączenia „po” własnym pobraniu.
+    """
+    return datetime.fromtimestamp(seconds, tz=ZoneInfo("UTC")).replace(tzinfo=None)
+
+
 # ── Doba, całodniowość i etykieta „kiedy" ───────────────────────────────────
 #
 # Trzy pytania, które w całym projekcie zadawano ośmioma własnymi kopiami —

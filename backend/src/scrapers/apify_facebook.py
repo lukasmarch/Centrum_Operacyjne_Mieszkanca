@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import httpx
 import re
 
@@ -296,11 +296,16 @@ class ApifyFacebookScraper(BaseScraper):
                     if timestamp:
                         try:
                             # Apify zwraca Unix timestamp (integer)
+                            # Bez strefy `fromtimestamp` dawał czas lokalny kontenera:
+                            # posty stały w bazie +2 h latem (audyt 11.10.2026, H-3)
                             if isinstance(timestamp, (int, float)):
-                                published_at = datetime.fromtimestamp(timestamp)
-                            # Lub ISO string
+                                published_at = time_span.from_epoch(timestamp)
+                            # Lub ISO string — sprowadzony do naiwnego UTC jak reszta bazy
                             elif isinstance(timestamp, str):
-                                published_at = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                parsed = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                if parsed.tzinfo is not None:
+                                    parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+                                published_at = parsed
                         except Exception as e:
                             self.logger.warning(f"Nieprawidłowy timestamp: {timestamp} ({type(timestamp)})")
 

@@ -176,8 +176,10 @@ class WeatherService:
             "visibility": data.get("visibility"),
             "rain_1h": rain.get("1h"),
             "rain_3h": rain.get("3h"),
-            "sunrise": datetime.fromtimestamp(sys.get("sunrise")) if sys.get("sunrise") else None,
-            "sunset": datetime.fromtimestamp(sys.get("sunset")) if sys.get("sunset") else None,
+            # tz-ok: wschód i zachód słońca CELOWO w czasie lokalnym — agent
+            # (`ai/tools/weather.py`) i front pokazują godzinę wprost, bez konwersji
+            "sunrise": datetime.fromtimestamp(sys.get("sunrise")) if sys.get("sunrise") else None,  # tz-ok: jw.
+            "sunset": datetime.fromtimestamp(sys.get("sunset")) if sys.get("sunset") else None,  # tz-ok: jw., czas lokalny
             "fetched_at": datetime.utcnow(),
             "is_current": True
         }

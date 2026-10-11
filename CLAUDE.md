@@ -867,6 +867,22 @@ surowym `strftime` na UTC, a obok, w bloku SPORT, ten sam bieg miał poprawne
 - Testy: `test_timezone_guard`, `test_event_terms` sekcja 5 (16 sprawdzeń na
   prawdziwym rekordzie biegu), `test_summary_headline` 36 + 9 (okno vs klucz)
 
+## Zapis znaczników czasu: strefa procesu (2026-10-11)
+**Kontener ma `TZ=Europe/Warsaw`, więc każda konwersja „przez strefę procesu” zapisywała
+czas LOKALNY do kolumny naiwnego UTC.** Audyt (F-003, H-3):
+- **Facebook +2 h latem** (+1 zimą): Apify oddaje unix timestamp, `fromtimestamp(ts)` bez `tz`
+  robił z niego czas lokalny. Główne źródło wiadomości o gminie stało 2 h „w przyszłości”,
+  a `parse_date_span` liczył dzień publikacji o dobę do przodu dla postów 22:00–24:00
+- **RSS +1 h latem**: `time.mktime` na krotce UTC z feedparsera. ⚠️ Krotka ma `tm_isdst=0`,
+  więc latem `mktime` czyta ją jako czas ZIMOWY — test na `datetime.timetuple()`
+  (`tm_isdst=-1`) przechodził na zepsutym kodzie. Dowód: Energa 15/16 wpisów „opublikowanych”
+  po własnym pobraniu
+- `time_span.from_epoch(ts)` — jedyna droga timestamp → naiwny UTC. Strażnik
+  (`test_timezone_guard`) łapie `mktime(` i `fromtimestamp(` bez `tz` + test zachowania pod TZ prod
+- ⚠️ **Bez backfillu** (zasada „nie działamy wstecz”). Re-scrape nadpisuje `published_at`,
+  więc wpisy wciąż obecne w kanałach poprawiają się same; starsze zostają przesunięte
+- Wschód/zachód słońca w `integrations/weather.py` CELOWO lokalne (`# tz-ok`)
+
 ## Wyszukiwarka pokazywała 1% bazy — i nikt tego nie widział (2026-09-05)
 **Mieszkaniec pyta o nocny bieg, który odbywa się TEGO DNIA w Kopaniarzach.
 Agent podaje „Leśny zryw" ze Starych Jabłonek — cudzy bieg sprzed pół roku.**

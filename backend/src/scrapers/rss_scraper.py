@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from src.scrapers.base import BaseScraper
 from src.database.schema import Source
+from src.services.time_span import from_epoch
 from src.utils.logger import setup_logger
 
 logger = setup_logger("RSSFeedScraper")
@@ -232,10 +233,11 @@ class RSSFeedScraper(BaseScraper):
 
         if date_tuple:
             try:
-                # Konwertuj time.struct_time na datetime
-                import time
-                timestamp = time.mktime(date_tuple)
-                return datetime.fromtimestamp(timestamp)
+                # feedparser oddaje krotkę w UTC. `time.mktime` czyta ją jako czas
+                # LOKALNY procesu, więc pod `TZ=Europe/Warsaw` latem wychodziło +1 h
+                # (audyt 11.10.2026, F-003). `calendar.timegm` to odwrotność dla UTC.
+                import calendar
+                return from_epoch(calendar.timegm(date_tuple))
             except Exception as e:
                 self.logger.warning(f"Failed to parse date: {e}")
 
