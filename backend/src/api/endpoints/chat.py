@@ -415,19 +415,30 @@ async def get_chat_history(
     session: AsyncSession = Depends(get_session),
     user: Optional[User] = Depends(get_optional_user)
 ):
-    """Get conversation history"""
-    user_id = user.id if user else None
+    """Historia rozmów — WYŁĄCZNIE własnych, więc wyłącznie dla zalogowanych.
+
+    Do 11.10.2026 (audyt, F-001) anonim dostawał listę rozmów WSZYSTKICH
+    użytkowników, a każdą rozmowę anonimową czytał po kolejnym id:
+    filtr stał pod `if user_id:`, a kontrola własności `conv.user_id != user_id`
+    przepuszczała `None == None`. Rozmowa anonimowa nie ma właściciela,
+    którego dałoby się sprawdzić — więc nie jest czytelna dla nikogo.
+    """
+    if user is None:
+        if conversation_id:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        return {"conversations": []}
+    user_id = user.id
 
     if conversation_id:
-        # Verify ownership before returning messages
+        # 404, nie 403: odpowiedź nie zdradza, czy cudza rozmowa istnieje
         conv_result = await session.execute(
-            select(Conversation).where(Conversation.id == conversation_id)
+            select(Conversation)
+            .where(Conversation.id == conversation_id)
+            .where(Conversation.user_id == user_id)
         )
         conv = conv_result.scalar_one_or_none()
         if not conv:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        if conv.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Forbidden")
 
         result = await session.execute(
             select(ChatMessage)
@@ -448,9 +459,12 @@ async def get_chat_history(
         ]}
 
     # Get recent conversations
-    query = select(Conversation).order_by(Conversation.updated_at.desc()).limit(limit)
-    if user_id:
-        query = query.where(Conversation.user_id == user_id)
+    query = (
+        select(Conversation)
+        .where(Conversation.user_id == user_id)
+        .order_by(Conversation.updated_at.desc())
+        .limit(limit)
+    )
 
     result = await session.execute(query)
     conversations = result.scalars().all()

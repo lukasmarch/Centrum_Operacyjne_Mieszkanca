@@ -527,7 +527,8 @@ dostawało odpowiedź „nie posiadam danych, skontaktuj się z urzędem" + wykr
   Zwykłe `npm run build` z ręki daje bundle z `localhost:8000` — nie wgrywaj takiego `dist/`
 - Auth dependency: `get_optional_user` (nie `get_current_user_optional`)
 - SSE split: po `\n` + `trim()` (nie `\n\n` - base_agent yield ma trailing `\n`)
-- pgvector insert: `$emb$[...]$emb$::vector`, `$meta${json}$meta$::jsonb` (dollar-quoting)
+- pgvector insert: wektor literałem `$emb$[...]$emb$::vector` (same liczby), metadane PARAMETREM
+  `CAST(:metadata AS jsonb)` — dollar-quoting tytułu ze scrapingu to SQL injection (audyt 11.10)
 - DB session w SSE generatorze: używaj `async_session()` z `database.connection`
 - Frontend routing: `useState<AppSection>` w App.tsx (switch/case, brak react-router)
 - Redis usunięty - cache w PostgreSQL
@@ -1113,6 +1114,22 @@ sołectwa ma zobaczyć więcej osób niż na prywatnym profilu sołtysa.
 - Test: `python -m scripts.test_solectwa [--live]` — własna domena kont, bo sprzątanie
   kasuje całą domenę (wspólna `@qa.rybnolive.pl` zabierała konta z ręcznego testu)
 - Po starcie sołtysa Żabin: wyłączyć źródło „Facebook - Sołtys Żabiny” (`ANNOUNCEMENT_ONLY_SOURCES`)
+
+## Kontrola dostępu po audycie (2026-10-11)
+**Audyt (`~/Desktop/moj-projekt-audyt/audit-output/40-final-report.md`) znalazł klasę, nie błąd:**
+każda trasa pilnowała dostępu sama albo wcale. Anonim czytał historię czatu WSZYSTKICH
+(F-001: `conv.user_id != user_id` przepuszczało `None == None`), klient planu „Firma”
+rozsyłał dowolny push do wszystkich (F-024), ręczne odświeżanie pogody było publiczne.
+- **Strażnik: `python -m scripts.test_access_control`** — sekcja 7 czerwieni każdą trasę
+  POST/PUT/PATCH/DELETE bez zależności logowania, która nie stoi na `PUBLIC_WRITE_ROUTES`
+  z powodem. Nowa trasa publiczna = świadomy wpis, nie przeoczenie
+- Rozmowa anonimowa nie ma właściciela → **nie jest czytelna dla nikogo** (404, nie 403)
+- `/api/push/test` — admin, wyłącznie na subskrypcję wskazaną `endpoint`
+- **IP klienta**: uvicorn z `--forwarded-allow-ips='*'` (compose). Do 11.10 `client.host`
+  był IP Caddy dla wszystkich → limit anonimowego czatu 3/dobę był wspólny dla całej gminy.
+  ⚠️ Każdy nowy limit po IP wymaga tej flagi
+- Whisper: 20 nagrań/IP/dobę + sufit 300/dobę, licznik w pamięci (jeden worker)
+- Swagger wyłączony na produkcji (`API_DOCS_ENABLED: "false"` w compose); lokalnie `/docs` działa
 
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem

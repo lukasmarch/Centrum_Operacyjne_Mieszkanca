@@ -5,7 +5,7 @@ Endpointy:
 - GET  /api/push/vapid-public-key  – publiczny klucz VAPID dla frontend
 - POST /api/push/subscribe          – rejestracja subskrypcji
 - DELETE /api/push/subscribe        – wypisanie (po endpoint URL)
-- POST /api/push/test               – test wysyłki (tylko admin/business)
+- POST /api/push/test               – test wysyłki na WŁASNĄ subskrypcję (tylko admin)
 """
 from datetime import datetime
 from typing import Optional, List
@@ -17,7 +17,7 @@ from sqlmodel import select
 from src.config import settings
 from src.database.connection import async_session
 from src.database.schema import PushSubscription
-from src.auth.dependencies import get_optional_user, get_business_user
+from src.auth.dependencies import get_optional_user, get_admin_user
 from src.services.push_service import push_service
 from src.utils.logger import setup_logger
 
@@ -46,6 +46,8 @@ class PushUnsubscribeRequest(BaseModel):
 
 
 class PushTestRequest(BaseModel):
+    # Subskrypcja przeglądarki, z której wołamy test — jedyny odbiorca.
+    endpoint: str
     title: str = "Test powiadomienia"
     body: str = "Centrum Operacyjne Mieszkańca – test push"
     url: str = "/"
@@ -151,26 +153,39 @@ async def unsubscribe_push(payload: PushUnsubscribeRequest):
 @router.post("/test")
 async def test_push(
     payload: PushTestRequest,
-    current_user=Depends(get_business_user),
+    current_user=Depends(get_admin_user),
 ):
     """
-    Test wysyłki push notification do wszystkich aktywnych subskrybentów.
-    Wymaga konta Business.
+    Test wysyłki na JEDNĄ subskrypcję — tę, którą wskazuje wołający.
+
+    Do 11.10.2026 (audyt, F-024) każdy klient planu „Firma lokalna” rozsyłał
+    tędy dowolny tytuł, treść i adres do WSZYSTKICH subskrybentów kanału
+    `alerty` — kanału awarii, któremu mieszkańcy ufają najbardziej.
+    Test nie potrzebuje odbiorców poza sobą, więc nie ma ich wcale.
     """
     async with async_session() as session:
-        sent = await push_service.send_to_category(
-            session=session,
-            category="alerty",
+        result = await session.execute(
+            select(PushSubscription)
+            .where(PushSubscription.endpoint == payload.endpoint)
+            .where(PushSubscription.active == True)
+        )
+        sub = result.scalars().first()
+        if not sub:
+            raise HTTPException(status_code=404, detail="Subskrypcja nie znaleziona")
+        ok = await push_service.send_push(
+            endpoint=sub.endpoint,
+            p256dh=sub.p256dh,
+            auth=sub.auth,
             title=payload.title,
             body=payload.body,
             url=payload.url,
         )
-    return {"status": "sent", "recipients": sent}
+    return {"status": "sent" if ok else "failed", "recipients": 1 if ok else 0}
 
 
 @router.get("/subscriptions/count")
-async def get_subscriptions_count(current_user=Depends(get_business_user)):
-    """Liczba aktywnych subskrypcji push (tylko Business)."""
+async def get_subscriptions_count(current_user=Depends(get_admin_user)):
+    """Liczba aktywnych subskrypcji push (tylko admin)."""
     from sqlalchemy import func
     async with async_session() as session:
         result = await session.execute(

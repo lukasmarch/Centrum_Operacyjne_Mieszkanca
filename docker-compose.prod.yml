@@ -25,6 +25,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/centrum_operacyjne
       TZ: Europe/Warsaw
+      API_DOCS_ENABLED: "false"
     env_file:
       - ./backend/.env.production
     volumes:
@@ -32,7 +33,14 @@ services:
       - logs:/app/logs
       # Zdjęcia pism od sołtysów — NIE montować do Caddy (w odróżnieniu od uploads)
       - private_uploads:/app/private_uploads
-    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level warning
+    # --forwarded-allow-ips: bez tego uvicorn ufa X-Forwarded-For tylko z 127.0.0.1,
+    # a Caddy łączy się z innego kontenera — `request.client.host` był więc IP Caddy
+    # dla KAŻDEGO żądania i limit anonimowego czatu (3/dobę) był wspólny dla całej
+    # gminy (audyt 11.10.2026, F-026). '*' jest tu bezpieczne: backend nie publikuje
+    # portów (patrz brak `ports:`), dociera do niego wyłącznie Caddy, a Caddy
+    # NADPISUJE przychodzący X-Forwarded-For adresem klienta. Przypinanie IP sieci
+    # Dockera byłoby kruche — podsieć zmienia się po `down`.
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level warning --forwarded-allow-ips='*'
     stop_grace_period: 120s
     logging:
       driver: "json-file"

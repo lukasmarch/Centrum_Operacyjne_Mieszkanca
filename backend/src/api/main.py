@@ -54,7 +54,13 @@ from src.ai.agents import (
 
 logger = setup_logger("API")
 
-app = FastAPI(title="Centrum Operacyjne Mieszkańca API")
+_docs = settings.API_DOCS_ENABLED
+app = FastAPI(
+    title="Centrum Operacyjne Mieszkańca API",
+    docs_url="/docs" if _docs else None,
+    redoc_url="/redoc" if _docs else None,
+    openapi_url="/openapi.json" if _docs else None,
+)
 
 # CORS for frontend (use env var, fallback to localhost)
 cors_origins = settings.CORS_ORIGINS.split(",") if settings.CORS_ORIGINS else [

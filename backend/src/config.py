@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     NEWSLETTER_ADS_ENABLED: bool = False
 
     # CORS settings
+    # Swagger (/docs, /redoc, /openapi.json). Produkcja wyłącza go w
+    # docker-compose.prod.yml: publiczny spis tras podawał każdemu adres
+    # /api/chat/history, zanim ten endpoint miał kontrolę dostępu (audyt 11.10.2026).
+    API_DOCS_ENABLED: bool = True
     CORS_ORIGINS: str = "http://localhost:3001,http://localhost:3002,http://localhost:5173"  # Comma-separated list
 
     # Push Notifications (Sprint 5C) - VAPID keys

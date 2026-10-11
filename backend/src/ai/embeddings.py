@@ -113,23 +113,26 @@ class EmbeddingService:
         metadata: dict
     ):
         """Store a single embedding in the database"""
-        # asyncpg doesn't support :param::vector casting - interpolate literals directly
-        # Use dollar-quoting ($emb$...$emb$) to avoid issues with special chars in metadata
+        # asyncpg nie łyka składni `:param::vector`, więc wektor idzie literałem —
+        # bezpiecznie, to same liczby. Metadane NIE: niosą tytuł ze scrapingu,
+        # a tytuł zawierający `$meta$` wychodził z dollar-quotingu wprost do SQL
+        # (audyt 11.10.2026, H-001). `CAST(:metadata AS jsonb)` to zwykły parametr.
         embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
         metadata_str = json.dumps(metadata, ensure_ascii=False) if metadata else "{}"
 
         await session.execute(
             text(f"""
                 INSERT INTO document_embeddings (source_type, source_id, chunk_index, chunk_text, embedding, metadata)
-                VALUES (:source_type, :source_id, :chunk_index, :chunk_text, $emb${embedding_str}$emb$::vector, $meta${metadata_str}$meta$::jsonb)
+                VALUES (:source_type, :source_id, :chunk_index, :chunk_text, $emb${embedding_str}$emb$::vector, CAST(:metadata AS jsonb))
                 ON CONFLICT (source_type, source_id, chunk_index)
-                DO UPDATE SET chunk_text = :chunk_text, embedding = $emb${embedding_str}$emb$::vector, metadata = $meta${metadata_str}$meta$::jsonb, created_at = NOW()
+                DO UPDATE SET chunk_text = :chunk_text, embedding = $emb${embedding_str}$emb$::vector, metadata = CAST(:metadata AS jsonb), created_at = NOW()
             """),
             {
                 "source_type": source_type,
                 "source_id": source_id,
                 "chunk_index": chunk_index,
                 "chunk_text": chunk_text,
+                "metadata": metadata_str,
             }
         )
 

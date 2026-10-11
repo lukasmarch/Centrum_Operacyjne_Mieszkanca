@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from ..database.connection import get_session
 from ..database.schema import Weather, AirQuality
 from ..integrations.weather import WeatherService
+from ..auth.dependencies import get_admin_user
 
 router = APIRouter(prefix="/api/weather", tags=["Weather"])
 
@@ -103,8 +104,14 @@ async def get_weather_history(
     result = await session.execute(statement)
     return result.scalars().all()
 
+# Ręczne odświeżenia wołają płatne/limitowane API (OpenWeather, Airly). Do 11.10.2026
+# (audyt, H-004) nie miały żadnej kontroli — anonim mógł wyczerpać limity,
+# a widget pogody i powietrza zostawał wtedy bez danych. Scheduler ich nie potrzebuje.
 @router.post("/update")
-async def update_weather(session: AsyncSession = Depends(get_session)):
+async def update_weather(
+    session: AsyncSession = Depends(get_session),
+    _admin=Depends(get_admin_user),
+):
     """Manually trigger weather update for all locations"""
     weather_service = WeatherService()
     results = await weather_service.update_all_locations(session)
@@ -161,7 +168,7 @@ async def get_air_quality_history(
 
 
 @router.post("/air-quality/update")
-async def update_air_quality_manual():
+async def update_air_quality_manual(_admin=Depends(get_admin_user)):
     """Manually trigger air quality update from Airly API"""
     from src.scheduler.air_quality_job import update_air_quality
     
