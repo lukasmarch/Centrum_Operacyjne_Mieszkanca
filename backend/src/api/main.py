@@ -173,7 +173,36 @@ async def startup_event():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    """Stan dla deployu i monitoringu (audyt 11.10.2026, F-034).
+
+    Do 11.10 odpowiadało stałym „ok” — także wtedy, gdy baza leżała, czyli każda
+    trasa z danymi dawała 500. Dziś: `SELECT 1` z limitem 3 s (503, gdy baza nie
+    odpowiada) i informacja, czy harmonogram jobów chodzi.
+    """
+    import asyncio
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import text
+    from src.database.connection import async_session
+    from src.scheduler.scheduler import scheduler
+
+    async def _ping() -> None:
+        async with async_session() as session:
+            await session.execute(text("SELECT 1"))
+
+    try:
+        await asyncio.wait_for(_ping(), timeout=3)
+        database = "ok"
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"/health: baza nie odpowiada ({type(exc).__name__}: {exc})")
+        database = "error"
+
+    body = {
+        "status": "ok" if database == "ok" else "error",
+        "database": database,
+        # „disabled” lokalnie (SCHEDULER_ENABLED=false) to stan poprawny, nie awaria
+        "scheduler": ("running" if scheduler.running else "stopped") if settings.SCHEDULER_ENABLED else "disabled",
+    }
+    return JSONResponse(body, status_code=200 if database == "ok" else 503)
 
 @app.get("/api/sources")
 async def get_sources(session: AsyncSession = Depends(get_session)):

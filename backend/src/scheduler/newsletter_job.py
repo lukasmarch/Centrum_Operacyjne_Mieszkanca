@@ -4,7 +4,8 @@ Newsletter scheduler jobs - Weekly (Saturday 10:00) and Daily (Mon-Fri 7:15)
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Optional
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
@@ -37,6 +38,36 @@ async def _marketing_consent(session, subscriber) -> bool:
     if not user or not user.consent_marketing:
         return False
     return user.tier == UserTier.FREE.value
+
+
+# Okno, w którym ten sam rodzaj newslettera NIE idzie drugi raz do tej samej osoby
+# (audyt 11.10.2026, F-022). Do 11.10 logi wysyłki zapisywał jeden commit na końcu
+# pętli: przebieg przerwany w połowie (restart, wyjątek) nie zostawiał śladu,
+# a ponowienie wysyłało mail drugi raz tym, którzy już go dostali. Od tej pamięci
+# zależy też nadrabianie po restarcie (`scheduler/job_runs.py`).
+WEEKLY_RESEND_GUARD = timedelta(days=6)
+
+
+def send_window_start(newsletter_type: str, now: Optional[datetime] = None) -> datetime:
+    """Od kiedy szukać wcześniejszej wysyłki (naiwny UTC): briefing — od lokalnej
+    północy dziś (jutrzejszy ma przyjść normalnie), tygodnik — 6 dni wstecz."""
+    from src.services.time_span import local_day_bounds
+    now = now or datetime.utcnow()
+    if newsletter_type == "daily":
+        return local_day_bounds(now=now)[0]
+    return now - WEEKLY_RESEND_GUARD
+
+
+async def already_sent(session, newsletter_type: str, now: Optional[datetime] = None) -> set:
+    """Subskrybenci, którzy w bieżącym oknie dostali już ten rodzaj newslettera."""
+    result = await session.execute(
+        select(NewsletterLog.subscriber_id).where(
+            NewsletterLog.newsletter_type == newsletter_type,
+            NewsletterLog.status == "sent",
+            NewsletterLog.sent_at >= send_window_start(newsletter_type, now),
+        )
+    )
+    return set(result.scalars().all())
 
 
 def _alert_failures(kind: str, stats: dict, generation_failed: list) -> None:
@@ -107,8 +138,15 @@ async def send_weekly_newsletter():
                 from src.newsletter.promo import get_newsletter_promo
                 content.update(await get_newsletter_promo(session))
 
+            sent_before = await already_sent(session, "weekly")
+            if sent_before:
+                logger.warning(f"Tygodnik: {len(sent_before)} odbiorców ma go już w tym tygodniu — pomijam")
+
             # Send to each subscriber
             for subscriber in subscribers:
+                if subscriber.id in sent_before:
+                    stats["skipped"] += 1
+                    continue
                 try:
                     result = await email_service.send_weekly_newsletter(
                         to_email=subscriber.email,
@@ -153,6 +191,9 @@ async def send_weekly_newsletter():
                 except Exception as e:
                     stats["failed"] += 1
                     logger.error(f"Error sending to {subscriber.email}: {str(e)}")
+
+                # Ślad PO KAŻDYM odbiorcy — przerwany przebieg wie, kto już dostał
+                await session.commit()
 
             await session.commit()
     finally:
@@ -235,8 +276,16 @@ async def send_daily_newsletter():
             # który i tak dociera do wszystkich. Ogłoszenia firm żyją poza tym w feedzie.
             promo = {}
 
+            sent_before = await already_sent(session, "daily")
+            if sent_before:
+                logger.warning(f"Briefing: {len(sent_before)} odbiorców ma go już dziś — pomijam")
+
             # Generate and send per location
             for location, subs in by_location.items():
+                subs = [(sub, usr) for sub, usr in subs if sub.id not in sent_before]
+                stats["skipped"] += sum(1 for sub, _u in by_location[location] if sub.id in sent_before)
+                if not subs:
+                    continue
                 try:
                     content = await generator.generate_daily(session, location=location)
                     content.update(promo)
@@ -299,6 +348,9 @@ async def send_daily_newsletter():
                     except Exception as e:
                         stats["failed"] += 1
                         logger.error(f"Error sending daily to {subscriber.email}: {str(e)}")
+
+                    # Ślad PO KAŻDYM odbiorcy — przerwany przebieg wie, kto już dostał
+                    await session.commit()
 
             await session.commit()
     finally:

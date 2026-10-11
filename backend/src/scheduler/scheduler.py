@@ -5,7 +5,7 @@ Manages all periodic tasks
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
+from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED, EVENT_JOB_SUBMITTED
 import atexit
 import traceback
 import threading
@@ -38,12 +38,19 @@ from src.scheduler.alert_push_job import run_alert_push
 from src.scheduler.trial_expiry_job import run_trial_expiry
 from src.scheduler.business_report_job import run_business_reports
 from src.scheduler.retention_job import run_retention_job
+from src.scheduler import job_runs
 from src.utils.logger import setup_logger
 
 logger = setup_logger("Scheduler")
 
 # Initialize scheduler with Polish timezone
-scheduler = BackgroundScheduler(timezone='Europe/Warsaw')
+# misfire_grace_time: domyślnie 1 s — job, który wystartowałby kilka minut później
+# (zajęta pula wątków, wolny start kontenera), był po cichu pomijany. coalesce:
+# po przerwie jeden przebieg zamiast serii zaległych (F-033)
+scheduler = BackgroundScheduler(
+    timezone='Europe/Warsaw',
+    job_defaults={'misfire_grace_time': 300, 'coalesce': True},
+)
 
 # Rate limit state: {job_id: datetime_last_sent}
 # Moduł-poziomowy singleton — przeżywa wszystkie wywołania listenerów w procesie
@@ -148,9 +155,22 @@ def _send_admin_alert(job_id: str, exception: Exception, traceback_str: str) -> 
         logger.error(f"Błąd wysyłki alertu admina dla '{job_id}': {alert_exc}")
 
 
+def _is_internal(job_id: str) -> bool:
+    """Joby techniczne (`__catch_up__`) zapisują przebiegi same, z terminem oryginału."""
+    return job_id.startswith("__")
+
+
+def _job_submitted_listener(event):
+    if not _is_internal(event.job_id):
+        times = getattr(event, "scheduled_run_times", None) or [None]
+        job_runs.record_started(event.job_id, times[-1])
+
+
 def _job_executed_listener(event):
     """Log successful job executions"""
     logger.info(f"✓ Job '{event.job_id}' executed successfully")
+    if not _is_internal(event.job_id):
+        job_runs.record_finished(event.job_id, event.scheduled_run_time)
 
 
 def _job_error_listener(event):
@@ -167,6 +187,11 @@ def _job_error_listener(event):
     logger.error(
         f"✗ Job '{event.job_id}' raised {type(event.exception).__name__}: {event.exception}\n{tb_str}"
     )
+    if not _is_internal(event.job_id):
+        job_runs.record_finished(
+            event.job_id, event.scheduled_run_time,
+            error=f"{type(event.exception).__name__}: {event.exception}",
+        )
     _send_admin_alert(
         job_id=event.job_id,
         exception=event.exception,
@@ -177,6 +202,65 @@ def _job_error_listener(event):
 def _job_missed_listener(event):
     """Log missed job executions"""
     logger.warning(f"⚠ Job '{event.job_id}' missed its scheduled run time")
+    if not _is_internal(event.job_id):
+        job_runs.record_missed(event.job_id, event.scheduled_run_time)
+
+
+def _run_catch_up(plan: list) -> None:
+    """Zaległe joby PO KOLEI, w kolejności terminów — jeden wątek, więc łańcuch
+    scraping → AI → osadzanie → briefing → mail nie nachodzi na siebie.
+    Przebieg zapisany z terminem ORYGINAŁU: następny restart go nie powtórzy."""
+    for fire, job_id in plan:
+        job = scheduler.get_job(job_id)
+        if job is None:
+            continue
+        logger.info(f"↻ Nadrabiam '{job_id}' (termin {fire:%Y-%m-%d %H:%M} UTC)")
+        job_runs.record_started(job_id, fire, catch_up=True)
+        try:
+            job.func(*job.args, **job.kwargs)
+            job_runs.record_finished(job_id, fire)
+        except Exception as exc:  # noqa: BLE001 — jeden zaległy job nie blokuje reszty
+            logger.error(f"✗ Nadrabianie '{job_id}' padło: {exc}")
+            job_runs.record_finished(job_id, fire, error=f"{type(exc).__name__}: {exc}")
+            _send_admin_alert(job_id=job_id, exception=exc, traceback_str=traceback.format_exc())
+
+
+def _schedule_catch_up() -> None:
+    """Po starcie: co przepadło przez restart — patrz `job_runs.plan_catch_up`."""
+    from apscheduler.triggers.interval import IntervalTrigger as _Interval
+
+    now = datetime.utcnow()
+    memory_start = job_runs.mark_scheduler_start()
+    specs = []
+    for job in scheduler.get_jobs():
+        if _is_internal(job.id):
+            continue
+        if isinstance(job.trigger, _Interval):
+            specs.append(job_runs.JobSpec(job.id, lambda _n: None, interval=job.trigger.interval))
+        else:
+            specs.append(job_runs.JobSpec(
+                job.id, lambda n, t=job.trigger: job_runs.cron_previous_fire(t, n),
+            ))
+    plan = job_runs.plan_catch_up(
+        specs, job_runs.load_history(now - timedelta(days=1)), memory_start, now,
+    )
+    if not plan:
+        logger.info("Nadrabianie po restarcie: nic nie przepadło")
+        return
+
+    interval_ids = {s.job_id for s in specs if s.interval is not None}
+    cron_plan = [(f, j) for f, j in plan if j not in interval_ids]
+    start_at = datetime.now(scheduler.timezone) + timedelta(seconds=30)
+    for _fire, job_id in plan:
+        if job_id in interval_ids:
+            # Cykliczne: zwykły przebieg za 30 s zamiast pełnego interwału od startu
+            scheduler.modify_job(job_id, next_run_time=start_at)
+    if cron_plan:
+        logger.warning(f"Nadrabianie po restarcie: {[j for _f, j in cron_plan]}")
+        scheduler.add_job(
+            func=_run_catch_up, args=[cron_plan], trigger='date', run_date=start_at,
+            id='__catch_up__', name='Nadrabianie po restarcie', replace_existing=True,
+        )
 
 
 def start_scheduler():
@@ -521,12 +605,18 @@ def start_scheduler():
     scheduler.add_listener(_job_executed_listener, EVENT_JOB_EXECUTED)
     scheduler.add_listener(_job_error_listener, EVENT_JOB_ERROR)
     scheduler.add_listener(_job_missed_listener, EVENT_JOB_MISSED)
+    scheduler.add_listener(_job_submitted_listener, EVENT_JOB_SUBMITTED)
 
     logger.info("Scheduler started with jobs:")
     for job in scheduler.get_jobs():
         logger.info(f"  - {job.name} ({job.id}): {job.trigger}")
 
     scheduler.start()
+
+    try:
+        _schedule_catch_up()
+    except Exception as exc:  # noqa: BLE001 — nadrabianie nie może zatrzymać startu
+        logger.error(f"Nadrabianie po restarcie nie ruszyło: {exc}")
 
     # Ensure scheduler shuts down on exit
     atexit.register(lambda: scheduler.shutdown())
