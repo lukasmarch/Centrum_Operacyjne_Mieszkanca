@@ -54,6 +54,8 @@ PUBLIC_WRITE_ROUTES = {
     ("POST", "/api/auth/login"): "logowanie",
     ("POST", "/api/auth/logout"): "kasuje własne ciasteczka",
     ("POST", "/api/auth/refresh"): "refresh token w treści/ciasteczku",
+    ("POST", "/api/auth/forgot-password"): "reset hasła — limit IP i adresu, odpowiedź nie zdradza konta",
+    ("POST", "/api/auth/reset-password"): "token resetu z maila (1 h, jednorazowy)",
     ("POST", "/api/newsletter/confirm"): "token z maila (32 B)",
     ("POST", "/api/newsletter/unsubscribe"): "token z maila (32 B)",
     ("PUT", "/api/newsletter/preferences"): "token z maila (32 B)",

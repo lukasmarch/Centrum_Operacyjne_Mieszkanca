@@ -69,3 +69,10 @@ class DailyLimit:
             raise HTTPException(status_code=429, detail=self.message)
         self._counts[key] += 1
         self._total += 1
+
+    def count(self, key: str) -> None:
+        """Zalicza zdarzenie BEZ odmowy — dla liczników porażek (nieudane
+        logowanie), gdzie o blokadzie decyduje `used()` przed kolejną próbą."""
+        self._roll()
+        self._counts[key] += 1
+        self._total += 1

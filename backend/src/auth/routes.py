@@ -6,7 +6,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -16,13 +16,16 @@ from src.config import settings
 from src.auth.dependencies import get_current_active_user
 from src.newsletter.subscriptions import ensure_subscription
 from src.services import roles as role_service
+from src.services.rate_limit import DailyLimit, client_key
 from .jwt import (
     get_password_hash, verify_password,
-    create_access_token, create_refresh_token, verify_token
+    create_access_token, create_refresh_token, verify_token,
+    session_claims, token_matches_password,
+    create_password_reset_token, read_password_reset_token, password_fingerprint,
 )
 from .schemas import (
     UserCreate, UserLogin, UserResponse, Token, AuthResponse,
-    MessageResponse, RefreshTokenRequest
+    MessageResponse, RefreshTokenRequest, ForgotPasswordRequest, ResetPasswordRequest,
 )
 
 # Cookie security: False for localhost (HTTP), True for production (HTTPS)
@@ -35,6 +38,68 @@ PRIVACY_POLICY_VERSION = "2026-09-29"  # = PRIVACY_VERSION i TERMS_VERSION we fr
 logger = logging.getLogger("Auth")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+# Limity kont (audyt 11.10.2026, F-028). Liczniki w pamięci, doba lokalna —
+# ta sama klasa co Whisper i Zgłoszenia 24 (`services/rate_limit`).
+# ⚠️ Nieudane logowania liczymy per para IP + adres i per IP, NIGDY per sam adres:
+# licznik na adres pozwoliłby obcemu zablokować komuś konto złymi hasłami.
+LOGIN_FAILS_PAIR = DailyLimit(
+    "Logowanie (IP+adres)", per_key=10, total=100_000,
+    message="Zbyt wiele nieudanych prób logowania. Spróbuj jutro albo ustaw nowe hasło.",
+)
+LOGIN_FAILS_IP = DailyLimit(
+    "Logowanie (IP)", per_key=50, total=100_000,
+    message="Zbyt wiele nieudanych prób logowania. Spróbuj jutro albo ustaw nowe hasło.",
+)
+RESET_BY_IP = DailyLimit(
+    "Reset hasła (IP)", per_key=5, total=100,
+    message="Zbyt wiele próśb o nowe hasło. Spróbuj jutro.",
+)
+RESET_BY_EMAIL = DailyLimit(
+    "Reset hasła (adres)", per_key=3, total=100,
+    message="Zbyt wiele próśb o nowe hasło. Spróbuj jutro.",
+)
+
+# Jedna odpowiedź dla każdego adresu — nie zdradzamy, czy konto istnieje
+RESET_REQUESTED_MESSAGE = (
+    "Jeśli to konto istnieje, wysłaliśmy na nie link do ustawienia nowego hasła. "
+    "Link działa przez godzinę."
+)
+
+
+def _issue_session(user: User, response: Response) -> Token:
+    """Tokeny i ciasteczka sesji — jedno miejsce dla rejestracji, logowania,
+    odświeżania i ustawienia nowego hasła. Tokeny niosą odcisk hasła (`pwv`),
+    więc zmiana hasła kończy wszystkie wcześniejsze sesje."""
+    claims = session_claims(user)
+    access_token = create_access_token(claims)
+    refresh_token = create_refresh_token(claims)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=COOKIE_SECURE,  # False dla localhost (HTTP)
+        samesite="lax",
+        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+    )
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+
+def _login_pair_key(request: Request, email: str) -> str:
+    return client_key(request) + ":" + email.strip().lower()
 
 
 async def _send_welcome_email(
@@ -201,46 +266,15 @@ async def register(
         from src.api.endpoints.roles import send_role_welcome
         background_tasks.add_task(send_role_welcome, new_user.id, granted_role.id)
 
-    # Generate tokens
-    token_data = {
-        "sub": new_user.email,
-        "user_id": new_user.id,
-        "tier": new_user.tier
-    }
-    access_token = create_access_token(token_data)
-    refresh_token = create_refresh_token(token_data)
+    tokens = _issue_session(new_user, response)
 
-    # Set cookies
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=COOKIE_SECURE,  # Set to False for localhost development
-        samesite="lax",
-        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
-    )
-
-    return AuthResponse(
-        user=UserResponse.model_validate(new_user),
-        tokens=Token(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
-        )
-    )
+    return AuthResponse(user=UserResponse.model_validate(new_user), tokens=tokens)
 
 
 @router.post("/login", response_model=AuthResponse)
 async def login(
     credentials: UserLogin,
+    request: Request,
     response: Response,
     session: AsyncSession = Depends(get_session)
 ):
@@ -249,22 +283,32 @@ async def login(
 
     Returns JWT tokens for authentication.
     """
-    # Find user
+    pair_key = _login_pair_key(request, credentials.email)
+    ip_key = client_key(request)
+    # Limit sprawdzamy PRZED hasłem — po wyczerpaniu nawet trafne hasło czeka do jutra,
+    # inaczej limit nie zatrzymywałby zgadywania
+    if LOGIN_FAILS_PAIR.used(pair_key) >= LOGIN_FAILS_PAIR.per_key:
+        raise HTTPException(status_code=429, detail=LOGIN_FAILS_PAIR.message)
+    if LOGIN_FAILS_IP.used(ip_key) >= LOGIN_FAILS_IP.per_key:
+        raise HTTPException(status_code=429, detail=LOGIN_FAILS_IP.message)
+
     result = await session.execute(
         select(User).where(User.email == credentials.email)
     )
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(credentials.password, user.password_hash):
+        LOGIN_FAILS_PAIR.count(pair_key)
+        LOGIN_FAILS_IP.count(ip_key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Nieprawidłowy e-mail lub hasło"
         )
 
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive"
+            detail="To konto jest nieaktywne"
         )
 
     # Update last login
@@ -272,41 +316,8 @@ async def login(
     await session.commit()
     await session.refresh(user)
 
-    # Generate tokens
-    token_data = {
-        "sub": user.email,
-        "user_id": user.id,
-        "tier": user.tier
-    }
-    access_token = create_access_token(token_data)
-    refresh_token = create_refresh_token(token_data)
-
-    # Set cookies
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
-    )
-
-    return AuthResponse(
-        user=UserResponse.model_validate(user),
-        tokens=Token(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
-        )
-    )
+    tokens = _issue_session(user, response)
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
 
 
 @router.post("/logout", response_model=MessageResponse)
@@ -329,59 +340,94 @@ async def refresh_tokens(
     """
     Refresh access token using refresh token.
     """
-    # Verify refresh token
     payload = verify_token(refresh_request.refresh_token, token_type="refresh")
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token"
+            detail="Sesja wygasła — zaloguj się ponownie"
         )
 
-    # Get user
-    user_email = payload.get("sub")
     result = await session.execute(
-        select(User).where(User.email == user_email)
+        select(User).where(User.email == payload.get("sub"))
     )
     user = result.scalar_one_or_none()
 
-    if not user or not user.is_active:
+    # Token odświeżania sprzed zmiany hasła nie odnawia sesji — inaczej przejęta
+    # sesja przeżyłaby zmianę hasła o kolejne 7 dni (F-028)
+    if not user or not user.is_active or not token_matches_password(payload, user):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive"
+            detail="Sesja wygasła — zaloguj się ponownie"
         )
 
-    # Generate new tokens
-    token_data = {
-        "sub": user.email,
-        "user_id": user.id,
-        "tier": user.tier
-    }
-    access_token = create_access_token(token_data)
-    new_refresh_token = create_refresh_token(token_data)
+    return _issue_session(user, response)
 
-    # Update cookies
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh_token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
-    )
 
-    return Token(
-        access_token=access_token,
-        refresh_token=new_refresh_token,
-        expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+async def _send_password_reset(email: str, full_name: Optional[str], reset_url: str) -> None:
+    """Mail w tle — odpowiedź trasy nie może zależeć od tego, czy konto istnieje,
+    a czas wysyłki przez Resend by to zdradzał."""
+    try:
+        from src.newsletter.email_service import EmailService
+        await EmailService().send_password_reset(
+            to_email=email, recipient_name=full_name, reset_url=reset_url,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"Nie udało się wysłać linku resetu hasła: {exc}")
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    """Link do ustawienia nowego hasła (ważny 1 h, jednorazowy).
+
+    Odpowiedź jest TA SAMA dla istniejącego i nieistniejącego adresu (F-028) —
+    formularz nie może służyć do sprawdzania, kto ma u nas konto.
+    """
+    RESET_BY_IP.hit(client_key(request))
+    RESET_BY_EMAIL.hit(data.email.strip().lower())
+
+    result = await session.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    if user is not None and user.is_active:
+        token = create_password_reset_token(user)
+        reset_url = f"{settings.APP_URL.rstrip('/')}/nowe-haslo?token={token}"
+        background_tasks.add_task(_send_password_reset, user.email, user.full_name, reset_url)
+        logger.info(f"Reset hasła: link wysłany do user_id={user.id}")
+
+    return MessageResponse(message=RESET_REQUESTED_MESSAGE)
+
+
+@router.post("/reset-password", response_model=AuthResponse)
+async def reset_password(
+    data: ResetPasswordRequest,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+):
+    """Nowe hasło z linku. Kończy wszystkie wcześniejsze sesje i loguje od razu."""
+    invalid = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Link wygasł albo został już użyty. Poproś o nowy.",
     )
+    payload = read_password_reset_token(data.token)
+    if payload is None:
+        raise invalid
+
+    user = await session.get(User, int(payload["sub"]))
+    # Odcisk innego hasła = link już użyty (albo hasło zmieniono inną drogą)
+    if user is None or not user.is_active or payload["pwv"] != password_fingerprint(user.password_hash):
+        raise invalid
+
+    user.password_hash = get_password_hash(data.new_password)
+    await session.commit()
+    await session.refresh(user)
+    logger.info(f"Reset hasła: nowe hasło ustawione dla user_id={user.id}")
+
+    tokens = _issue_session(user, response)
+    return AuthResponse(user=UserResponse.model_validate(user), tokens=tokens)
 
 
 @router.get("/referral")

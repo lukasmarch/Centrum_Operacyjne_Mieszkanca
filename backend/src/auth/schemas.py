@@ -69,6 +69,26 @@ class UserLogin(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    """Prośba o link do ustawienia nowego hasła"""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Nowe hasło z linku z maila — te same wymagania co przy rejestracji"""
+    token: str = Field(min_length=20, max_length=2000)
+    new_password: str = Field(min_length=8, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        return v
+
+
 class PasswordChange(BaseModel):
     """Schema for password change"""
     current_password: str

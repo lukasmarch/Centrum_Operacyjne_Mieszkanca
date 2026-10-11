@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from src.database import get_session, User, UserTier
-from .jwt import verify_token
+from .jwt import token_matches_password, verify_token
 
 # Bearer token scheme
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -71,6 +71,14 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
+        )
+
+    # Token wydany dla poprzedniego hasła — sesja skończyła się zmianą hasła (F-028)
+    if not token_matches_password(payload, user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesja wygasła po zmianie hasła — zaloguj się ponownie",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return user
@@ -182,4 +190,8 @@ async def get_optional_user(
     result = await session.execute(
         select(User).where(User.email == user_email)
     )
-    return result.scalar_one_or_none()
+    user = result.scalar_one_or_none()
+    # Sesja sprzed zmiany hasła = brak sesji, nie błąd (trasy z opcjonalnym logowaniem)
+    if user is not None and not token_matches_password(payload, user):
+        return None
+    return user

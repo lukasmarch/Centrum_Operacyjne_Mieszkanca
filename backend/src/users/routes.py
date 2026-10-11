@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_session, User
 from src.auth.dependencies import get_current_active_user
 from src.auth.schemas import (
-    UserResponse, UserUpdate, PasswordChange, MessageResponse, AVAILABLE_LOCATIONS
+    UserResponse, UserUpdate, PasswordChange, MessageResponse, AVAILABLE_LOCATIONS, Token
 )
 from .service import UserService
 from .dsar import export_user_data, delete_user_account
@@ -65,9 +65,10 @@ async def update_current_user_profile(
     return UserResponse.model_validate(updated_user)
 
 
-@router.post("/me/change-password", response_model=MessageResponse)
+@router.post("/me/change-password", response_model=Token)
 async def change_password(
     password_data: PasswordChange,
+    response: Response,
     current_user: User = Depends(get_current_active_user),
     session: AsyncSession = Depends(get_session)
 ):
@@ -75,6 +76,10 @@ async def change_password(
     Change current user's password.
 
     Requires current password for verification.
+
+    Nowe hasło kończy wszystkie wcześniejsze sesje (F-028) — także tę, z której
+    przyszło żądanie. Dlatego trasa oddaje nowe tokeny: urządzenie, na którym
+    zmieniono hasło, zostaje zalogowane, wszystkie inne wypadają.
     """
     success = await UserService.change_password(
         session=session,
@@ -86,10 +91,12 @@ async def change_password(
     if not success:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect"
+            detail="Obecne hasło jest nieprawidłowe"
         )
 
-    return MessageResponse(message="Password changed successfully")
+    from src.auth.routes import _issue_session
+    await session.refresh(current_user)
+    return _issue_session(current_user, response)
 
 
 @router.get("/me/subscription")

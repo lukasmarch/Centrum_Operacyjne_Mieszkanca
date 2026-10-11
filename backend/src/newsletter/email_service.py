@@ -743,6 +743,33 @@ class EmailService:
             return "jutro rano"
         return f"w {DAYS_PL[candidate.weekday()].lower()} rano"
 
+    async def send_password_reset(
+        self,
+        to_email: str,
+        recipient_name: Optional[str],
+        reset_url: str,
+    ) -> Dict[str, Any]:
+        """Link do ustawienia nowego hasła (audyt 11.10.2026, F-028).
+
+        Mail transakcyjny: idzie także do kogoś, kto wypisał się z newslettera,
+        i nie ma linku wypisu (`unsubscribe_url=None` chowa go w stopce).
+        """
+        context = self._common_context(to_email, "", campaign="reset_hasla")
+        context.update({
+            "unsubscribe_url": None,
+            "subject": "Ustaw nowe hasło do RybnoLive",
+            "preheader": "Link działa przez godzinę i tylko raz.",
+            "recipient_name": (recipient_name or "").split()[0] if recipient_name else None,
+            "reset_url": reset_url,
+            "date_header": self._date_label(datetime.now()),
+        })
+        html = self.render_template("password_reset.html", context)
+        return await self.send_email(
+            to_email=to_email,
+            subject=context["subject"],
+            html_content=html,
+        )
+
     async def send_confirmation_email(
         self,
         to_email: str,

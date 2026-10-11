@@ -85,8 +85,11 @@
       <a href="{{ url_dashboard }}" style="color:#91c5ff; text-decoration:none;">Otw&oacute;rz serwis</a>
       <span style="color:#525252;">&nbsp;&middot;&nbsp;</span>
       <a href="{{ url_terms }}" style="color:#91c5ff; text-decoration:none;">Regulamin</a>
+      {#- Mail transakcyjny (reset hasła) nie jest newsletterem — bez linku wypisu #}
+      {% if unsubscribe_url %}
       <span style="color:#525252;">&nbsp;&middot;&nbsp;</span>
       <a href="{{ unsubscribe_url }}" style="color:#8f8f8f; text-decoration:underline;">Wypisz si&#281;</a>
+      {% endif %}
     </div>
     <div style="font-family:'Outfit',Arial,Helvetica,sans-serif; font-size:11px; line-height:17px; mso-line-height-rule:exactly; color:#525252; padding-top:12px;">
       Wydawca: Studio Kamienia Naturalnego Lu-Mar-Go &middot; &#379;abiny 96, 13-220 Rybno<br>

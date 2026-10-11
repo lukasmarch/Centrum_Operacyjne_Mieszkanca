@@ -126,3 +126,73 @@ def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
 
     except JWTError:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Sesja związana z hasłem i reset hasła (audyt 11.10.2026, F-028)
+#
+# Do 11.10.2026 zmiana hasła nie kończyła żadnej sesji: token logowania (8 h)
+# i odświeżania (7 dni) działały dalej, więc ktoś, kto przejął sesję, zostawał
+# w środku także po tym, jak właściciel zmienił hasło. Resetu hasła nie było wcale.
+#
+# Zamiast tabeli sesji — ODCISK hasła w tokenie (`pwv`): HMAC z bieżącego
+# skrótu hasła. Nowe hasło = nowy skrót (bcrypt ma sól, więc nawet to samo hasło
+# daje inny) = wszystkie wcześniejsze tokeny przestają pasować. Ten sam odcisk
+# czyni token resetu JEDNORAZOWYM: po ustawieniu hasła link sam się unieważnia.
+# ---------------------------------------------------------------------------
+import hashlib
+import hmac
+
+PASSWORD_RESET_TTL = timedelta(hours=1)
+
+
+def password_fingerprint(password_hash: str) -> str:
+    """Odcisk bieżącego hasła — nie da się z niego odtworzyć skrótu ani hasła."""
+    return hmac.new(
+        settings.JWT_SECRET.encode(), password_hash.encode(), hashlib.sha256
+    ).hexdigest()[:16]
+
+
+def session_claims(user) -> dict:
+    """Zawartość tokenów logowania i odświeżania dla konta."""
+    return {
+        "sub": user.email,
+        "user_id": user.id,
+        "tier": user.tier,
+        "pwv": password_fingerprint(user.password_hash),
+    }
+
+
+def token_matches_password(payload: dict, user) -> bool:
+    """Czy token został wydany dla BIEŻĄCEGO hasła konta.
+
+    ⚠️ Token bez `pwv` (wydany przed 11.10.2026) przechodzi — inaczej wdrożenie
+    wylogowałoby wszystkich naraz. Wygasa sam, najpóźniej po 7 dniach.
+    """
+    pwv = payload.get("pwv")
+    if pwv is None:
+        return True
+    return hmac.compare_digest(pwv, password_fingerprint(user.password_hash))
+
+
+def create_password_reset_token(user, now: Optional[datetime] = None) -> str:
+    now = now or datetime.utcnow()
+    return jwt.encode(
+        {
+            "sub": str(user.id),
+            "type": "password_reset",
+            "pwv": password_fingerprint(user.password_hash),
+            "exp": now + PASSWORD_RESET_TTL,
+        },
+        settings.JWT_SECRET,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+
+
+def read_password_reset_token(token: str) -> Optional[dict]:
+    """Treść tokenu resetu albo None (zły podpis, wygasły, inny typ).
+    Zgodność z bieżącym hasłem sprawdza wołający — wymaga wiersza konta."""
+    payload = verify_token(token, token_type="password_reset")
+    if not payload or not payload.get("pwv") or not str(payload.get("sub", "")).isdigit():
+        return None
+    return payload
