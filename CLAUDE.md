@@ -1154,8 +1154,10 @@ rozsyłał dowolny push do wszystkich (F-024), ręczne odświeżanie pogody był
 - Newsletter `/subscribe`: wypisany adres wraca dopiero po potwierdzeniu; jedna odpowiedź dla
   każdego adresu; aktywny nie dostaje maila (formularz nie zasypie cudzej skrzynki)
 - `logo_url` ustawia wyłącznie upload; kasowanie starego pliku tylko wewnątrz katalogu
-- Caddy: HSTS (bez `includeSubDomains`) + `Permissions-Policy`. Caddyfile przeładowuje się RĘCZNIE:
-  `docker compose -f docker-compose.prod.yml exec caddy caddy reload --config /etc/caddy/Caddyfile`
+- Caddy: HSTS (bez `includeSubDomains`) + `Permissions-Policy`. ⚠️ Zmiana Caddyfile wymaga
+  `docker compose -f docker-compose.prod.yml up -d --force-recreate caddy` — sam `caddy reload` NIE
+  wystarcza: plik jest montowany pojedynczo, `git merge` podmienia go nowym inode, a kontener widzi
+  stary (11.10: reload „udany”, nagłówków brak). Kilka sekund przerwy, certyfikaty w `caddy_data`
 - Swagger wyłączony na produkcji (`API_DOCS_ENABLED: "false"` w compose); lokalnie `/docs` działa
 
 ## TODO (Kolejne priorytety)
