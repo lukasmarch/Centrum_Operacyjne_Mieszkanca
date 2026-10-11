@@ -201,9 +201,42 @@ export const changePassword = async (
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Password change failed');
+    throw await toApiError(response, 'Nie udało się zmienić hasła. Spróbuj ponownie za chwilę.');
   }
+
+  // Nowe hasło kończy wszystkie wcześniejsze sesje (także tę) — backend oddaje
+  // świeże tokeny, bez nich następne kliknięcie by wylogowało (F-028)
+  const tokens = await response.json();
+  if (tokens?.access_token && tokens?.refresh_token) {
+    storeTokens(tokens.access_token, tokens.refresh_token);
+  }
+};
+
+/**
+ * Prośba o link do ustawienia nowego hasła. Odpowiedź jest ta sama dla
+ * każdego adresu — backend nie zdradza, czy konto istnieje.
+ */
+export const forgotPassword = async (email: string): Promise<string> => {
+  const response = await postJson(`${API_BASE_URL}/auth/forgot-password`, { email });
+  if (!response.ok) {
+    throw await toApiError(response, 'Nie udało się wysłać linku. Spróbuj ponownie za chwilę.');
+  }
+  const result = await response.json();
+  return result.message;
+};
+
+/** Nowe hasło z linku z maila — po sukcesie konto jest od razu zalogowane. */
+export const resetPassword = async (token: string, newPassword: string): Promise<AuthResponse> => {
+  const response = await postJson(`${API_BASE_URL}/auth/reset-password`, {
+    token,
+    new_password: newPassword,
+  });
+  if (!response.ok) {
+    throw await toApiError(response, 'Nie udało się ustawić hasła. Spróbuj ponownie za chwilę.');
+  }
+  const result: AuthResponse = await response.json();
+  storeTokens(result.tokens.access_token, result.tokens.refresh_token);
+  return result;
 };
 
 /**

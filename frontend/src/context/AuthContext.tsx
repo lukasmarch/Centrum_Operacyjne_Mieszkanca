@@ -34,6 +34,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (data: UserUpdateData) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** Nowe hasło z linku z maila — loguje od razu */
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
   clearError: () => void;
   /** Ponowne pobranie konta — po zmianie planu z zewnątrz (np. przyjęcie roli sołtysa) */
   refreshUser: () => Promise<void>;
@@ -202,6 +204,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     []
   );
 
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+    setError(null);
+    try {
+      const response = await authApi.resetPassword(token, newPassword);
+      setUser(response.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nie udało się ustawić hasła.');
+      throw err;
+    }
+  }, []);
+
   /**
    * Clear error state
    */
@@ -227,6 +240,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     updateProfile,
     changePassword,
+    resetPassword,
     clearError,
     refreshUser,
     isPremium,

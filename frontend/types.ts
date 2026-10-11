@@ -271,7 +271,7 @@ export interface ReportMapItem {
   created_at: string;
 }
 
-export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'cinema' | 'council' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'profile' | 'terms' | 'privacy' | 'cookies' | 'invite' | 'announcement';
+export type AppSection = 'dashboard' | 'news' | 'events' | 'weather' | 'waste' | 'bus' | 'cinema' | 'council' | 'stats' | 'business' | 'reports' | 'premium' | 'checkout' | 'assistant' | 'login' | 'register' | 'reset-password' | 'profile' | 'terms' | 'privacy' | 'cookies' | 'invite' | 'announcement';
 
 export type TabId = 'home' | 'assistant' | 'miasto' | 'dane' | 'zgloszenia';
 

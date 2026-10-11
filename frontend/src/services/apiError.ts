@@ -44,6 +44,8 @@ const FIELD_MESSAGES: Record<string, (type: string, msg: string) => string> = {
     return 'Hasło nie spełnia wymagań: min. 8 znaków, wielka litera i cyfra.';
   },
 };
+// Reset i zmiana hasła wysyłają `new_password` — te same wymagania i komunikaty
+FIELD_MESSAGES.new_password = FIELD_MESSAGES.password;
 
 interface ValidationItem {
   loc?: (string | number)[];

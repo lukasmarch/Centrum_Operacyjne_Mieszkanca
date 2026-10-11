@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface LoginPageProps {
-  onNavigate: (page: 'register' | 'dashboard' | 'terms' | 'privacy') => void;
+  onNavigate: (page: 'register' | 'dashboard' | 'terms' | 'privacy' | 'reset-password') => void;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
@@ -93,11 +93,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
 
             {/* Forgot password */}
             <div className="flex justify-end">
+              {/* Do 11.10.2026 przycisk nie robił nic — zapomniane hasło = utracone konto */}
               <button
                 type="button"
-                className="text-sm text-blue-400 hover:text-blue-300 font-medium"
+                onClick={() => onNavigate('reset-password')}
+                className="min-h-[44px] text-sm text-blue-400 hover:text-blue-300 font-medium"
               >
-                Zapomniałeś hasła?
+                Nie pamiętasz hasła?
               </button>
             </div>
 

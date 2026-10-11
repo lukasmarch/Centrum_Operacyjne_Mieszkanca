@@ -16,6 +16,7 @@ import CinemaPage from './src/pages/CinemaPage';
 import { DataCacheProvider } from './src/context/DataCacheContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginPage from './src/pages/LoginPage';
+import PasswordResetPage from './src/pages/PasswordResetPage';
 import RegisterPage from './src/pages/RegisterPage';
 import BottomTabBar from './components/navigation/BottomTabBar';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
@@ -78,6 +79,7 @@ const SECTION_TO_TAB: Record<AppSection, TabId> = {
     profile: 'home',
     login: 'home',
     register: 'home',
+    'reset-password': 'home',
     terms: 'home',
     privacy: 'home',
     cookies: 'home',
@@ -127,6 +129,8 @@ export const SECTION_TO_PATH: Partial<Record<AppSection, string>> = {
     // /ogloszenie?id=… — ogłoszenie sołectwa (link z feedu i z profilu FB sołtysa)
     invite: '/zaproszenie',
     announcement: '/ogloszenie',
+    // /nowe-haslo?token=… — link z maila resetu hasła (token strona zdejmuje z adresu)
+    'reset-password': '/nowe-haslo',
 };
 
 const PATH_TO_SECTION: Record<string, AppSection> = Object.entries(SECTION_TO_PATH)
@@ -294,6 +298,9 @@ const AppContent: React.FC = () => {
         // Auth pages
         if (activeSection === 'login') {
             return <LoginPage onNavigate={handleNavigate} />;
+        }
+        if (activeSection === 'reset-password') {
+            return <PasswordResetPage onNavigate={handleNavigate} />;
         }
         if (activeSection === 'register') {
             return <RegisterPage onNavigate={handleNavigate} />;
