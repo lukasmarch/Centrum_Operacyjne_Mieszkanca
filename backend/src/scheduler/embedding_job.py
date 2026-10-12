@@ -37,6 +37,67 @@ MAX_BATCH_SIZE = 200  # Max articles per run
 EMBED_LOOKBACK_DAYS = 3
 
 
+async def embed_article(session, article: Article, source_name: str) -> int:
+    """Chunki + osadzenie jednego artykułu. Bez commita — robi go wołający.
+
+    Wydzielone z `_embed_articles` (E7, 12.10.2026): korekta ogłoszenia
+    sołectwa liczy osadzenie od razu, bo job chodzi 6:50 i 13:45, a stare
+    chunki z błędną treścią są kasowane w chwili korekty.
+    """
+    # Detect BIP source by name (Source.type="html" for all HTML scrapers)
+    is_bip = "BIP" in source_name
+    actual_source_type = "bip" if is_bip else "article"
+
+    if is_bip:
+        chunks = chunker.chunk_bip_document(
+            title=article.title,
+            content=article.content,
+            doc_type="dokument"
+        )
+    else:
+        chunks = chunker.chunk_article(
+            title=article.title,
+            content=article.content,
+            summary=article.summary,
+            source_name=source_name,
+            category=article.category or ""
+        )
+
+    texts = [c["text"] for c in chunks]
+    embeddings = await embedding_service.embed_batch(texts)
+    log_api_cost(
+        session,
+        model="text-embedding-3-small",
+        tokens_input=embedding_service.last_usage_tokens,
+        tokens_output=0,
+        endpoint="scheduler:embedding_articles",
+    )
+
+    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+        metadata = {
+            **chunk["metadata"],
+            "title": article.title,
+            "url": article.url,
+            "published_at": article.published_at.isoformat() if article.published_at else "",
+            "source_name": source_name
+        }
+
+        await embedding_service.store_embedding(
+            session=session,
+            source_type=actual_source_type,
+            source_id=article.id,
+            chunk_index=i,
+            chunk_text=chunk["text"],
+            embedding=embedding,
+            metadata=metadata
+        )
+
+    article.embedded = True
+    session.add(article)
+    logger.info(f"Embedded {actual_source_type} article {article.id} ({source_name}): {len(chunks)} chunks")
+    return len(chunks)
+
+
 async def _embed_articles(session):
     """Embed unembedded articles scraped within the lookback window"""
     # Doba LOKALNA — job chodzi 6:50 i 13:45 czasu polskiego, a granica UTC
@@ -49,6 +110,7 @@ async def _embed_articles(session):
         .join(Source, Article.source_id == Source.id)
         .where(Article.embedded == False)
         .where(Article.processed == True)
+        .where(Article.withdrawn_at.is_(None))
         .where(Article.scraped_at >= window_start)
         .order_by(Article.scraped_at.desc())
         .limit(MAX_BATCH_SIZE)
@@ -64,59 +126,8 @@ async def _embed_articles(session):
 
     for article, source_name in articles:
         try:
-            # Detect BIP source by name (Source.type="html" for all HTML scrapers)
-            is_bip = "BIP" in source_name
-            actual_source_type = "bip" if is_bip else "article"
-
-            if is_bip:
-                chunks = chunker.chunk_bip_document(
-                    title=article.title,
-                    content=article.content,
-                    doc_type="dokument"
-                )
-            else:
-                chunks = chunker.chunk_article(
-                    title=article.title,
-                    content=article.content,
-                    summary=article.summary,
-                    source_name=source_name,
-                    category=article.category or ""
-                )
-
-            texts = [c["text"] for c in chunks]
-            embeddings = await embedding_service.embed_batch(texts)
-            log_api_cost(
-                session,
-                model="text-embedding-3-small",
-                tokens_input=embedding_service.last_usage_tokens,
-                tokens_output=0,
-                endpoint="scheduler:embedding_articles",
-            )
-
-            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                metadata = {
-                    **chunk["metadata"],
-                    "title": article.title,
-                    "url": article.url,
-                    "published_at": article.published_at.isoformat() if article.published_at else "",
-                    "source_name": source_name
-                }
-
-                await embedding_service.store_embedding(
-                    session=session,
-                    source_type=actual_source_type,
-                    source_id=article.id,
-                    chunk_index=i,
-                    chunk_text=chunk["text"],
-                    embedding=embedding,
-                    metadata=metadata
-                )
-
-            article.embedded = True
-            session.add(article)
+            await embed_article(session, article, source_name)
             embedded_count += 1
-            logger.info(f"Embedded {actual_source_type} article {article.id} ({source_name}): {len(chunks)} chunks")
-
         except Exception as e:
             logger.error(f"Failed to embed article {article.id}: {e}")
 
@@ -133,6 +144,7 @@ async def _embed_events(session):
         select(Event)
         .where(Event.embedded == False)
         .where(Event.canonical_id.is_(None))
+        .where(Event.withdrawn_at.is_(None))
         .limit(MAX_BATCH_SIZE)
     )
     events = result.scalars().all()

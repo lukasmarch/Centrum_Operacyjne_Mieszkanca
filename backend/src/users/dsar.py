@@ -20,7 +20,7 @@ from sqlmodel import select
 from src.database.schema import (
     User, Subscription, NewsletterSubscriber, Report, PushSubscription,
     BusinessProfile, BusinessAnnouncement, CEIDGBusiness, BusinessClaimLog,
-    SolectwoPost, UserRole,
+    SolectwoPost, SolectwoPostRequest, UserRole,
 )
 from src.database.vectors import Conversation, ChatMessage, APICostLog
 from src.utils.logger import setup_logger
@@ -164,7 +164,19 @@ async def export_user_data(session: AsyncSession, user: User) -> dict:
         "images_kept": 0 if p.images_deleted_at else len(p.image_files or []),
         "created_at": _iso(p.created_at),
         "published_at": _iso(p.published_at),
+        "withdrawn_at": _iso(p.withdrawn_at),
     } for p in post_rows]
+    request_rows = (await session.execute(
+        select(SolectwoPostRequest).where(SolectwoPostRequest.user_id == user.id)
+        .order_by(SolectwoPostRequest.created_at)
+    )).scalars().all()
+    solectwo_requests = [{
+        "post_id": r.post_id,
+        "kind": r.kind,
+        "message": r.message,
+        "status": r.status,
+        "created_at": _iso(r.created_at),
+    } for r in request_rows]
 
     return {
         "format": "RODO art. 15/20 data export",
@@ -179,6 +191,7 @@ async def export_user_data(session: AsyncSession, user: User) -> dict:
         "ai_usage": ai_usage,
         "roles": roles,
         "solectwo_posts": solectwo_posts,
+        "solectwo_requests": solectwo_requests,
     }
 
 
@@ -276,14 +289,15 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
     # („Sołtys sołectwa X"), nie nazwiskiem, i mieszkańcy mogą do nich wracać;
     # tracą jedynie powiązanie z kontem. Nieopublikowane kasujemy w całości
     # razem ze zdjęciami: nikt ich nie zobaczył, a skan bywa pełen danych.
-    from src.api.endpoints.solectwa import PUBLISHED, delete_images
+    from src.api.endpoints.solectwa import PUBLISHED, WITHDRAWN, delete_images
 
     own_posts = (await session.execute(
         select(SolectwoPost).where(SolectwoPost.user_id == user.id)
     )).scalars().all()
     for post in own_posts:
         delete_images(post)
-        if post.status == PUBLISHED:
+        # Odwołane też zostaje: jego strona mówi mieszkańcom, że ogłoszenie odwołano
+        if post.status in (PUBLISHED, WITHDRAWN):
             post.user_id = None
             post.role_id = None
             post.note = None
@@ -293,6 +307,8 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
         else:
             await session.delete(post)
     await session.flush()
+    # Prośby o korektę to treść pisana przez sołtysa — znikają z kontem
+    await session.execute(delete(SolectwoPostRequest).where(SolectwoPostRequest.user_id == user.id))
     await session.execute(delete(UserRole).where(UserRole.user_id == user.id))
 
     # 6. Anonimizacja rekordu users (FK z subscriptions/referrals pozostaje spójne)

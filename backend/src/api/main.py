@@ -421,6 +421,26 @@ async def takedown_article(
     await session.execute(sql_text(
         "DELETE FROM document_embeddings WHERE source_type = 'article' AND source_id = :aid"
     ), {"aid": article_id})
+    # Klucze obce bez ON DELETE: do 12.10.2026 takedown wpisu sołectwa albo
+    # wpisu, z którego powstało wydarzenie, kończył się błędem 500 — ścieżka
+    # awaryjna padała dokładnie wtedy, gdy była potrzebna. Ogłoszenie sołectwa
+    # zostaje jako ODWOŁANE (z historią), wydarzenia znikają z kalendarza.
+    await session.execute(sql_text(
+        "UPDATE solectwo_posts SET article_id = NULL, "
+        "status = CASE WHEN status = 'published' THEN 'withdrawn' ELSE status END, "
+        "withdrawn_at = coalesce(withdrawn_at, now() AT TIME ZONE 'utc'), "
+        "withdraw_reason = coalesce(withdraw_reason, 'Usunięte na żądanie (notice-and-takedown)') "
+        "WHERE article_id = :aid"
+    ), {"aid": article_id})
+    await session.execute(sql_text(
+        "DELETE FROM document_embeddings WHERE source_type = 'event' AND source_id IN "
+        "(SELECT id FROM events WHERE source_article_id = :aid)"
+    ), {"aid": article_id})
+    await session.execute(sql_text(
+        "UPDATE events SET canonical_id = NULL WHERE canonical_id IN "
+        "(SELECT id FROM events WHERE source_article_id = :aid)"
+    ), {"aid": article_id})
+    await session.execute(sql_text("DELETE FROM events WHERE source_article_id = :aid"), {"aid": article_id})
     await session.delete(article)
     await session.commit()
 

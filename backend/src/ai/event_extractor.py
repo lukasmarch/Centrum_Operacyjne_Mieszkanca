@@ -402,6 +402,7 @@ async def find_duplicate(
           ON d.source_type = 'event' AND d.source_id = e.id AND d.chunk_index = 0
         WHERE date(e.event_date AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Warsaw') = :day
           AND e.canonical_id IS NULL
+          AND e.withdrawn_at IS NULL
           {exclude_clause}
         ORDER BY sim DESC
         LIMIT 10
@@ -783,6 +784,7 @@ URL: {article.url}
             .where(
                 Article.processed == True,
                 Article.category.is_not(None),
+                Article.withdrawn_at.is_(None),
                 Article.id.not_in(already_extracted),
                 or_(
                     Article.scraped_at >= cutoff,

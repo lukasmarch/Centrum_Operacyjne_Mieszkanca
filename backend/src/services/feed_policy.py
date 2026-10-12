@@ -439,6 +439,9 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
     )
 
     return [
+        # Odwołane ogłoszenie (E7, 12.10.2026) znika ze wszystkich kanałów
+        # naraz — wiersz zostaje, bo historia korekt ma przetrwać.
+        article_model.withdrawn_at.is_(None),
         article_model.is_filler == False,        # noqa: E712 — SQLAlchemy
         article_model.is_promotional == False,   # noqa: E712
         visible_text.op("~")(_LETTER_RUN_SQL),
@@ -763,14 +766,16 @@ def visible_event_conditions(event_model):
     Warunki SQL „to wydarzenie pokazujemy mieszkańcowi" — dla kalendarza,
     briefingu, newslettera i Przewodnika naraz.
 
-    Dwa powody, dla których wydarzenie zostaje w bazie, ale nie na ekranie:
-    jest powtórzeniem innego (`canonical_id`) albo dzieje się za daleko
-    (`locality`). NULL w lokalności to wpis sprzed 21.08.2026 — pokazujemy go,
+    Trzy powody, dla których wydarzenie zostaje w bazie, ale nie na ekranie:
+    jest powtórzeniem innego (`canonical_id`), dzieje się za daleko
+    (`locality`) albo jego ogłoszenie odwołano (`withdrawn_at`). NULL w lokalności to wpis sprzed 21.08.2026 — pokazujemy go,
     bo cofnięcie się z oceną wstecz kosztowałoby przebieg modelu po całej tabeli,
     a stare wpisy i tak wychodzą z okien czasowych.
     """
     return [
         event_model.canonical_id.is_(None),
+        # Ogłoszenie źródłowe odwołane (E7) — kalendarz nie może go zapowiadać
+        event_model.withdrawn_at.is_(None),
         or_(
             event_model.locality.is_(None),
             event_model.locality >= MIN_EVENT_LOCALITY,
