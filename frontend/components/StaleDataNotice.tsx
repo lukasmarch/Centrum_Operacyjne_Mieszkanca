@@ -15,7 +15,7 @@ interface StaleDataNoticeProps {
 const StaleDataNotice: React.FC<StaleDataNoticeProps> = ({ fetchedAt }) => {
     const at = fetchedAt ? clockLabel(fetchedAt) : null;
     return (
-        <p role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-200">
+        <p role="status" className="bg-tv-yellow px-4 py-2.5 text-[15px] leading-snug text-tv-ink">
             Nie udało się odświeżyć{at ? ` — pokazujemy stan z ${at}` : ''}. Spróbujemy ponownie za kilka minut.
         </p>
     );

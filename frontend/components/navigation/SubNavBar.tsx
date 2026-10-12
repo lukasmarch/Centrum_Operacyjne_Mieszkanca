@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from '../../lib/utils';
 
 interface SubNavItem {
@@ -10,24 +10,38 @@ interface SubNavBarProps {
   items: SubNavItem[];
   activeItem: string;
   onItemChange: (id: string) => void;
+  className?: string;
 }
 
-const SubNavBar: React.FC<SubNavBarProps> = ({ items, activeItem, onItemChange }) => {
+const SubNavBar: React.FC<SubNavBarProps> = ({ items, activeItem, onItemChange, className }) => {
+  // Na telefonie siedem pozycji nie mieści się w szerokości — aktywna (Odpady,
+  // Kino…) stała za prawą krawędzią i pasek nie mówił, gdzie jesteś
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    el?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [activeItem]);
+
   return (
-    <div className="sticky top-0 z-30 border-b border-white/5 backdrop-blur-xl">
+    <div className={cn('border-b border-tv-seam bg-tv-ink', className)}>
       <div className="max-w-7xl mx-auto px-4 py-2">
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        {/* Maska na prawej krawędzi mówi, że pasek przewija się dalej */}
+        <div
+          ref={listRef}
+          className="flex items-center gap-1 overflow-x-auto no-scrollbar [mask-image:linear-gradient(to_right,#000_85%,transparent)] lg:[mask-image:none]"
+        >
           {items.map((item) => {
             const isActive = activeItem === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => onItemChange(item.id)}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 border',
+                  'font-cond min-h-[44px] whitespace-nowrap px-3 text-[16px] font-bold uppercase tracking-wide transition-colors',
                   isActive
-                    ? 'bg-white/10 text-white border-white/20 shadow-sm'
-                    : 'bg-transparent text-neutral-500 border-transparent hover:text-neutral-300 hover:bg-white/5'
+                    ? 'bg-tv-paper text-tv-ink'
+                    : 'text-tv-paper hover:bg-tv-panel hover:text-white'
                 )}
               >
                 {item.label}

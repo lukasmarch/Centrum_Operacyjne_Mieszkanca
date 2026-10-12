@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden;background:#1a1b1d;color:#f2f2f2;font-family:'Barlow',sans-serif}
+.top{display:flex;justify-content:space-between;padding:14px 16px;font-size:15px;color:#aaa}
+.top b{color:#f2f2f2}
+h1{font-family:'Barlow Condensed';font-size:30px;padding:0 16px 10px;letter-spacing:.04em}
+.board{margin:0 10px;background:#0b0b0b;padding:8px;border:3px solid #3a3c40}
+.r{display:grid;grid-template-columns:74px 1fr 14px;gap:8px;align-items:center;padding:8px 4px;border-bottom:1px solid #222}
+.f{font-family:'Barlow Condensed';font-weight:700;font-size:22px;letter-spacing:.06em;text-transform:uppercase;background:#151515;padding:2px 6px;border-top:1px solid #2a2a2a}
+.l{width:10px;height:10px;border-radius:50%;background:#2a2a2a}.on{background:#ffb000}
+.sub{grid-column:2;font-size:14px;color:#aaa}
+.btn{margin:16px;border:2px solid #ffb000;color:#ffb000;padding:14px;text-align:center;font-weight:600;font-size:17px}
+.tabs{position:absolute;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #333}
+.tabs div{padding:10px 0 18px;text-align:center;font-size:13px;color:#aaa}.tabs .s{color:#ffb000;font-weight:600}
+</style></head><body>
+<div class="top"><span>RybnoLive</span><span><b>niedz. 11.10</b> 14:05</span></div>
+<h1>ŻABINY · DZIŚ I NAJBLIŻEJ</h1>
+<div class="board">
+ <div class="r"><span class="f">WT 0900</span><span class="f">PRĄD · GRĄDY</span><i class="l on"></i><span class="sub">wyłączenie do 13:00 · Żabiny bez zmian</span></div>
+ <div class="r"><span class="f">WT 0600</span><span class="f">WYWÓZ</span><i class="l"></i><span class="sub">zmieszane · Żabiny</span></div>
+ <div class="r"><span class="f">PN 0640</span><span class="f">AUTOBUS</span><i class="l"></i><span class="sub">do Działdowa · dziś nie kursuje</span></div>
+ <div class="r"><span class="f">TERAZ</span><span class="f">9° POCHMURNO</span><i class="l"></i><span class="sub">odczuwalnie 6° · powietrze czyste</span></div>
+</div>
+<div class="btn">Powiadamiaj o Żabinach</div>
+<nav class="tabs"><div class="s">Tablica</div><div>Gmina</div><div>Zapytaj</div><div>Więcej</div></nav>
+</body></html>

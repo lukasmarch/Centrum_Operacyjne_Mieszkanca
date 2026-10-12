@@ -1,9 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-// Uwaga: components/Dashboard.tsx (bento-panel) NIE jest już nigdzie routowany.
-// Zostaje w repo jako magazyn kafli, których nie ma jeszcze gdzie indziej
-// (ruch drogowy, kino, apteka dyżurna, monitoring) — do przeniesienia na
-// strony szczegółowe, potem plik można skasować.
+// Bento-panel (`components/Dashboard.tsx` i jego kafle) usunięty 11.10.2026 —
+// ruch, kino i apteka żyją w kaflach pulpitu (`components/simple/*`).
 import NewsFeed from './components/NewsFeed';
 import EventsFeed from './components/EventsFeed';
 import { AppSection, TabId } from './types';
@@ -23,9 +21,10 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import CookieConsent from './components/CookieConsent';
 import PaymentReturnBanner from './components/PaymentReturnBanner';
 import PricingCards, { Frequency } from './components/PricingCards';
+import { PageHead } from './components/simple/tv';
+import { ArrowLeft } from 'lucide-react';
 import SubNavBar from './components/navigation/SubNavBar';
 import TopBar from './components/navigation/TopBar';
-import { BeamsBackground } from './components/ui/beams-background';
 
 // Lazy-loaded pages — pobierane dopiero przy pierwszym wejściu
 const ProfilePage  = lazy(() => import('./src/pages/ProfilePage'));
@@ -55,6 +54,23 @@ const MIASTO_ITEMS = [
     { id: 'waste', label: 'Odpady' },
     { id: 'bus', label: 'Autobus' },
     { id: 'cinema', label: 'Kino' },
+];
+
+// Nawigacja sekcji w nagłówku na szerokim ekranie (od `lg`). Na telefonie tę rolę
+// pełnią dolna belka + podmenu „Gmina”. Kolejność: pulpit, potem to, po co się
+// wraca najczęściej (wiadomości, wydarzenia, odpady, autobus), urzędowe, reszta.
+const TOP_NAV: { id: AppSection; label: string }[] = [
+    { id: 'dashboard', label: 'Pulpit' },
+    { id: 'news', label: 'Wiadomości' },
+    { id: 'events', label: 'Wydarzenia' },
+    { id: 'waste', label: 'Odpady' },
+    { id: 'bus', label: 'Autobus' },
+    { id: 'weather', label: 'Pogoda' },
+    { id: 'council', label: 'Rada' },
+    { id: 'cinema', label: 'Kino' },
+    { id: 'business', label: 'Firmy' },
+    { id: 'reports', label: 'Zgłoszenia 24' },
+    { id: 'assistant', label: 'Asystent' },
 ];
 
 // Zakładka "Firmy": katalog wizytówek jako front, Statystyki GUS dostępne
@@ -351,12 +367,13 @@ const AppContent: React.FC = () => {
             case 'stats':
                 return (
                     <div>
-                        <div className="max-w-7xl mx-auto px-4 pt-4">
+                        <div>
                             <button
                                 onClick={() => handleNavigate('business')}
-                                className="text-sm text-neutral-400 hover:text-neutral-200 font-medium transition-colors"
+                                className="inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline"
                             >
-                                ← Wróć do Firm
+                                <ArrowLeft size={16} aria-hidden />
+                                Wróć do firm
                             </button>
                         </div>
                         <GUSPage />
@@ -382,11 +399,11 @@ const AppContent: React.FC = () => {
                 );
             case 'premium':
                 return (
-                    <div className="max-w-4xl mx-auto py-12">
-                        <div className="text-center mb-12">
-                            <h2 className="text-4xl font-black mb-4 text-gradient-saas">Wybierz swój plan</h2>
-                            <p className="text-neutral-500 text-lg">Wspieraj lokalne dziennikarstwo i zyskaj dostęp do ekstra funkcji.</p>
-                        </div>
+                    <div className="max-w-5xl space-y-6 lg:space-y-8">
+                        <PageHead
+                            title="Wybierz swój plan"
+                            sub="Wspieraj lokalne dziennikarstwo i zyskaj dostęp do ekstra funkcji."
+                        />
                         <PricingCards
                             currentTier={user?.tier || 'free'}
                             onSelect={startCheckout}
@@ -394,54 +411,57 @@ const AppContent: React.FC = () => {
 
                         {/* Przebieg zakupu opisany jawnie — kupujący (i weryfikator Przelewy24)
                             musi znać kolejne kroki i warunki przed założeniem konta */}
-                        <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6">
-                                <h3 className="text-lg font-bold mb-4">Jak kupić dostęp</h3>
-                                <ol className="space-y-3 text-sm text-neutral-400">
-                                    <li><span className="text-blue-400 font-bold mr-2">1.</span>Wybierz plan powyżej (Premium lub Firma lokalna) i okres rozliczeniowy — miesięczny albo roczny.</li>
-                                    <li><span className="text-blue-400 font-bold mr-2">2.</span>Na stronie <strong className="text-neutral-300">Podsumowanie zamówienia</strong> sprawdź cenę i zakres planu, po czym zaakceptuj Regulamin.</li>
-                                    <li><span className="text-blue-400 font-bold mr-2">3.</span>Załóż konto lub zaloguj się — dostęp do planu jest przypisany do konta w serwisie.</li>
-                                    <li><span className="text-blue-400 font-bold mr-2">4.</span>Potwierdź zamówienie z obowiązkiem zapłaty i przejdź do bramki Przelewy24 — BLIK, karta lub przelew online.</li>
-                                    <li><span className="text-blue-400 font-bold mr-2">5.</span>Po zaksięgowaniu płatności plan aktywuje się automatycznie, a potwierdzenie trafia na Twój e-mail.</li>
+                        <div className="grid grid-cols-1 gap-px bg-tv-seam md:grid-cols-2">
+                            <section className="border-t-2 border-tv-blue bg-tv-panel p-5 sm:p-6">
+                                <h3 className="font-cond mb-4 text-[20px] font-extrabold text-white">Jak kupić dostęp</h3>
+                                <ol className="space-y-3 text-[15px] leading-snug text-[#d7dbe8]">
+                                    <li className="flex gap-3"><span className="font-cond tabular w-4 shrink-0 font-extrabold text-tv-bluesoft">1.</span><span>Wybierz plan powyżej (Premium lub Firma lokalna) i okres rozliczeniowy — miesięczny albo roczny.</span></li>
+                                    <li className="flex gap-3"><span className="font-cond tabular w-4 shrink-0 font-extrabold text-tv-bluesoft">2.</span><span>Na stronie <strong className="text-white">Podsumowanie zamówienia</strong> sprawdź cenę i zakres planu, po czym zaakceptuj Regulamin.</span></li>
+                                    <li className="flex gap-3"><span className="font-cond tabular w-4 shrink-0 font-extrabold text-tv-bluesoft">3.</span><span>Załóż konto lub zaloguj się — dostęp do planu jest przypisany do konta w serwisie.</span></li>
+                                    <li className="flex gap-3"><span className="font-cond tabular w-4 shrink-0 font-extrabold text-tv-bluesoft">4.</span><span>Potwierdź zamówienie z obowiązkiem zapłaty i przejdź do bramki Przelewy24 — BLIK, karta lub przelew online.</span></li>
+                                    <li className="flex gap-3"><span className="font-cond tabular w-4 shrink-0 font-extrabold text-tv-bluesoft">5.</span><span>Po zaksięgowaniu płatności plan aktywuje się automatycznie, a potwierdzenie trafia na Twój e-mail.</span></li>
                                 </ol>
-                            </div>
+                            </section>
 
-                            <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 text-sm text-neutral-400 space-y-4">
+                            <section className="space-y-4 border-t-2 border-tv-seam bg-tv-panel p-5 text-[15px] text-[#d7dbe8] sm:p-6">
                                 <div>
-                                    <h3 className="text-lg font-bold text-white mb-2">Sprzedawca</h3>
+                                    <h3 className="font-cond mb-2 text-[20px] font-extrabold text-white">Sprzedawca</h3>
                                     <p className="leading-relaxed">
                                         Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz<br />
                                         Żabiny 96, 13-220 Rybno<br />
-                                        NIP: 571-156-78-15<br />
-                                        <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a>
+                                        NIP: <span className="tabular">571-156-78-15</span><br />
+                                        <a href="tel:+48501081723" className="tabular text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline">+48 501 081 723</a>
                                         {' · '}
-                                        <a href="mailto:biuro@lumargo.pl" className="hover:text-blue-400 transition-colors">biuro@lumargo.pl</a>
+                                        <a href="mailto:biuro@lumargo.pl" className="text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline">biuro@lumargo.pl</a>
                                     </p>
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-neutral-300 mb-1">Płatności i rezygnacja</h4>
+                                    <h4 className="mb-1 font-bold text-white">Płatności i rezygnacja</h4>
                                     <p className="leading-relaxed">
                                         Płatności obsługuje PayPro S.A. (Przelewy24). Ceny są cenami brutto w złotych.
                                         Płacisz z góry za wybrany okres — subskrypcja nie odnawia się automatycznie i wygasa po jego upływie.
                                         Konsumentowi przysługuje prawo odstąpienia od umowy w terminie 14 dni (szczegóły i wzór oświadczenia w Regulaminie).
                                     </p>
                                 </div>
-                                <p className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
-                                    <a href={SECTION_TO_PATH.terms} onClick={navLink('terms')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">Regulamin</a>
-                                    <a href={SECTION_TO_PATH.privacy} onClick={navLink('privacy')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">Polityka prywatności</a>
-                                    <a href={SECTION_TO_PATH.cookies} onClick={navLink('cookies')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">Polityka cookies</a>
+                                <p className="flex flex-wrap gap-x-4">
+                                    <a href={SECTION_TO_PATH.terms} onClick={navLink('terms')} className="inline-flex min-h-[44px] items-center font-bold text-tv-bluesoft underline underline-offset-2 hover:text-white">Regulamin</a>
+                                    <a href={SECTION_TO_PATH.privacy} onClick={navLink('privacy')} className="inline-flex min-h-[44px] items-center font-bold text-tv-bluesoft underline underline-offset-2 hover:text-white">Polityka prywatności</a>
+                                    <a href={SECTION_TO_PATH.cookies} onClick={navLink('cookies')} className="inline-flex min-h-[44px] items-center font-bold text-tv-bluesoft underline underline-offset-2 hover:text-white">Polityka cookies</a>
                                 </p>
-                            </div>
+                            </section>
                         </div>
                     </div>
                 );
             default:
                 return (
-                    <div className="p-20 text-center flex flex-col items-center justify-center">
-                        <span className="text-6xl mb-4">🚧</span>
-                        <h3 className="text-2xl font-bold">Sekcja w budowie</h3>
-                        <p className="text-neutral-500 max-w-sm">Ten moduł jest aktualnie opracowywany przez nasz zespół AI i developerów.</p>
-                        <button onClick={() => handleNavigate('dashboard')} className="mt-6 text-blue-500 font-bold">Wróć do kokpitu</button>
+                    <div className="space-y-4">
+                        <PageHead title="Tej sekcji jeszcze nie ma" sub="Adres prowadzi do części serwisu, której nie uruchomiliśmy." />
+                        <button
+                            onClick={() => handleNavigate('dashboard')}
+                            className="font-cond flex min-h-[52px] items-center bg-tv-blue px-5 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
+                        >
+                            Wróć na pulpit
+                        </button>
                     </div>
                 );
         }
@@ -450,12 +470,12 @@ const AppContent: React.FC = () => {
     // Loading state
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-black">
+            <div className="min-h-screen flex items-center justify-center bg-tv-ink">
                 <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl flex items-center justify-center font-bold text-3xl text-white mx-auto mb-4 animate-pulse shadow-lg shadow-blue-500/30">
-                        R
-                    </div>
-                    <p className="text-neutral-500">Ładowanie...</p>
+                    <p className="font-cond flex items-center justify-center text-[30px] font-black text-white">
+                        Rybno<span className="ml-0.5 bg-tv-blue px-1.5 py-1 text-[24px] uppercase">Live</span>
+                    </p>
+                    <p className="mt-3 text-[15px] text-tv-muted">Ładowanie…</p>
                 </div>
             </div>
         );
@@ -465,22 +485,23 @@ const AppContent: React.FC = () => {
     // przewijania, więc przyklejony TopBar przyklejał się do JEGO góry i uciekał
     // razem ze stroną. `clip` obcina tak samo, ale kontenera nie tworzy
     return (
-        <div className="min-h-screen text-white selection:bg-blue-500/30 overflow-x-clip" style={{ background: '#05080f' }}>
-            {/* Global BeamsBackground — fixed full-page, shared with hero */}
-            <BeamsBackground intensity="medium" className="fixed inset-0 pointer-events-none" />
-            {/* Extra depth: dark radial overlay at centre-bottom */}
-            <div className="fixed inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_100%,rgba(37,99,239,0.06),transparent)] pointer-events-none" />
+        // Jedno płaskie tło (odświeżenie 10.2026): bez wiązek światła i poświaty
+        // pod całą stroną — kolor na ekranie ma nieść stan, nie dekorację
+        <div className="min-h-screen bg-tv-ink text-white overflow-x-clip">
 
             {/* Top Bar */}
             <TopBar
                 user={user}
                 isAuthenticated={isAuthenticated}
                 onNavigate={handleNavigate}
+                activeSection={activeSection}
+                navItems={TOP_NAV.map(item => ({ ...item, href: SECTION_TO_PATH[item.id] ?? '/' }))}
             />
 
             {/* Sub Navigation for Miasto / Dane tabs */}
             {activeTab === 'miasto' && (
                 <SubNavBar
+                    className="lg:hidden"
                     items={MIASTO_ITEMS}
                     activeItem={activeSection}
                     onItemChange={handleSubNavChange}
@@ -521,37 +542,33 @@ const AppContent: React.FC = () => {
             </main>
 
             {/* Footer */}
-            {activeSection !== 'assistant' && <footer className="max-w-7xl mx-auto px-8 py-10 mb-20 border-t border-white/5 text-neutral-500 text-xs relative z-10">
+            {activeSection !== 'assistant' && <footer className="relative z-10 mx-auto mb-20 max-w-7xl border-t border-tv-seam px-4 py-10 text-[14px] text-tv-muted md:px-8 lg:mb-0">
                 {/* Blok danych sprzedawcy — identyfikacja wymagana przy sprzedaży online.
                     Nazwa firmy w brzmieniu z CEIDG (z imieniem i nazwiskiem — dla działalności
                     jednoosobowej jest ono częścią firmy) — wymóg weryfikacji Przelewy24 */}
                 <div className="flex flex-col md:flex-row justify-between gap-8 mb-6">
                     <div className="leading-relaxed">
-                        <p className="font-medium text-neutral-400 mb-1">© 2026 Rybno Live</p>
+                        <p className="mb-1 font-semibold text-tv-paper">© 2026 RybnoLive</p>
                         <p>Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz</p>
                         <p>Żabiny 96</p>
                         <p>13-220 Rybno</p>
                         <p>NIP: 571-156-78-15</p>
                         <p className="mt-1">
-                            <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a>
+                            <a href="tel:+48501081723" className="underline-offset-4 hover:text-white hover:underline transition-colors">+48 501 081 723</a>
                         </p>
                         <p>
-                            <a href="mailto:biuro@lumargo.pl" className="hover:text-blue-400 transition-colors">biuro@lumargo.pl</a>
+                            <a href="mailto:biuro@lumargo.pl" className="underline-offset-4 hover:text-white hover:underline transition-colors">biuro@lumargo.pl</a>
                         </p>
                     </div>
-                    <div className="flex flex-col gap-1.5 md:text-right text-neutral-400">
-                        <a href={SECTION_TO_PATH.terms} onClick={navLink('terms')} className="hover:text-blue-400 transition-colors">Regulamin</a>
-                        <a href={SECTION_TO_PATH.privacy} onClick={navLink('privacy')} className="hover:text-blue-400 transition-colors">Polityka prywatności</a>
-                        <a href={SECTION_TO_PATH.cookies} onClick={navLink('cookies')} className="hover:text-blue-400 transition-colors">Polityka cookies</a>
-                        <a href={SECTION_TO_PATH.premium} onClick={navLink('premium')} className="hover:text-blue-400 transition-colors">Cennik</a>
+                    <div className="flex flex-col gap-1.5 md:text-right text-tv-paper">
+                        <a href={SECTION_TO_PATH.terms} onClick={navLink('terms')} className="underline-offset-4 hover:text-white hover:underline transition-colors">Regulamin</a>
+                        <a href={SECTION_TO_PATH.privacy} onClick={navLink('privacy')} className="underline-offset-4 hover:text-white hover:underline transition-colors">Polityka prywatności</a>
+                        <a href={SECTION_TO_PATH.cookies} onClick={navLink('cookies')} className="underline-offset-4 hover:text-white hover:underline transition-colors">Polityka cookies</a>
+                        <a href={SECTION_TO_PATH.premium} onClick={navLink('premium')} className="underline-offset-4 hover:text-white hover:underline transition-colors">Cennik</a>
                     </div>
                 </div>
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4 border-t border-white/5">
+                <div className="border-t border-tv-seam pt-4">
                     <p>Płatności: Przelewy24 (BLIK, karta, przelew online)</p>
-                    <div className="flex gap-4 font-mono opacity-50">
-                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Rybno-1</span>
-                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> API: v2.4</span>
-                    </div>
                 </div>
             </footer>}
 

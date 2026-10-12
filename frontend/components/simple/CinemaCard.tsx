@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Clapperboard, ChevronRight } from 'lucide-react';
+import { Tag } from './tv';
 import { useCinema } from '../../src/hooks/useCinema';
 
 interface CinemaCardProps {
@@ -35,44 +36,42 @@ const CinemaCard: React.FC<CinemaCardProps> = ({ onClick }) => {
     const time = show.at.toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' });
 
     return (
-        <button
-            onClick={onClick}
-            className="group flex w-full items-stretch gap-4 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1117] p-4 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04] lg:p-5"
-        >
-            {/* Plakat w proporcji 2:3, czyli tej, w której plakaty powstają —
-                kadrowanie do kwadratu ucina twarze i tytuł */}
-            <span className="relative h-[92px] w-[62px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 lg:h-[116px] lg:w-[78px]">
-                {movie.posterUrl && !posterFailed ? (
-                    <img
-                        src={movie.posterUrl}
-                        alt=""
-                        loading="lazy"
-                        onError={() => setPosterFailed(true)}
-                        className="h-full w-full object-cover"
-                    />
-                ) : (
-                    <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-600/40 to-purple-950">
-                        <Clapperboard size={22} className="text-white/40" aria-hidden />
+        <section aria-label="Kino" className="flex flex-col">
+            <Tag as="h2">{cinemaName}</Tag>
+            <button
+                onClick={onClick}
+                className="group flex flex-1 items-stretch gap-4 border-t-2 border-tv-blue bg-tv-panel p-4 text-left transition-colors hover:bg-tv-panel2 lg:p-5"
+            >
+                {/* Plakat 2:3 — proporcja, w której plakaty powstają; zdjęcie niesie
+                    własny kolor, interfejs wokół niego milknie */}
+                <span className="relative h-[108px] w-[72px] shrink-0 overflow-hidden bg-tv-panel2 lg:h-[132px] lg:w-[88px]">
+                    {movie.posterUrl && !posterFailed ? (
+                        <img
+                            src={movie.posterUrl}
+                            alt={`Plakat filmu ${movie.title}`}
+                            loading="lazy"
+                            onError={() => setPosterFailed(true)}
+                            className="h-full w-full object-cover"
+                        />
+                    ) : (
+                        <span className="flex h-full w-full items-center justify-center">
+                            <Clapperboard size={24} className="text-tv-muted" aria-hidden />
+                        </span>
+                    )}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col justify-center">
+                    <span className="font-cond tabular text-[24px] font-extrabold leading-none text-white">
+                        {when} {time}
                     </span>
-                )}
-            </span>
-
-            <span className="flex min-w-0 flex-1 flex-col justify-center">
-                <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-violet-300">
-                    <Clapperboard size={12} aria-hidden />
-                    Co obejrzeć
+                    <span className="mt-1.5 line-clamp-2 text-[16px] font-semibold leading-snug text-[#d7dbe8]">
+                        {movie.title}
+                    </span>
+                    <span className="mt-1 inline-flex items-center gap-1 text-[15px] font-bold text-tv-bluesoft group-hover:text-white">
+                        Repertuar <ChevronRight size={16} aria-hidden />
+                    </span>
                 </span>
-                <span className="mt-1 line-clamp-2 text-base font-semibold leading-snug text-white">
-                    {movie.title}
-                </span>
-                <span className="mt-1 text-[13px] text-neutral-400">
-                    <span className="font-semibold text-neutral-200">{when} o {time}</span>
-                    {' · '}{cinemaName}
-                </span>
-            </span>
-
-            <ChevronRight size={18} className="shrink-0 self-center text-neutral-600" aria-hidden />
-        </button>
+            </button>
+        </section>
     );
 };
 

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Clapperboard, MapPin, ExternalLink } from 'lucide-react';
+import { Clapperboard, ExternalLink } from 'lucide-react';
+import { Notice, PageHead, Skeleton, Tag } from '../../components/simple/tv';
 import { useCinema, CinemaMovie } from '../hooks/useCinema';
 
 const DAY_NAMES = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
@@ -41,8 +42,8 @@ const Poster: React.FC<{ movie: CinemaMovie; className?: string }> = ({ movie, c
         );
     }
     return (
-        <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-600/40 to-purple-950">
-            <Clapperboard size={26} className="text-white/40" aria-hidden />
+        <span className="flex h-full w-full items-center justify-center">
+            <Clapperboard size={24} className="text-tv-muted" aria-hidden />
         </span>
     );
 };
@@ -78,66 +79,68 @@ const CinemaPage: React.FC = () => {
     }, [movies]);
 
     return (
-        <div className="mx-auto max-w-5xl px-4 py-6 lg:py-10">
-            <header>
-                <h1 className="text-3xl font-extrabold tracking-tight text-white lg:text-4xl">Kino</h1>
-                <p className="mt-2 flex items-center gap-1.5 text-sm text-neutral-400">
-                    <MapPin size={14} aria-hidden className="text-violet-400" />
-                    {cinemaName} — najbliższe kino dla mieszkańców gminy Rybno
-                </p>
-            </header>
+        <div className="max-w-5xl space-y-6 lg:space-y-8">
+            <PageHead
+                title="Kino"
+                sub={<>{cinemaName} — najbliższe kino dla mieszkańców gminy Rybno</>}
+            />
 
-            {loading && <p className="mt-8 text-sm text-neutral-500">Sprawdzam repertuar…</p>}
-
-            {!loading && !days.length && (
-                <p className="mt-8 rounded-2xl border border-white/10 bg-[#0d1117] p-5 text-sm text-neutral-400">
-                    Kino nie podało jeszcze repertuaru na najbliższe dni.
-                </p>
+            {loading && (
+                <div aria-label="Sprawdzam repertuar…" className="space-y-px">
+                    <Skeleton className="h-8 w-24" />
+                    <Skeleton className="h-36" />
+                </div>
             )}
 
-            <div className="mt-6 space-y-6">
-                {days.map(day => (
-                    <section key={day.label}>
-                        <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
-                            {day.label}
-                        </h2>
-                        {/* Dwie kolumny na desktopie: wiersz z plakatem 64 px
-                            i jednym tytułem ciągnął się na całą szerokość strony,
-                            zostawiając dwie trzecie pustego pola po prawej */}
-                        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            {day.items.map(({ movie, at }) => (
-                                <li
-                                    key={`${movie.title}-${at.getTime()}`}
-                                    className="flex items-stretch gap-4 rounded-2xl border border-white/10 bg-[#0d1117] p-4"
-                                >
-                                    <span className="h-[96px] w-[64px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
-                                        <Poster movie={movie} />
+            {!loading && !days.length && (
+                <Notice>Kino nie podało jeszcze repertuaru na najbliższe dni.</Notice>
+            )}
+
+            {days.map(day => (
+                <section key={day.label} className="flex flex-col">
+                    <Tag as="h2">{day.label}</Tag>
+                    {/* Dwie kolumny na desktopie: wiersz z plakatem 64 px
+                        i jednym tytułem ciągnął się na całą szerokość strony,
+                        zostawiając dwie trzecie pustego pola po prawej */}
+                    <ul className="grid grid-cols-1 gap-px border-t-2 border-tv-blue bg-tv-seam lg:grid-cols-2">
+                        {day.items.map(({ movie, at }) => (
+                            <li
+                                key={`${movie.title}-${at.getTime()}`}
+                                className="flex items-stretch gap-4 bg-tv-panel p-4"
+                            >
+                                {/* Plakat 2:3, kąty proste — obraz niesie własny kolor */}
+                                <span className="h-[108px] w-[72px] shrink-0 overflow-hidden bg-tv-panel2">
+                                    <Poster movie={movie} />
+                                </span>
+                                <span className="flex min-w-0 flex-1 flex-col justify-center">
+                                    <span className="font-cond tabular text-[24px] font-extrabold leading-none text-white">
+                                        {at.toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' })}
                                     </span>
-                                    <span className="flex min-w-0 flex-1 flex-col justify-center">
-                                        <span className="text-lg font-black leading-none text-white">
-                                            {at.toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' })}
-                                        </span>
-                                        <span className="mt-1.5 text-base font-semibold leading-snug text-neutral-100">
-                                            {movie.title}
-                                        </span>
-                                        {movie.link && (
-                                            <a
-                                                href={movie.link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="mt-1.5 inline-flex items-center gap-1 self-start text-[13px] font-semibold text-violet-300 hover:text-violet-200"
-                                            >
-                                                Bilety i szczegóły
-                                                <ExternalLink size={12} aria-hidden />
-                                            </a>
-                                        )}
+                                    <span className="mt-1.5 text-[17px] font-semibold leading-snug text-[#d7dbe8]">
+                                        {movie.title}
                                     </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
-                ))}
-            </div>
+                                    {movie.link && (
+                                        <a
+                                            href={movie.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex min-h-[44px] items-center gap-1.5 self-start text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline"
+                                        >
+                                            Bilety i szczegóły
+                                            <ExternalLink size={14} aria-hidden />
+                                        </a>
+                                    )}
+                                </span>
+                            </li>
+                        ))}
+                        {/* Nieparzysta liczba seansów zostawiłaby w siatce pole w kolorze
+                            szwu — wypełniamy je tłem strony */}
+                        {day.items.length % 2 === 1 && (
+                            <li aria-hidden className="hidden bg-tv-ink lg:block" />
+                        )}
+                    </ul>
+                </section>
+            ))}
         </div>
     );
 };

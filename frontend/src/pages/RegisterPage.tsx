@@ -6,7 +6,37 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { track } from '../services/analytics';
 import { AVAILABLE_LOCATIONS } from '../../types';
+import { guestVillage } from '../hooks/useMyVillage';
 import { ApiError } from '../services/apiError';
+import { Check } from 'lucide-react';
+import { Notice, PageHead } from '../../components/simple/tv';
+
+// Formularz w języku „Paska informacyjnego” — te same miary co logowanie:
+// pole 52 px, tekst 16 px (iOS nie powiększa przy fokusie), kąty proste.
+// Obramowanie dokłada `fieldClass` (szew albo żółć przy błędzie)
+const LABEL = 'mb-1.5 block text-[15px] font-semibold text-tv-paper';
+const INPUT =
+  'min-h-[52px] w-full border-2 bg-tv-ink px-4 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper disabled:opacity-60';
+const HINT = 'mt-1.5 text-[13px] leading-snug text-tv-muted';
+const PRIMARY =
+  'font-cond min-h-[52px] w-full bg-tv-blue px-4 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-not-allowed disabled:opacity-50';
+const LINK = 'font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline';
+
+/** Kwadratowe pole zgody 24 px — natywny checkbox bez wyglądu, znaczek z lucide */
+const SquareCheck: React.FC<{ checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }> = ({
+  checked, onChange, disabled,
+}) => (
+  <span className="relative mt-[-1px] inline-flex h-6 w-6 shrink-0">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      disabled={disabled}
+      className="peer h-6 w-6 cursor-pointer appearance-none border-2 border-tv-muted bg-tv-ink transition-colors checked:border-tv-blue checked:bg-tv-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tv-yellow disabled:opacity-60"
+    />
+    <Check size={16} strokeWidth={3} aria-hidden className="pointer-events-none absolute inset-0 m-auto hidden text-white peer-checked:block" />
+  </span>
+);
 
 interface RegisterPageProps {
   onNavigate: (page: 'login' | 'dashboard' | 'terms' | 'privacy') => void;
@@ -31,7 +61,12 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
     password: '',
     confirmPassword: '',
     full_name: '',
-    location: 'Rybno',
+    // Wieś wybrana na pulpicie jako gość przechodzi do konta — bez pytania drugi raz.
+    // „Rybno” bez rejonu nie jest pozycją listy (R1/R2), więc wtedy zostaje stan dawny
+    location: (() => {
+      const picked = guestVillage();
+      return picked && (AVAILABLE_LOCATIONS as readonly string[]).includes(picked) ? picked : 'Rybno';
+    })(),
   });
   const [consentTerms, setConsentTerms] = useState(false);
   const [consentMarketing, setConsentMarketing] = useState(false);
@@ -121,45 +156,35 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
   };
 
   const fieldClass = (name: string) =>
-    `w-full px-4 py-3 rounded-xl border ${fieldErrors[name] ? 'border-red-500' : 'border-gray-700'} bg-gray-900 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all`;
+    `${INPUT} ${fieldErrors[name] ? 'border-tv-yellow' : 'border-tv-seam'}`;
 
   const fieldError = (name: string) =>
     fieldErrors[name] ? (
-      <p id={`${name}-error`} role="alert" className="mt-1 text-sm text-red-400">{fieldErrors[name]}</p>
+      <p id={`${name}-error`} role="alert" className="mt-1.5 text-[14px] font-semibold text-tv-yellow">{fieldErrors[name]}</p>
     ) : null;
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center py-8">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-3xl text-white mx-auto mb-4">
-            D
-          </div>
-          <h1 className="text-3xl font-black mb-2 text-white">Dołącz do nas!</h1>
-          <p className="text-neutral-500">Stwórz konto w Centrum Operacyjnym</p>
-        </div>
+    <div className="flex min-h-[70vh] items-center justify-center py-8">
+      <div className="w-full max-w-md space-y-5">
+        <PageHead title="Dołącz do nas!" sub="Stwórz konto w Centrum Operacyjnym" />
 
-        {/* Form */}
-        <div className="bg-gray-950 rounded-3xl p-8 shadow-sm border border-gray-800/50">
+        <div className="border-t-2 border-tv-blue bg-tv-panel p-5 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Error message */}
             {/* Komunikat ogólny — chyba że to ten sam, który stoi już przy polu
                 („Ten adres ma już konto” przy e-mailu), wtedy raz wystarczy */}
             {(error || localError) && !Object.values(fieldErrors).includes(error || localError) && (
-              <div role="alert" className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm">
-                {error || localError}
-              </div>
+              <Notice tone="warn" role="alert">{error || localError}</Notice>
             )}
 
-            {/* Full name */}
             <div>
-              <label className="block text-sm font-semibold text-neutral-300 mb-2">
+              <label htmlFor="reg-full_name" className={LABEL}>
                 Imię i nazwisko *
               </label>
               <input
+                id="reg-full_name"
                 type="text"
                 name="full_name"
+                autoComplete="name"
                 value={formData.full_name}
                 onChange={handleChange}
                 placeholder="Jan Kowalski"
@@ -171,14 +196,15 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
               {fieldError('full_name')}
             </div>
 
-            {/* Email */}
             <div>
-              <label className="block text-sm font-semibold text-neutral-300 mb-2">
+              <label htmlFor="reg-email" className={LABEL}>
                 Email *
               </label>
               <input
+                id="reg-email"
                 type="email"
                 name="email"
+                autoComplete="email"
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="twoj@email.pl"
@@ -190,16 +216,16 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
               {fieldError('email')}
             </div>
 
-            {/* Location */}
             <div>
-              <label className="block text-sm font-semibold text-neutral-300 mb-2">
+              <label htmlFor="reg-location" className={LABEL}>
                 Miejscowość
               </label>
               <select
+                id="reg-location"
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className={`${INPUT} border-tv-seam`}
                 disabled={isLoading}
               >
                 {AVAILABLE_LOCATIONS.map((loc) => (
@@ -208,19 +234,20 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-neutral-400 mt-1">
+              <p className={HINT}>
                 Wybierz swoją miejscowość, aby otrzymywać spersonalizowane informacje
               </p>
             </div>
 
-            {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-neutral-300 mb-2">
+              <label htmlFor="reg-password" className={LABEL}>
                 Hasło *
               </label>
               <input
+                id="reg-password"
                 type="password"
                 name="password"
+                autoComplete="new-password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••••"
@@ -230,19 +257,20 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
                 disabled={isLoading}
               />
               {fieldError('password')}
-              <p className="text-xs text-neutral-400 mt-1">
+              <p className={HINT}>
                 Min. 8 znaków, wielka litera i cyfra
               </p>
             </div>
 
-            {/* Confirm password */}
             <div>
-              <label className="block text-sm font-semibold text-neutral-300 mb-2">
+              <label htmlFor="reg-confirmPassword" className={LABEL}>
                 Potwierdź hasło *
               </label>
               <input
+                id="reg-confirmPassword"
                 type="password"
                 name="confirmPassword"
+                autoComplete="new-password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="••••••••"
@@ -254,37 +282,33 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
               {fieldError('confirmPassword')}
             </div>
 
-            {/* Zgody RODO */}
-            <div className="space-y-3 pt-1">
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
+            {/* Zgody RODO — treść bez zmian; pole kwadratowe 24 px w wierszu ≥ 44 px */}
+            <div className="space-y-1 border-t border-tv-seam pt-3">
+              <label className="flex min-h-[44px] cursor-pointer items-start gap-3 py-2.5">
+                <SquareCheck
                   checked={consentTerms}
-                  onChange={(e) => setConsentTerms(e.target.checked)}
+                  onChange={setConsentTerms}
                   disabled={isLoading}
-                  className="mt-0.5 accent-blue-500 shrink-0"
                 />
-                <span className="text-xs text-neutral-400 leading-relaxed">
+                <span className="text-[14px] leading-relaxed text-[#d7dbe8]">
                   Akceptuję{' '}
-                  <button type="button" onClick={() => onNavigate('terms')} className="text-blue-400 hover:underline">
+                  <button type="button" onClick={() => onNavigate('terms')} className={LINK}>
                     Regulamin
                   </button>{' '}
                   i zapoznałem/am się z{' '}
-                  <button type="button" onClick={() => onNavigate('privacy')} className="text-blue-400 hover:underline">
+                  <button type="button" onClick={() => onNavigate('privacy')} className={LINK}>
                     Polityką prywatności
                   </button>{' '}
-                  <span className="text-red-400">*</span>
+                  <span className="text-tv-paper">*</span>
                 </span>
               </label>
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
+              <label className="flex min-h-[44px] cursor-pointer items-start gap-3 py-2.5">
+                <SquareCheck
                   checked={consentMarketing}
-                  onChange={(e) => setConsentMarketing(e.target.checked)}
+                  onChange={setConsentMarketing}
                   disabled={isLoading}
-                  className="mt-0.5 accent-blue-500 shrink-0"
                 />
-                <span className="text-xs text-neutral-400 leading-relaxed">
+                <span className="text-[14px] leading-relaxed text-[#d7dbe8]">
                   Chcę dostawać informacje o nowościach w serwisie i oferty lokalnych firm
                   (opcjonalne, zgodę można cofnąć w każdej chwili)
                 </span>
@@ -298,21 +322,21 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
             {/* Konto z zaproszenia (sołtys) dostaje Premium BEZ terminu — obietnica
                 30 dni byłaby tu nieprawdą (backend: `roles.grant_role`) */}
             {inviteToken ? (
-              <div className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3">
-                <p className="text-xs font-bold text-emerald-300">
+              <div className="border border-tv-seam bg-tv-ink px-4 py-3">
+                <p className="font-cond text-[16px] font-extrabold leading-snug text-white">
                   Plan Premium bez opłat — na czas pełnienia funkcji
                 </p>
-                <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
+                <p className="mt-1 text-[14px] leading-relaxed text-[#d7dbe8]">
                   Po założeniu konta od razu przejdziesz do panelu sołectwa,
                   a na maila przyjdzie instrukcja dodawania ogłoszeń.
                 </p>
               </div>
             ) : (
-              <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
-                <p className="text-xs font-bold text-amber-300">
+              <div className="border border-tv-seam bg-tv-ink px-4 py-3">
+                <p className="font-cond text-[16px] font-extrabold leading-snug text-white">
                   30 dni planu Premium — bez karty płatniczej
                 </p>
-                <p className="mt-1 text-xs text-neutral-400 leading-relaxed">
+                <p className="mt-1 text-[14px] leading-relaxed text-[#d7dbe8]">
                   Poranny briefing na mail, asystent AI bez limitu i powiadomienia o awariach.
                   Potem konto przechodzi na darmowy plan Dla Każdego — nic nie pobieramy
                   automatycznie i uprzedzimy Cię mailem tydzień wcześniej.
@@ -320,55 +344,14 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, inviteToken, on
               </div>
             )}
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isLoading || !consentTerms}
-              className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  Tworzenie konta...
-                </span>
-              ) : (
-                'Zarejestruj się'
-              )}
+            <button type="submit" disabled={isLoading || !consentTerms} className={PRIMARY}>
+              {isLoading ? 'Tworzenie konta…' : 'Zarejestruj się'}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-800/50"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-gray-950 text-neutral-400">lub</span>
-            </div>
-          </div>
-
-          {/* Login link */}
-          <p className="text-center text-neutral-400">
-            Masz już konto?{' '}
-            <button
-              onClick={() => onNavigate('login')}
-              className="text-blue-600 font-bold hover:text-blue-700"
-            >
+          <p className="mt-5 flex flex-wrap items-center gap-x-2 border-t border-tv-seam pt-4 text-[15px] text-tv-muted">
+            Masz już konto?
+            <button onClick={() => onNavigate('login')} className={`${LINK} min-h-[44px]`}>
               Zaloguj się
             </button>
           </p>

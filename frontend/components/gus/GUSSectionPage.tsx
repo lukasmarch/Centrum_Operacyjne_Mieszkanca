@@ -22,7 +22,9 @@
  */
 
 import React, { useState, useRef } from 'react';
-import { RefreshCw, AlertCircle, ChevronLeft, TrendingUp, Info } from 'lucide-react';
+import { RefreshCw, ChevronLeft, Info } from 'lucide-react';
+import { Notice, Skeleton, Tag } from '../simple/tv';
+import { GUS_CHART, TOOLTIP_CLASS } from './charts/palette';
 import { useGUSSection } from '../../src/hooks/useGUSStats';
 import { useAuth } from '../../src/context/AuthContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -46,11 +48,12 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
   // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <RefreshCw className="animate-spin text-blue-400 mx-auto mb-4" size={48} />
-          <p className="text-neutral-400 text-lg font-medium">Ładowanie sekcji...</p>
+      <div aria-label="Ładowanie sekcji..." className="space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-2 gap-px bg-tv-seam md:grid-cols-4">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28" />)}
         </div>
+        <Skeleton className="h-80" />
       </div>
     );
   }
@@ -59,7 +62,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
   if (error) {
     if (error.includes('Premium tier required') || error.includes('403')) {
       return (
-        <div className="max-w-4xl mx-auto mt-12 px-4">
+        <div className="max-w-4xl">
           <GUSTierGate
             requiredTier="premium"
             currentTier={user?.tier || 'free'}
@@ -70,19 +73,15 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
     }
 
     return (
-      <div className="max-w-2xl mx-auto mt-12 p-8 bg-red-900/20 border border-red-500/30 rounded-xl">
-        <div className="flex items-start gap-4">
-          <AlertCircle className="text-red-400 flex-shrink-0" size={32} />
-          <div>
-            <h3 className="text-xl font-bold text-red-300 mb-2">Błąd ładowania sekcji</h3>
-            <p className="text-red-400 mb-4">{error}</p>
-            <button
-              onClick={() => refetch()}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-            >
-              Spróbuj ponownie
-            </button>
-          </div>
+      <div className="max-w-2xl space-y-px" role="alert">
+        <Notice tone="warn"><strong>Błąd ładowania sekcji.</strong> {error}</Notice>
+        <div className="bg-tv-panel px-4 py-3">
+          <button
+            onClick={() => refetch()}
+            className="font-cond inline-flex min-h-[44px] items-center bg-tv-blue px-4 text-[15px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
+          >
+            Spróbuj ponownie
+          </button>
         </div>
       </div>
     );
@@ -100,18 +99,17 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
   // Guard: no variables returned for this section
   if (!primaryVariable || variableKeys.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto mt-12 p-8 bg-amber-900/20 border border-amber-500/30 rounded-xl text-center">
-        <AlertCircle className="text-amber-400 mx-auto mb-4" size={32} />
-        <h3 className="text-xl font-bold text-neutral-100 mb-2">Brak danych dla tej sekcji</h3>
-        <p className="text-neutral-400 mb-4">
-          Sekcja nie zawiera jeszcze danych dla Gminy Rybno.
-        </p>
-        <button
-          onClick={onBack}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          Powrót do przeglądu
-        </button>
+      <div className="max-w-2xl space-y-px">
+        <Notice><strong>Brak danych dla tej sekcji.</strong> Sekcja nie zawiera jeszcze danych dla Gminy Rybno.</Notice>
+        <div className="bg-tv-panel px-4 py-3">
+          <button
+            onClick={onBack}
+            className="inline-flex min-h-[44px] items-center gap-1 text-[15px] font-bold text-tv-bluesoft underline-offset-4 hover:text-white hover:underline"
+          >
+            <ChevronLeft size={16} aria-hidden />
+            Powrót do przeglądu
+          </button>
+        </div>
       </div>
     );
   }
@@ -130,30 +128,32 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
     year: item.year,
   })) || [];
 
+  const trendText = (pct: number) => `${pct >= 0 ? '+' : ''}${pct.toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="space-y-8">
       {/* Header with back button */}
-      <div className="mb-8">
+      <div>
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-blue-400 hover:text-blue-300 font-medium mb-4 transition-colors"
+          className="mb-2 inline-flex min-h-[44px] items-center gap-1 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline"
         >
-          <ChevronLeft size={20} />
+          <ChevronLeft size={16} aria-hidden />
           Powrót do przeglądu
         </button>
 
-        <div>
-          <h1 className="text-3xl font-bold text-neutral-100 mb-2">{section_name}</h1>
-          <p className="text-neutral-400">
-            Szczegółowe statystyki dla Gminy Rybno · {variableKeys.length} wskaźników
+        <div className="border-b border-tv-seam pb-3">
+          <h2 className="font-cond text-[24px] font-extrabold leading-tight text-white lg:text-[30px]">{section_name}</h2>
+          <p className="mt-0.5 text-[15px] text-tv-muted">
+            Szczegółowe statystyki dla Gminy Rybno · <span className="tabular">{variableKeys.length}</span> wskaźników
           </p>
         </div>
       </div>
 
       {/* KPI Cards Row (all variables in section) */}
-      <div className="mb-6">
-        <h2 className="text-base font-semibold text-neutral-400 uppercase tracking-wider mb-3">Kluczowe wskaźniki</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 min-w-0">
+      <section className="flex flex-col">
+        <h3 className="flex"><Tag>Kluczowe wskaźniki</Tag></h3>
+        <div className="grid min-w-0 grid-cols-2 gap-px border-t-2 border-tv-blue bg-tv-seam md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {variableKeys.map(varKey => {
             const variable = variables[varKey];
             const isActive = selectedVariable === varKey || (!selectedVariable && varKey === firstVariableKey);
@@ -166,7 +166,9 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
                     chartRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }, 50);
                 }}
-                className={`text-left transition-all min-w-0 rounded-lg ${isActive ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-950' : ''}`}
+                aria-pressed={isActive}
+                // Wybrany wskaźnik: obrys chabrem wewnątrz pola (bez poświaty pierścienia)
+                className={`min-w-0 text-left ${isActive ? 'outline outline-2 -outline-offset-2 outline-tv-blue' : ''}`}
               >
                 <KPICard
                   label={variable.current.metadata.name}
@@ -180,11 +182,11 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
             );
           })}
         </div>
-      </div>
+      </section>
 
       {/* Main Trend Chart */}
       {trendData.length > 0 && (
-        <div className="mb-8" ref={chartRef}>
+        <div className="scroll-mt-24 bg-tv-panel p-4 lg:p-5" ref={chartRef}>
           <TrendChart
             data={trendData}
             title={`Trend historyczny: ${primaryVariable.current.metadata.name}`}
@@ -197,7 +199,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
       )}
 
       {/* Comparison Charts Grid (2x2) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 min-w-0">
+      <div className="grid min-w-0 grid-cols-1 gap-px bg-tv-seam lg:grid-cols-2">
         {/* Gminy comparison */}
         {comparisonData.length > 0 && (
           <div className="min-w-0">
@@ -214,8 +216,8 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
 
         {/* Gmina vs Powiat Comparison (Only for Gmina-level variables) */}
         {primaryVariable.current.metadata.level === 'gmina' && primaryVariable.powiat_comparison && (
-          <div className="bg-white/[0.04] rounded-xl border border-white/5 p-5 min-w-0">
-            <h3 className="text-lg font-bold text-neutral-100 mb-4">Gmina vs Powiat</h3>
+          <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
+            <h3 className="font-cond mb-3 text-[20px] font-extrabold leading-snug text-white">Gmina vs Powiat</h3>
             <div style={{ width: '100%', height: '280px', minWidth: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -225,49 +227,52 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
                   ]}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={{ stroke: '#334155' }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <CartesianGrid vertical={false} stroke={GUS_CHART.seam} />
+                  <XAxis dataKey="name" tick={{ fontSize: 13, fill: GUS_CHART.paper }} axisLine={{ stroke: GUS_CHART.seam }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 13, fill: GUS_CHART.muted }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', color: '#f1f5f9' }}
-                    cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-                    formatter={(value: number) => [
-                      value.toLocaleString('pl-PL') + ' ' + primaryVariable.current.metadata.unit,
-                      'Wartość'
-                    ]}
+                    content={({ active, payload }: any) =>
+                      active && payload?.length ? (
+                        <div className={TOOLTIP_CLASS}>
+                          <p className="text-[13px] font-bold text-tv-muted">{payload[0].payload.name}</p>
+                          <p className="font-cond tabular mt-0.5 text-[20px] font-extrabold text-white">
+                            {(payload[0].value as number).toLocaleString('pl-PL') + ' ' + primaryVariable.current.metadata.unit}
+                          </p>
+                        </div>
+                      ) : null
+                    }
+                    cursor={{ fill: GUS_CHART.panel2 }}
                   />
-                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                    <Cell fill="#3b82f6" />
-                    <Cell fill="#334155" />
+                  <Bar dataKey="value">
+                    <Cell fill={GUS_CHART.series} />
+                    <Cell fill={GUS_CHART.compare} fillOpacity={0.45} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 flex items-center justify-center gap-6 text-xs text-neutral-500 mb-3">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span>Gmina Rybno</span>
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-slate-600 inline-block"></span>Powiat Działdowski</span>
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-tv-seam pt-3 text-[13px]">
+              <span className="flex items-center gap-2 font-bold text-tv-paper"><span className="inline-block h-3 w-3 bg-tv-blue" aria-hidden></span>Gmina Rybno</span>
+              <span className="flex items-center gap-2 text-tv-muted"><span className="inline-block h-3 w-3" style={{ backgroundColor: GUS_CHART.compare, opacity: 0.45 }} aria-hidden></span>Powiat Działdowski</span>
             </div>
-            <div className="p-3 bg-blue-900/20 rounded-lg text-sm text-neutral-300 text-center border border-blue-500/20">
-              Gmina stanowi <strong className="text-blue-400">{primaryVariable.powiat_comparison.percentage_of_powiat}%</strong> wartości powiatu.
-            </div>
+            <p className="mt-3 bg-tv-panel2 px-3 py-2.5 text-[15px] text-[#d7dbe8]">
+              Gmina stanowi <strong className="tabular text-white">{primaryVariable.powiat_comparison.percentage_of_powiat}%</strong> wartości powiatu.
+            </p>
           </div>
         )}
 
         {/* Powiat Level Information (Fallback for missing gmina data) */}
         {primaryVariable.current.metadata.level === 'powiat' && (
-          <div className="bg-white/[0.04] rounded-xl border border-white/5 p-5 flex flex-col justify-center items-center text-center h-full min-h-[400px] min-w-0">
-            <div className="bg-amber-900/20 p-4 rounded-full mb-4">
-              <Info className="text-amber-400" size={32} />
-            </div>
-            <h3 className="text-lg font-bold text-neutral-100 mb-2">Dane na poziomie powiatu</h3>
-            <p className="text-neutral-400 max-w-sm">
+          <div className="flex h-full min-w-0 flex-col items-start justify-center bg-tv-panel p-4 lg:p-5">
+            <h3 className="font-cond flex items-center gap-2 text-[20px] font-extrabold leading-snug text-white">
+              <Info className="text-tv-muted" size={18} aria-hidden />
+              Dane na poziomie powiatu
+            </h3>
+            <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-[#d7dbe8]">
               Dla tego wskaźnika szczegółowe dane dla Gminy Rybno nie są dostępne w Banku Danych Lokalnych GUS.
             </p>
-            <div className="mt-6 p-4 bg-gray-800/50 rounded-lg border border-white/10">
-              <p className="text-xs text-neutral-500 uppercase tracking-wide font-semibold mb-1">
-                Wartość dla Powiatu Działdowskiego
-              </p>
-              <p className="text-2xl font-bold text-neutral-100">
+            <div className="mt-5 flex flex-col">
+              <Tag tone="yellow">Wartość dla Powiatu Działdowskiego</Tag>
+              <p className="font-cond tabular bg-tv-panel2 px-3.5 py-3 text-[26px] font-extrabold leading-none text-white">
                 {primaryVariable.current.value.toLocaleString('pl-PL')} {primaryVariable.current.metadata.unit}
               </p>
             </div>
@@ -275,115 +280,100 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
         )}
 
         {/* Additional metrics - placeholder for future donut/bar charts */}
-        <div className="bg-white/[0.04] rounded-xl border border-white/5 p-5 min-w-0">
-          <h3 className="text-lg font-bold text-neutral-100 mb-4">Dodatkowe metryki</h3>
-          <div className="space-y-3">
+        <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
+          <h3 className="font-cond mb-2 text-[20px] font-extrabold leading-snug text-white">Dodatkowe metryki</h3>
+          <ul className="divide-y divide-tv-seam">
             {variableKeys.slice(0, 5).map(varKey => {
               const variable = variables[varKey];
               return (
-                <div key={varKey} className="flex items-center justify-between text-sm">
-                  <span className="text-neutral-300 font-medium">{variable.current.metadata.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-neutral-100 font-bold">
+                <li key={varKey} className="flex items-baseline justify-between gap-3 py-2 text-[15px]">
+                  <span className="min-w-0 text-[#d7dbe8]">{variable.current.metadata.name}</span>
+                  <span className="tabular flex shrink-0 items-baseline gap-2">
+                    <span className="font-bold text-white">
                       {variable.current.value.toLocaleString('pl-PL')} {variable.current.metadata.unit}
                     </span>
                     {variable.current.trend_pct != null && (
-                      <span
-                        className={`text-xs font-semibold ${variable.current.trend_pct >= 0 ? 'text-green-400' : 'text-red-400'}`}
-                      >
-                        {variable.current.trend_pct >= 0 ? '+' : ''}
-                        {variable.current.trend_pct.toFixed(1)}%
-                      </span>
+                      <span className="text-[13px] text-tv-muted">{trendText(variable.current.trend_pct)}</span>
                     )}
-                  </div>
-                </div>
+                  </span>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </div>
 
         {/* Quick stats summary */}
-        <div className="bg-gradient-to-br from-blue-900/30 to-indigo-900/30 rounded-xl border border-blue-500/20 p-5">
-          <h3 className="text-lg font-bold text-neutral-100 mb-4 flex items-center gap-2">
-            <TrendingUp className="text-blue-400" size={20} />
-            Podsumowanie
-          </h3>
-          <div className="space-y-3 text-sm">
+        <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
+          <h3 className="font-cond mb-3 text-[20px] font-extrabold leading-snug text-white">Podsumowanie</h3>
+          <dl className="space-y-3">
             <div>
-              <p className="text-neutral-400 mb-1">Liczba wskaźników w sekcji</p>
-              <p className="text-2xl font-bold text-neutral-100">{variableKeys.length}</p>
+              <dt className="text-[13px] text-tv-muted">Liczba wskaźników w sekcji</dt>
+              <dd className="font-cond tabular text-[26px] font-extrabold leading-tight text-white">{variableKeys.length}</dd>
             </div>
             <div>
-              <p className="text-neutral-400 mb-1">Ostatnia aktualizacja</p>
-              <p className="text-lg font-semibold text-neutral-100">
+              <dt className="text-[13px] text-tv-muted">Ostatnia aktualizacja</dt>
+              <dd className="tabular text-[17px] font-bold text-white">
                 {new Date(last_refresh).toLocaleDateString('pl-PL')}
-              </p>
+              </dd>
             </div>
             <div>
-              <p className="text-neutral-400 mb-1">Zakres danych</p>
-              <p className="text-lg font-semibold text-neutral-100">
+              <dt className="text-[13px] text-tv-muted">Zakres danych</dt>
+              <dd className="tabular text-[17px] font-bold text-white">
                 {trendData.length > 0
                   ? `${trendData[0].year} - ${trendData[trendData.length - 1].year}`
                   : 'Brak danych'}
-              </p>
+              </dd>
             </div>
-          </div>
+          </dl>
         </div>
       </div>
 
       {/* Data Table (all variables with YoY change) */}
-      <div className="mb-8 bg-white/[0.04] rounded-xl border border-white/5 overflow-hidden">
-        <div className="p-5 border-b border-white/5">
-          <h2 className="text-xl font-bold text-neutral-100">Wszystkie wskaźniki</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-800/40 border-b border-white/5">
+      <section className="flex flex-col">
+        <h3 className="flex"><Tag>Wszystkie wskaźniki</Tag></h3>
+        <div className="overflow-x-auto border-t-2 border-tv-blue bg-tv-panel">
+          <table className="w-full text-[15px]">
+            <thead className="border-b border-tv-seam">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                <th className="font-cond px-4 py-3 text-left text-[13px] font-extrabold uppercase tracking-wide text-tv-muted">
                   Wskaźnik
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                <th className="font-cond px-4 py-3 text-right text-[13px] font-extrabold uppercase tracking-wide text-tv-muted">
                   Wartość (2024)
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                <th className="font-cond px-4 py-3 text-right text-[13px] font-extrabold uppercase tracking-wide text-tv-muted">
                   Zmiana r/r
                 </th>
-                <th className="px-5 py-3 text-center text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                <th className="font-cond px-4 py-3 text-center text-[13px] font-extrabold uppercase tracking-wide text-tv-muted">
                   Poziom
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-tv-seam">
               {variableKeys.map(varKey => {
                 const variable = variables[varKey];
                 return (
-                  <tr key={varKey} className="hover:bg-gray-800/30 transition-colors">
-                    <td className="px-5 py-4 text-sm font-medium text-neutral-200">
+                  <tr key={varKey} className="transition-colors hover:bg-tv-panel2">
+                    <td className="px-4 py-3 text-[#d7dbe8]">
                       {variable.current.metadata.name}
                     </td>
-                    <td className="px-5 py-4 text-sm text-right text-neutral-100 font-semibold">
+                    <td className="tabular whitespace-nowrap px-4 py-3 text-right font-bold text-white">
                       {variable.current.value.toLocaleString('pl-PL')} {variable.current.metadata.unit}
                     </td>
-                    <td className="px-5 py-4 text-sm text-right">
+                    <td className="tabular whitespace-nowrap px-4 py-3 text-right text-tv-paper">
                       {variable.current.trend_pct != null ? (
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${variable.current.trend_pct >= 0
-                            ? 'bg-green-900/30 text-green-400'
-                            : 'bg-red-900/30 text-red-400'
-                            }`}
-                        >
+                        <>
                           {variable.current.trend_pct >= 0 ? '+' : ''}
                           {variable.current.trend_pct.toFixed(2)}%
-                        </span>
+                        </>
                       ) : (
-                        <span className="text-neutral-600">—</span>
+                        <span className="text-tv-muted">—</span>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-center">
-                      <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-gray-800 text-neutral-400">
-                        {variable.current.metadata.level === 'gmina' ? 'Gmina' : 'Powiat'}
-                      </span>
+                    <td className="px-4 py-3 text-center">
+                      {variable.current.metadata.level === 'gmina'
+                        ? <Tag tone="seam">Gmina</Tag>
+                        : <Tag tone="yellow">Powiat</Tag>}
                     </td>
                   </tr>
                 );
@@ -391,24 +381,22 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       {/* Pro Upsell - only for anonymous/free users */}
       {(!user || user.tier === 'free') && (
-        <div className="mb-8">
-          <GUSTierGate
-            requiredTier="business"
-            currentTier={user?.tier || 'free'}
-            context="insights"
-          />
-        </div>
+        <GUSTierGate
+          requiredTier="business"
+          currentTier={user?.tier || 'free'}
+          context="insights"
+        />
       )}
 
       {/* Data freshness footer */}
-      <div className="mt-8 p-4 bg-gray-900/40 rounded-lg border border-white/5 text-sm text-neutral-400 text-center">
-        <RefreshCw size={16} className="inline mr-2" />
+      <p className="flex flex-wrap items-center gap-x-2 border-t border-tv-seam pt-4 text-[13px] text-tv-muted">
+        <RefreshCw size={14} aria-hidden />
         Ostatnia aktualizacja danych:{' '}
-        <strong className="text-neutral-100">
+        <strong className="tabular text-tv-paper">
           {new Date(last_refresh).toLocaleDateString('pl-PL', {
             year: 'numeric',
             month: 'long',
@@ -417,7 +405,7 @@ const GUSSectionPage: React.FC<GUSSectionPageProps> = ({ sectionKey, onBack }) =
         </strong>
         {' · '}
         Dane GUS są aktualizowane kwartalnie
-      </div>
+      </p>
     </div>
   );
 };

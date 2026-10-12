@@ -26,6 +26,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import { GUS_CHART, TOOLTIP_CLASS } from './palette';
 
 interface TrendChartProps {
   data: Array<{ year: number; value: number; label?: string }>;
@@ -41,7 +42,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
   data,
   title,
   unit = '',
-  color = '#3b82f6', // blue-500
+  color = GUS_CHART.series,
   height = 300,
   showLegend = false,
   formatType = 'integer',
@@ -56,7 +57,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
       case 'percentage':
         return `${val.toFixed(1)}%`;
       case 'currency':
-        return `${val.toLocaleString('pl-PL')} PLN`;
+        return val.toLocaleString('pl-PL', { maximumFractionDigits: 0 }); // jednostkę dokłada `unit` obok
       default:
         return val.toLocaleString('pl-PL');
     }
@@ -66,11 +67,11 @@ const TrendChart: React.FC<TrendChartProps> = ({
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-gray-950 px-4 py-3 rounded-lg shadow-lg border border-gray-700/50">
-          <p className="text-sm font-semibold text-neutral-200">
+        <div className={TOOLTIP_CLASS}>
+          <p className="tabular text-[13px] font-bold text-tv-muted">
             Rok {payload[0].payload.year}
           </p>
-          <p className="text-lg font-bold text-blue-400 mt-1">
+          <p className="font-cond tabular mt-0.5 text-[20px] font-extrabold text-white">
             {formatValue(payload[0].value)} {unit}
           </p>
         </div>
@@ -80,9 +81,9 @@ const TrendChart: React.FC<TrendChartProps> = ({
   };
 
   return (
-    <div className="bg-transparent rounded-xl min-w-0">
+    <div className="min-w-0">
       {title && (
-        <h3 className="text-lg font-bold text-neutral-100 mb-4">{title}</h3>
+        <h3 className="font-cond mb-3 text-[20px] font-extrabold leading-snug text-white">{title}</h3>
       )}
 
       <div style={{ width: '100%', height: `${height}px`, minWidth: 0 }}>
@@ -91,30 +92,25 @@ const TrendChart: React.FC<TrendChartProps> = ({
             data={data}
             margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
           >
-            <defs>
-              <linearGradient id={`areaGradient-${color}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.3} />
-                <stop offset="100%" stopColor={color} stopOpacity={0.05} />
-              </linearGradient>
-            </defs>
-
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <CartesianGrid vertical={false} stroke={GUS_CHART.seam} />
 
             <XAxis
               dataKey="year"
-              stroke="#94a3b8"
-              style={{ fontSize: '12px', fontWeight: 500 }}
-              tick={{ fill: '#94a3b8' }}
+              stroke={GUS_CHART.seam}
+              style={{ fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}
+              tick={{ fill: GUS_CHART.muted }}
+              tickLine={false}
             />
 
             <YAxis
-              stroke="#94a3b8"
-              style={{ fontSize: '12px', fontWeight: 500 }}
-              tick={{ fill: '#94a3b8' }}
+              stroke={GUS_CHART.seam}
+              style={{ fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}
+              tick={{ fill: GUS_CHART.muted }}
+              tickLine={false}
               tickFormatter={(value) => formatValue(value).split(',')[0]} // Remove decimals for axis
             />
 
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: GUS_CHART.muted, strokeWidth: 1 }} />
 
             {showLegend && (
               <Legend
@@ -128,7 +124,8 @@ const TrendChart: React.FC<TrendChartProps> = ({
               dataKey="value"
               stroke={color}
               strokeWidth={2.5}
-              fill={`url(#areaGradient-${color})`}
+              fill="none"
+              activeDot={{ r: 4, fill: color, stroke: GUS_CHART.ink, strokeWidth: 2 }}
               animationDuration={1000}
               animationEasing="ease-in-out"
             />
@@ -138,27 +135,23 @@ const TrendChart: React.FC<TrendChartProps> = ({
 
       {/* Stats summary below chart */}
       {data.length > 1 && (
-        <div className="mt-4 pt-4 border-t border-gray-800/50 flex items-center justify-between text-sm">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-tv-seam pt-3 text-[13px]">
           <div>
-            <span className="text-neutral-500">Najwcześniejszy: </span>
-            <span className="font-semibold text-neutral-200">
+            <span className="text-tv-muted">Najwcześniejszy: </span>
+            <span className="tabular font-bold text-tv-paper">
               {formatValue(data[0].value)} {unit} ({data[0].year})
             </span>
           </div>
           <div>
-            <span className="text-neutral-500">Najnowszy: </span>
-            <span className="font-semibold text-neutral-200">
+            <span className="text-tv-muted">Najnowszy: </span>
+            <span className="tabular font-bold text-tv-paper">
               {formatValue(data[data.length - 1].value)} {unit} ({data[data.length - 1].year})
             </span>
           </div>
           <div>
-            <span className="text-neutral-500">Zmiana: </span>
-            <span
-              className={`font-semibold ${data[data.length - 1].value >= data[0].value
-                ? 'text-green-600'
-                : 'text-red-600'
-                }`}
-            >
+            <span className="text-tv-muted">Zmiana: </span>
+            {/* Kierunek bez koloru — zieleń/czerwień nie są tu stanem */}
+            <span className="tabular font-bold text-white">
               {((((data[data.length - 1].value - data[0].value) / data[0].value) * 100).toFixed(1))}%
             </span>
           </div>

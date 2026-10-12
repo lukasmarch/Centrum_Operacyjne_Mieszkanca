@@ -7,7 +7,8 @@
  * funkcją. Zdjęcia oryginału tu nie ma i nie będzie: widzi je tylko redakcja.
  */
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, FileText, Loader2, Sparkles } from 'lucide-react';
+import { CalendarDays, ChevronDown, FileText, Sparkles } from 'lucide-react';
+import { Notice, Skeleton, Tag } from '../../components/simple/tv';
 import { PublicPost, fetchPublicPost, parseUtc } from '../services/solectwaApi';
 
 const idFromUrl = () => Number(new URLSearchParams(window.location.search).get('id')) || 0;
@@ -43,55 +44,69 @@ const SolectwoPostPage: React.FC = () => {
     }, []);
 
     if (error) {
-        return <div className="max-w-2xl mx-auto px-4 py-16 text-center text-neutral-400">{error}</div>;
+        return <div className="max-w-2xl"><Notice>{error}</Notice></div>;
     }
     if (!post) {
-        return <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-neutral-500" /></div>;
+        return (
+            <div aria-label="Wczytuję ogłoszenie…" className="max-w-2xl space-y-px">
+                <Skeleton className="h-7 w-48" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-40" />
+            </div>
+        );
     }
 
     const term = termLabel(post);
     const published = parseUtc(post.published_at);
 
     return (
-        <article className="max-w-2xl mx-auto px-4 py-8 space-y-5">
-            <header>
-                <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Ogłoszenie sołectwa {post.solectwo}</p>
-                <h1 className="text-2xl sm:text-3xl font-black mt-2 leading-tight">{post.title}</h1>
-                <p className="text-sm text-neutral-400 mt-2">
-                    {post.signed_as}
-                    {published && ` · ${published.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+        <article className="flex max-w-2xl flex-col">
+            {/* Plakietka z nazwą sołectwa nad pasem tytułu — ten sam układ co kafle pulpitu */}
+            <Tag>Sołectwo {post.solectwo}</Tag>
+            <header className="border-t-2 border-tv-blue bg-tv-panel px-4 pb-4 pt-3 lg:px-5">
+                <h1 className="font-cond text-[26px] font-extrabold leading-tight text-white lg:text-[34px]">{post.title}</h1>
+                <p className="mt-1.5 text-[15px] leading-snug text-tv-muted">
+                    <span className="font-bold text-tv-paper">{post.signed_as}</span>
+                    {published && <span className="tabular">{` · ${published.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}`}</span>}
                 </p>
             </header>
 
+            {/* Termin to zapowiedź — żółty pasek kontekstu pod pasem tytułu */}
             {term && (
-                <div className="flex items-center gap-3 rounded-2xl border border-blue-500/30 bg-blue-500/5 px-4 py-3">
-                    <CalendarDays className="w-5 h-5 text-blue-400 shrink-0" />
-                    <span className="font-semibold first-letter:uppercase">{term}</span>
+                <div className="flex min-h-[48px] items-center gap-3 bg-tv-yellow px-4 py-2 text-tv-ink lg:px-5">
+                    <CalendarDays size={18} className="shrink-0" aria-hidden />
+                    <span className="tabular text-[16px] font-bold first-letter:uppercase">{term}</span>
                 </div>
             )}
 
             {post.summary && (
-                <section className="rounded-2xl bg-gray-950 border border-gray-800/50 p-5">
-                    <p className="text-base leading-relaxed text-neutral-100">{post.summary}</p>
-                    <p className="mt-3 text-xs text-neutral-500 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5" />
+                <section className="mt-px bg-tv-panel px-4 py-4 lg:px-5">
+                    <p className="max-w-[70ch] text-[16px] leading-relaxed text-white">{post.summary}</p>
+                    <p className="mt-3 flex items-center gap-1.5 text-[13px] text-tv-muted">
+                        <Sparkles size={14} aria-hidden />
                         Podsumowanie przygotowane automatycznie, sprawdzone przez redakcję.
                     </p>
                 </section>
             )}
 
             {post.transcript && (
-                <section className="rounded-2xl bg-gray-950 border border-gray-800/50">
-                    <button onClick={() => setShowTranscript((v) => !v)}
-                        className="w-full flex items-center gap-2 px-5 py-4 text-left font-semibold">
-                        <FileText className="w-4 h-4 text-neutral-400" />
+                <section className="mt-6 flex flex-col">
+                    <button
+                        onClick={() => setShowTranscript((v) => !v)}
+                        aria-expanded={showTranscript}
+                        className="flex min-h-[52px] w-full items-center gap-2 border-t-2 border-tv-seam bg-tv-panel px-4 text-left text-[16px] font-bold text-white transition-colors hover:bg-tv-panel2 lg:px-5"
+                    >
+                        <FileText size={16} className="text-tv-muted" aria-hidden />
                         Pełna treść pisma
-                        <span className="ml-auto text-xs text-neutral-500">{showTranscript ? 'zwiń' : 'rozwiń'}</span>
+                        <span className="ml-auto inline-flex items-center gap-1 text-[14px] font-bold text-tv-bluesoft">
+                            {showTranscript ? 'zwiń' : 'rozwiń'}
+                            <ChevronDown size={16} aria-hidden className={`transition-transform ${showTranscript ? 'rotate-180' : ''}`} />
+                        </span>
                     </button>
                     {showTranscript && (
-                        <div className="px-5 pb-5">
-                            <p className="whitespace-pre-line text-sm leading-relaxed text-neutral-200 font-serif">{post.transcript}</p>
-                            <p className="mt-4 text-xs text-neutral-500">
+                        <div className="bg-tv-panel px-4 pb-5 lg:px-5">
+                            <p className="max-w-[70ch] whitespace-pre-line text-[15px] leading-relaxed text-[#d7dbe8]">{post.transcript}</p>
+                            <p className="mt-4 max-w-[70ch] border-t border-tv-seam pt-3 text-[13px] leading-relaxed text-tv-muted">
                                 Tekst odczytany automatycznie ze zdjęcia pisma. W razie rozbieżności rozstrzyga oryginał.
                                 Dane osób prywatnych zastąpiliśmy znacznikiem [dane osobowe].
                             </p>

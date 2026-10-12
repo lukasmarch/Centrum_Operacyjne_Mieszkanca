@@ -112,27 +112,17 @@ const HealthTodayCard: React.FC<{ onOpenAssistant?: () => void }> = () => {
 
     return (
         <div
-            className={`rounded-xl border px-4 py-3 ${
-                hasChange
-                    ? 'border-amber-500/25 bg-amber-500/[0.08]'
-                    : 'border-white/10 bg-white/[0.03]'
-            }`}
+            className={`px-4 py-3 ${hasChange ? 'bg-tv-yellow text-tv-ink' : 'bg-tv-panel'}`}
         >
             <div className="flex items-start gap-3">
-                <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                        hasChange ? 'bg-amber-500/15' : 'bg-rose-500/10'
-                    }`}
-                >
-                    <Stethoscope
-                        size={20}
-                        className={hasChange ? 'text-amber-400' : 'text-rose-400'}
-                        aria-hidden
-                    />
-                </span>
+                <Stethoscope
+                    size={20}
+                    className={`mt-0.5 shrink-0 ${hasChange ? 'text-tv-ink' : 'text-tv-muted'}`}
+                    aria-hidden
+                />
 
                 <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-bold leading-snug text-neutral-200">
+                    <p className={`text-[15px] font-bold leading-snug ${hasChange ? "text-tv-ink" : "text-tv-paper"}`}>
                         Ośrodek zdrowia dziś
                     </p>
 
@@ -140,18 +130,18 @@ const HealthTodayCard: React.FC<{ onOpenAssistant?: () => void }> = () => {
                         <ul className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                             {rows.map((row, i) => (
                                 <React.Fragment key={i}>
-                                    <li className="whitespace-nowrap text-sm font-semibold tabular-nums text-neutral-200">
+                                    <li className={`whitespace-nowrap text-[15px] font-semibold tabular-nums ${hasChange ? "text-tv-ink" : "text-white"}`}>
                                         {prettyHours(row.hours)}
                                     </li>
-                                    <li className="min-w-0 text-sm leading-snug text-neutral-400">
-                                        <span className="font-semibold text-neutral-300">{row.clinic}</span>
+                                    <li className={`min-w-0 text-[15px] leading-snug ${hasChange ? "text-tv-ink" : "text-tv-muted"}`}>
+                                        <span className={`font-semibold ${hasChange ? "text-tv-ink" : "text-tv-paper"}`}>{row.clinic}</span>
                                         {row.who && <> · {row.who}</>}
                                     </li>
                                 </React.Fragment>
                             ))}
                         </ul>
                     ) : (
-                        <p className="mt-1 text-sm text-neutral-400">
+                        <p className={`mt-1 text-[15px] ${hasChange ? "text-tv-ink" : "text-tv-muted"}`}>
                             Dziś ośrodek nie przyjmuje.
                         </p>
                     )}
@@ -159,10 +149,10 @@ const HealthTodayCard: React.FC<{ onOpenAssistant?: () => void }> = () => {
                     {/* Zmiana jest jedynym powodem, dla którego ktoś ma przeczytać
                         ten kafel uważnie — dostaje własny wiersz, nie przypis */}
                     {hasChange && (
-                        <div className="mt-2 space-y-1 border-t border-amber-500/20 pt-2">
+                        <div className="mt-2 space-y-1 border-t border-black/25 pt-2">
                             {changes.map(({ clinic, doctor }, i) => (
-                                <p key={i} className="flex items-start gap-2 text-sm leading-snug text-amber-200">
-                                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-400" aria-hidden />
+                                <p key={i} className="flex items-start gap-2 text-[15px] font-semibold leading-snug text-tv-ink">
+                                    <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden />
                                     <span>
                                         <span className="font-semibold">
                                             {clinic}
@@ -177,15 +167,15 @@ const HealthTodayCard: React.FC<{ onOpenAssistant?: () => void }> = () => {
                     )}
 
                     {pharmacy && (
-                        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/[0.06] pt-2 text-sm text-neutral-400">
-                            <Pill size={14} className="shrink-0 text-emerald-400" aria-hidden />
-                            <span className="text-neutral-300">Apteka dyżurna:</span>
-                            <span className="font-semibold text-neutral-200">{pharmacy.name}</span>
+                        <p className={`mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t pt-2 text-[15px] ${hasChange ? 'border-black/25 text-tv-ink' : 'border-tv-seam text-tv-muted'}`}>
+                            <Pill size={15} className="shrink-0" aria-hidden />
+                            <span>Apteka dyżurna:</span>
+                            <span className={`font-semibold ${hasChange ? 'text-tv-ink' : 'text-white'}`}>{pharmacy.name}</span>
                             <span className="whitespace-nowrap tabular-nums">{prettyHours(pharmacy.hours)}</span>
                             {pharmacy.phone && (
                                 <a
                                     href={`tel:${pharmacy.phone.replace(/[^\d+]/g, '')}`}
-                                    className="inline-flex items-center gap-1 text-neutral-300 underline-offset-2 hover:text-white hover:underline"
+                                    className={`inline-flex min-h-[44px] items-center gap-1 font-semibold underline underline-offset-2 ${hasChange ? "text-tv-ink" : "text-tv-bluesoft hover:text-white"}`}
                                 >
                                     <Phone size={12} aria-hidden />
                                     {pharmacy.phone}

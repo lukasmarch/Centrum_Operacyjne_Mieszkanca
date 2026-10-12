@@ -1,6 +1,6 @@
 import React from 'react';
-import { Sparkles, ArrowRight } from 'lucide-react';
 import { useDailySummary } from '../../src/hooks/useDailySummary';
+import { RowLink, Tag } from './tv';
 
 /**
  * Briefing dnia w trybie prostym — nagłówek AI i pierwsze zdania omówienia.
@@ -76,35 +76,40 @@ const BriefingCard: React.FC<BriefingCardProps> = ({ onShowAll }) => {
     const updated = lastUpdated?.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
     const day = lastUpdated ? briefingDay(lastUpdated, new Date()) : null;
 
-    return (
-        <section aria-label="Briefing dnia" className="rounded-2xl border border-white/10 bg-[#0d1117] p-5 lg:p-6">
-            <div className="flex items-center gap-2">
-                <Sparkles size={14} className="text-blue-400" aria-hidden />
-                <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Briefing dnia</span>
-                {updated && day && (
-                    <span className={`text-sm ${day.stale ? 'font-semibold text-amber-300' : 'text-neutral-400'}`}>
-                        · {day.label}, {updated}
-                    </span>
-                )}
-            </div>
-
-            <h2 className="mt-3 text-xl lg:text-2xl font-bold leading-snug text-white">
-                {summary.headline}
-            </h2>
-
-            {summary.highlights && (
-                <p className="mt-2 text-base leading-relaxed text-neutral-300">
-                    {renderBold(firstSentences(summary.highlights))}
+    // Briefing z wczoraj (przebieg jeszcze nie ruszył albo padł) NIE może stać
+    // na stronie jak dzisiejszy. Do 11.10.2026 zmieniał tylko kolor etykiety,
+    // a nagłówek dalej mówił „Dziś w Rybnie odbywa się…” o wczorajszym dniu —
+    // pierwsza treść na stronie zaprzeczała własnemu znacznikowi czasu.
+    // Teraz zwija się do jednej linii z datą: tekst, który mówi „dziś”, pokazuje
+    // się wyłącznie w dniu, którego dotyczy.
+    if (day?.stale) {
+        return (
+            <section aria-label="Briefing dnia" className="flex flex-wrap items-center justify-between gap-x-4 border-y border-tv-seam py-2">
+                <p className="text-[15px] text-tv-muted">
+                    Dzisiejszy briefing jeszcze nie powstał. Ostatni: <span className="font-semibold text-tv-paper">{day.label}, {updated}</span>
                 </p>
-            )}
+                <RowLink onClick={onShowAll}>Wiadomości z gminy</RowLink>
+            </section>
+        );
+    }
 
-            <button
-                onClick={onShowAll}
-                className="mt-3 flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-blue-400 transition-colors hover:text-blue-300"
-            >
-                Czytaj wszystkie wiadomości
-                <ArrowRight size={15} aria-hidden />
-            </button>
+    return (
+        <section aria-label="Briefing dnia">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Tag as="h2">Briefing dnia</Tag>
+                {updated && <span className="tabular text-[15px] text-tv-muted">dziś, {updated}</span>}
+            </div>
+            <div className="border-t-2 border-tv-blue bg-tv-panel px-4 pb-2 pt-3 lg:px-5">
+                <p className="font-cond text-[22px] font-extrabold leading-snug text-white lg:text-[26px]">
+                    {summary.headline}
+                </p>
+                {summary.highlights && (
+                    <p className="mt-2 max-w-[70ch] text-[16px] leading-relaxed text-[#d7dbe8]">
+                        {renderBold(firstSentences(summary.highlights))}
+                    </p>
+                )}
+                <RowLink onClick={onShowAll}>Czytaj wszystkie wiadomości</RowLink>
+            </div>
         </section>
     );
 };

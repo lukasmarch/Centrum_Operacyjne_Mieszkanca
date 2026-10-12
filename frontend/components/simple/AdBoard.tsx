@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Store, Phone, Clock, Tag, ArrowRight, ExternalLink } from 'lucide-react';
+import { Store, Phone, Clock, Tag as TagIcon, ArrowRight, ExternalLink } from 'lucide-react';
+import { Tag } from './tv';
 import {
     fetchCatalog, fetchActiveAnnouncements, trackBusinessImpression, getAssetUrl, promotableCards,
     CatalogCard, ActiveAnnouncement,
@@ -99,13 +100,10 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
 
     return (
         <section aria-label="Reklama">
-            <h2 className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold uppercase tracking-widest text-neutral-500">
-                <Store size={13} className="text-amber-500" aria-hidden />
-                Reklama
-                <span className="font-medium normal-case tracking-normal text-neutral-600">
-                    · firmy z gminy, które opłaciły wyróżnienie
-                </span>
-            </h2>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <Tag as="h2" tone="seam">Reklama</Tag>
+                <span className="text-[15px] text-tv-muted">firmy z gminy, które opłaciły wyróżnienie</span>
+            </div>
 
             {/*
               Pusta sekcja NIE znika, bo to jedyne miejsce, w którym przedsiębiorca
@@ -115,16 +113,14 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
             {isEmpty ? (
                 <button
                     onClick={onOpenBusinesses}
-                    className="group flex w-full items-center gap-4 rounded-2xl border border-dashed border-amber-500/25 bg-amber-500/[0.04] p-5 text-left transition-colors hover:border-amber-500/40"
+                    className="group flex w-full items-center gap-4 border-t border-tv-seam py-3 text-left"
                 >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                        <Store size={20} className="text-amber-400" aria-hidden />
-                    </span>
+                    <Store size={20} className="shrink-0 text-tv-muted" aria-hidden />
                     <span className="min-w-0 flex-1">
-                        <span className="block text-base font-semibold text-white">
+                        <span className="block text-[16px] font-semibold text-tv-paper">
                             Twoja firma może być tutaj
                         </span>
-                        <span className="mt-0.5 block text-sm text-neutral-400">
+                        <span className="mt-0.5 block text-[15px] text-tv-muted">
                             Wizytówkę przejmiesz za darmo. Wyróżnienie na stronie głównej
                             i w katalogu jest w planie Firma lokalna.
                         </span>
@@ -132,39 +128,39 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
                     <ArrowRight
                         size={18}
                         aria-hidden
-                        className="shrink-0 text-neutral-600 transition-colors group-hover:text-amber-300"
+                        className="shrink-0 text-tv-muted transition-colors group-hover:text-white"
                     />
                 </button>
             ) : (
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+                <div className="grid grid-cols-1 gap-px border-t border-tv-seam bg-tv-seam lg:grid-cols-2">
                     {firms.map(firm => (
                         <button
                             key={firm.id}
                             onClick={() => { trackBusinessImpression(firm.id); onOpenBusinesses(); }}
-                            className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-4 text-left transition-colors hover:border-amber-500/35"
+                            className="flex items-start gap-3 bg-tv-panel p-4 text-left transition-colors hover:bg-tv-panel2"
                         >
                             {firm.profile.logo_url ? (
                                 <img
                                     src={getAssetUrl(firm.profile.logo_url)}
                                     alt=""
                                     loading="lazy"
-                                    className="h-11 w-11 shrink-0 rounded-xl border border-white/10 object-cover"
+                                    className="h-11 w-11 shrink-0 object-cover"
                                 />
                             ) : (
-                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                                    <Store size={18} className="text-amber-400" aria-hidden />
+                                <span className="flex h-11 w-11 shrink-0 items-center justify-center bg-tv-panel2">
+                                    <Store size={18} className="text-tv-muted" aria-hidden />
                                 </span>
                             )}
                             <span className="min-w-0 flex-1">
-                                <span className="block text-base font-semibold leading-snug text-white">
+                                <span className="block text-[16px] font-semibold leading-snug text-white">
                                     {firm.nazwa}
                                 </span>
                                 {firm.profile.description && (
-                                    <span className="mt-0.5 line-clamp-2 block text-sm text-neutral-400">
+                                    <span className="mt-0.5 line-clamp-2 text-[15px] text-tv-muted">
                                         {firm.profile.description}
                                     </span>
                                 )}
-                                <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[13px] text-neutral-500">
+                                <span className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[14px] text-tv-muted">
                                     {firm.profile.telefon && (
                                         <span className="inline-flex items-center gap-1">
                                             <Phone size={11} aria-hidden />{firm.profile.telefon}
@@ -183,16 +179,16 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
                     {ads.map(ad => (
                         <article
                             key={`ad-${ad.id}`}
-                            className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-4"
+                            className="bg-tv-panel p-4"
                         >
                             <div className="flex items-start gap-3">
-                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
-                                    <Tag size={18} className="text-amber-400" aria-hidden />
+                                <span className="flex h-11 w-11 shrink-0 items-center justify-center bg-tv-panel2">
+                                    <TagIcon size={18} className="text-tv-muted" aria-hidden />
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-base font-semibold leading-snug text-white">{ad.title}</p>
-                                    <p className="mt-0.5 text-sm leading-snug text-neutral-400">{ad.body}</p>
-                                    <p className="mt-1.5 text-[13px] text-neutral-500">{ad.nazwa}</p>
+                                    <p className="text-[16px] font-semibold leading-snug text-white">{ad.title}</p>
+                                    <p className="mt-0.5 text-[15px] leading-snug text-tv-muted">{ad.body}</p>
+                                    <p className="mt-1.5 text-[14px] text-tv-muted">{ad.nazwa}</p>
                                 </div>
                             </div>
                         </article>
@@ -203,7 +199,7 @@ const AdBoard: React.FC<AdBoardProps> = ({ onOpenBusinesses }) => {
             {!isEmpty && (
                 <button
                     onClick={onOpenBusinesses}
-                    className="mt-3 flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-amber-400 transition-colors hover:text-amber-300"
+                    className="mt-1 flex min-h-[44px] items-center gap-1.5 text-[15px] font-bold text-tv-bluesoft transition-colors hover:text-white"
                 >
                     {/* Liczba mówi wprost, że rotacja istnieje — firma, która dziś
                         nie stoi na stronie głównej, widzi, że nie zniknęła */}

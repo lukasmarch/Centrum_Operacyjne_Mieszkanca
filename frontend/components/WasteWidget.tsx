@@ -1,55 +1,77 @@
 import React, { useState, useMemo } from 'react';
-import { Trash2, Leaf, Container, FileText, Wine, Truck, Monitor, X, ChevronRight } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { WasteEvent } from '../types';
 import { wasteData } from '../src/data/wasteSchedule';
+import { Notice, Tag, dayWord } from './simple/tv';
 
 interface WasteWidgetProps {
     events: WasteEvent[];
     town: string;
 }
 
-const getWasteIcon = (type: string) => {
+/**
+ * Kolor pojemnika — JEDYNY kolor spoza palety `tv-*` na tej stronie, i to celowo:
+ * to nie ozdoba, tylko informacja, którą mieszkaniec zna z podwórka (worek
+ * żółty, niebieski, zielony, brązowy — jednolity system segregacji). Mały
+ * kwadrat stoi obok NAZWY frakcji, nigdy zamiast niej. Frakcje bez ustalonego
+ * koloru (zmieszane, popiół, gabaryty, elektrośmieci) kwadratu nie mają.
+ * Do 11.10.2026 każda frakcja miała własną pastelową kartę (fiolet dla
+ * „pozostałych”), więc kolor mieszał informację z dekoracją.
+ */
+const binColor = (type: string): string | null => {
     const lower = type.toLowerCase();
-    if (lower.includes('zmieszane')) return <Trash2 size={20} />;
-    if (lower.includes('bio')) return <Leaf size={20} />;
-    if (lower.includes('metale')) return <Container size={20} />;
-    if (lower.includes('papier')) return <FileText size={20} />;
-    if (lower.includes('szkło')) return <Wine size={20} />;
-    if (lower.includes('wielkogabarytowe')) return <Truck size={20} />;
-    if (lower.includes('elektroniczny')) return <Monitor size={20} />;
-    return <Trash2 size={20} />;
+    if (lower.includes('bio')) return '#8a5a2b';
+    if (lower.includes('metale')) return '#ffd23f';
+    if (lower.includes('papier')) return '#2f6fe0';
+    if (lower.includes('szkło')) return '#2e9e4f';
+    return null;
 };
 
-const getWasteStyles = (type: string) => {
-    const lower = type.toLowerCase();
-    if (lower.includes('zmieszane')) return 'bg-slate-700/30 text-neutral-300 border-slate-600/30';
-    if (lower.includes('bio')) return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
-    if (lower.includes('metale')) return 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20';
-    if (lower.includes('papier')) return 'bg-blue-500/10 text-blue-300 border-blue-500/20';
-    if (lower.includes('szkło')) return 'bg-green-500/10 text-green-300 border-green-500/20';
-    if (lower.includes('popiół')) return 'bg-slate-500/20 text-neutral-400 border-slate-500/20';
-    return 'bg-purple-500/10 text-purple-300 border-purple-500/20';
-};
-
-const getModalDotColor = (type: string) => {
-    const lower = type.toLowerCase();
-    if (lower.includes('zmieszane')) return 'bg-neutral-400';
-    if (lower.includes('bio')) return 'bg-amber-400';
-    if (lower.includes('metale')) return 'bg-yellow-400';
-    if (lower.includes('papier')) return 'bg-blue-400';
-    if (lower.includes('szkło')) return 'bg-green-400';
-    if (lower.includes('popiół')) return 'bg-slate-400';
-    return 'bg-purple-400';
+const WasteType: React.FC<{ type: string; muted?: boolean }> = ({ type, muted = false }) => {
+    const color = binColor(type);
+    return (
+        <span className={`flex items-center gap-2 ${muted ? 'text-tv-muted' : ''}`}>
+            <span
+                aria-hidden
+                className="h-3 w-3 shrink-0"
+                style={color ? { backgroundColor: color, opacity: muted ? 0.5 : 1 } : undefined}
+            />
+            {type}
+        </span>
+    );
 };
 
 const MONTHS_PL = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
 
+/** Data odbioru z `daysRemaining` — jak kafel „Wywóz” na pulpicie (bez zgadywania roku) */
+const dateIn = (days: number) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + days);
+    return d;
+};
+
+const inDays = (n: number) => (n === 0 ? 'dziś' : n === 1 ? 'jutro' : `za ${n} dni`);
+
 const WasteWidget: React.FC<WasteWidgetProps> = ({ events, town }) => {
-    const [modalOpen, setModalOpen] = useState(false);
-    const upcomingEvents = events.slice(0, 4);
+    const [fullOpen, setFullOpen] = useState(false);
 
     // Bez cichego „Rybno” → R1: nazwa musi być pozycją harmonogramu (F-039)
     const mappedTown = town;
+
+    // Terminy zebrane po DNIU: papier, metale i szkło jeżdżą zwykle razem,
+    // a mieszkaniec pyta „kiedy i co wystawić”, nie „kiedy papier”
+    const upcomingDays = useMemo(() => {
+        const byDay: { days: number; date: string; types: string[] }[] = [];
+        // 10 odbiorów, nie 4 jak w dawnym kaflu bento: na własnej stronie lista
+        // ma sięgać kilku tygodni, inaczej „kolejne terminy” to jeden wiersz
+        events.slice(0, 10).forEach(ev => {
+            const last = byDay[byDay.length - 1];
+            if (last && last.days === ev.daysRemaining) last.types.push(ev.type);
+            else byDay.push({ days: ev.daysRemaining, date: ev.originalDateString, types: [ev.type] });
+        });
+        return byDay;
+    }, [events]);
 
     // Build full schedule grouped by month from raw wasteData
     const fullSchedule = useMemo(() => {
@@ -83,150 +105,107 @@ const WasteWidget: React.FC<WasteWidgetProps> = ({ events, town }) => {
             });
     }, [mappedTown]);
 
+    const [next, ...later] = upcomingDays;
+
     return (
-        <>
-        <div className="overflow-hidden flex flex-col h-full">
-            <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5 backdrop-blur-md">
-                <div>
-                    <h2 className="font-bold text-neutral-100 text-lg flex items-center gap-2">
-                        <Truck style={{ color: 'var(--chart-3)' }} size={22} />
-                        Harmonogram Odbioru
-                    </h2>
-                    <p className="text-sm text-neutral-400 mt-1">
-                        Najbliższe wywozy dla miejscowości: <span className="font-semibold text-neutral-200">{mappedTown}</span>
-                    </p>
-                </div>
-                <button
-                    onClick={() => setModalOpen(true)}
-                    className="text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 transition-colors flex items-center gap-1"
-                >
-                    Pełny harmonogram
-                    <ChevronRight size={12} />
-                </button>
-            </div>
-
-            <div className="p-5">
-                {upcomingEvents.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4">
-                        {upcomingEvents.map((event, idx) => {
-                            const style = getWasteStyles(event.type);
-                            const isTomorrow = event.daysRemaining === 1;
-                            const isToday = event.daysRemaining === 0;
-
-                            return (
-                                <div key={idx} className={`relative rounded-lg p-3 border ${style} flex items-center justify-between transition-transform hover:-translate-y-1 duration-200 hover:bg-white/5`}>
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className="opacity-80 flex-shrink-0">
-                                            {getWasteIcon(event.type)}
-                                        </div>
-                                        <div className="font-semibold text-sm leading-tight min-w-0 flex-1">
-                                            {event.type}
-                                        </div>
-                                    </div>
-
-                                    <div className="text-right flex-shrink-0 ml-3">
-                                        <div className="text-xl font-bold tracking-tight">
-                                            {event.originalDateString.slice(0, 5)}
-                                        </div>
-                                        <div className="text-[10px] font-medium uppercase tracking-wider opacity-80 mt-0.5 whitespace-nowrap">
-                                            {isToday ? 'DZISIAJ' : isTomorrow ? 'JUTRO' : `za ${event.daysRemaining} dni`}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div className="text-center py-8 text-neutral-500">
-                        <p>Brak zaplanowanych odbiorów w najbliższym czasie.</p>
-                    </div>
-                )}
-            </div>
-
-            <div className="bg-white/5 px-5 py-3 text-xs text-neutral-500 flex justify-between items-center border-t border-white/5">
-                <span>Dane na rok 2026</span>
-                <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Aktualne
-                </span>
-            </div>
-        </div>
-
-        {/* Full schedule modal */}
-        {modalOpen && (
-            <div
-                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-                onClick={() => setModalOpen(false)}
-            >
-                {/* Backdrop */}
-                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-
-                {/* Panel */}
-                <div
-                    className="relative w-full sm:max-w-lg bg-[#0f1117] border border-white/10 rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[80vh]"
-                    onClick={e => e.stopPropagation()}
-                >
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/8 shrink-0">
-                        <div>
-                            <h3 className="font-bold text-white text-base flex items-center gap-2">
-                                <Truck size={16} className="text-emerald-400" />
-                                Pełny harmonogram 2026
-                            </h3>
-                            <p className="text-xs text-neutral-500 mt-0.5">
-                                Miejscowość: <span className="text-emerald-400 font-semibold">{mappedTown}</span>
+        <div className="space-y-6">
+            {next ? (
+                <>
+                    {/* Najbliższy wywóz — wartość jak na kaflu „Wywóz” pulpitu */}
+                    <section aria-label="Najbliższy wywóz" className="flex flex-col items-start">
+                        <Tag as="h2">Najbliższy wywóz</Tag>
+                        <div className="w-full border-t-2 border-tv-blue bg-tv-panel px-4 pb-4 pt-3 lg:px-5">
+                            <p className="font-cond tabular text-[34px] font-extrabold leading-[1.05] text-white lg:text-[40px]">
+                                {dayWord(dateIn(next.days))}
+                                {next.days <= 1 && (
+                                    <span className="ml-3 text-[20px] text-tv-muted lg:text-[22px]">{next.date.slice(0, 5)}</span>
+                                )}
+                            </p>
+                            <ul className="mt-2 space-y-1 text-[16px] font-semibold text-white">
+                                {next.types.map(type => <li key={type}><WasteType type={type} /></li>)}
+                            </ul>
+                            <p className="mt-2 text-[15px] text-tv-muted">
+                                {mappedTown}{next.days > 1 && <> · {inDays(next.days)}</>}
                             </p>
                         </div>
-                        <button
-                            onClick={() => setModalOpen(false)}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
-                        >
-                            <X size={16} />
-                        </button>
-                    </div>
+                    </section>
 
-                    {/* Content — scrollable */}
-                    <div className="overflow-y-auto flex-1 px-5 py-4 space-y-6">
+                    {later.length > 0 && (
+                        <section aria-label="Kolejne terminy">
+                            <Tag as="h2" tone="paper">Kolejne terminy</Tag>
+                            <ul className="grid grid-cols-1 gap-px border-t-2 border-tv-paper bg-tv-seam">
+                                {later.map(day => (
+                                    <li key={day.date} className="flex gap-4 bg-tv-panel px-4 py-3">
+                                        <span className="flex w-24 shrink-0 flex-col">
+                                            <span className="font-cond tabular text-[22px] font-extrabold leading-none text-white">
+                                                {dayWord(dateIn(day.days))}
+                                            </span>
+                                            <span className="tabular mt-1 text-[13px] text-tv-muted">{inDays(day.days)}</span>
+                                        </span>
+                                        <span className="min-w-0 flex-1 space-y-1 text-[16px] font-semibold text-white">
+                                            {day.types.map(type => <WasteType key={type} type={type} />)}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
+                </>
+            ) : (
+                <Notice>Brak zaplanowanych odbiorów w najbliższym czasie.</Notice>
+            )}
+
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-tv-muted">
+                <span>Dane na rok 2026</span>
+                <span className="inline-flex items-center gap-1">
+                    <CheckCircle2 size={14} className="text-tv-green" aria-hidden />
+                    Aktualne
+                </span>
+            </p>
+
+            {/* Pełny harmonogram rozwija się NA STRONIE — do 11.10.2026 był modalem,
+                a lista terminów nie wymaga przerwania ani zamkniętego fokusu */}
+            <section aria-label="Pełny harmonogram 2026">
+                <button
+                    onClick={() => setFullOpen(o => !o)}
+                    aria-expanded={fullOpen}
+                    aria-controls="waste-full"
+                    className="font-cond inline-flex min-h-[52px] w-full items-center justify-center gap-2 bg-tv-blue px-4 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] sm:w-auto"
+                >
+                    Pełny harmonogram
+                    {fullOpen ? <ChevronUp size={18} aria-hidden /> : <ChevronDown size={18} aria-hidden />}
+                </button>
+
+                {fullOpen && (
+                    <div id="waste-full" className="mt-4 space-y-5">
+                        <p className="text-[15px] text-tv-muted">
+                            Pełny harmonogram 2026 · miejscowość: <span className="font-semibold text-tv-paper">{mappedTown}</span>
+                        </p>
                         {fullSchedule.length === 0 && (
-                            <p className="text-neutral-500 text-sm text-center py-8">Brak danych dla tej miejscowości.</p>
+                            <Notice>Brak danych dla tej miejscowości.</Notice>
                         )}
                         {fullSchedule.map(({ label, items }) => (
                             <div key={label}>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2">{label}</p>
-                                <div className="space-y-1.5">
+                                <Tag as="h3" tone="seam">{label}</Tag>
+                                <ul className="grid grid-cols-1 gap-px border-t border-tv-seam bg-tv-seam">
                                     {items.map((item, i) => (
-                                        <div
-                                            key={i}
-                                            className={`flex items-center gap-3 px-3 py-2 rounded-xl border transition-colors ${
-                                                item.isPast
-                                                    ? 'border-white/4 bg-white/[0.02] opacity-40'
-                                                    : 'border-white/6 bg-white/[0.04] hover:bg-white/[0.06]'
-                                            }`}
-                                        >
-                                            <span className={`w-2 h-2 rounded-full shrink-0 ${getModalDotColor(item.type)}`} />
-                                            <span className="text-[11px] font-mono text-neutral-400 shrink-0 w-14">
+                                        <li key={i} className="flex min-h-[44px] items-center gap-4 bg-tv-panel px-4 py-2 text-[15px]">
+                                            <span className={`tabular w-14 shrink-0 font-semibold ${item.isPast ? 'text-tv-muted' : 'text-white'}`}>
                                                 {item.dateStr.slice(0, 5)}
                                             </span>
-                                            <span className={`text-xs font-medium truncate ${item.isPast ? 'text-neutral-500' : 'text-neutral-200'}`}>
-                                                {item.type}
+                                            <span className={item.isPast ? '' : 'text-tv-paper'}>
+                                                <WasteType type={item.type} muted={item.isPast} />
                                             </span>
-                                        </div>
+                                        </li>
                                     ))}
-                                </div>
+                                </ul>
                             </div>
                         ))}
+                        <p className="text-[13px] text-tv-muted">Pozycje wyszarzone = daty już minione</p>
                     </div>
-
-                    {/* Footer */}
-                    <div className="px-5 py-3 border-t border-white/8 shrink-0">
-                        <p className="text-[10px] text-neutral-600 text-center">
-                            Pozycje wyszarzone = daty już minione
-                        </p>
-                    </div>
-                </div>
-            </div>
-        )}
-        </>
+                )}
+            </section>
+        </div>
     );
 };
 

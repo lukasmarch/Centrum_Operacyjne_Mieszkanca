@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { track } from '../services/analytics';
-import { Landmark, Play, ExternalLink, ChevronDown, Gavel } from 'lucide-react';
+import { Play, ExternalLink, ChevronDown } from 'lucide-react';
+import { Notice, PageHead, Skeleton, Tag } from '../../components/simple/tv';
 import {
     useCouncilSessions,
     useCouncilDetails,
@@ -52,8 +53,9 @@ const StampLink: React.FC<{ stamp?: string | null; url?: string | null }> = ({ s
     if (!stamp) return null;
     const label = shortStamp(stamp);
     if (!url) {
-        return <span className="font-mono text-xs text-neutral-500">{label}</span>;
+        return <span className="tabular shrink-0 text-[13px] text-tv-muted">{label}</span>;
     }
+    // Znacznik to przycisk 44 px, nie szary tekst — patrz komentarz nad listą
     return (
         <a
             href={url}
@@ -61,28 +63,28 @@ const StampLink: React.FC<{ stamp?: string | null; url?: string | null }> = ({ s
             rel="noopener noreferrer"
             title="Otwórz nagranie w tej minucie"
             onClick={() => track('session_stamp_click', { section: 'council', meta: { stamp: label } })}
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-sky-400/30 bg-sky-400/10 px-2 py-1 font-mono text-xs font-semibold text-sky-300 transition-colors hover:border-sky-400/60 hover:bg-sky-400/20 hover:text-sky-200"
+            className="font-cond tabular inline-flex min-h-[44px] shrink-0 items-center gap-1.5 bg-tv-panel2 px-3 text-[15px] font-extrabold text-tv-bluesoft transition-colors hover:bg-tv-blue hover:text-white"
         >
-            <Play size={10} aria-hidden className="fill-current" />
+            <Play size={12} aria-hidden className="fill-current" />
             {label}
         </a>
     );
 };
 
 const Point: React.FC<{ point: CouncilPoint }> = ({ point }) => (
-    <li className="border-t border-white/10 py-5 first:border-t-0 first:pt-0">
+    <li className="py-4 first:pt-1">
         <div className="flex items-start justify-between gap-3">
-            <h4 className="text-[15px] font-bold leading-snug text-white">{point.title}</h4>
+            <h4 className="pt-2 text-[17px] font-semibold leading-snug text-white">{point.title}</h4>
             <StampLink stamp={point.timestamp} url={point.watch_url} />
         </div>
 
-        <p className="mt-2 text-[14.5px] leading-relaxed text-neutral-300">{point.description}</p>
+        <p className="mt-1.5 max-w-[70ch] text-[15px] leading-relaxed text-[#d7dbe8]">{point.description}</p>
 
         {point.quote && (
-            <blockquote className="mt-3 rounded-r-xl border-l-[3px] border-sky-500 bg-sky-500/5 px-4 py-2.5 text-[14px] leading-relaxed text-neutral-200">
+            <blockquote className="mt-3 max-w-[70ch] bg-tv-panel2 px-4 py-3 text-[15px] leading-relaxed text-white">
                 „{point.quote}”
                 {point.speaker && (
-                    <footer className="mt-1 text-xs font-medium not-italic text-neutral-500">
+                    <footer className="mt-1 text-[13px] text-tv-muted">
                         — {point.speaker}
                     </footer>
                 )}
@@ -92,14 +94,14 @@ const Point: React.FC<{ point: CouncilPoint }> = ({ point }) => (
 );
 
 const Resolution: React.FC<{ resolution: CouncilResolution }> = ({ resolution }) => (
-    <li className="flex items-start justify-between gap-3 border-t border-white/5 py-2.5 first:border-t-0">
-        <span className="min-w-0 text-[14px] leading-snug text-neutral-300">
+    <li className="flex items-start justify-between gap-3 py-2">
+        <span className="min-w-0 pt-2.5 text-[15px] leading-snug text-[#d7dbe8]">
             {resolution.number && (
-                <span className="mr-1.5 font-semibold text-neutral-100">{resolution.number}</span>
+                <span className="tabular mr-1.5 font-bold text-white">{resolution.number}</span>
             )}
             {resolution.subject}
             {resolution.outcome && (
-                <span className="ml-1.5 text-neutral-500">— {resolution.outcome}</span>
+                <span className="ml-1.5 text-tv-muted">— {resolution.outcome}</span>
             )}
         </span>
         <StampLink stamp={resolution.timestamp} url={resolution.watch_url} />
@@ -117,86 +119,80 @@ const CouncilPage: React.FC = () => {
     };
 
     return (
-        <div className="mx-auto max-w-4xl px-4 py-6 lg:py-10">
+        <div className="max-w-4xl space-y-6 lg:space-y-8">
             {/* Podtytuł mówi, CO tu jest (podsumowanie najważniejszych spraw),
                 a nie jak powstało. Skąd się bierze skrót, wyjaśnia jedno zdanie
                 pod spodem — wcześniejsza ramka „Jak powstaje ten skrót" zajmowała
                 pół ekranu i odsuwała pierwszą sesję poniżej zgięcia. */}
-            <header>
-                <h1 className="text-3xl font-extrabold tracking-tight text-white lg:text-4xl">
-                    Sesje Rady Gminy
-                </h1>
-                <p className="mt-2 flex items-center gap-1.5 text-sm text-neutral-400">
-                    <Landmark size={14} aria-hidden className="text-sky-400" />
-                    Podsumowanie obrad — najważniejsze sprawy z każdej sesji
-                </p>
-                <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-neutral-400">
+            <div>
+                <PageHead
+                    title="Sesje Rady Gminy"
+                    sub="Podsumowanie obrad — najważniejsze sprawy z każdej sesji"
+                />
+                <p className="mt-3 max-w-[70ch] text-[15px] leading-relaxed text-[#d7dbe8]">
                     Przy każdym temacie stoi minuta nagrania — jak rozdziały na YouTube.
                     Klikasz znacznik i nagranie otwiera się dokładnie w tym miejscu.
                 </p>
-            </header>
+            </div>
 
-            {loading && <p className="mt-8 text-sm text-neutral-500">Sprawdzam rejestr obrad…</p>}
+            {loading && (
+                <div aria-label="Sprawdzam rejestr obrad…" className="space-y-px">
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-44" />
+                </div>
+            )}
 
             {failed && (
-                <p className="mt-8 rounded-2xl border border-white/10 bg-[#0d1117] p-5 text-sm text-neutral-400">
+                <Notice tone="warn" role="alert">
                     Nie udało się pobrać skrótów obrad. Spróbuj odświeżyć stronę.
-                </p>
+                </Notice>
             )}
 
             {!loading && !failed && sessions?.length === 0 && (
-                <p className="mt-8 rounded-2xl border border-white/10 bg-[#0d1117] p-5 text-sm text-neutral-400">
+                <Notice>
                     Nie ma tu jeszcze żadnego skrótu. Pierwszy pojawi się po najbliższej sesji
                     Rady Gminy — terminy posiedzeń zbieramy w kalendarzu wydarzeń.
-                </p>
+                </Notice>
             )}
 
-            <div className="mt-6 space-y-4">
+            <div className="space-y-6">
                 {sessions?.map(session => {
                     const expanded = open === session.id;
                     const detail = details[session.id];
                     const summary = detail?.summary;
 
                     return (
-                        <article
-                            key={session.id}
-                            className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1117]"
-                        >
-                            <div className="p-5">
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                                    {session.session_number && (
-                                        <span className="text-sky-300">{session.session_number} sesja</span>
-                                    )}
-                                    <span aria-hidden>·</span>
-                                    <span>{dateLabel(session.session_date)}</span>
-                                    {session.duration_min && (
-                                        <>
-                                            <span aria-hidden>·</span>
-                                            <span>{session.duration_min} min nagrania</span>
-                                        </>
-                                    )}
-                                </div>
-
-                                <h3 className="mt-2 text-xl font-black leading-tight tracking-tight text-white">
+                        <article key={session.id} className="flex flex-col">
+                            {/* Plakietka z numerem sesji JEST nagłówkiem; data i czas
+                                nagrania stoją pod tytułem, nie jako etykieta nad nim */}
+                            <Tag as="h2">{session.session_number ? `${session.session_number} sesja` : 'Sesja Rady'}</Tag>
+                            <div className="border-t-2 border-tv-blue bg-tv-panel px-4 pb-4 pt-3 lg:px-5">
+                                <h3 className="font-cond text-[22px] font-extrabold leading-snug text-white lg:text-[26px]">
                                     {session.headline || session.title}
                                 </h3>
+                                <p className="tabular mt-1 text-[14px] font-bold text-tv-paper">
+                                    {dateLabel(session.session_date)}
+                                    {session.duration_min && (
+                                        <span className="font-normal text-tv-muted"> · {session.duration_min} min nagrania</span>
+                                    )}
+                                </p>
 
                                 {session.lead && (
-                                    <p className="mt-2.5 text-[14.5px] leading-relaxed text-neutral-300">
+                                    <p className="mt-2 max-w-[70ch] text-[15px] leading-relaxed text-[#d7dbe8]">
                                         {session.lead}
                                     </p>
                                 )}
 
-                                <div className="mt-4 flex flex-wrap items-center gap-3">
+                                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
                                     <button
                                         type="button"
                                         onClick={() => toggle(session.id)}
                                         aria-expanded={expanded}
-                                        className="inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-400"
+                                        className="font-cond inline-flex min-h-[44px] items-center gap-1.5 bg-tv-blue px-4 text-[15px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
                                     >
                                         {expanded ? 'Zwiń skrót' : 'Zobacz, co ustalono'}
                                         <ChevronDown
-                                            size={15}
+                                            size={16}
                                             aria-hidden
                                             className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
                                         />
@@ -207,23 +203,23 @@ const CouncilPage: React.FC = () => {
                                             href={session.video_url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-[13px] font-semibold text-neutral-400 hover:text-neutral-200"
+                                            className="inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline"
                                         >
                                             Całe nagranie obrad
-                                            <ExternalLink size={12} aria-hidden />
+                                            <ExternalLink size={14} aria-hidden />
                                         </a>
                                     )}
                                 </div>
                             </div>
 
                             {expanded && (
-                                <div className="border-t border-white/10 bg-black/20 px-5 pb-5 pt-5">
+                                <div className="border-t border-tv-seam bg-tv-panel px-4 pb-5 pt-4 lg:px-5">
                                     {!detail && pending === session.id && (
-                                        <p className="text-sm text-neutral-500">Wczytuję skrót…</p>
+                                        <p className="text-[15px] text-tv-muted">Wczytuję skrót…</p>
                                     )}
 
                                     {summary?.points?.length ? (
-                                        <ul>
+                                        <ul className="divide-y divide-tv-seam">
                                             {summary.points.map((point, i) => (
                                                 <Point key={`${point.timestamp}-${i}`} point={point} />
                                             ))}
@@ -231,12 +227,9 @@ const CouncilPage: React.FC = () => {
                                     ) : null}
 
                                     {summary?.resolutions?.length ? (
-                                        <section className="mt-6 rounded-xl border border-white/10 bg-[#0d1117] p-4">
-                                            <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-neutral-500">
-                                                <Gavel size={13} aria-hidden />
-                                                Uchwały poddane pod głosowanie
-                                            </h4>
-                                            <ul className="mt-3">
+                                        <section className="mt-5 flex flex-col">
+                                            <h4 className="flex"><Tag tone="paper">Uchwały poddane pod głosowanie</Tag></h4>
+                                            <ul className="divide-y divide-tv-seam border-t border-tv-paper">
                                                 {summary.resolutions.map((resolution, i) => (
                                                     <Resolution key={`${resolution.subject}-${i}`} resolution={resolution} />
                                                 ))}
@@ -245,14 +238,14 @@ const CouncilPage: React.FC = () => {
                                     ) : null}
 
                                     {detail && (
-                                        <p className="mt-5 text-xs leading-relaxed text-neutral-500">
+                                        <p className="mt-5 max-w-[70ch] text-[13px] leading-relaxed text-tv-muted">
                                             Skrót powstał z zapisu całego nagrania obrad.
                                             {' '}
                                             <a
                                                 href={session.page_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-neutral-400 underline decoration-white/20 underline-offset-2 hover:text-neutral-200"
+                                                className="font-bold text-tv-bluesoft underline underline-offset-4 hover:text-white"
                                             >
                                                 Nagranie w galerii Gminy Rybno
                                             </a>

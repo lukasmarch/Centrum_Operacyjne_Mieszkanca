@@ -2,6 +2,23 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { createPortal } from 'react-dom';
+import {
+    Camera,
+    Check,
+    CheckCircle2,
+    ChevronDown,
+    Clock,
+    Crosshair,
+    Eye,
+    Map as MapIcon,
+    MapPin,
+    Send,
+    Shield,
+    ThumbsUp,
+    User,
+    X,
+} from 'lucide-react';
 import type { Report, ReportCategory, AppSection } from '../../types';
 import {
     fetchReports,
@@ -18,6 +35,7 @@ import {
 } from '../services/reportsApi';
 import type { ReportMapItem } from '../../types';
 import { useAuth } from '../context/AuthContext';
+import { Chip, Notice, PageHead, Skeleton, Tag } from '../../components/simple/tv';
 
 // ==================== Helpers ====================
 
@@ -55,39 +73,101 @@ function trackPosition(status: string): number {
     }
 }
 
+/**
+ * Czerwień tylko dla TRWAJĄCEJ awarii — kolor = stan, nie kategoria.
+ * Kategoria „Alarm/Pożar” z AI sama nie wystarcza: zgłoszenie sprzed tygodnia
+ * albo już załatwione w czerwieni czytałoby się jak sprawa na teraz. Okno 36 h
+ * to ten sam próg „sprawy najbliższych godzin”, co w feedzie.
+ */
+const LIVE_ALARM_H = 36;
+const isLiveAlarm = (r: { category: string; status: string; created_at: string }): boolean =>
+    (r.category === 'emergency' || r.category === 'fire') &&
+    r.status !== 'resolved' &&
+    r.status !== 'rejected' &&
+    Date.now() - new Date(r.created_at).getTime() <= LIVE_ALARM_H * 3_600_000;
+
+/** Plakietka statusu. Rozwiązane = papier z zieloną IKONĄ obok (zieleń nigdy jako tło). */
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+    const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.new;
+    return (
+        <span className="inline-flex items-center gap-1.5">
+            {status === 'resolved' && <CheckCircle2 size={16} className="shrink-0 text-tv-green" aria-hidden />}
+            <Tag tone={cfg.tone}>{cfg.label}</Tag>
+        </span>
+    );
+};
+
+/** Pole formularza: szew 2 px na tle atramentu, 52 px, 16 px tekstu (iOS nie powiększa). */
+const FIELD =
+    'w-full min-h-[52px] border-2 border-tv-seam bg-tv-ink px-3 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper';
+const LABEL = 'mb-1.5 block text-[15px] font-bold text-white';
+const BTN_PRIMARY =
+    'font-cond inline-flex min-h-[52px] items-center justify-center gap-2 bg-tv-blue px-5 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-not-allowed disabled:opacity-50';
+const BTN_PAPER =
+    'font-cond inline-flex min-h-[44px] items-center justify-center gap-2 bg-tv-paper px-5 text-[16px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-white disabled:opacity-50';
+
+/**
+ * Płaski modal: panel z chabrowym szwem u góry, tło przyciemnione jednolicie (bez rozmycia).
+ * Portal do `body`, bo `main` w App.tsx ma `relative z-10` — własny kontekst nakładania,
+ * z którego `z-[1000]` nie wyjdzie: górny pasek i dolne zakładki zasłaniały główkę
+ * modala i przycisk wysyłki.
+ */
+const ModalShell: React.FC<{
+    onClose: () => void;
+    label: string;
+    maxWidth?: string;
+    children: React.ReactNode;
+}> = ({ onClose, label, maxWidth = 'max-w-2xl', children }) => createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-3 sm:p-4" onClick={onClose}>
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={label}
+            className={`relative max-h-[90vh] w-full ${maxWidth} overflow-y-auto border border-tv-seam border-t-2 border-t-tv-blue bg-tv-panel`}
+            onClick={(e) => e.stopPropagation()}
+        >
+            {children}
+        </div>
+    </div>,
+    document.body,
+);
+
+const CloseButton: React.FC<{ onClick: () => void; className?: string }> = ({ onClick, className = '' }) => (
+    <button
+        type="button"
+        onClick={onClick}
+        aria-label="Zamknij"
+        className={`flex h-11 w-11 shrink-0 items-center justify-center bg-tv-panel2 text-tv-paper transition-colors hover:bg-tv-seam hover:text-white ${className}`}
+    >
+        <X size={20} aria-hidden />
+    </button>
+);
+
 const InterventionTrack: React.FC<{ status: string; compact?: boolean }> = ({ status, compact }) => {
     const pos = trackPosition(status);
     if (pos < 0) return null;
+    // Bieżący krok w kolorze stanu: żółć = w toku, papier = reszta; przebyte — wyciszone
+    const nowBar = STATUS_CONFIG[status]?.tone === 'yellow' ? 'bg-tv-yellow' : 'bg-tv-paper';
     return (
-        <div className="flex items-start w-full" aria-label={`Status interwencji: ${STATUS_CONFIG[status]?.label || status}`}>
+        <ol className="grid w-full grid-cols-4 gap-px" aria-label={`Status interwencji: ${STATUS_CONFIG[status]?.label || status}`}>
             {TRACK_STEPS.map((step, i) => {
                 const done = i < pos;
                 const now = i === pos;
                 return (
-                    <div key={step.key} className="flex-1 flex flex-col items-center relative">
-                        {i > 0 && (
-                            <div
-                                className={`absolute top-[5px] right-1/2 w-full h-0.5 ${i <= pos ? 'bg-emerald-500/70' : 'bg-white/10'}`}
-                            />
-                        )}
+                    <li key={step.key} className="min-w-0" aria-current={now ? 'step' : undefined}>
+                        <span className={`block ${compact ? 'h-1' : 'h-1.5'} ${now ? nowBar : done ? 'bg-tv-muted' : 'bg-tv-seam'}`} />
                         <span
-                            className={`relative z-10 rounded-full block ${compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} ${
-                                now
-                                    ? 'bg-blue-500 ring-4 ring-blue-500/25'
-                                    : done
-                                        ? 'bg-emerald-500'
-                                        : 'bg-white/15 border border-white/20'
+                            className={`font-cond mt-1.5 flex items-center gap-1 text-[13px] leading-tight [overflow-wrap:anywhere] ${
+                                now ? 'font-extrabold text-white' : 'text-tv-muted'
                             }`}
-                        />
-                        <span className={`mt-1 text-center leading-tight ${compact ? 'text-[8px]' : 'text-[9px]'} ${
-                            now ? 'text-blue-300 font-bold' : done ? 'text-neutral-400' : 'text-neutral-600'
-                        }`}>
+                        >
+                            {now && status === 'resolved' && <CheckCircle2 size={13} className="shrink-0 text-tv-green" aria-hidden />}
                             {i === 2 && status === 'in_progress' ? 'W realizacji' : step.label}
                         </span>
-                    </div>
+                    </li>
                 );
             })}
-        </div>
+        </ol>
     );
 };
 
@@ -102,8 +182,8 @@ const ReportCard: React.FC<{
     onView: (report: Report) => void;
 }> = ({ report, onUpvote, onView }) => {
     const cat = CATEGORY_CONFIG[report.category] || CATEGORY_CONFIG.other;
-    const status = STATUS_CONFIG[report.status] || STATUS_CONFIG.new;
     const severity = report.ai_severity ? SEVERITY_CONFIG[report.ai_severity] : null;
+    const live = isLiveAlarm(report);
     const [imgError, setImgError] = useState(false);
     const [imgRetry, setImgRetry] = useState(0);
 
@@ -121,101 +201,68 @@ const ReportCard: React.FC<{
 
     return (
         <div
-            className="bg-white/[0.04] backdrop-blur-sm rounded-3xl border border-white/8 shadow-sm hover:shadow-xl hover:shadow-blue-900/10 hover:border-white/12 transition-all duration-300 overflow-hidden cursor-pointer group"
+            role="button"
+            tabIndex={0}
+            className="group flex cursor-pointer flex-col bg-tv-panel transition-colors hover:bg-tv-panel2"
             onClick={() => onView(report)}
+            onKeyDown={(e) => { if (e.key === 'Enter') onView(report); }}
         >
             {/* Image */}
             {report.image_url && !imgError && (
-                <div className="h-48 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gray-900 animate-pulse" />
+                <div className="h-48 overflow-hidden bg-tv-panel2">
                     <img
                         src={imgSrc}
                         alt={report.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 relative z-10"
+                        className="h-full w-full object-cover"
                         loading="lazy"
                         onError={handleImgError}
                     />
-                    <div className="absolute top-3 left-3 flex gap-2 z-20 flex-wrap">
-                        <span
-                            className="px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-lg backdrop-blur-md"
-                            style={{ backgroundColor: `${cat.color}dd` }}
-                        >
-                            {cat.emoji} {cat.label}
-                        </span>
-                        {VERIFIED_STATUSES.includes(report.status) && (
-                            <span className="px-2.5 py-1 rounded-full text-xs font-bold text-emerald-300 bg-emerald-900/70 border border-emerald-500/40 shadow-lg backdrop-blur-md">
-                                ✓ Zweryfikowane
-                            </span>
-                        )}
-                    </div>
-                    {severity && (
-                        <div className="absolute top-3 right-3 z-20">
-                            <span
-                                className="px-2 py-1 rounded-full text-[10px] font-bold text-white uppercase tracking-wider shadow-lg backdrop-blur-md"
-                                style={{ backgroundColor: `${severity.color}dd` }}
-                            >
-                                {severity.label}
-                            </span>
-                        </div>
-                    )}
                 </div>
             )}
 
-            <div className="p-5">
-                {/* Category tag if no image */}
-                {(!report.image_url || imgError) && (
-                    <div className="flex gap-2 mb-3 flex-wrap">
-                        <span
-                            className="px-2.5 py-1 rounded-full text-xs font-bold text-white"
-                            style={{ backgroundColor: cat.color }}
-                        >
-                            {cat.emoji} {cat.label}
+            <div className="flex flex-1 flex-col p-4">
+                {/* Rodzaj sprawy to opis, nie stan — bez koloru kategorii */}
+                <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px] text-tv-muted">
+                    {live && <Tag tone="red">Alarm</Tag>}
+                    <span className="font-cond font-bold uppercase tracking-wide">{cat.label}</span>
+                    {severity && !live && <span>· priorytet {severity.label.toLowerCase()}</span>}
+                    {VERIFIED_STATUSES.includes(report.status) && (
+                        <span className="inline-flex items-center gap-1 text-tv-paper">
+                            <CheckCircle2 size={14} className="text-tv-green" aria-hidden /> Zweryfikowane
                         </span>
-                        {VERIFIED_STATUSES.includes(report.status) && (
-                            <span className="px-2.5 py-1 rounded-full text-xs font-bold text-emerald-300 bg-emerald-900/60 border border-emerald-500/40">
-                                ✓ Zweryfikowane
-                            </span>
-                        )}
-                        {severity && (
-                            <span
-                                className="px-2 py-1 rounded-full text-[10px] font-bold text-white uppercase"
-                                style={{ backgroundColor: severity.color }}
-                            >
-                                {severity.label}
-                            </span>
-                        )}
-                    </div>
-                )}
+                    )}
+                </div>
 
-                <h3 className="font-bold text-neutral-100 text-lg leading-tight mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-violet-400 transition-all">
+                <h3 className="mb-1.5 line-clamp-2 text-[18px] font-bold leading-snug text-white">
                     {report.title}
                 </h3>
 
-                <p className="text-neutral-400 text-sm mb-4 line-clamp-2">
+                <p className="mb-3 line-clamp-2 text-[15px] leading-snug text-[#d7dbe8]">
                     {report.ai_summary || report.description}
                 </p>
 
                 {/* Location */}
                 {report.address && (
-                    <p className="text-xs text-neutral-500 mb-3 flex items-center gap-1">
-                        <span>📍</span>
+                    <p className="mb-3 flex items-center gap-1 text-[14px] text-tv-muted">
+                        <MapPin size={14} className="shrink-0" aria-hidden />
                         <span className="truncate">{report.address}</span>
                     </p>
                 )}
 
                 {/* Pasek interwencji — publiczny postęp sprawy */}
                 {trackPosition(report.status) >= 0 && (
-                    <div className="mb-3 pt-3 border-t border-white/5">
+                    <div className="mb-2 border-t border-tv-seam pt-3">
                         <InterventionTrack status={report.status} compact />
                     </div>
                 )}
 
                 {/* Footer */}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-800/50/60">
-                    <div className="flex items-center gap-3 text-xs text-neutral-500">
+                <div className="mt-auto flex items-center justify-between border-t border-tv-seam pt-1">
+                    <div className="flex items-center gap-3 text-[13px] text-tv-muted">
                         <span>{timeAgo(report.created_at)}</span>
-                        <span className="flex items-center gap-1">
-                            <span className="text-neutral-600">👁</span> {report.views_count}
+                        <span className="tabular flex items-center gap-1">
+                            <Eye size={14} aria-hidden /> {report.views_count}
+                            <span className="sr-only">wyświetleń</span>
                         </span>
                     </div>
 
@@ -224,9 +271,10 @@ const ReportCard: React.FC<{
                             e.stopPropagation();
                             onUpvote(report.id);
                         }}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-all text-xs font-bold"
+                        className="inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-bold text-tv-bluesoft transition-colors hover:text-white"
                     >
-                        👍 {report.upvotes > 0 ? `${report.upvotes} potwierdza` : 'Potwierdzam'}
+                        <ThumbsUp size={16} aria-hidden />
+                        {report.upvotes > 0 ? <span className="tabular">{report.upvotes} potwierdza</span> : 'Potwierdzam'}
                     </button>
                 </div>
             </div>
@@ -244,161 +292,140 @@ const ReportDetail: React.FC<{
     onStatusChange?: (id: number, status: string) => void;
 }> = ({ report, onClose, onUpvote, isAdmin, onStatusChange }) => {
     const cat = CATEGORY_CONFIG[report.category] || CATEGORY_CONFIG.other;
-    const status = STATUS_CONFIG[report.status] || STATUS_CONFIG.new;
     const severity = report.ai_severity ? SEVERITY_CONFIG[report.ai_severity] : null;
+    const live = isLiveAlarm(report);
     const [detailImgError, setDetailImgError] = useState(false);
     const [savingStatus, setSavingStatus] = useState(false);
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div
-                className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* Close Button Mobile */}
-                <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 z-50 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md md:hidden"
-                >
-                    ✕
-                </button>
+        <ModalShell onClose={onClose} label={report.title}>
+            <CloseButton onClick={onClose} className="absolute right-3 top-3 z-10" />
 
-                {/* Image */}
-                {report.image_url && !detailImgError && (
-                    <div className="h-64 overflow-hidden rounded-t-3xl relative">
-                        <img
-                            src={getImageUrl(report.image_url)}
-                            alt={report.title}
-                            className="w-full h-full object-cover"
-                            onError={() => setDetailImgError(true)}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 to-transparent opacity-50"></div>
+            {/* Image */}
+            {report.image_url && !detailImgError && (
+                <div className="h-64 overflow-hidden bg-tv-panel2">
+                    <img
+                        src={getImageUrl(report.image_url)}
+                        alt={report.title}
+                        className="h-full w-full object-cover"
+                        onError={() => setDetailImgError(true)}
+                    />
+                </div>
+            )}
+
+            <div className="p-5 sm:p-8">
+                {/* Header */}
+                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 pr-12">
+                    {live && <Tag tone="red">Alarm</Tag>}
+                    <StatusBadge status={report.status} />
+                    <span className="font-cond text-[14px] font-bold uppercase tracking-wide text-tv-muted">{cat.label}</span>
+                    {severity && !live && (
+                        <span className="text-[14px] text-tv-muted">Priorytet: {severity.label}</span>
+                    )}
+                </div>
+
+                <h2 className="font-cond mb-2 text-[26px] font-extrabold leading-tight text-white">{report.title}</h2>
+
+                <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-tv-muted">
+                    <span className="flex items-center gap-1"><Clock size={14} aria-hidden /> {timeAgo(report.created_at)}</span>
+                    {report.author_name && <span className="flex items-center gap-1"><User size={14} aria-hidden /> {report.author_name}</span>}
+                    <span className="tabular flex items-center gap-1"><Eye size={14} aria-hidden /> {report.views_count} wyświetleń</span>
+                </div>
+
+                {/* Pasek interwencji */}
+                {trackPosition(report.status) >= 0 && (
+                    <div className="mb-6 max-w-md border-b border-tv-seam pb-6">
+                        <InterventionTrack status={report.status} />
                     </div>
                 )}
 
-                <div className="p-8">
-                    {/* Header */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        <span className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg" style={{ backgroundColor: cat.color }}>
-                            {cat.emoji} {cat.label}
-                        </span>
-                        <span className="px-3 py-1 rounded-full text-xs font-bold border border-gray-700/50" style={{ backgroundColor: `${status.color}15`, color: status.color }}>
-                            {status.label}
-                        </span>
-                        {severity && (
-                            <span className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg" style={{ backgroundColor: severity.color }}>
-                                Priorytet: {severity.label}
-                            </span>
-                        )}
-                    </div>
-
-                    <h2 className="text-2xl font-black text-neutral-100 mb-2">{report.title}</h2>
-
-                    <div className="flex items-center gap-4 text-sm text-neutral-400 mb-4">
-                        <span className="flex items-center gap-1">🕐 {timeAgo(report.created_at)}</span>
-                        {report.author_name && <span className="flex items-center gap-1">👤 {report.author_name}</span>}
-                        <span className="flex items-center gap-1">👁 {report.views_count} wyświetleń</span>
-                    </div>
-
-                    {/* Pasek interwencji */}
-                    {trackPosition(report.status) >= 0 && (
-                        <div className="mb-6 border-b border-gray-800/50 pb-6 max-w-md">
-                            <InterventionTrack status={report.status} />
-                        </div>
-                    )}
-
-                    {/* Panel urzędnika/redakcji — zmiana statusu interwencji */}
-                    {isAdmin && (
-                        <div className="mb-6 p-4 bg-blue-500/5 border border-blue-500/15 rounded-2xl">
-                            <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
-                                🛡️ Panel redakcji — status interwencji
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {['new', 'verified', 'forwarded', 'in_progress', 'resolved', 'rejected'].map(s => (
-                                    <button
-                                        key={s}
-                                        disabled={savingStatus || report.status === s}
-                                        onClick={async () => {
-                                            setSavingStatus(true);
-                                            try { await onStatusChange?.(report.id, s); } finally { setSavingStatus(false); }
-                                        }}
-                                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                                            report.status === s
-                                                ? 'bg-blue-500 text-white border-blue-400'
-                                                : 'bg-white/[0.04] text-neutral-400 border-white/10 hover:text-neutral-200 hover:bg-white/[0.08]'
-                                        } disabled:opacity-60`}
-                                    >
-                                        {STATUS_CONFIG[s]?.label || s}
-                                    </button>
-                                ))}
-                            </div>
-                            <p className="text-[11px] text-neutral-500 mt-2">
-                                Autor zgłoszenia dostaje e-mail przy każdej zmianie statusu.
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Description */}
-                    <div className="mb-8">
-                        <h3 className="font-bold text-neutral-300 mb-3 flex items-center gap-2">
-                            📄 Opis zgłoszenia
+                {/* Panel urzędnika/redakcji — zmiana statusu interwencji */}
+                {isAdmin && (
+                    <div className="mb-6 border border-tv-seam bg-tv-ink p-4">
+                        <h3 className="font-cond mb-2 flex items-center gap-1.5 text-[14px] font-extrabold uppercase tracking-wide text-tv-paper">
+                            <Shield size={15} aria-hidden /> Panel redakcji — status interwencji
                         </h3>
-                        <p className="text-neutral-400 whitespace-pre-wrap leading-relaxed">{report.description}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {['new', 'verified', 'forwarded', 'in_progress', 'resolved', 'rejected'].map(s => (
+                                <button
+                                    key={s}
+                                    disabled={savingStatus || report.status === s}
+                                    aria-pressed={report.status === s}
+                                    onClick={async () => {
+                                        setSavingStatus(true);
+                                        try { await onStatusChange?.(report.id, s); } finally { setSavingStatus(false); }
+                                    }}
+                                    className={`font-cond inline-flex min-h-[44px] items-center px-3 text-[15px] font-bold uppercase tracking-wide transition-colors ${
+                                        report.status === s
+                                            ? 'bg-tv-paper text-tv-ink'
+                                            : 'bg-tv-panel text-tv-paper hover:bg-tv-panel2 hover:text-white'
+                                    } disabled:cursor-default ${report.status === s ? '' : 'disabled:opacity-60'}`}
+                                >
+                                    {STATUS_CONFIG[s]?.label || s}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-[13px] text-tv-muted">
+                            Autor zgłoszenia dostaje e-mail przy każdej zmianie statusu.
+                        </p>
                     </div>
+                )}
 
-                    <div className="grid md:grid-cols-2 gap-4 mb-8">
+                {/* Description */}
+                <section className="mb-6">
+                    <Tag as="h3" tone="seam">Opis zgłoszenia</Tag>
+                    <p className="whitespace-pre-wrap border-t border-tv-seam pt-3 text-[16px] leading-relaxed text-[#d7dbe8]">{report.description}</p>
+                </section>
+
+                {(report.ai_summary || report.ai_condition_assessment) && (
+                    <div className="mb-6 grid gap-px bg-tv-seam md:grid-cols-2">
                         {/* AI Summary */}
                         {report.ai_summary && (
-                            <div className="p-5 bg-blue-500/5 rounded-2xl border border-blue-500/10">
-                                <h3 className="font-bold text-blue-400 mb-2 text-sm flex items-center gap-2">
-                                    🤖 Streszczenie AI
-                                </h3>
-                                <p className="text-blue-100/70 text-sm leading-relaxed">{report.ai_summary}</p>
-                            </div>
+                            <section className="bg-tv-ink p-4">
+                                <Tag as="h3" tone="seam">Streszczenie AI</Tag>
+                                <p className="mt-2 text-[15px] leading-relaxed text-[#d7dbe8]">{report.ai_summary}</p>
+                            </section>
                         )}
 
                         {/* AI Details */}
                         {report.ai_condition_assessment && (
-                            <div className="p-5 bg-amber-500/5 rounded-2xl border border-amber-500/10">
-                                <h3 className="font-bold text-amber-400 mb-2 text-sm flex items-center gap-2">
-                                    📋 Ocena stanu
-                                </h3>
-                                <p className="text-amber-100/70 text-sm leading-relaxed">{report.ai_condition_assessment}</p>
-                            </div>
+                            <section className="bg-tv-ink p-4">
+                                <Tag as="h3" tone="seam">Ocena stanu</Tag>
+                                <p className="mt-2 text-[15px] leading-relaxed text-[#d7dbe8]">{report.ai_condition_assessment}</p>
+                            </section>
                         )}
                     </div>
+                )}
 
-                    {/* Location */}
-                    {report.address && (
-                        <div className="mb-8 p-5 bg-black/50 rounded-2xl border border-gray-800/50">
-                            <h3 className="font-bold text-neutral-300 mb-2 flex items-center gap-2">
-                                📍 Lokalizacja
-                            </h3>
-                            <p className="text-neutral-400">{report.address}</p>
+                {/* Location */}
+                {report.address && (
+                    <section className="mb-6">
+                        <Tag as="h3" tone="seam">Lokalizacja</Tag>
+                        <div className="border-t border-tv-seam pt-3">
+                            <p className="flex items-start gap-1.5 text-[16px] text-[#d7dbe8]">
+                                <MapPin size={16} className="mt-1 shrink-0 text-tv-muted" aria-hidden />{report.address}
+                            </p>
                             {report.location_name && (
-                                <p className="text-sm text-neutral-500 mt-1">{report.location_name}</p>
+                                <p className="mt-1 pl-[22px] text-[14px] text-tv-muted">{report.location_name}</p>
                             )}
                         </div>
-                    )}
+                    </section>
+                )}
 
-                    {/* Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t border-gray-800/50">
-                        <button
-                            onClick={() => onUpvote(report.id)}
-                            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 border border-blue-500/20 transition-all font-bold group"
-                        >
-                            <span className="group-hover:scale-110 transition-transform">👍</span> Potwierdź ({report.upvotes})
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="px-6 py-3 rounded-xl bg-gray-900 text-neutral-300 hover:bg-gray-800 transition-colors font-bold border border-gray-700/50"
-                        >
-                            Zamknij
-                        </button>
-                    </div>
+                {/* Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-tv-seam pt-5">
+                    <button
+                        onClick={() => onUpvote(report.id)}
+                        className={`${BTN_PRIMARY} min-h-[44px]`}
+                    >
+                        <ThumbsUp size={18} aria-hidden /> Potwierdź (<span className="tabular">{report.upvotes}</span>)
+                    </button>
+                    <button onClick={onClose} className={BTN_PAPER}>
+                        Zamknij
+                    </button>
                 </div>
             </div>
-        </div>
+        </ModalShell>
     );
 };
 
@@ -569,298 +596,325 @@ const ReportFormModal: React.FC<{
 
     if (success) {
         return (
-            <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div className="bg-gray-950 border border-gray-800/50 rounded-3xl p-12 text-center max-w-md w-full shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-3xl -z-10"></div>
-                    <div className="text-6xl mb-4">✅</div>
-                    <h2 className="text-2xl font-black text-neutral-100 mb-2">Zgłoszenie wysłane!</h2>
-                    <p className="text-neutral-400">Dziękujemy. Zgłoszenie trafiło do moderacji — pojawi się na mapie po zatwierdzeniu.</p>
+            <ModalShell onClose={() => {}} label="Zgłoszenie wysłane" maxWidth="max-w-md">
+                <div className="p-8 text-center">
+                    <CheckCircle2 size={44} className="mx-auto mb-4 text-tv-green" aria-hidden />
+                    <h2 className="font-cond mb-2 text-[26px] font-extrabold text-white">Zgłoszenie wysłane!</h2>
+                    <p className="text-[16px] leading-snug text-[#d7dbe8]">Dziękujemy. Zgłoszenie trafiło do moderacji — pojawi się na mapie po zatwierdzeniu.</p>
                 </div>
-            </div>
+            </ModalShell>
         );
     }
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div
-                className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl relative"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="p-8">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-2xl font-black text-neutral-100">🚨 Nowe Zgłoszenie</h2>
-                        <button onClick={onClose} className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 transition-colors border border-gray-700/50">
-                            ✕
-                        </button>
-                    </div>
+        <ModalShell onClose={onClose} label="Nowe zgłoszenie" maxWidth="max-w-lg">
+            <div className="p-5 sm:p-8">
+                <div className="mb-5 flex items-center justify-between gap-3 border-b border-tv-seam pb-3">
+                    <h2 className="font-cond text-[26px] font-extrabold leading-tight text-white">Nowe zgłoszenie</h2>
+                    <CloseButton onClick={onClose} />
+                </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Photo */}
-                        <div>
-                            <label className="block text-sm font-bold text-neutral-300 mb-2">📸 Zdjęcie (opcjonalne)</label>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                onChange={handleImageChange}
-                                className="hidden"
-                            />
-                            {imagePreview ? (
-                                <div className="relative group">
-                                    <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded-xl border border-gray-700/50" />
-                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setImage(null);
-                                                setImagePreview(null);
-                                            }}
-                                            className="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center text-sm font-bold hover:bg-red-600 transition-colors"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    {/* Photo */}
+                    <div>
+                        <span className={LABEL}>Zdjęcie (opcjonalne)</span>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleImageChange}
+                            className="hidden"
+                        />
+                        {imagePreview ? (
+                            <div className="relative">
+                                <img src={imagePreview} alt="Podgląd zdjęcia" className="h-48 w-full border-2 border-tv-seam object-cover" />
+                                {/* Usuwanie zawsze widoczne — na telefonie nie ma „najechania” */}
                                 <button
                                     type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full h-32 border-2 border-dashed border-gray-700/50 rounded-xl flex flex-col items-center justify-center text-neutral-400 hover:border-blue-500 hover:text-blue-400 hover:bg-gray-900/50 transition-all group"
+                                    aria-label="Usuń zdjęcie"
+                                    onClick={() => {
+                                        setImage(null);
+                                        setImagePreview(null);
+                                    }}
+                                    className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center bg-tv-ink text-white transition-colors hover:bg-tv-panel2"
                                 >
-                                    <span className="text-3xl mb-1 group-hover:scale-110 transition-transform">📷</span>
-                                    <span className="text-sm font-medium">Zrób zdjęcie lub wybierz z galerii</span>
+                                    <X size={20} aria-hidden />
                                 </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex h-32 w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-tv-seam bg-tv-ink text-tv-paper transition-colors hover:border-tv-paper hover:text-white"
+                            >
+                                <Camera size={28} aria-hidden />
+                                <span className="text-[15px] font-semibold">Zrób zdjęcie lub wybierz z galerii</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Title */}
+                    <div>
+                        <label htmlFor="report-title" className={LABEL}>Tytuł zgłoszenia *</label>
+                        <input
+                            id="report-title"
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="np. Dziura w drodze na ul. Głównej"
+                            className={FIELD}
+                            required
+                            maxLength={200}
+                        />
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                        <label htmlFor="report-description" className={LABEL}>Opis problemu *</label>
+                        <textarea
+                            id="report-description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Opisz problem jak najdokładniej..."
+                            rows={4}
+                            className={`${FIELD} resize-none py-3`}
+                            required
+                        />
+                    </div>
+
+                    {/* Geolocation */}
+                    <div role="group" aria-labelledby="report-loc-head" className="space-y-4 bg-tv-panel2 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span id="report-loc-head" className="text-[15px] font-bold text-white">Lokalizacja zdarzenia *</span>
+                            {geoStatus === 'loading' && (
+                                <span className="text-[13px] text-tv-muted">Pobieranie GPS…</span>
+                            )}
+                            {geoStatus === 'success' && (
+                                <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-tv-paper">
+                                    <CheckCircle2 size={14} className="text-tv-green" aria-hidden /> GPS znaleziony
+                                </span>
+                            )}
+                            {geoStatus === 'error' && <Tag tone="yellow">Wpisz ręcznie</Tag>}
+                        </div>
+
+                        <p className="text-[14px] leading-snug text-tv-muted">Podaj dokładne miejsce, by służby mogły szybko dotrzeć na miejsce zdarzenia</p>
+
+                        {/* Locality selector */}
+                        <div>
+                            <label htmlFor="report-locality" className="mb-1.5 block text-[14px] font-semibold text-tv-paper">Miejscowość</label>
+                            <div className="relative">
+                                <select
+                                    id="report-locality"
+                                    value={locationName}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setLocationName(val);
+                                        // Immediately set GPS coords for known localities
+                                        if (val && val !== '__custom') {
+                                            const coords = LOCALITY_COORDS[val];
+                                            if (coords) {
+                                                setLatitude(coords[0]);
+                                                setLongitude(coords[1]);
+                                                setGpsFromLocality(true);
+                                            }
+                                        }
+                                    }}
+                                    className={`${FIELD} appearance-none pr-10`}
+                                >
+                                    <option value="">— Wybierz miejscowość —</option>
+                                    <optgroup label="Gmina Rybno" className="bg-tv-ink">
+                                        <option value="Rybno">Rybno</option>
+                                        <option value="Dębień">Dębień</option>
+                                        <option value="Grabacz">Grabacz</option>
+                                        <option value="Gralewo">Gralewo</option>
+                                        <option value="Gralewo-Stacja">Gralewo-Stacja</option>
+                                        <option value="Gronowo">Gronowo</option>
+                                        <option value="Groszki">Groszki</option>
+                                        <option value="Grądy">Grądy</option>
+                                        <option value="Hartowiec">Hartowiec</option>
+                                        <option value="Jeglia">Jeglia</option>
+                                        <option value="Kopaniarze">Kopaniarze</option>
+                                        <option value="Koszelewki">Koszelewki</option>
+                                        <option value="Koszelewy">Koszelewy</option>
+                                        <option value="Naguszewo">Naguszewo</option>
+                                        <option value="Nowa Wieś">Nowa Wieś</option>
+                                        <option value="Prusy">Prusy</option>
+                                        <option value="Rapaty">Rapaty</option>
+                                        <option value="Rumian">Rumian</option>
+                                        <option value="Szczupliny">Szczupliny</option>
+                                        <option value="Truszczyny">Truszczyny</option>
+                                        <option value="Tuczki">Tuczki</option>
+                                        <option value="Wery">Wery</option>
+                                        <option value="Żabiny">Żabiny</option>
+                                    </optgroup>
+                                    <optgroup label="Okolice" className="bg-tv-ink">
+                                        <option value="Działdowo">Działdowo</option>
+                                        <option value="Lidzbark">Lidzbark</option>
+                                        <option value="Iłowo-Osada">Iłowo-Osada</option>
+                                        <option value="Płośnica">Płośnica</option>
+                                        <option value="Kozłowo">Kozłowo</option>
+                                    </optgroup>
+                                    <optgroup label="Inne" className="bg-tv-ink">
+                                        <option value="__custom">Inna miejscowość…</option>
+                                    </optgroup>
+                                </select>
+                                <ChevronDown size={18} aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-tv-muted" />
+                            </div>
+                            {locationName === '__custom' && (
+                                <input
+                                    type="text"
+                                    aria-label="Nazwa miejscowości"
+                                    placeholder="Wpisz nazwę miejscowości"
+                                    className={`${FIELD} mt-2`}
+                                    onChange={(e) => {
+                                        if (e.target.value.trim()) {
+                                            setLocationName(e.target.value.trim());
+                                        }
+                                    }}
+                                    autoFocus
+                                />
                             )}
                         </div>
 
-                        {/* Title */}
+                        {/* Street / address */}
                         <div>
-                            <label className="block text-sm font-bold text-neutral-300 mb-2">Tytuł zgłoszenia *</label>
+                            <label htmlFor="report-address" className="mb-1.5 block text-[14px] font-semibold text-tv-paper">Ulica / nr domu / punkt orientacyjny</label>
+                            <input
+                                id="report-address"
+                                type="text"
+                                value={address}
+                                onChange={(e) => setAddress(e.target.value)}
+                                placeholder="np. ul. Główna 15, przy sklepie Biedronka, droga do szkoły"
+                                className={FIELD}
+                            />
+                            <p className="mt-1.5 text-[13px] text-tv-muted">
+                                Wpisz ulicę z numerem lub opisz miejsce tak, by łatwo je odnaleźć
+                            </p>
+                        </div>
+
+                        {/* GPS coords preview */}
+                        {latitude && longitude && (
+                            <p className="tabular flex items-center gap-2 border-t border-tv-seam pt-3 text-[13px] text-tv-muted">
+                                <Crosshair size={14} aria-hidden />
+                                GPS: {latitude.toFixed(5)}, {longitude.toFixed(5)}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Author info (anonymous by default) */}
+                    <div className="space-y-2">
+                        <p className="text-[14px] leading-snug text-tv-muted">Podaj dane kontaktowe (opcjonalnie – zgłoszenie może być anonimowe)</p>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <input
                                 type="text"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder="np. Dziura w drodze na ul. Głównej"
-                                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-gray-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-neutral-100 placeholder:text-neutral-500"
-                                required
-                                maxLength={200}
+                                aria-label="Twoje imię"
+                                value={authorName}
+                                onChange={(e) => setAuthorName(e.target.value)}
+                                placeholder="Twoje imię"
+                                className={FIELD}
+                            />
+                            <input
+                                type="email"
+                                aria-label="E-mail"
+                                value={authorEmail}
+                                onChange={(e) => setAuthorEmail(e.target.value)}
+                                placeholder="Email"
+                                className={FIELD}
                             />
                         </div>
+                    </div>
 
-                        {/* Description */}
-                        <div>
-                            <label className="block text-sm font-bold text-neutral-300 mb-2">Opis problemu *</label>
-                            <textarea
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Opisz problem jak najdokładniej..."
-                                rows={4}
-                                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-gray-700/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-neutral-100 placeholder:text-neutral-500 resize-none"
-                                required
+                    {/* Zgoda RODO + ostrzeżenie o zdjęciach */}
+                    <div className="space-y-px">
+                        {/* Żółć = ostrzeżenie: zgłoszenie może zostać odrzucone */}
+                        <p className="bg-tv-yellow px-3 py-2.5 text-[14px] leading-snug text-tv-ink">
+                            Nie publikuj wizerunku osób trzecich bez ich zgody ani czytelnych
+                            tablic rejestracyjnych — takie zgłoszenia mogą zostać odrzucone lub
+                            zanonimizowane przez moderację.
+                        </p>
+                        <label className="flex min-h-[44px] cursor-pointer items-start gap-3 bg-tv-panel2 px-3 py-3">
+                            <input
+                                type="checkbox"
+                                checked={consentReport}
+                                onChange={(e) => setConsentReport(e.target.checked)}
+                                className="mt-0.5 h-5 w-5 shrink-0 accent-[#1f4fff]"
                             />
-                        </div>
+                            <span className="text-[14px] leading-snug text-[#d7dbe8]">
+                                Wyrażam zgodę na przetwarzanie danych zawartych w zgłoszeniu
+                                (treść, lokalizacja, zdjęcie, opcjonalne dane kontaktowe) w celu
+                                jego publikacji i obsługi, zgodnie z{' '}
+                                <button
+                                    type="button"
+                                    onClick={() => { onClose(); onNavigate?.('privacy'); }}
+                                    className="font-semibold text-tv-bluesoft underline underline-offset-2 hover:text-white"
+                                >
+                                    Polityką prywatności
+                                </button>{' '}
+                                <span className="text-white">*</span>
+                            </span>
+                        </label>
+                    </div>
 
-                        {/* Geolocation */}
-                        <div className="p-4 bg-black/50 rounded-xl border border-gray-800/50 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-neutral-300">📍 Lokalizacja zdarzenia *</span>
-                                {geoStatus === 'loading' && (
-                                    <span className="text-xs text-blue-400 animate-pulse px-2 py-0.5 bg-blue-500/10 rounded-full border border-blue-500/20">📡 Pobieranie GPS...</span>
-                                )}
-                                {geoStatus === 'success' && (
-                                    <span className="text-xs text-green-400 px-2 py-0.5 bg-green-500/10 rounded-full border border-green-500/20 font-medium">✓ GPS znaleziony</span>
-                                )}
-                                {geoStatus === 'error' && (
-                                    <span className="text-xs text-amber-400 px-2 py-0.5 bg-amber-500/10 rounded-full border border-amber-500/20 font-medium">⚠ Wpisz ręcznie</span>
-                                )}
-                            </div>
+                    {/* Error */}
+                    {error && (
+                        <Notice tone="warn" role="alert">{error}</Notice>
+                    )}
 
-                            <p className="text-xs text-neutral-500">Podaj dokładne miejsce, by służby mogły szybko dotrzeć na miejsce zdarzenia</p>
-
-                            {/* Locality selector */}
-                            <div>
-                                <label className="block text-xs font-semibold text-neutral-500 mb-1">Miejscowość</label>
-                                <div className="relative">
-                                    <select
-                                        value={locationName}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setLocationName(val);
-                                            // Immediately set GPS coords for known localities
-                                            if (val && val !== '__custom') {
-                                                const coords = LOCALITY_COORDS[val];
-                                                if (coords) {
-                                                    setLatitude(coords[0]);
-                                                    setLongitude(coords[1]);
-                                                    setGpsFromLocality(true);
-                                                }
-                                            }
-                                        }}
-                                        className="w-full px-3 py-2.5 rounded-lg border border-gray-700/50 text-sm text-neutral-200 bg-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none"
-                                    >
-                                        <option value="">— Wybierz miejscowość —</option>
-                                        <optgroup label="Gmina Rybno" className="bg-gray-900">
-                                            <option value="Rybno">Rybno</option>
-                                            <option value="Dębień">Dębień</option>
-                                            <option value="Grabacz">Grabacz</option>
-                                            <option value="Gralewo">Gralewo</option>
-                                            <option value="Gralewo-Stacja">Gralewo-Stacja</option>
-                                            <option value="Gronowo">Gronowo</option>
-                                            <option value="Groszki">Groszki</option>
-                                            <option value="Grądy">Grądy</option>
-                                            <option value="Hartowiec">Hartowiec</option>
-                                            <option value="Jeglia">Jeglia</option>
-                                            <option value="Kopaniarze">Kopaniarze</option>
-                                            <option value="Koszelewki">Koszelewki</option>
-                                            <option value="Koszelewy">Koszelewy</option>
-                                            <option value="Naguszewo">Naguszewo</option>
-                                            <option value="Nowa Wieś">Nowa Wieś</option>
-                                            <option value="Prusy">Prusy</option>
-                                            <option value="Rapaty">Rapaty</option>
-                                            <option value="Rumian">Rumian</option>
-                                            <option value="Szczupliny">Szczupliny</option>
-                                            <option value="Truszczyny">Truszczyny</option>
-                                            <option value="Tuczki">Tuczki</option>
-                                            <option value="Wery">Wery</option>
-                                            <option value="Żabiny">Żabiny</option>
-                                        </optgroup>
-                                        <optgroup label="Okolice" className="bg-gray-900">
-                                            <option value="Działdowo">Działdowo</option>
-                                            <option value="Lidzbark">Lidzbark</option>
-                                            <option value="Iłowo-Osada">Iłowo-Osada</option>
-                                            <option value="Płośnica">Płośnica</option>
-                                            <option value="Kozłowo">Kozłowo</option>
-                                        </optgroup>
-                                        <optgroup label="Inne" className="bg-gray-900">
-                                            <option value="__custom">✏️ Inna miejscowość...</option>
-                                        </optgroup>
-                                    </select>
-                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-neutral-400">
-                                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
-                                    </div>
-                                </div>
-                                {locationName === '__custom' && (
-                                    <input
-                                        type="text"
-                                        placeholder="Wpisz nazwę miejscowości"
-                                        className="w-full mt-2 px-3 py-2 rounded-lg bg-gray-900 border border-gray-700/50 text-sm text-neutral-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-neutral-500"
-                                        onChange={(e) => {
-                                            if (e.target.value.trim()) {
-                                                setLocationName(e.target.value.trim());
-                                            }
-                                        }}
-                                        autoFocus
-                                    />
-                                )}
-                            </div>
-
-                            {/* Street / address */}
-                            <div>
-                                <label className="block text-xs font-semibold text-neutral-500 mb-1">Ulica / nr domu / punkt orientacyjny</label>
-                                <input
-                                    type="text"
-                                    value={address}
-                                    onChange={(e) => setAddress(e.target.value)}
-                                    placeholder="np. ul. Główna 15, przy sklepie Biedronka, droga do szkoły"
-                                    className="w-full px-3 py-2.5 rounded-lg bg-gray-900 border border-gray-700/50 text-sm text-neutral-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-neutral-500"
-                                />
-                                <p className="text-[11px] text-neutral-500 mt-1">
-                                    Wpisz ulicę z numerem lub opisz miejsce tak, by łatwo je odnaleźć
-                                </p>
-                            </div>
-
-                            {/* GPS coords preview */}
-                            {latitude && longitude && (
-                                <div className="flex items-center gap-2 text-[11px] text-neutral-400 bg-gray-950 px-3 py-2 rounded-lg border border-gray-800/50 font-mono">
-                                    <span>🛰️</span>
-                                    <span>GPS: {latitude.toFixed(5)}, {longitude.toFixed(5)}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Author info (anonymous by default) */}
-                        <div className="space-y-3">
-                            <p className="text-xs text-neutral-500">Podaj dane kontaktowe (opcjonalnie – zgłoszenie może być anonimowe)</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <input
-                                    type="text"
-                                    value={authorName}
-                                    onChange={(e) => setAuthorName(e.target.value)}
-                                    placeholder="Twoje imię"
-                                    className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700/50 text-sm text-neutral-200 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
-                                />
-                                <input
-                                    type="email"
-                                    value={authorEmail}
-                                    onChange={(e) => setAuthorEmail(e.target.value)}
-                                    placeholder="Email"
-                                    className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700/50 text-sm text-neutral-200 placeholder:text-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Zgoda RODO + ostrzeżenie o zdjęciach */}
-                        <div className="p-3 bg-amber-500/5 border border-amber-500/15 rounded-xl space-y-2">
-                            <p className="text-[11px] text-amber-200/70 leading-relaxed">
-                                📷 Nie publikuj wizerunku osób trzecich bez ich zgody ani czytelnych
-                                tablic rejestracyjnych — takie zgłoszenia mogą zostać odrzucone lub
-                                zanonimizowane przez moderację.
-                            </p>
-                            <label className="flex items-start gap-2.5 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={consentReport}
-                                    onChange={(e) => setConsentReport(e.target.checked)}
-                                    className="mt-0.5 accent-blue-500 shrink-0"
-                                />
-                                <span className="text-[11px] text-neutral-400 leading-relaxed">
-                                    Wyrażam zgodę na przetwarzanie danych zawartych w zgłoszeniu
-                                    (treść, lokalizacja, zdjęcie, opcjonalne dane kontaktowe) w celu
-                                    jego publikacji i obsługi, zgodnie z{' '}
-                                    <button
-                                        type="button"
-                                        onClick={() => { onClose(); onNavigate?.('privacy'); }}
-                                        className="text-blue-400 hover:underline"
-                                    >
-                                        Polityką prywatności
-                                    </button>{' '}
-                                    <span className="text-red-400">*</span>
-                                </span>
-                            </label>
-                        </div>
-
-                        {/* Error */}
-                        {error && (
-                            <div className="p-3 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-sm font-medium">
-                                ⚠️ {error}
-                            </div>
+                    {/* Submit */}
+                    <button
+                        type="submit"
+                        disabled={submitting || !title.trim() || !description.trim() || !consentReport}
+                        className={`${BTN_PRIMARY} w-full`}
+                    >
+                        {submitting ? (
+                            'Analizuję z AI…'
+                        ) : (
+                            <><Send size={18} aria-hidden /> Wyślij zgłoszenie</>
                         )}
-
-                        {/* Submit */}
-                        <button
-                            type="submit"
-                            disabled={submitting || !title.trim() || !description.trim() || !consentReport}
-                            className="w-full py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black text-lg rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-900/30 border border-blue-500/20"
-                        >
-                            {submitting ? (
-                                <span className="flex items-center justify-center gap-2">
-                                    <span className="animate-spin">⏳</span> Analizuję z AI...
-                                </span>
-                            ) : (
-                                '🚨 Wyślij zgłoszenie'
-                            )}
-                        </button>
-                    </form>
-                </div>
+                    </button>
+                </form>
             </div>
-        </div>
+        </ModalShell>
     );
 };
 
 // ==================== Alert Map (Leaflet with markers) ====================
 
 const RYBNO_CENTER: [number, number] = [53.3904, 19.8400]; // Gmina Rybno center
+
+/**
+ * Kolor pinezki = stan, nie priorytet z AI. Czerwień wyłącznie dla trwającego
+ * alarmu (`isLiveAlarm`); wysoki priorytet bez alarmu to „sprawdź” — żółć;
+ * reszta papier. Kółko zostaje: na mapie to znak miejsca, nie ozdoba.
+ */
+const PIN_RED = '#d42a1f';
+// Żółć znaczy w tym świecie kontekst/zapowiedź, nie „ważne” — priorytet niesie
+// jasność: papier = wysoki, przygaszony = pozostałe (przegląd 11.10.2026)
+const PIN_HIGH = '#f5f6fa';
+const PIN_PAPER = '#7a83a0';
+
+const pinColor = (r: ReportMapItem): string => {
+    if (isLiveAlarm(r)) return PIN_RED;
+    if (r.ai_severity === 'critical' || r.ai_severity === 'high') return PIN_HIGH;
+    return PIN_PAPER;
+};
+
+const MapHead: React.FC<{ sub: React.ReactNode; legend?: boolean }> = ({ sub, legend }) => (
+    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 p-4">
+        <div>
+            <h2 className="font-cond text-[20px] font-extrabold text-white">Mapa alertów – gmina Rybno</h2>
+            <p className="mt-0.5 text-[14px] text-tv-muted">{sub}</p>
+        </div>
+        {legend && (
+            <ul className="flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-tv-muted" aria-label="Legenda">
+                <li className="flex items-center gap-1.5"><span className="inline-block h-3 w-3" style={{ background: PIN_RED }} />Alarm teraz</li>
+                <li className="flex items-center gap-1.5"><span className="inline-block h-3 w-3" style={{ background: PIN_HIGH }} />Wysoki priorytet</li>
+                <li className="flex items-center gap-1.5"><span className="inline-block h-3 w-3" style={{ background: PIN_PAPER }} />Pozostałe</li>
+            </ul>
+        )}
+    </div>
+);
 
 const AlertMap: React.FC<{
     reports: ReportMapItem[];
@@ -883,11 +937,8 @@ const AlertMap: React.FC<{
 
     if (!reports.length) {
         return (
-            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-gray-800/50">
-                    <h3 className="font-bold text-neutral-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
-                    <p className="text-xs text-neutral-400 mt-1">Brak zgłoszeń z lokalizacją GPS</p>
-                </div>
+            <section className="border-t-2 border-tv-blue bg-tv-panel" aria-label="Mapa alertów">
+                <MapHead sub="Brak zgłoszeń z lokalizacją GPS" />
                 <div style={{ height: 350 }}>
                     <MapContainer center={RYBNO_CENTER} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
                         <TileLayer
@@ -896,12 +947,12 @@ const AlertMap: React.FC<{
                         />
                     </MapContainer>
                 </div>
-            </div>
+            </section>
         );
     }
 
-    // Create a clean dot marker
-    const createPinIcon = (color: string, _emoji: string, size: number) => {
+    // Płaska kropka: obwódka atramentu zamiast cienia
+    const createPinIcon = (color: string, size: number) => {
         const dotSize = Math.round(Math.max(size * 0.5, 14));
         return L.divIcon({
             className: '',
@@ -914,8 +965,7 @@ const AlertMap: React.FC<{
                     height:${dotSize}px;
                     background:${color};
                     border-radius:50%;
-                    border:3px solid #fff;
-                    box-shadow:0 0 0 2px ${color}, 0 2px 6px rgba(0,0,0,0.4);
+                    border:3px solid #0a0e1a;
                     cursor:pointer;
                 "></div>
             `,
@@ -923,23 +973,11 @@ const AlertMap: React.FC<{
     };
 
     return (
-        <div className="bg-white/[0.04] backdrop-blur-sm rounded-3xl border border-white/8 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-white/8 flex items-center justify-between">
-                <div>
-                    <h3 className="font-bold text-neutral-100">🗺️ Mapa Alertów – Gmina Rybno</h3>
-                    <p className="text-xs text-neutral-400 mt-1">{reports.length} zgłoszeń z lokalizacją GPS</p>
-                </div>
-                {/* Legend */}
-                <div className="flex gap-3 text-[10px] text-neutral-400">
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#e74c3c] inline-block shadow-sm shadow-red-500/50"></span>Krytyczny</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#e67e22] inline-block shadow-sm shadow-orange-500/50"></span>Wysoki</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#f39c12] inline-block shadow-sm shadow-amber-500/50"></span>Średni</span>
-                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#27ae60] inline-block shadow-sm shadow-green-500/50"></span>Niski</span>
-                </div>
-            </div>
+        <section className="border-t-2 border-tv-blue bg-tv-panel" aria-label="Mapa alertów">
+            <MapHead sub={<><span className="tabular">{reports.length}</span> zgłoszeń z lokalizacją GPS</>} legend />
 
             {/* Leaflet Map */}
-            <div style={{ height: 500 }}>
+            <div className="h-[380px] lg:h-[500px]">
                 <MapContainer center={RYBNO_CENTER} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
                     {bounds && <FitBounds bounds={bounds} />}
                     <TileLayer
@@ -950,7 +988,7 @@ const AlertMap: React.FC<{
                         const cat = CATEGORY_CONFIG[r.category] || CATEGORY_CONFIG.other;
                         const sev = r.ai_severity ? (SEVERITY_CONFIG[r.ai_severity] || SEVERITY_CONFIG.medium) : SEVERITY_CONFIG.medium;
                         const pinSize = r.ai_severity === 'critical' ? 42 : r.ai_severity === 'high' ? 36 : r.ai_severity === 'medium' ? 30 : 26;
-                        const icon = createPinIcon(sev.color, cat.emoji, pinSize);
+                        const icon = createPinIcon(pinColor(r), pinSize);
                         return (
                             <Marker
                                 key={r.id}
@@ -961,30 +999,17 @@ const AlertMap: React.FC<{
                                 }}
                             >
                                 <Popup className="dark-popup">
-                                    <div style={{ minWidth: 200, color: '#1e293b' }}> {/* Keep text dark inside popup for now, or style popup globally */}
-                                        <div style={{ fontWeight: 'bold', fontSize: 14, marginBottom: 6 }}>
-                                            {cat.emoji} {r.title}
+                                    {/* Dymek Leaflet ma jasne tło — tekst ciemny, bez kolorów kategorii */}
+                                    <div style={{ minWidth: 200, color: '#0a0e1a' }}>
+                                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, lineHeight: 1.3 }}>
+                                            {r.title}
                                         </div>
-                                        <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>
-                                            {timeAgo(r.created_at)}
-                                        </div>
-                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-                                            <span style={{
-                                                fontSize: 10, fontWeight: 'bold', padding: '3px 10px',
-                                                borderRadius: 12, color: '#fff', backgroundColor: cat.color
-                                            }}>
-                                                {cat.label}
-                                            </span>
-                                            <span style={{
-                                                fontSize: 10, fontWeight: 'bold', padding: '3px 10px',
-                                                borderRadius: 12, color: '#fff', backgroundColor: sev.color
-                                            }}>
-                                                {sev.label}
-                                            </span>
+                                        <div style={{ fontSize: 13, color: '#4a5168', marginBottom: 4 }}>
+                                            {timeAgo(r.created_at)} · {cat.label} · priorytet {sev.label.toLowerCase()}
                                         </div>
                                         {r.upvotes > 0 && (
-                                            <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                                                👍 {r.upvotes} potwierdzeń
+                                            <div style={{ fontSize: 13, color: '#4a5168' }}>
+                                                {r.upvotes} potwierdzeń
                                             </div>
                                         )}
                                     </div>
@@ -994,7 +1019,7 @@ const AlertMap: React.FC<{
                     })}
                 </MapContainer>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -1032,72 +1057,72 @@ const ModerationPanel: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div
-                className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="flex items-center justify-between mb-6">
+        <ModalShell onClose={onClose} label="Moderacja zgłoszeń">
+            <div className="p-5 sm:p-8">
+                <div className="mb-5 flex items-start justify-between gap-3 border-b border-tv-seam pb-3">
                     <div>
-                        <h2 className="text-2xl font-black text-neutral-100">🛡️ Moderacja zgłoszeń</h2>
-                        <p className="text-sm text-neutral-500 mt-1">
+                        <h2 className="font-cond text-[26px] font-extrabold leading-tight text-white">Moderacja zgłoszeń</h2>
+                        <p className="mt-1 text-[14px] leading-snug text-tv-muted">
                             Zatwierdzone zgłoszenia publikują się na liście i mapie; przy zagrożeniach
                             wysyłany jest push. Autor dostaje e-mail o decyzji.
                         </p>
                     </div>
-                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50 shrink-0">✕</button>
+                    <CloseButton onClick={onClose} />
                 </div>
 
                 {loading ? (
-                    <p className="text-neutral-400 text-center py-8">Ładowanie…</p>
-                ) : pending.length === 0 ? (
-                    <div className="text-center py-10">
-                        <span className="text-4xl block mb-3">✅</span>
-                        <p className="text-neutral-400 font-medium">Brak zgłoszeń oczekujących na moderację</p>
+                    <div className="space-y-px">
+                        <Skeleton className="h-28" />
+                        <Skeleton className="h-28" />
                     </div>
+                ) : pending.length === 0 ? (
+                    <p className="flex items-center gap-2 bg-tv-ink px-4 py-3 text-[15px] text-tv-paper">
+                        <CheckCircle2 size={18} className="shrink-0 text-tv-green" aria-hidden />
+                        Brak zgłoszeń oczekujących na moderację
+                    </p>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="grid gap-px bg-tv-seam">
                         {pending.map(r => {
                             const cat = CATEGORY_CONFIG[r.category] || CATEGORY_CONFIG.other;
                             return (
-                                <div key={r.id} className="p-4 bg-white/[0.03] border border-white/8 rounded-2xl">
+                                <div key={r.id} className="bg-tv-ink p-4">
                                     <div className="flex gap-4">
                                         {r.image_url && (
                                             <img
                                                 src={getImageUrl(r.image_url)}
                                                 alt=""
-                                                className="w-20 h-20 object-cover rounded-xl border border-white/10 shrink-0"
+                                                className="h-20 w-20 shrink-0 object-cover"
                                             />
                                         )}
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex gap-2 mb-1.5 flex-wrap">
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: cat.color }}>
-                                                    {cat.emoji} {cat.label}
-                                                </span>
-                                                <span className="text-[10px] text-neutral-500">{timeAgo(r.created_at)}</span>
-                                                {r.location_name && <span className="text-[10px] text-neutral-500">📍 {r.location_name}</span>}
+                                            <div className="mb-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[13px] text-tv-muted">
+                                                <span className="font-cond font-bold uppercase tracking-wide">{cat.label}</span>
+                                                <span>{timeAgo(r.created_at)}</span>
+                                                {r.location_name && (
+                                                    <span className="inline-flex items-center gap-1"><MapPin size={13} aria-hidden />{r.location_name}</span>
+                                                )}
                                             </div>
-                                            <p className="font-bold text-neutral-100 text-sm">{r.title}</p>
-                                            <p className="text-xs text-neutral-400 line-clamp-2 mt-0.5">{r.description}</p>
+                                            <p className="text-[16px] font-bold leading-snug text-white">{r.title}</p>
+                                            <p className="mt-0.5 line-clamp-2 text-[14px] leading-snug text-[#d7dbe8]">{r.description}</p>
                                             {r.author_name && (
-                                                <p className="text-[11px] text-neutral-500 mt-1">👤 {r.author_name}</p>
+                                                <p className="mt-1 inline-flex items-center gap-1 text-[13px] text-tv-muted"><User size={13} aria-hidden />{r.author_name}</p>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 mt-3">
+                                    <div className="mt-3 grid grid-cols-2 gap-2">
                                         <button
                                             disabled={busyId === r.id}
                                             onClick={() => moderate(r.id, 'verified')}
-                                            className="flex-1 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-xs font-bold hover:bg-emerald-500/25 transition-all disabled:opacity-50"
+                                            className={`${BTN_PRIMARY} min-h-[44px] px-3 text-[15px]`}
                                         >
-                                            ✓ Zatwierdź i opublikuj
+                                            <Check size={16} aria-hidden /> Zatwierdź i opublikuj
                                         </button>
                                         <button
                                             disabled={busyId === r.id}
                                             onClick={() => moderate(r.id, 'rejected')}
-                                            className="flex-1 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-bold hover:bg-red-500/20 transition-all disabled:opacity-50"
+                                            className="font-cond inline-flex min-h-[44px] items-center justify-center gap-2 bg-tv-panel2 px-3 text-[15px] font-extrabold uppercase tracking-wide text-tv-paper transition-colors hover:bg-tv-seam hover:text-white disabled:opacity-50"
                                         >
-                                            ✕ Odrzuć
+                                            <X size={16} aria-hidden /> Odrzuć
                                         </button>
                                     </div>
                                 </div>
@@ -1106,7 +1131,7 @@ const ModerationPanel: React.FC<{
                     </div>
                 )}
             </div>
-        </div>
+        </ModalShell>
     );
 };
 
@@ -1224,99 +1249,88 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
 
     const hasMore = reports.length < total;
 
-    const categories: { value: ReportCategory | undefined; label: string; emoji: string }[] = [
-        { value: undefined, label: 'Wszystkie', emoji: '📋' },
-        { value: 'emergency', label: 'Alarm', emoji: '🚨' },
-        { value: 'fire', label: 'Pożar', emoji: '🔥' },
-        { value: 'infrastructure', label: 'Infrastruktura', emoji: '🏗️' },
-        { value: 'water', label: 'Woda', emoji: '💧' },
-        { value: 'safety', label: 'Bezpieczeństwo', emoji: '⚠️' },
-        { value: 'waste', label: 'Odpady', emoji: '🗑️' },
-        { value: 'greenery', label: 'Zieleń', emoji: '🌳' },
-        { value: 'other', label: 'Inne', emoji: '📋' },
+    const categories: { value: ReportCategory | undefined; label: string }[] = [
+        { value: undefined, label: 'Wszystkie' },
+        { value: 'emergency', label: 'Alarm' },
+        { value: 'fire', label: 'Pożar' },
+        { value: 'infrastructure', label: 'Infrastruktura' },
+        { value: 'water', label: 'Woda' },
+        { value: 'safety', label: 'Bezpieczeństwo' },
+        { value: 'waste', label: 'Odpady' },
+        { value: 'greenery', label: 'Zieleń' },
+        { value: 'other', label: 'Inne' },
     ];
 
     return (
-        <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Header */}
-            <header className="bg-white/[0.04] backdrop-blur-xl rounded-3xl p-8 text-white border border-white/8">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div>
-                        <h2 className="text-3xl font-black tracking-tight text-neutral-100">
-                            Zgłoszenia <span className="text-red-400">24</span>
-                        </h2>
-                        <p className="text-neutral-400 mt-2 font-medium max-w-xl">
-                            Widzisz coś ważnego? Sfotografuj i zgłoś — redakcja zweryfikuje,
-                            opublikuje i dopilnuje sprawy w urzędzie.
-                        </p>
-                    </div>
-                    <div className="flex gap-3 items-center">
+        <div className="space-y-6 pb-12 lg:space-y-8">
+            <PageHead
+                title="Zgłoszenia 24"
+                sub="Widzisz coś ważnego? Sfotografuj i zgłoś — redakcja zweryfikuje, opublikuje i dopilnuje sprawy w urzędzie."
+                aside={
+                    <div className="flex flex-wrap items-center gap-2">
                         {isAdmin && (
                             <button
                                 onClick={() => setShowModeration(true)}
-                                className={`px-5 py-4 rounded-2xl font-bold text-sm border transition-all ${
+                                className={`font-cond inline-flex min-h-[52px] items-center gap-2 px-4 text-[16px] font-extrabold uppercase tracking-wide transition-colors ${
+                                    // Żółć = czeka na decyzję redakcji; bez kolejki — neutralnie
                                     pendingCount > 0
-                                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
-                                        : 'bg-white/[0.04] text-neutral-400 border-white/10 hover:bg-white/[0.08]'
+                                        ? 'bg-tv-yellow text-tv-ink hover:bg-[#ffe27a]'
+                                        : 'bg-tv-panel text-tv-paper hover:bg-tv-panel2'
                                 }`}
                             >
-                                🛡️ Moderacja{pendingCount > 0 ? ` (${pendingCount})` : ''}
+                                <Shield size={18} aria-hidden /> Moderacja{pendingCount > 0 ? <span className="tabular">({pendingCount})</span> : ''}
                             </button>
                         )}
-                        <button
-                            onClick={() => setShowForm(true)}
-                            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-2xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30 text-lg transform hover:scale-105 duration-200 border border-blue-500/20"
-                        >
-                            📸 Zgłoś temat
+                        <button onClick={() => setShowForm(true)} className={BTN_PRIMARY}>
+                            <Camera size={20} aria-hidden /> Zgłoś temat
                         </button>
                     </div>
-                </div>
+                }
+            />
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 relative z-10">
-                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">Wszystkie</p>
-                        <p className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">{total}</p>
-                    </div>
-                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">🚨 Alarm</p>
-                        <p className="text-2xl font-black text-red-400">{reports.filter(r => r.category === 'emergency').length}</p>
-                    </div>
-                    <div className="bg-emerald-500/10 backdrop-blur-md p-4 rounded-xl border border-emerald-500/20">
-                        <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider mb-1">✅ Rozwiązane (30 dni)</p>
-                        <p className="text-2xl font-black text-emerald-400">{resolvedLast30d ?? '—'}</p>
-                    </div>
-                    <div className="bg-white/5 backdrop-blur-md p-4 rounded-xl border border-white/10">
-                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">🗺️ Na mapie</p>
-                        <p className="text-2xl font-black text-blue-400">{mapReports.length}</p>
-                    </div>
+            {/* Liczniki — płyty na szwie, jak „Na dziś” na pulpicie */}
+            <dl className="grid grid-cols-2 gap-px border-t-2 border-tv-blue bg-tv-seam md:grid-cols-4">
+                <div className="bg-tv-panel p-4">
+                    <dt className="font-cond text-[13px] font-extrabold uppercase tracking-wide text-tv-muted">Wszystkie</dt>
+                    <dd className="font-cond tabular mt-1 text-[30px] font-extrabold leading-none text-white">{total}</dd>
                 </div>
-            </header>
+                <div className="bg-tv-panel p-4">
+                    <dt className="font-cond text-[13px] font-extrabold uppercase tracking-wide text-tv-muted">Alarm</dt>
+                    <dd className="font-cond tabular mt-1 text-[30px] font-extrabold leading-none text-white">{reports.filter(r => r.category === 'emergency').length}</dd>
+                </div>
+                <div className="bg-tv-panel p-4">
+                    <dt className="font-cond flex items-center gap-1 text-[13px] font-extrabold uppercase tracking-wide text-tv-muted">
+                        <CheckCircle2 size={14} className="text-tv-green" aria-hidden /> Rozwiązane (30 dni)
+                    </dt>
+                    <dd className="font-cond tabular mt-1 text-[30px] font-extrabold leading-none text-white">{resolvedLast30d ?? '—'}</dd>
+                </div>
+                <div className="bg-tv-panel p-4">
+                    <dt className="font-cond text-[13px] font-extrabold uppercase tracking-wide text-tv-muted">Na mapie</dt>
+                    <dd className="font-cond tabular mt-1 text-[30px] font-extrabold leading-none text-white">{mapReports.length}</dd>
+                </div>
+            </dl>
 
             {/* Controls bar above map */}
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+                <div role="group" aria-label="Kategorie" className="flex flex-wrap gap-1.5">
                     {categories.map((cat) => (
-                        <button
+                        <Chip
                             key={cat.label}
+                            active={category === cat.value}
+                            alert={cat.value === 'emergency'}
                             onClick={() => setCategory(cat.value)}
-                            className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${category === cat.value
-                                ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20 border border-blue-500/30'
-                                : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
-                                }`}
                         >
-                            {cat.emoji} {cat.label}
-                        </button>
+                            {cat.label}
+                        </Chip>
                     ))}
                 </div>
 
                 <button
                     onClick={() => setShowMap(!showMap)}
-                    className={`px-4 py-2 rounded-full text-sm font-bold transition-all border ${showMap
-                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-sm shadow-blue-500/10'
-                        : 'bg-white/[0.04] text-neutral-400 border-white/8 hover:bg-white/[0.07] hover:text-neutral-200'
-                        }`}
+                    aria-pressed={showMap}
+                    className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline"
                 >
-                    🗺️ {showMap ? 'Ukryj mapę' : 'Pokaż mapę'}
+                    <MapIcon size={16} aria-hidden /> {showMap ? 'Ukryj mapę' : 'Pokaż mapę'}
                 </button>
             </div>
 
@@ -1325,31 +1339,28 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
 
             {/* Reports Grid */}
             {loading && reports.length === 0 ? (
-                <div className="text-center py-12">
-                    <span className="text-4xl animate-bounce block mb-4">🔍</span>
-                    <p className="text-neutral-400 font-medium">Ładowanie zgłoszeń...</p>
+                <div className="grid grid-cols-1 gap-px sm:grid-cols-2" aria-label="Ładowanie zgłoszeń">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-72" />)}
                 </div>
             ) : reports.length === 0 ? (
-                <div className="text-center py-16 bg-white/[0.04] backdrop-blur-sm rounded-3xl border border-white/8">
-                    <span className="text-6xl block mb-4">📭</span>
-                    <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400 mb-2">Brak zgłoszeń</h3>
-                    <p className="text-neutral-400 mb-6">Bądź pierwszy – zgłoś problem w swojej okolicy!</p>
-                    <button
-                        onClick={() => setShowForm(true)}
-                        className="px-8 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold rounded-xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30 border border-blue-500/20"
-                    >
-                        + Dodaj zgłoszenie
+                <div className="border-t-2 border-tv-blue bg-tv-panel p-6">
+                    <h2 className="font-cond text-[22px] font-extrabold text-white">Brak zgłoszeń</h2>
+                    <p className="mb-4 mt-1 text-[15px] text-[#d7dbe8]">Bądź pierwszy – zgłoś problem w swojej okolicy!</p>
+                    <button onClick={() => setShowForm(true)} className={BTN_PRIMARY}>
+                        <Camera size={20} aria-hidden /> Dodaj zgłoszenie
                     </button>
                 </div>
             ) : (
-                <>
+                <section aria-label="Zgłoszenia mieszkańców">
                     {/* Section heading */}
-                    <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Zgłoszenia mieszkańców</h3>
-                        <span className="text-xs text-neutral-500 font-medium px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/8">{total} łącznie</span>
+                    <div className="flex items-baseline gap-3">
+                        <Tag as="h2">Zgłoszenia mieszkańców</Tag>
+                        <span className="tabular text-[14px] text-tv-muted">{total} łącznie</span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Szczeliny na tle atramentu, nie szwu: przy niepełnym ostatnim rzędzie
+                        puste pole zlewa się ze stroną zamiast stać jak pusty kafel */}
+                    <div className="grid grid-cols-1 gap-px border-t-2 border-tv-blue bg-tv-ink sm:grid-cols-2">
                         {reports.map((report) => (
                             <ReportCard
                                 key={report.id}
@@ -1361,7 +1372,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                     </div>
 
                     {hasMore && (
-                        <div className="text-center pt-8">
+                        <div className="pt-6 text-center">
                             <button
                                 onClick={() => {
                                     const next = page + 1;
@@ -1369,13 +1380,13 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ onNavigate }) => {
                                     loadReports(next);
                                 }}
                                 disabled={loading}
-                                className="px-8 py-3 bg-white/[0.04] border border-white/8 text-neutral-300 rounded-full font-bold hover:bg-white/[0.08] hover:text-white transition-all disabled:opacity-50 shadow-sm"
+                                className={`${BTN_PAPER} min-h-[52px]`}
                             >
                                 {loading ? 'Ładowanie...' : 'Pokaż więcej'}
                             </button>
                         </div>
                     )}
-                </>
+                </section>
             )}
 
             {/* Modals */}

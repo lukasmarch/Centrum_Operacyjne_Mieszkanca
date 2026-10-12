@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppSection, Business } from '../../types';
 import { useAuth } from '../context/AuthContext';
-import { Search, X, Info, Store, BarChart3, Phone, Globe, Clock, Star, BadgeCheck, Pencil, Megaphone, Tag } from 'lucide-react';
+import {
+    Search, X, Info, Store, BarChart3, Phone, Globe, Clock, Star, BadgeCheck, Pencil, Megaphone,
+    Tag as TagIcon, MapPin, ArrowRight, ChevronLeft, CheckCircle2, ShieldCheck, User, Mail, Check,
+} from 'lucide-react';
+import { Tag, PageHead, Chip, Skeleton } from '../../components/simple/tv';
 import {
     fetchCatalog, claimBusiness, fetchMyClaims,
     trackBusinessImpression, trackBusinessContact, fetchPendingClaims, moderateClaim,
@@ -10,7 +14,9 @@ import {
     CatalogCard, MyClaim, PendingClaim, ActiveAnnouncement,
 } from '../services/businessApi';
 // Okna właściciela są wspólne z zakładką „Moja firma" w profilu
-import { EditProfileModal, AnnouncementsModal } from '../../components/BusinessOwnerModals';
+import {
+    EditProfileModal, AnnouncementsModal, ModalShell, FormError, FIELD, PRIMARY_BTN,
+} from '../../components/BusinessOwnerModals';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -46,38 +52,14 @@ interface CategoryItem {
     count: number;
 }
 
-// Emoji icons per category for visual appeal
-const CATEGORY_ICONS: Record<string, string> = {
-    'Handel i naprawy': '🛒',
-    'Budownictwo': '🏗️',
-    'Transport': '🚚',
-    'Informacja i komunikacja': '💻',
-    'Usługi profesjonalne': '⚖️',
-    'Nauka i technika': '🔬',
-    'Rolnictwo': '🌾',
-    'Zakwaterowanie i gastronomia': '🍽️',
-    'Opieka zdrowotna': '🏥',
-    'Edukacja': '📚',
-    'Finanse i ubezpieczenia': '💰',
-    'Nieruchomości': '🏠',
-    'Kultura i rekreacja': '🎭',
-    'Pozostałe usługi': '🔧',
-    'Przetwórstwo': '🏭',
-    'Administracja i wsparcie': '📋',
-    'Energetyka': '⚡',
-    'Woda i odpady': '💧',
-    'Administracja publiczna': '🏛️',
-    'Górnictwo': '⛏️',
-    'Gospodarstwa domowe': '🏡',
-    'Organizacje eksterytorialne': '🌍',
-};
-
-const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; label: string }> = {
-    'AKTYWNY': { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30', label: 'Aktywne' },
-    'ZAWIESZONY': { bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30', label: 'Zawieszone' },
-    'WYKRESLONY': { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30', label: 'Wykreślone' },
-    'WYLACZNIE_W_FORMIE_SPOLKI': { bg: 'bg-sky-500/20', text: 'text-sky-400', border: 'border-sky-500/30', label: 'Tylko w spółce' },
-    'OCZEKUJE_NA_ROZPOCZECIE_DZIALANOSCI': { bg: 'bg-violet-500/20', text: 'text-violet-400', border: 'border-violet-500/30', label: 'Przed startem' },
+// Etykiety znanych statusów CEIDG. Kolor statusu nie jest ozdobą: na karcie
+// wyróżnia się wyłącznie „Zawieszona” (żółć = „sprawdź, zanim zadzwonisz”).
+const STATUS_LABELS: Record<string, string> = {
+    'AKTYWNY': 'Aktywne',
+    'ZAWIESZONY': 'Zawieszone',
+    'WYKRESLONY': 'Wykreślone',
+    'WYLACZNIE_W_FORMIE_SPOLKI': 'Tylko w spółce',
+    'OCZEKUJE_NA_ROZPOCZECIE_DZIALANOSCI': 'Przed startem',
 };
 
 /**
@@ -88,14 +70,14 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
  */
 const statusLabel = (status: string | null | undefined): string => {
     if (!status) return 'Nieznany';
-    const known = STATUS_COLORS[status];
-    if (known) return known.label;
+    const known = STATUS_LABELS[status];
+    if (known) return known;
     const words = status.toLowerCase().split('_').join(' ');
     return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-// Interactive dual-bar chart: blue = total registrations, amber = suspended
-const CHART_HEIGHT_PX = 80;
+// Wykres słupkowy: chaber = wpisy w rejestrze, żółć = zawieszone (kolor = stan)
+const CHART_HEIGHT_PX = 96;
 
 const YearBarChart: React.FC<{
     data: Record<string, number>;
@@ -112,8 +94,7 @@ const YearBarChart: React.FC<{
 
     return (
         <div className="w-full">
-            {/* Chart area */}
-            <div className="relative w-full flex items-end gap-px" style={{ height: `${CHART_HEIGHT_PX}px` }}>
+            <div className="relative flex w-full items-end gap-px" style={{ height: `${CHART_HEIGHT_PX}px` }}>
                 {entries.map(([year, count]) => {
                     const totalBar = maxVal > 0 ? Math.max(2, Math.round((count / maxVal) * CHART_HEIGHT_PX)) : 2;
                     const suspendedCount = (dataSuspended[year] as number) || 0;
@@ -121,39 +102,37 @@ const YearBarChart: React.FC<{
                     const isSelected = selectedYear === Number(year);
 
                     return (
-                        <div
+                        <button
                             key={year}
-                            className={`flex-1 relative group h-full flex flex-col justify-end cursor-pointer transition-all
+                            type="button"
+                            aria-pressed={isSelected}
+                            aria-label={`${year}: ${count} firm${suspendedCount > 0 ? `, ${suspendedCount} zawieszonych` : ''}`}
+                            className={`group relative flex h-full flex-1 flex-col justify-end transition-opacity
                                 ${isSelected ? 'opacity-100' : selectedYear ? 'opacity-40 hover:opacity-80' : 'hover:opacity-90'}`}
                             onClick={() => onYearClick(isSelected ? null : Number(year))}
                             title={`${year}: ${count} firm${suspendedCount > 0 ? ` (${suspendedCount} zaw.)` : ''}`}
                         >
-                            {/* Stacked: blue total bar */}
-                            <div
-                                className={`w-full rounded-t-sm transition-colors ${isSelected ? 'bg-blue-400' : 'bg-blue-500/70 group-hover:bg-blue-400'
-                                    }`}
+                            <span
+                                className={`block w-full transition-colors ${isSelected ? 'bg-tv-paper' : 'bg-tv-blue group-hover:bg-[#3a63ff]'}`}
                                 style={{ height: `${totalBar}px` }}
                             />
-                            {/* Amber overlay: suspended count */}
                             {suspendedBar > 0 && (
-                                <div
-                                    className="w-full absolute bottom-0 left-0 right-0 bg-amber-500/60 rounded-t-sm"
+                                <span
+                                    className="absolute bottom-0 left-0 right-0 block bg-tv-yellow"
                                     style={{ height: `${suspendedBar}px` }}
                                 />
                             )}
-                            {/* Selection ring */}
-                            {isSelected && (
-                                <div className="absolute inset-0 ring-1 ring-blue-400 ring-inset rounded-t-sm" />
-                            )}
-                        </div>
+                        </button>
                     );
                 })}
             </div>
-            {/* X-axis labels: show every 5th year */}
-            <div className="flex items-start gap-px mt-1">
+            {/* Oś lat: co piąty rok; etykieta wystaje poza wąski słupek, stąd overflow-visible */}
+            <div className="mt-1.5 flex items-start gap-px" aria-hidden>
                 {entries.map(([year]) => (
-                    <div key={year} className="flex-1 text-center text-[8px] text-neutral-600 leading-none">
-                        {Number(year) % 5 === 0 ? year : ''}
+                    <div key={year} className="relative h-4 flex-1 overflow-visible">
+                        {Number(year) % 5 === 0 && (
+                            <span className="tabular absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[13px] leading-none text-tv-muted">{year}</span>
+                        )}
                     </div>
                 ))}
             </div>
@@ -169,10 +148,12 @@ const CatalogBusinessCard: React.FC<{
     onEdit?: () => void;
     onAnnouncements?: () => void;
     announcements?: ActiveAnnouncement[];
-}> = ({ card, isOwner, onEdit, onAnnouncements, announcements }) => {
+    span?: boolean;
+}> = ({ card, isOwner, onEdit, onAnnouncements, announcements, span = false }) => {
     // Wizytówka właściciela portalu nie dostaje odznaki „Polecane w Rybnie" —
     // katalog polecający wyłącznie firmę właściciela podważa całą ofertę B2B
     const premium = card.profile.is_premium && !isOwnerBusiness(card.nazwa);
+    const [logoBroken, setLogoBroken] = useState(false);
 
     useEffect(() => {
         trackBusinessImpression(card.id);
@@ -180,66 +161,64 @@ const CatalogBusinessCard: React.FC<{
     }, [card.id]);
 
     return (
-        <div className={`group p-5 rounded-2xl border transition-all duration-300 flex flex-col gap-3 ${
-            premium
-                ? 'bg-gradient-to-b from-amber-500/10 to-white/[0.03] border-amber-500/40 hover:border-amber-400/60 shadow-lg shadow-amber-900/10'
-                : 'bg-white/[0.04] border-white/8 hover:border-white/15'
-        }`}>
-            <div className="flex justify-between items-start">
-                {premium ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        <Star size={10} className="fill-amber-300" /> Polecane w Rybnie
-                    </span>
-                ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-300 border border-blue-500/25">
-                        <BadgeCheck size={11} /> Zweryfikowana
-                    </span>
-                )}
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold overflow-hidden ${
-                    premium ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white' : 'bg-white/[0.06] border border-white/10 text-neutral-300'
-                }`}>
-                    {card.profile.logo_url
-                        ? <img src={getAssetUrl(card.profile.logo_url)} alt="" className="w-full h-full object-cover" />
+        <article className={`flex flex-col gap-3 bg-tv-panel p-4 lg:p-5 ${span ? 'lg:col-span-2' : ''}`}>
+            <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden bg-tv-panel2 font-cond text-[15px] font-extrabold text-tv-paper">
+                    {/* Plik logo bywa skasowany albo nieosiągalny — wtedy inicjały, nie ikona zepsutego obrazka */}
+                    {card.profile.logo_url && !logoBroken
+                        ? <img src={getAssetUrl(card.profile.logo_url)} alt="" onError={() => setLogoBroken(true)} className="h-full w-full object-cover" />
                         : card.nazwa.substring(0, 2).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                    {/* Wyróżnienie planu Firma lokalna = plakietka papierowa, nie złoto:
+                        w tym świecie kolor niesie stan, a reklama nie jest stanem */}
+                    {premium ? (
+                        <Tag tone="paper"><span className="inline-flex items-center gap-1"><Star size={12} aria-hidden /> Polecane w Rybnie</span></Tag>
+                    ) : (
+                        <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-tv-muted">
+                            <BadgeCheck size={14} aria-hidden /> Zweryfikowana
+                        </span>
+                    )}
+                    <h3 className="mt-1.5 text-[17px] font-semibold leading-snug text-white">{card.nazwa}</h3>
                 </div>
             </div>
 
-            <h3 className="font-bold text-neutral-100 text-sm leading-snug">{card.nazwa}</h3>
-
             {card.profile.description && (
-                <p className={`text-xs leading-relaxed line-clamp-3 ${premium ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                <p className="line-clamp-3 max-w-[70ch] text-[15px] leading-relaxed text-[#d7dbe8]">
                     {card.profile.description}
                 </p>
             )}
 
             {/* Aktywne ogłoszenia/okazje firmy (plan Firma lokalna) */}
-            {announcements && announcements.length > 0 && announcements.map(a => (
-                <div key={a.id} className={`rounded-xl px-3 py-2 border text-xs ${
-                    a.type === 'okazja'
-                        ? 'bg-amber-500/10 border-amber-500/30'
-                        : 'bg-white/[0.04] border-white/10'
-                }`}>
-                    <p className={`font-bold flex items-center gap-1.5 ${a.type === 'okazja' ? 'text-amber-300' : 'text-neutral-200'}`}>
-                        {a.type === 'okazja' ? <Tag size={11} /> : <Megaphone size={11} />}
-                        {a.title}
-                        {a.type === 'okazja' && a.valid_until && (
-                            <span className="ml-auto text-[10px] font-medium text-amber-400 whitespace-nowrap">
-                                do {new Date(a.valid_until).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
-                            </span>
-                        )}
-                    </p>
-                    <p className="text-neutral-400 mt-0.5 line-clamp-2">{a.body}</p>
+            {announcements && announcements.length > 0 && (
+                <div className="grid grid-cols-1 gap-px bg-tv-seam">
+                    {announcements.map(a => (
+                        <div key={a.id} className="bg-tv-panel2 px-3 py-2.5">
+                            <p className="flex items-start gap-1.5 text-[15px] font-bold leading-snug text-white">
+                                {a.type === 'okazja'
+                                    ? <TagIcon size={14} className="mt-1 shrink-0 text-tv-muted" aria-hidden />
+                                    : <Megaphone size={14} className="mt-1 shrink-0 text-tv-muted" aria-hidden />}
+                                <span className="min-w-0 flex-1">{a.title}</span>
+                                {a.type === 'okazja' && a.valid_until && (
+                                    <span className="font-cond tabular shrink-0 whitespace-nowrap bg-tv-yellow px-2 py-1 text-[13px] font-extrabold uppercase leading-none text-tv-ink">
+                                        do {new Date(a.valid_until).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+                                    </span>
+                                )}
+                            </p>
+                            <p className="mt-0.5 line-clamp-2 text-[14px] text-[#d7dbe8]">{a.body}</p>
+                        </div>
+                    ))}
                 </div>
-            ))}
+            )}
 
-            <div className="space-y-1.5 text-xs text-neutral-400 mt-auto">
-                <p className="flex items-center gap-2"><span className="text-neutral-500">📍</span>{card.miasto}{card.branza ? ` · ${card.branza}` : ''}</p>
+            <div className="mt-auto space-y-1 text-[14px] text-tv-muted">
+                <p className="flex items-center gap-2"><MapPin size={14} className="shrink-0" aria-hidden />{card.miasto}{card.branza ? ` · ${card.branza}` : ''}</p>
                 {card.profile.godziny && (
-                    <p className="flex items-center gap-2"><Clock size={12} className="text-neutral-500" />{card.profile.godziny}</p>
+                    <p className="flex items-center gap-2"><Clock size={14} className="shrink-0" aria-hidden />{card.profile.godziny}</p>
                 )}
             </div>
 
-            <div className="flex gap-2 pt-2 border-t border-white/8">
+            <div className="flex flex-wrap gap-2 border-t border-tv-seam pt-3">
                 {card.profile.telefon && (
                     <a
                         href={`tel:${card.profile.telefon.replace(/\s/g, '')}`}
@@ -248,13 +227,9 @@ const CatalogBusinessCard: React.FC<{
                         // karty (wyżej, `trackBusinessImpression`) mówi tylko tyle,
                         // że ktoś przeszedł obok wystawy
                         onClick={() => trackBusinessContact(card.id)}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                            premium
-                                ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:from-amber-500 hover:to-orange-500'
-                                : 'bg-blue-600 text-white hover:bg-blue-500'
-                        }`}
+                        className="font-cond inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 bg-tv-blue px-3 text-[16px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
                     >
-                        <Phone size={12} /> Zadzwoń
+                        <Phone size={15} aria-hidden /> Zadzwoń
                     </a>
                 )}
                 {card.profile.www && (
@@ -262,29 +237,30 @@ const CatalogBusinessCard: React.FC<{
                         href={card.profile.www.startsWith('http') ? card.profile.www : `https://${card.profile.www}`}
                         target="_blank" rel="noopener noreferrer"
                         onClick={() => trackBusinessContact(card.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold bg-white/[0.06] text-neutral-300 border border-white/10 hover:bg-white/[0.1] transition-all"
+                        className="font-cond inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 bg-tv-paper px-3 text-[16px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-white"
                     >
-                        <Globe size={12} /> WWW
+                        <Globe size={15} aria-hidden /> WWW
+                        <span className="sr-only">(otwiera się w nowej karcie)</span>
                     </a>
                 )}
                 {isOwner && (
                     <>
                         <button
                             onClick={onEdit}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/[0.06] text-neutral-300 border border-white/10 hover:bg-white/[0.1] transition-all"
+                            className="font-cond inline-flex min-h-[44px] items-center justify-center gap-1.5 bg-tv-panel2 px-3 text-[16px] font-bold uppercase tracking-wide text-tv-paper transition-colors hover:bg-tv-seam hover:text-white"
                         >
-                            <Pencil size={12} /> Edytuj
+                            <Pencil size={15} aria-hidden /> Edytuj
                         </button>
                         <button
                             onClick={onAnnouncements}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/25 hover:bg-amber-500/20 transition-all"
+                            className="font-cond inline-flex min-h-[44px] items-center justify-center gap-1.5 bg-tv-panel2 px-3 text-[16px] font-bold uppercase tracking-wide text-tv-paper transition-colors hover:bg-tv-seam hover:text-white"
                         >
-                            <Megaphone size={12} /> Ogłoszenia
+                            <Megaphone size={15} aria-hidden /> Ogłoszenia
                         </button>
                     </>
                 )}
             </div>
-        </div>
+        </article>
     );
 };
 
@@ -377,182 +353,184 @@ const ClaimModal: React.FC<{
         }
     };
 
+    if (done) {
+        return (
+            <ModalShell title="Zgłoszenie przyjęte" onClose={onClose}>
+                <div className="flex items-start gap-3">
+                    <CheckCircle2 size={24} className="mt-0.5 shrink-0 text-tv-green" aria-hidden />
+                    <p className="text-[15px] leading-relaxed text-[#d7dbe8]">
+                        {manual ? (
+                            <>
+                                Sprawdzimy wpis <strong className="text-white">{mNazwa}</strong> w ciągu
+                                2 dni roboczych — firmy nie ma w rejestrze, więc potwierdzamy ją u źródła.
+                                Do tego czasu jest widoczna tylko dla Ciebie.
+                            </>
+                        ) : (
+                            <>
+                                Zweryfikujemy przejęcie wizytówki <strong className="text-white">{selected?.nazwa}</strong> w
+                                ciągu 2 dni roboczych. Po zatwierdzeniu uzupełnisz opis i godziny otwarcia.
+                            </>
+                        )}
+                    </p>
+                </div>
+                <button onClick={onClose} className={`${PRIMARY_BTN} mt-6`}>
+                    Zamknij
+                </button>
+            </ModalShell>
+        );
+    }
+
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
-                {done ? (
-                    <div className="text-center py-8">
-                        <div className="text-5xl mb-4">🎉</div>
-                        <h2 className="text-xl font-black text-neutral-100 mb-2">Zgłoszenie przyjęte!</h2>
-                        <p className="text-neutral-400 text-sm leading-relaxed">
-                            {manual ? (
-                                <>
-                                    Sprawdzimy wpis <strong className="text-neutral-200">{mNazwa}</strong> w ciągu
-                                    2 dni roboczych — firmy nie ma w rejestrze, więc potwierdzamy ją u źródła.
-                                    Do tego czasu jest widoczna tylko dla Ciebie.
-                                </>
-                            ) : (
-                                <>
-                                    Zweryfikujemy przejęcie wizytówki <strong className="text-neutral-200">{selected?.nazwa}</strong> w
-                                    ciągu 2 dni roboczych. Po zatwierdzeniu uzupełnisz opis i godziny otwarcia.
-                                </>
-                            )}
+        <ModalShell
+            title={manual ? 'Dodaj swoją firmę' : 'Przejmij wizytówkę'}
+            onClose={onClose}
+            sub={<>Krok <span className="tabular">{step}</span> z 2 — {step === 1
+                ? 'znajdź swoją firmę w rejestrze'
+                : manual ? 'dane firmy i kontakt' : 'dane kontaktowe do wizytówki'}</>}
+        >
+            {!isAuthenticated ? (
+                <div>
+                    <p className="mb-4 text-[15px] leading-relaxed text-[#d7dbe8]">
+                        Do przejęcia wizytówki potrzebujesz bezpłatnego konta —
+                        będzie służyć do zarządzania kartą Twojej firmy.
+                    </p>
+                    <button
+                        onClick={() => { onClose(); onNavigate?.('login'); }}
+                        className={PRIMARY_BTN}
+                    >
+                        Zaloguj się / Załóż konto
+                    </button>
+                </div>
+            ) : step === 1 ? (
+                <div className="space-y-3">
+                    <div className="flex min-h-[52px] items-center gap-3 border-2 border-tv-seam bg-tv-ink pl-3 transition-colors focus-within:border-tv-paper">
+                        <Search size={18} className="shrink-0 text-tv-muted" aria-hidden />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Nazwa firmy lub NIP…"
+                            aria-label="Nazwa firmy lub NIP"
+                            className="min-w-0 flex-1 bg-transparent py-3 pr-3 text-[16px] text-white outline-none placeholder:text-tv-muted focus-visible:outline-none"
+                            autoFocus
+                        />
+                    </div>
+                    {searching && <p className="text-[14px] text-tv-muted">Szukam…</p>}
+                    {results.length > 0 && (
+                        <div className="grid max-h-72 grid-cols-1 gap-px overflow-y-auto bg-tv-seam">
+                            {results.map(b => (
+                                <button
+                                    key={b.id}
+                                    onClick={() => { setSelected(b); setStep(2); }}
+                                    className="w-full bg-tv-ink p-3 text-left transition-colors hover:bg-tv-panel2"
+                                >
+                                    <p className="text-[16px] font-semibold text-white">{b.nazwa}</p>
+                                    <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-tv-muted">
+                                        <MapPin size={13} aria-hidden /> {b.miasto} · NIP <span className="tabular">{b.nip}</span>
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {search.length >= 2 && !searching && results.length === 0 && (
+                        <p className="py-3 text-[15px] text-tv-muted">
+                            Nie znaleziono firmy o tej nazwie.
                         </p>
-                        <button onClick={onClose} className="mt-6 px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-500 transition-colors">
-                            Zamknij
+                    )}
+                    {/* Wyjście dla firm spoza CEIDG: spółek, oddziałów, kół gospodyń.
+                        Rejestr obejmuje wyłącznie jednoosobowe działalności, więc
+                        „nie ma jej w wyszukiwarce" nie znaczy „nie istnieje" */}
+                    <div className="mt-1 border-t border-tv-seam pt-3">
+                        <p className="mb-2 text-[14px] leading-relaxed text-tv-muted">
+                            Nie ma tu Twojej firmy? Rejestr CEIDG nie obejmuje spółek,
+                            oddziałów ani kół gospodyń — dopisz ją ręcznie, sprawdzimy zgłoszenie.
+                        </p>
+                        <button
+                            onClick={() => { setManual(true); setSelected(null); setStep(2); }}
+                            className="font-cond inline-flex min-h-[48px] w-full items-center justify-center bg-tv-paper px-4 text-[16px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-white"
+                        >
+                            Dodaj firmę ręcznie
                         </button>
                     </div>
-                ) : (
-                    <>
-                        <div className="flex items-center justify-between mb-2">
-                            <h2 className="text-xl font-black text-neutral-100">
-                                {manual ? 'Dodaj swoją firmę' : 'Przejmij wizytówkę'}
-                            </h2>
-                            <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {manual ? (
+                        <div className="space-y-3">
+                            <input type="text" value={mNazwa} onChange={e => setMNazwa(e.target.value)}
+                                placeholder="Pełna nazwa firmy *" autoFocus
+                                className={FIELD} />
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <select value={mMiasto} onChange={e => setMMiasto(e.target.value)}
+                                    aria-label="Miejscowość"
+                                    className={`${FIELD} [color-scheme:dark]`}>
+                                    <option value="">Miejscowość *</option>
+                                    {localities.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                                </select>
+                                <input type="text" value={mUlica} onChange={e => setMUlica(e.target.value)}
+                                    placeholder="Ulica i numer"
+                                    className={FIELD} />
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <input type="text" value={mNip} onChange={e => setMNip(e.target.value)}
+                                    placeholder="NIP (jeśli firma go ma)" inputMode="numeric"
+                                    className={FIELD} />
+                                {/* Trafia na wizytówkę jako opis — wpis ręczny nie ma kodu PKD,
+                                    z którego katalog liczy branżę firmom z rejestru */}
+                                <input type="text" value={mBranza} onChange={e => setMBranza(e.target.value)}
+                                    placeholder="Czym się zajmujecie? (pokażemy na wizytówce)"
+                                    className={FIELD} />
+                            </div>
+                            <button onClick={() => { setManual(false); setStep(1); }} className="inline-flex min-h-[44px] items-center gap-1 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline">
+                                <ChevronLeft size={16} aria-hidden /> wróć do wyszukiwarki
+                            </button>
                         </div>
-                        <p className="text-xs text-neutral-500 mb-6">
-                            Krok {step} z 2 — {step === 1
-                                ? 'znajdź swoją firmę w rejestrze'
-                                : manual ? 'dane firmy i kontakt' : 'dane kontaktowe do wizytówki'}
-                        </p>
-
-                        {!isAuthenticated ? (
-                            <div className="text-center py-6">
-                                <p className="text-neutral-300 text-sm mb-4">
-                                    Do przejęcia wizytówki potrzebujesz bezpłatnego konta —
-                                    będzie służyć do zarządzania kartą Twojej firmy.
-                                </p>
-                                <button
-                                    onClick={() => { onClose(); onNavigate?.('login'); }}
-                                    className="px-8 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold rounded-xl hover:from-blue-500 hover:to-violet-500 transition-all"
-                                >
-                                    Zaloguj się / Załóż konto
-                                </button>
-                            </div>
-                        ) : step === 1 ? (
-                            <div className="space-y-3">
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-3 w-4 h-4 text-neutral-500" />
-                                    <input
-                                        type="text"
-                                        value={search}
-                                        onChange={e => setSearch(e.target.value)}
-                                        placeholder="Nazwa firmy lub NIP…"
-                                        className="w-full pl-10 pr-4 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500"
-                                        autoFocus
-                                    />
-                                </div>
-                                {searching && <p className="text-xs text-neutral-500">Szukam…</p>}
-                                <div className="space-y-2 max-h-72 overflow-y-auto">
-                                    {results.map(b => (
-                                        <button
-                                            key={b.id}
-                                            onClick={() => { setSelected(b); setStep(2); }}
-                                            className="w-full text-left p-3 rounded-xl bg-white/[0.03] border border-white/8 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all"
-                                        >
-                                            <p className="text-sm font-bold text-neutral-200">{b.nazwa}</p>
-                                            <p className="text-xs text-neutral-500 mt-0.5">📍 {b.miasto} · NIP {b.nip}</p>
-                                        </button>
-                                    ))}
-                                    {search.length >= 2 && !searching && results.length === 0 && (
-                                        <p className="text-xs text-neutral-500 text-center py-4">
-                                            Nie znaleziono firmy o tej nazwie.
-                                        </p>
-                                    )}
-                                </div>
-                                {/* Wyjście dla firm spoza CEIDG: spółek, oddziałów, kół gospodyń.
-                                    Rejestr obejmuje wyłącznie jednoosobowe działalności, więc
-                                    „nie ma jej w wyszukiwarce" nie znaczy „nie istnieje" */}
-                                <div className="pt-3 mt-1 border-t border-white/8">
-                                    <p className="text-[11px] text-neutral-500 leading-relaxed mb-2">
-                                        Nie ma tu Twojej firmy? Rejestr CEIDG nie obejmuje spółek,
-                                        oddziałów ani kół gospodyń — dopisz ją ręcznie, sprawdzimy zgłoszenie.
-                                    </p>
-                                    <button
-                                        onClick={() => { setManual(true); setSelected(null); setStep(2); }}
-                                        className="w-full py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-sm font-bold text-neutral-200 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all"
-                                    >
-                                        Dodaj firmę ręcznie
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {manual ? (
-                                    <div className="space-y-3">
-                                        <input type="text" value={mNazwa} onChange={e => setMNazwa(e.target.value)}
-                                            placeholder="Pełna nazwa firmy *" autoFocus
-                                            className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <select value={mMiasto} onChange={e => setMMiasto(e.target.value)}
-                                                className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none">
-                                                <option value="">Miejscowość *</option>
-                                                {localities.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                                            </select>
-                                            <input type="text" value={mUlica} onChange={e => setMUlica(e.target.value)}
-                                                placeholder="Ulica i numer"
-                                                className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <input type="text" value={mNip} onChange={e => setMNip(e.target.value)}
-                                                placeholder="NIP (jeśli firma go ma)" inputMode="numeric"
-                                                className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                                            {/* Trafia na wizytówkę jako opis — wpis ręczny nie ma kodu PKD,
-                                                z którego katalog liczy branżę firmom z rejestru */}
-                                            <input type="text" value={mBranza} onChange={e => setMBranza(e.target.value)}
-                                                placeholder="Czym się zajmujecie? (pokażemy na wizytówce)"
-                                                className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                                        </div>
-                                        <button onClick={() => { setManual(false); setStep(1); }} className="text-[11px] text-blue-400 hover:underline">
-                                            ← wróć do wyszukiwarki
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
-                                        <p className="text-sm font-bold text-neutral-200">{selected?.nazwa}</p>
-                                        <p className="text-xs text-neutral-500">📍 {selected?.miasto} · NIP {selected?.nip}</p>
-                                        <button onClick={() => setStep(1)} className="text-[11px] text-blue-400 hover:underline mt-1">← zmień firmę</button>
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Telefon firmowy"
-                                        className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail firmowy"
-                                        className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                                </div>
-                                <input type="text" value={www} onChange={e => setWww(e.target.value)} placeholder="Strona WWW (opcjonalnie)"
-                                    className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                                <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
-                                    placeholder={manual
-                                        ? 'Jak możemy potwierdzić, że firma działa? (np. adres szyldu, strona, profil na Facebooku)'
-                                        : 'Jak możemy potwierdzić, że to Twoja firma? (np. oddzwonimy na numer z szyldu/strony)'}
-                                    className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500 resize-none" />
-                                <label className="flex items-start gap-2.5 cursor-pointer">
-                                    <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 accent-blue-500 shrink-0" />
-                                    <span className="text-[11px] text-neutral-400 leading-relaxed">
-                                        {manual
-                                            ? 'Oświadczam, że reprezentuję tę firmę, podane dane są prawdziwe, a firma działa na terenie gminy Rybno. Wyrażam zgodę na publikację danych kontaktowych na wizytówce w katalogu firm RybnoLive.'
-                                            : 'Oświadczam, że reprezentuję tę firmę, i wyrażam zgodę na publikację podanych danych kontaktowych na wizytówce w katalogu firm RybnoLive.'}
-                                        {' '}<span className="text-red-400">*</span>
-                                    </span>
-                                </label>
-                                {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠️ {error}</p>}
-                                <button
-                                    onClick={submit}
-                                    disabled={submitting || !consent || (manual && !(mNazwa.trim() && mMiasto))}
-                                    className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 transition-all"
-                                >
-                                    {submitting ? 'Wysyłam…' : manual ? 'Zgłoś firmę (0 zł)' : 'Przejmij wizytówkę (0 zł)'}
-                                </button>
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-        </div>
+                    ) : (
+                        <div className="bg-tv-panel2 px-3 pt-3">
+                            <p className="text-[16px] font-semibold text-white">{selected?.nazwa}</p>
+                            <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-tv-muted">
+                                <MapPin size={13} aria-hidden /> {selected?.miasto} · NIP <span className="tabular">{selected?.nip}</span>
+                            </p>
+                            <button onClick={() => setStep(1)} className="inline-flex min-h-[44px] items-center gap-1 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline">
+                                <ChevronLeft size={16} aria-hidden /> zmień firmę
+                            </button>
+                        </div>
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Telefon firmowy"
+                            className={FIELD} />
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail firmowy"
+                            className={FIELD} />
+                    </div>
+                    <input type="text" value={www} onChange={e => setWww(e.target.value)} placeholder="Strona WWW (opcjonalnie)"
+                        className={FIELD} />
+                    <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
+                        placeholder={manual
+                            ? 'Jak możemy potwierdzić, że firma działa? (np. adres szyldu, strona, profil na Facebooku)'
+                            : 'Jak możemy potwierdzić, że to Twoja firma? (np. oddzwonimy na numer z szyldu/strony)'}
+                        className={`${FIELD} resize-none`} />
+                    <label className="flex cursor-pointer items-start gap-3">
+                        <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[#1f4fff]" />
+                        <span className="text-[13px] leading-relaxed text-tv-muted">
+                            {manual
+                                ? 'Oświadczam, że reprezentuję tę firmę, podane dane są prawdziwe, a firma działa na terenie gminy Rybno. Wyrażam zgodę na publikację danych kontaktowych na wizytówce w katalogu firm RybnoLive.'
+                                : 'Oświadczam, że reprezentuję tę firmę, i wyrażam zgodę na publikację podanych danych kontaktowych na wizytówce w katalogu firm RybnoLive.'}
+                            {' '}<span className="font-bold text-tv-yellow">*</span>
+                        </span>
+                    </label>
+                    {error && <FormError>{error}</FormError>}
+                    <button
+                        onClick={submit}
+                        disabled={submitting || !consent || (manual && !(mNazwa.trim() && mMiasto))}
+                        className={PRIMARY_BTN}
+                    >
+                        {submitting ? 'Wysyłam…' : manual ? 'Zgłoś firmę (0 zł)' : 'Przejmij wizytówkę (0 zł)'}
+                    </button>
+                </div>
+            )}
+        </ModalShell>
     );
 };
-
 
 // ==================== Modal: weryfikacja przejęć (admin) ====================
 
@@ -582,83 +560,90 @@ const ClaimsModerationModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-xl w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-black text-neutral-100">🛡️ Weryfikacja wizytówek</h2>
-                    <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
-                </div>
-                {loading ? (
-                    <p className="text-neutral-400 text-center py-6">Ładowanie…</p>
-                ) : claims.length === 0 ? (
-                    <p className="text-neutral-400 text-center py-6">✅ Brak przejęć do weryfikacji</p>
-                ) : (
-                    <div className="space-y-4">
-                        {claims.map(c => (
-                            <div key={c.claim_id} className="p-4 bg-white/[0.03] border border-white/8 rounded-2xl">
-                                <div className="flex items-start gap-2">
-                                    <p className="font-bold text-neutral-100 text-sm flex-1">{c.nazwa}</p>
-                                    {c.source === 'manual' && (
-                                        <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 text-amber-400 text-[10px] font-bold">
-                                            spoza CEIDG
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-neutral-500 mt-0.5">
-                                    📍 {c.miasto}{c.nip ? ` · NIP ${c.nip}` : ' · bez NIP-u'}
-                                </p>
-                                {c.source === 'manual' && (
-                                    // Przy przejęciu dane firmy potwierdza rejestr i sprawdzamy
-                                    // tylko zgłaszającego. Tutaj rejestr nie mówi nic — odrzucenie
-                                    // kasuje wiersz firmy razem z wizytówką
-                                    <p className="text-[11px] text-amber-400/80 mt-1.5 leading-relaxed">
-                                        Wpis ręczny — potwierdź, że firma istnieje i działa w gminie.
-                                        Rejestr tego nie potwierdza.
-                                    </p>
-                                )}
-                                <p className="text-xs text-neutral-400 mt-1.5">
-                                    👤 {c.user_email}
-                                    {c.telefon && <> · 📞 {c.telefon}</>}
-                                    {c.email && <> · ✉️ {c.email}</>}
-                                </p>
-                                {/* Historia zgłaszającego. Odrzucenie kasuje wiersz wizytówki,
-                                    więc bez `business_claim_log` każdy wniosek wyglądał jak
-                                    pierwszy — także trzeci z rzędu po dwóch odmowach. */}
-                                <p className="text-[11px] text-neutral-500 mt-1">
-                                    {c.user_registered_at && <>konto od {new Date(c.user_registered_at).toLocaleDateString('pl-PL')}</>}
-                                    {!!c.user_verified_profiles && <> · prowadzi {c.user_verified_profiles} {pluralPL(c.user_verified_profiles, 'wizytówkę', 'wizytówki', 'wizytówek')}</>}
-                                </p>
-                                {!!c.user_rejected_before && (
-                                    <p className="text-[11px] font-bold text-amber-400 mt-1">
-                                        ⚠️ Wcześniej odrzuciliśmy {c.user_rejected_before}{' '}
-                                        {pluralPL(c.user_rejected_before, 'wniosek', 'wnioski', 'wniosków')} tego konta
-                                    </p>
-                                )}
-                                {c.note && <p className="text-xs text-neutral-400 mt-1.5 italic">„{c.note}"</p>}
-                                <div className="flex gap-2 mt-3">
-                                    <button
-                                        disabled={busyId === c.claim_id}
-                                        onClick={() => decide(c.claim_id, 'approve')}
-                                        className="flex-1 py-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 text-xs font-bold hover:bg-emerald-500/25 transition-all disabled:opacity-50"
-                                    >
-                                        ✓ Zatwierdź
-                                    </button>
-                                    <button
-                                        disabled={busyId === c.claim_id}
-                                        onClick={() => decide(c.claim_id, 'reject')}
-                                        className="flex-1 py-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-bold hover:bg-red-500/20 transition-all disabled:opacity-50"
-                                    >
-                                        ✕ Odrzuć
-                                    </button>
-                                </div>
+        <ModalShell
+            wide
+            onClose={onClose}
+            title={<span className="inline-flex items-center gap-2"><ShieldCheck size={22} className="text-tv-muted" aria-hidden /> Weryfikacja wizytówek</span>}
+        >
+            {loading ? (
+                <p className="py-6 text-center text-[15px] text-tv-muted">Wczytuję…</p>
+            ) : claims.length === 0 ? (
+                <p className="flex items-center justify-center gap-2 py-6 text-[15px] text-tv-paper">
+                    <CheckCircle2 size={18} className="text-tv-green" aria-hidden /> Brak przejęć do weryfikacji
+                </p>
+            ) : (
+                <div className="grid grid-cols-1 gap-px bg-tv-seam">
+                    {claims.map(c => (
+                        <div key={c.claim_id} className="bg-tv-panel py-4">
+                            <div className="flex items-start gap-2">
+                                <p className="flex-1 text-[16px] font-bold text-white">{c.nazwa}</p>
+                                {c.source === 'manual' && <Tag tone="yellow">spoza CEIDG</Tag>}
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </div>
+                            <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-tv-muted">
+                                <MapPin size={13} aria-hidden /> {c.miasto}{c.nip ? ` · NIP ${c.nip}` : ' · bez NIP-u'}
+                            </p>
+                            {c.source === 'manual' && (
+                                // Przy przejęciu dane firmy potwierdza rejestr i sprawdzamy
+                                // tylko zgłaszającego. Tutaj rejestr nie mówi nic — odrzucenie
+                                // kasuje wiersz firmy razem z wizytówką
+                                <p className="mt-1.5 text-[14px] leading-relaxed text-tv-yellow">
+                                    Wpis ręczny — potwierdź, że firma istnieje i działa w gminie.
+                                    Rejestr tego nie potwierdza.
+                                </p>
+                            )}
+                            <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[14px] text-[#d7dbe8]">
+                                <User size={14} className="text-tv-muted" aria-hidden /> {c.user_email}
+                                {c.telefon && <> · <Phone size={14} className="text-tv-muted" aria-hidden /> {c.telefon}</>}
+                                {c.email && <> · <Mail size={14} className="text-tv-muted" aria-hidden /> {c.email}</>}
+                            </p>
+                            {/* Historia zgłaszającego. Odrzucenie kasuje wiersz wizytówki,
+                                więc bez `business_claim_log` każdy wniosek wyglądał jak
+                                pierwszy — także trzeci z rzędu po dwóch odmowach. */}
+                            <p className="mt-1 text-[13px] text-tv-muted">
+                                {c.user_registered_at && <>konto od {new Date(c.user_registered_at).toLocaleDateString('pl-PL')}</>}
+                                {!!c.user_verified_profiles && <> · prowadzi {c.user_verified_profiles} {pluralPL(c.user_verified_profiles, 'wizytówkę', 'wizytówki', 'wizytówek')}</>}
+                            </p>
+                            {!!c.user_rejected_before && (
+                                <p className="mt-2 bg-tv-yellow px-3 py-2 text-[14px] font-bold text-tv-ink">
+                                    Wcześniej odrzuciliśmy {c.user_rejected_before}{' '}
+                                    {pluralPL(c.user_rejected_before, 'wniosek', 'wnioski', 'wniosków')} tego konta
+                                </p>
+                            )}
+                            {c.note && <p className="mt-1.5 text-[14px] italic text-[#d7dbe8]">„{c.note}"</p>}
+                            <div className="mt-3 flex gap-2">
+                                <button
+                                    disabled={busyId === c.claim_id}
+                                    onClick={() => decide(c.claim_id, 'approve')}
+                                    className="font-cond inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 bg-tv-blue text-[16px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:opacity-50"
+                                >
+                                    <Check size={16} aria-hidden /> Zatwierdź
+                                </button>
+                                <button
+                                    disabled={busyId === c.claim_id}
+                                    onClick={() => decide(c.claim_id, 'reject')}
+                                    className="font-cond inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 bg-tv-panel2 text-[16px] font-bold uppercase tracking-wide text-tv-paper transition-colors hover:bg-tv-seam hover:text-white disabled:opacity-50"
+                                >
+                                    <X size={16} aria-hidden /> Odrzuć
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </ModalShell>
     );
 };
+
+
+/** Kafel liczby rejestru — plakietka nad wartością, jak `Plate` na pulpicie, bez przycisku. */
+const StatPlate: React.FC<{ tag: string; value: number; tone?: 'blue' | 'yellow' | 'seam' }> = ({ tag, value, tone = 'blue' }) => (
+    <div className="flex min-w-0 flex-col items-start">
+        <Tag tone={tone}>{tag}</Tag>
+        <span className="font-cond tabular w-full bg-tv-panel px-3.5 pb-3.5 pt-3 text-[26px] font-extrabold leading-[1.05] text-white lg:text-[30px]">
+            {value}
+        </span>
+    </div>
+);
 
 interface BusinessPageProps {
     onNavigate?: (section: AppSection) => void;
@@ -848,63 +833,47 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
     const registeredCount = activeCount + suspendedCount + spolkaCount;
 
     return (
-        <div className="space-y-8 pb-12">
-            {/* ── Hero + przełącznik widoków ── */}
-            <header className="bg-white/[0.04] backdrop-blur-xl rounded-3xl p-8 border border-white/5">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div>
-                        <h2 className="text-3xl font-black text-neutral-100 tracking-tight">
-                            {view === 'katalog' ? 'Katalog Firm' : 'Firmy — dane i statystyki'}
-                        </h2>
-                        <p className="text-neutral-400 mt-2">
-                            {view === 'katalog'
-                                // Liczba mnoga przy jednej wizytówce obiecuje więcej, niż katalog ma do pokazania
-                                ? (catalog.length > 2
-                                    ? 'Sprawdzone lokalne firmy z Gminy Rybno — z kontaktem i godzinami otwarcia'
-                                    : 'Katalog firm z Gminy Rybno właśnie startuje — przejmij wizytówkę swojej firmy za darmo')
-                                : 'Rejestr CEIDG: statystyki, sołectwa, branże i trendy rejestracji firm'}
-                        </p>
+        <div className="space-y-6 pb-12 lg:space-y-8">
+            {/* ── Główka + przełącznik widoków ── */}
+            <div className="space-y-3">
+                <PageHead
+                    title={view === 'katalog' ? 'Katalog Firm' : 'Firmy — dane i statystyki'}
+                    sub={view === 'katalog'
+                        // Liczba mnoga przy jednej wizytówce obiecuje więcej, niż katalog ma do pokazania
+                        ? (catalog.length > 2
+                            ? 'Sprawdzone lokalne firmy z Gminy Rybno — z kontaktem i godzinami otwarcia'
+                            : 'Katalog firm z Gminy Rybno właśnie startuje — przejmij wizytówkę swojej firmy za darmo')
+                        : 'Rejestr CEIDG: statystyki, sołectwa, branże i trendy rejestracji firm'}
+                />
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <div role="group" aria-label="Widok" className="flex gap-1.5">
+                        <Chip active={view === 'katalog'} onClick={() => setView('katalog')}>
+                            <Store size={16} aria-hidden /> Katalog
+                        </Chip>
+                        <Chip active={view === 'dane'} onClick={() => setView('dane')}>
+                            <BarChart3 size={16} aria-hidden /> Dane
+                        </Chip>
                     </div>
-                    <div className="flex gap-2 items-center flex-wrap">
+                    {isAdmin && (
                         <button
-                            onClick={() => onNavigate?.('stats')}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border bg-white/[0.04] text-neutral-400 border-white/10 hover:bg-white/[0.08] hover:text-neutral-200 transition-all"
+                            onClick={() => setShowClaimsModeration(true)}
+                            className={`font-cond inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap px-3 text-[15px] font-bold uppercase tracking-wide transition-colors ${
+                                pendingClaimsCount > 0
+                                    ? 'bg-tv-yellow text-tv-ink hover:bg-[#ffe27a]'
+                                    : 'bg-tv-panel text-tv-paper hover:bg-tv-panel2 hover:text-white'
+                            }`}
                         >
-                            <BarChart3 size={13} /> Statystyki GUS
+                            <ShieldCheck size={16} aria-hidden /> Weryfikacja{pendingClaimsCount > 0 && <span className="tabular">({pendingClaimsCount})</span>}
                         </button>
-                        {isAdmin && (
-                            <button
-                                onClick={() => setShowClaimsModeration(true)}
-                                className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all ${
-                                    pendingClaimsCount > 0
-                                        ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25'
-                                        : 'bg-white/[0.04] text-neutral-400 border-white/10 hover:bg-white/[0.08]'
-                                }`}
-                            >
-                                🛡️ Weryfikacja{pendingClaimsCount > 0 ? ` (${pendingClaimsCount})` : ''}
-                            </button>
-                        )}
-                        <div className="flex bg-white/[0.04] border border-white/10 rounded-xl p-1">
-                            <button
-                                onClick={() => setView('katalog')}
-                                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                                    view === 'katalog' ? 'bg-blue-600 text-white shadow' : 'text-neutral-400 hover:text-neutral-200'
-                                }`}
-                            >
-                                <Store size={13} /> Katalog
-                            </button>
-                            <button
-                                onClick={() => setView('dane')}
-                                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                                    view === 'dane' ? 'bg-blue-600 text-white shadow' : 'text-neutral-400 hover:text-neutral-200'
-                                }`}
-                            >
-                                <BarChart3 size={13} /> Dane
-                            </button>
-                        </div>
-                    </div>
+                    )}
+                    <button
+                        onClick={() => onNavigate?.('stats')}
+                        className="ml-auto inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline"
+                    >
+                        <BarChart3 size={16} aria-hidden /> Statystyki GUS <ArrowRight size={16} aria-hidden />
+                    </button>
                 </div>
-            </header>
+            </div>
 
             {/* ══════════ WIDOK: KATALOG WIZYTÓWEK ══════════ */}
             {view === 'katalog' && (
@@ -912,38 +881,51 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                     {/* Status mojego przejęcia */}
                     {myPendingClaims.map(claim => (
                         <div key={claim.business_id}
-                            className="bg-blue-500/5 border border-blue-500/15 rounded-2xl p-4 text-sm text-neutral-300">
-                            ⏳ Twoje zgłoszenie firmy <strong>{claim.nazwa}</strong> czeka
-                            na weryfikację — zwykle do 2 dni roboczych.
-                            {onNavigate && (
-                                <button onClick={() => onNavigate('profile')}
-                                    className="ml-1 text-blue-300 hover:text-blue-200 underline underline-offset-2">
-                                    Status wszystkich Twoich firm
-                                </button>
-                            )}
+                            className="flex items-start gap-3 bg-tv-panel px-4 py-3 text-[15px] leading-snug text-tv-paper">
+                            <Clock size={18} className="mt-0.5 shrink-0 text-tv-muted" aria-hidden />
+                            <p>
+                                Twoje zgłoszenie firmy <strong className="text-white">{claim.nazwa}</strong> czeka
+                                na weryfikację — zwykle do 2 dni roboczych.
+                                {onNavigate && (
+                                    <button onClick={() => onNavigate('profile')}
+                                        className="ml-1 font-bold text-tv-bluesoft underline underline-offset-4 hover:text-white">
+                                        Status wszystkich Twoich firm
+                                    </button>
+                                )}
+                            </p>
                         </div>
                     ))}
 
                     {catalogLoading ? (
-                        <div className="text-center py-16 text-neutral-500">Ładowanie katalogu…</div>
-                    ) : catalog.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {catalog.map(card => (
-                                <CatalogBusinessCard
-                                    key={card.id}
-                                    card={card}
-                                    isOwner={myVerifiedByBusinessId.has(card.id)}
-                                    onEdit={() => setEditClaim(myVerifiedByBusinessId.get(card.id) || null)}
-                                    onAnnouncements={() => setAnnClaim(myVerifiedByBusinessId.get(card.id) || null)}
-                                    announcements={activeAnns.filter(a => a.business_id === card.id).slice(0, 2)}
-                                />
-                            ))}
+                        <div className="grid grid-cols-1 gap-px bg-tv-seam lg:grid-cols-2" aria-busy="true">
+                            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-48" />)}
                         </div>
+                    ) : catalog.length > 0 ? (
+                        <section aria-label="Wizytówki firm">
+                            <div className="flex items-baseline gap-3">
+                                <Tag as="h2">Wizytówki</Tag>
+                                <span className="tabular text-[14px] text-tv-muted">{catalog.length}</span>
+                            </div>
+                            <div className="grid grid-cols-1 gap-px border-t-2 border-tv-blue bg-tv-seam lg:grid-cols-2">
+                                {catalog.map((card, i) => (
+                                    <CatalogBusinessCard
+                                        key={card.id}
+                                        // Nieparzysta liczba kart: ostatnia na całą szerokość, inaczej
+                                        // od lg zostaje pusta komórka w kolorze szwu
+                                        span={i === catalog.length - 1 && catalog.length % 2 === 1}
+                                        card={card}
+                                        isOwner={myVerifiedByBusinessId.has(card.id)}
+                                        onEdit={() => setEditClaim(myVerifiedByBusinessId.get(card.id) || null)}
+                                        onAnnouncements={() => setAnnClaim(myVerifiedByBusinessId.get(card.id) || null)}
+                                        announcements={activeAnns.filter(a => a.business_id === card.id).slice(0, 2)}
+                                    />
+                                ))}
+                            </div>
+                        </section>
                     ) : (
-                        <div className="text-center py-14 bg-white/[0.03] border border-white/5 rounded-3xl">
-                            <p className="text-4xl mb-3">🏪</p>
-                            <h3 className="text-lg font-bold text-neutral-200 mb-2">Bądź pierwszy i przejmij swoją wizytówkę</h3>
-                            <p className="text-sm text-neutral-500 max-w-md mx-auto">
+                        <div className="bg-tv-panel p-4 lg:p-5">
+                            <h3 className="font-cond text-[21px] font-extrabold leading-snug text-white">Bądź pierwszy i przejmij swoją wizytówkę</h3>
+                            <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-[#d7dbe8]">
                                 Katalog wizytówek właśnie startuje. Przejmij kartę swojej firmy za darmo
                                 i bądź widoczny dla mieszkańców całej gminy.
                             </p>
@@ -951,35 +933,36 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                     )}
 
                     {/* Sekcja "Dla firm" — lejek przejęcia wizytówki */}
-                    <section className="bg-gradient-to-br from-blue-500/10 via-white/[0.03] to-violet-500/10 border border-blue-500/20 rounded-3xl p-8">
-                        <div className="max-w-2xl">
-                            <h3 className="text-2xl font-black text-neutral-100 mb-2">Prowadzisz firmę w gminie?</h3>
-                            <p className="text-sm text-neutral-400 leading-relaxed mb-6">
+                    <section className="border-t-2 border-tv-blue bg-tv-panel p-4 lg:p-5">
+                        <div className="max-w-3xl">
+                            <h2 className="font-cond text-[22px] font-extrabold leading-snug text-white lg:text-[26px]">Prowadzisz firmę w gminie?</h2>
+                            <p className="mt-1 max-w-[70ch] text-[15px] leading-relaxed text-[#d7dbe8]">
                                 Twoja firma prawdopodobnie już jest w naszym rejestrze — ale jej karta jest pusta.
-                                Przejmij wizytówkę <strong className="text-neutral-200">za darmo</strong>: dodasz telefon,
+                                Przejmij wizytówkę <strong className="text-white">za darmo</strong>: dodasz telefon,
                                 godziny otwarcia i opis, a mieszkańcy znajdą Cię w katalogu.
                             </p>
-                            <div className="grid sm:grid-cols-3 gap-3 mb-6 text-xs">
-                                <div className="p-4 bg-white/[0.04] border border-white/8 rounded-2xl">
-                                    <p className="font-bold text-neutral-200 mb-1">1 · Rejestrowa</p>
-                                    <p className="text-neutral-500">Podstawowe dane z CEIDG — bez kontaktu</p>
+                            {/* Trzy poziomy wizytówki — numer niesie kolejność, nie ozdobę */}
+                            <div className="mt-4 grid grid-cols-1 gap-px bg-tv-seam sm:grid-cols-3">
+                                <div className="bg-tv-panel2 p-3.5">
+                                    <p className="font-cond text-[16px] font-extrabold uppercase tracking-wide text-white">1 · Rejestrowa</p>
+                                    <p className="mt-1 text-[14px] leading-snug text-tv-muted">Podstawowe dane z CEIDG — bez kontaktu</p>
                                 </div>
-                                <div className="p-4 bg-blue-500/8 border border-blue-500/25 rounded-2xl">
-                                    <p className="font-bold text-blue-300 mb-1">2 · Przejęta — 0 zł</p>
-                                    <p className="text-neutral-400">Kontakt, godziny, opis + odznaka „Zweryfikowana"</p>
+                                <div className="bg-tv-panel2 p-3.5">
+                                    <p className="font-cond text-[16px] font-extrabold uppercase tracking-wide text-white">2 · Przejęta — 0 zł</p>
+                                    <p className="mt-1 text-[14px] leading-snug text-tv-muted">Kontakt, godziny, opis + odznaka „Zweryfikowana"</p>
                                 </div>
-                                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
-                                    <p className="font-bold text-amber-300 mb-1">3 · Firma lokalna — 49 zł/mc</p>
-                                    <p className="text-neutral-400">„Polecane w Rybnie", top pozycji, ogłoszenia, statystyki</p>
+                                <div className="bg-tv-panel2 p-3.5">
+                                    <p className="font-cond text-[16px] font-extrabold uppercase tracking-wide text-white">3 · Firma lokalna — 49 zł/mc</p>
+                                    <p className="mt-1 text-[14px] leading-snug text-tv-muted">„Polecane w Rybnie", top pozycji, ogłoszenia, statystyki</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowClaim(true)}
-                                className="px-8 py-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-2xl hover:from-blue-500 hover:to-violet-500 transition-all shadow-lg shadow-blue-900/30"
+                                className="font-cond mt-5 inline-flex min-h-[52px] w-full items-center justify-center gap-2 bg-tv-blue px-5 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] sm:w-auto"
                             >
-                                Przejmij wizytówkę swojej firmy →
+                                Przejmij wizytówkę swojej firmy <ArrowRight size={18} aria-hidden />
                             </button>
-                            <p className="text-[11px] text-neutral-500 mt-3">
+                            <p className="mt-3 text-[14px] text-tv-muted">
                                 Szukasz firmy, której tu nie ma? Pełny rejestr znajdziesz w zakładce „Dane".
                             </p>
                         </div>
@@ -990,77 +973,59 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
             {/* ══════════ WIDOK: DANE REJESTROWE I STATYSTYKI ══════════ */}
             {view === 'dane' && (
                 <>
-            {/* Header / Stats */}
-            <header className="bg-white/[0.04] backdrop-blur-xl rounded-3xl p-8 border border-white/5">
+            {/* Kluczowe liczby — plakietki z wartością jak „Na dziś” na pulpicie */}
+            <div className="grid grid-cols-2 gap-x-3 gap-y-4 lg:grid-cols-4 lg:gap-4">
+                <StatPlate tag="Firmy w rejestrze" value={registeredCount} />
+                <StatPlate tag="Aktywne" value={activeCount} />
+                <StatPlate tag="Zawieszone" tone="yellow" value={suspendedCount} />
+                <StatPlate tag="Miejscowości" tone="seam" value={localities.length} />
+            </div>
 
-                {/* Key stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-white/[0.04] p-4 rounded-xl border border-white/8">
-                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-1">Firmy w rejestrze</p>
-                        <p className="text-2xl font-black text-neutral-100">{registeredCount}</p>
-                    </div>
-                    <div className="bg-green-500/10 p-4 rounded-xl border border-green-500/20">
-                        <p className="text-xs text-green-400 font-bold uppercase tracking-wider mb-1">Aktywne</p>
-                        <p className="text-2xl font-black text-green-400">{activeCount}</p>
-                    </div>
-                    <div className="bg-amber-500/10 p-4 rounded-xl border border-amber-500/20">
-                        <p className="text-xs text-amber-400 font-bold uppercase tracking-wider mb-1">Zawieszone</p>
-                        <p className="text-2xl font-black text-amber-400">{suspendedCount}</p>
-                    </div>
-                    <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20">
-                        <p className="text-xs text-blue-400 font-bold uppercase tracking-wider mb-1">Miejscowości</p>
-                        <p className="text-2xl font-black text-blue-400">{localities.length}</p>
-                    </div>
-                </div>
-
-                {/* Year chart */}
-                {analytics && Object.keys(analytics.by_year).length > 0 && (
-                    <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/5">
-                        <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
-                            {/* Left: title + description + legend */}
+            {/* Year chart */}
+            {analytics && Object.keys(analytics.by_year).length > 0 && (
+                <section aria-label="Firmy w rejestrze wg roku założenia">
+                    <Tag as="h2">Firmy w rejestrze wg roku założenia</Tag>
+                    <div className="border-t-2 border-tv-blue bg-tv-panel p-4 lg:p-5">
+                        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <h3 className="text-sm font-bold text-neutral-200 uppercase tracking-wider">
-                                    📈 Firmy w rejestrze wg roku założenia
-                                </h3>
-                                <p className="text-xs text-neutral-500 mt-0.5 mb-2">
+                                <p className="text-[14px] text-tv-muted">
                                     Wpisy istniejące dziś (bez wykreślonych) — kliknij słupek, aby przefiltrować karty
                                 </p>
-                                <div className="flex gap-4 text-xs">
-                                    <span className="flex items-center gap-1.5 text-neutral-400">
-                                        <span className="w-3 h-2 rounded-sm bg-blue-500/70 inline-block" />
+                                <div className="mt-2 flex gap-4 text-[13px]">
+                                    <span className="flex items-center gap-1.5 text-tv-paper">
+                                        <span className="inline-block h-2.5 w-3.5 bg-tv-blue" aria-hidden />
                                         W rejestrze
                                     </span>
-                                    <span className="flex items-center gap-1.5 text-amber-400">
-                                        <span className="w-3 h-2 rounded-sm bg-amber-500/60 inline-block" />
+                                    <span className="flex items-center gap-1.5 text-tv-paper">
+                                        <span className="inline-block h-2.5 w-3.5 bg-tv-yellow" aria-hidden />
                                         Zawieszone
                                     </span>
                                 </div>
                             </div>
 
-                            {/* Right: selected year details */}
+                            {/* Wybrany rok */}
                             {selectedYear && (
-                                <div className="flex items-start gap-3">
-                                    <div className="bg-white/[0.06] border border-blue-500/30 rounded-xl px-4 py-3 text-right min-w-[130px]">
-                                        <p className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold mb-1">
-                                            📅 Rok {selectedYear}
+                                <div className="flex items-start gap-1">
+                                    <div className="min-w-[150px] bg-tv-panel2 px-3.5 py-2.5">
+                                        <p className="font-cond tabular text-[13px] font-extrabold uppercase tracking-wide text-tv-paper">
+                                            Rok {selectedYear}
                                         </p>
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-sm font-black text-blue-400">
-                                                {analytics.by_year[String(selectedYear)] ?? 0}
-                                                <span className="text-xs font-normal text-neutral-500 ml-1">zarejestrowanych</span>
-                                            </span>
-                                            <span className="text-sm font-black text-amber-400">
-                                                {(analytics.by_year_suspended ?? {})[String(selectedYear)] ?? 0}
-                                                <span className="text-xs font-normal text-neutral-500 ml-1">zawieszonych</span>
-                                            </span>
-                                        </div>
+                                        <p className="tabular mt-1 text-[15px] font-bold text-white">
+                                            {analytics.by_year[String(selectedYear)] ?? 0}
+                                            <span className="ml-1 text-[13px] font-normal text-tv-muted">zarejestrowanych</span>
+                                        </p>
+                                        <p className="tabular text-[15px] font-bold text-tv-yellow">
+                                            {(analytics.by_year_suspended ?? {})[String(selectedYear)] ?? 0}
+                                            <span className="ml-1 text-[13px] font-normal text-tv-muted">zawieszonych</span>
+                                        </p>
                                     </div>
                                     <button
                                         onClick={() => handleYearClick(null)}
-                                        className="mt-1 text-neutral-500 hover:text-neutral-300 transition-colors"
+                                        className="flex h-11 w-11 items-center justify-center text-tv-muted transition-colors hover:bg-tv-panel2 hover:text-white"
                                         title="Wyczyść filtr roku"
+                                        aria-label="Wyczyść filtr roku"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <X size={18} aria-hidden />
                                     </button>
                                 </div>
                             )}
@@ -1072,33 +1037,35 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                             onYearClick={handleYearClick}
                         />
                     </div>
-                )}
-            </header>
+                </section>
+            )}
 
-            {/* Search bar */}
-            <div className="relative">
-                <div className="relative">
-                    <Search className="absolute left-4 top-3.5 w-5 h-5 text-neutral-500 pointer-events-none" />
+            {/* Wyszukiwarka — ten sam wygląd co pole pytania na pulpicie (AskBar) */}
+            <div>
+                <div className="flex min-h-[56px] items-center gap-3 border-2 border-tv-seam bg-tv-panel pl-4 transition-colors focus-within:border-tv-paper">
+                    <Search size={20} className="shrink-0 text-tv-muted" aria-hidden />
                     <input
                         type="text"
                         placeholder="Szukaj firmy po nazwie..."
+                        aria-label="Szukaj firmy po nazwie"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-12 py-3.5 bg-white/[0.05] backdrop-blur border border-white/8 rounded-2xl text-neutral-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-neutral-500 transition-all"
+                        className="min-w-0 flex-1 bg-transparent py-3 text-[17px] text-white outline-none placeholder:text-tv-muted focus-visible:outline-none"
                     />
                     {searchTerm && (
                         <button
                             onClick={clearSearch}
-                            className="absolute right-4 top-3.5 text-neutral-500 hover:text-neutral-300 transition-colors"
+                            aria-label="Wyczyść wyszukiwanie"
+                            className="flex h-12 w-12 shrink-0 items-center justify-center text-tv-muted transition-colors hover:text-white"
                         >
-                            <X className="w-5 h-5" />
+                            <X size={20} aria-hidden />
                         </button>
                     )}
                 </div>
                 {isSearchMode && (
-                    <p className="text-xs text-neutral-500 mt-1.5 ml-1">
-                        {searchLoading ? 'Szukam...' : `Znaleziono: ${searchResults?.length ?? 0} firm`}
-                        {' '}— <button onClick={clearSearch} className="text-blue-400 hover:text-blue-300 underline">wyczyść</button>
+                    <p className="mt-1.5 text-[14px] text-tv-muted">
+                        {searchLoading ? 'Szukam...' : <>Znaleziono: <span className="tabular">{searchResults?.length ?? 0}</span> firm</>}
+                        {' '}— <button onClick={clearSearch} className="font-bold text-tv-bluesoft underline underline-offset-4 hover:text-white">wyczyść</button>
                     </p>
                 )}
             </div>
@@ -1106,62 +1073,42 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
             {/* Filters: not shown in search mode */}
             {!isSearchMode && (
                 <>
-                    {/* Category pills */}
                     {categories.length > 0 && (
                         <div>
-                            <p className="text-xs text-neutral-500 uppercase tracking-wider font-bold mb-2 ml-1">Branża</p>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => handleCategorySelect(null)}
-                                    className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${selectedCategory === null
-                                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
-                                        : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
-                                        }`}
-                                >
+                            <Tag as="h2" tone="seam" className="mb-2">Branża</Tag>
+                            <div role="group" aria-label="Branża" className="flex flex-wrap gap-1.5">
+                                <Chip active={selectedCategory === null} onClick={() => handleCategorySelect(null)}>
                                     Wszystkie branże
-                                </button>
+                                </Chip>
                                 {categories.map(cat => (
-                                    <button
+                                    <Chip
                                         key={cat.category}
+                                        active={selectedCategory === cat.category}
                                         onClick={() => handleCategorySelect(cat.category)}
-                                        className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${selectedCategory === cat.category
-                                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
-                                            : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
-                                            }`}
+                                        count={cat.count}
                                     >
-                                        <span>{CATEGORY_ICONS[cat.category] ?? '📌'}</span>
                                         {cat.category}
-                                        <span className="opacity-60 font-normal">({cat.count})</span>
-                                    </button>
+                                    </Chip>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Locality tabs */}
                     <div>
-                        <p className="text-xs text-neutral-500 uppercase tracking-wider font-bold mb-2 ml-1">Miejscowość</p>
-                        <div className="flex flex-wrap gap-2">
-                            <button
-                                onClick={() => handleLocalitySelect(null)}
-                                className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${selectedLocality === null
-                                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                                    : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
-                                    }`}
-                            >
+                        <Tag as="h2" tone="seam" className="mb-2">Miejscowość</Tag>
+                        <div role="group" aria-label="Miejscowość" className="flex flex-wrap gap-1.5">
+                            <Chip active={selectedLocality === null} onClick={() => handleLocalitySelect(null)}>
                                 Wszystkie
-                            </button>
+                            </Chip>
                             {localities.map(loc => (
-                                <button
+                                <Chip
                                     key={loc.name}
+                                    active={selectedLocality === loc.name}
                                     onClick={() => handleLocalitySelect(loc.name)}
-                                    className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${selectedLocality === loc.name
-                                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                                        : 'bg-white/[0.04] text-neutral-400 hover:bg-white/[0.07] border border-white/8 hover:text-neutral-200'
-                                        }`}
+                                    count={loc.count}
                                 >
-                                    {loc.name} <span className="ml-1 opacity-60">({loc.count})</span>
-                                </button>
+                                    {loc.name}
+                                </Chip>
                             ))}
                         </div>
                     </div>
@@ -1170,99 +1117,95 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
 
             {/* Active filter info */}
             {(selectedLocality || selectedCategory) && !isSearchMode && (
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-neutral-500">Filtrowanie:</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 text-[14px] text-tv-muted">Filtrowanie:</span>
                     {selectedLocality && (
-                        <span className="flex items-center gap-1 text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1 rounded-full font-semibold">
-                            📍 {selectedLocality}
-                            <button onClick={() => setSelectedLocality(null)} className="ml-1 hover:text-blue-200"><X className="w-3 h-3" /></button>
-                        </span>
+                        <button
+                            onClick={() => setSelectedLocality(null)}
+                            aria-label={`Usuń filtr: ${selectedLocality}`}
+                            className="inline-flex min-h-[44px] items-center gap-1.5 bg-tv-paper px-3 text-[15px] font-semibold text-tv-ink transition-colors hover:bg-white"
+                        >
+                            <MapPin size={14} aria-hidden /> {selectedLocality} <X size={14} aria-hidden />
+                        </button>
                     )}
                     {selectedCategory && (
-                        <span className="flex items-center gap-1 text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1 rounded-full font-semibold">
-                            {CATEGORY_ICONS[selectedCategory] ?? '📌'} {selectedCategory}
-                            <button onClick={() => setSelectedCategory(null)} className="ml-1 hover:text-indigo-200"><X className="w-3 h-3" /></button>
-                        </span>
-                    )}
-                </div>
-            )}
-
-            {/* Business Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                {displayedBusinesses.map((business) => {
-                    return (
-                        <div
-                            key={business.id}
-                            className="group bg-white/[0.04] backdrop-blur-sm p-5 rounded-2xl border border-white/5 hover:border-white/10 shadow-sm hover:shadow-xl hover:shadow-black/20 transition-all duration-300 flex flex-col"
+                        <button
+                            onClick={() => setSelectedCategory(null)}
+                            aria-label={`Usuń filtr: ${selectedCategory}`}
+                            className="inline-flex min-h-[44px] items-center gap-1.5 bg-tv-paper px-3 text-[15px] font-semibold text-tv-ink transition-colors hover:bg-white"
                         >
-                            {/* Top row: status badge + initials */}
-                            <div className="flex justify-between items-start mb-3">
-                                <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${business.status === 'AKTYWNY'
-                                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                    : business.status === 'ZAWIESZONY'
-                                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                        : 'bg-white/[0.04] text-neutral-500 border border-white/8'
-                                    }`}>
-                                    {business.status === 'AKTYWNY' ? '● Aktywna'
-                                        : business.status === 'ZAWIESZONY' ? '⏸ Zawieszona'
-                                            : statusLabel(business.status)}
-                                </span>
-                                <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-white/8 flex items-center justify-center text-xs font-bold text-neutral-400 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all">
-                                    {business.nazwa.substring(0, 2).toUpperCase()}
-                                </div>
-                            </div>
-
-                            {/* Business name */}
-                            <h3 className="font-bold text-neutral-100 mb-3 min-h-[2.5rem] line-clamp-2 group-hover:text-blue-400 transition-colors text-sm leading-snug">
-                                {business.nazwa}
-                            </h3>
-
-                            {/* Details */}
-                            <div className="space-y-2 text-sm text-neutral-400 flex-1">
-                                <p className="flex items-start gap-2 text-xs">
-                                    <span className="text-neutral-500 mt-0.5 shrink-0">📍</span>
-                                    <span className="leading-tight">
-                                        {business.ulica ? `${business.ulica} ${business.budynek}` : business.miasto}{business.lokal ? `/${business.lokal}` : ''}{' — '}
-                                        {business.miasto}
-                                    </span>
-                                </p>
-                            </div>
-
-                            {/* Category badge */}
-                            {business.branza && (
-                                <div className="mt-3 pt-3 border-t border-white/5">
-                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
-                                        {CATEGORY_ICONS[business.branza] ?? '📌'} {business.branza}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Empty state */}
-            {displayedBusinesses.length === 0 && !loading && !searchLoading && (
-                <div className="text-center py-20">
-                    <p className="text-neutral-500 text-4xl mb-4">🏢</p>
-                    <p className="text-neutral-400 font-semibold">
-                        {isSearchMode ? 'Brak firm pasujących do wyszukiwania' : 'Brak firm w tej kategorii'}
-                    </p>
-                    {isSearchMode && (
-                        <button onClick={clearSearch} className="mt-3 text-blue-400 hover:text-blue-300 text-sm underline">
-                            Wyczyść wyszukiwanie
+                            {selectedCategory} <X size={14} aria-hidden />
                         </button>
                     )}
                 </div>
             )}
 
+            {/* Siatka rejestru — linie robi tło szwu (`gap-px`), od lg dwie kolumny */}
+            {displayedBusinesses.length > 0 && (
+                <div className="grid grid-cols-1 gap-px border-t-2 border-tv-blue bg-tv-seam lg:grid-cols-2">
+                    {displayedBusinesses.map((business, i) => {
+                        const span = i === displayedBusinesses.length - 1 && displayedBusinesses.length % 2 === 1;
+                        return (
+                            <div key={business.id} className={`flex gap-3 bg-tv-panel p-4 ${span ? 'lg:col-span-2' : ''}`}>
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center bg-tv-panel2 font-cond text-[15px] font-extrabold text-tv-paper">
+                                    {business.nazwa.substring(0, 2).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    {/* Status słowem; kolor tylko dla zawieszonej — zanim mieszkaniec
+                                        zadzwoni, powinien wiedzieć, że firma może nie działać */}
+                                    <p className="text-[13px] leading-snug">
+                                        {business.status === 'ZAWIESZONY' ? (
+                                            <Tag tone="yellow">Zawieszona</Tag>
+                                        ) : (
+                                            <span className={`font-bold ${business.status === 'AKTYWNY' ? 'text-tv-paper' : 'text-tv-muted'}`}>
+                                                {business.status === 'AKTYWNY' ? 'Aktywna' : statusLabel(business.status)}
+                                            </span>
+                                        )}
+                                        {business.branza && <span className="text-tv-muted"> · {business.branza}</span>}
+                                    </p>
+                                    <h3 className="mt-1 line-clamp-2 text-[16px] font-semibold leading-snug text-white">
+                                        {business.nazwa}
+                                    </h3>
+                                    <p className="mt-1 flex items-start gap-1.5 text-[14px] leading-snug text-tv-muted">
+                                        <MapPin size={14} className="mt-0.5 shrink-0" aria-hidden />
+                                        <span>
+                                            {business.ulica ? `${business.ulica} ${business.budynek}` : business.miasto}{business.lokal ? `/${business.lokal}` : ''}{' — '}
+                                            {business.miasto}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Empty state */}
+            {displayedBusinesses.length === 0 && !loading && !searchLoading && (
+                <div className="bg-tv-panel px-4 py-3">
+                    <p className="text-[15px] text-tv-paper">
+                        {isSearchMode ? 'Brak firm pasujących do wyszukiwania' : 'Brak firm w tej kategorii'}
+                    </p>
+                    {isSearchMode && (
+                        <button onClick={clearSearch} className="inline-flex min-h-[44px] items-center text-[15px] font-bold text-tv-bluesoft underline-offset-4 hover:text-white hover:underline">
+                            Wyczyść wyszukiwanie
+                        </button>
+                    )}
+                </div>
+            )}
+            {displayedBusinesses.length === 0 && (loading || searchLoading) && (
+                <div className="grid grid-cols-1 gap-px bg-tv-seam lg:grid-cols-2" aria-busy="true">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28" />)}
+                </div>
+            )}
+
             {/* Load More – only in list mode */}
             {!isSearchMode && hasMore && (
-                <div className="text-center pt-4">
+                <div className="flex justify-center">
                     <button
                         onClick={loadMore}
                         disabled={loading}
-                        className="px-8 py-3 bg-white/[0.04] border border-white/8 text-neutral-300 rounded-xl font-bold hover:bg-white/[0.07] disabled:opacity-50 transition-colors"
+                        className="font-cond inline-flex min-h-[52px] items-center bg-tv-paper px-6 text-[17px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-white disabled:opacity-50"
                     >
                         {loading ? 'Ładowanie...' : 'Pokaż więcej firm'}
                     </button>
@@ -1272,23 +1215,23 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
             )}
 
             {/* Nota prawna — klauzula informacyjna art. 14 RODO */}
-            <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 flex gap-3 items-start">
-                <Info className="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-neutral-500 leading-relaxed">
-                    Dane firm pochodzą z publicznego rejestru <strong className="text-neutral-400">CEIDG</strong> i
+            <div className="flex items-start gap-3 border-t border-tv-seam pt-4">
+                <Info size={16} className="mt-0.5 shrink-0 text-tv-muted" aria-hidden />
+                <p className="max-w-[80ch] text-[13px] leading-relaxed text-tv-muted">
+                    Dane firm pochodzą z publicznego rejestru <strong className="text-tv-paper">CEIDG</strong> i
                     obejmują nazwę, adres wykonywania działalności, NIP, REGON, branżę, status wpisu
                     i rok rozpoczęcia działalności. Danych kontaktowych z rejestru nie pobieramy —
                     telefon i e-mail widać tylko tam, gdzie firma podała je sama.
                     Szczegóły w{' '}
                     <button
                         onClick={() => onNavigate?.('privacy')}
-                        className="text-blue-400 hover:text-blue-300 underline"
+                        className="text-tv-bluesoft underline underline-offset-2 hover:text-white"
                     >
                         polityce prywatności (art. 14 RODO)
                     </button>.
                     {' '}Prowadzisz tę firmę i chcesz zaktualizować lub ukryć swoją kartę?
                     Napisz:{' '}
-                    <a href="mailto:biuro@lumargo.pl?subject=Katalog%20firm%20RybnoLive" className="text-blue-400 hover:text-blue-300 underline">
+                    <a href="mailto:biuro@lumargo.pl?subject=Katalog%20firm%20RybnoLive" className="text-tv-bluesoft underline underline-offset-2 hover:text-white">
                         biuro@lumargo.pl
                     </a>{' '}— żądania rozpatrujemy w ciągu 7 dni.
                 </p>

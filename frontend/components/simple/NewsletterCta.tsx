@@ -66,60 +66,43 @@ const NewsletterCta: React.FC<NewsletterCtaProps> = ({ onRegister }) => {
     };
 
     return (
-        <section
-            aria-label="Załóż konto"
-            className="relative rounded-2xl border border-white/10 bg-[#0d1117] p-5"
-        >
-            <button
-                onClick={close}
-                aria-label="Zamknij"
-                className="absolute right-2.5 top-2.5 rounded-lg p-1 text-neutral-600 transition-colors hover:bg-white/5 hover:text-neutral-300"
-            >
-                <X size={14} aria-hidden />
-            </button>
+        <section aria-label="Załóż konto" className="relative">
+            <div className="relative border-t-2 border-tv-paper bg-tv-panel p-4 pr-12 lg:flex lg:items-center lg:gap-8 lg:p-5 lg:pr-14">
+                <button
+                    onClick={close}
+                    aria-label="Nie teraz — schowaj na dwa miesiące"
+                    className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-tv-muted transition-colors hover:text-white"
+                >
+                    <X size={18} aria-hidden />
+                </button>
 
-            <div className="flex items-start gap-3 pr-6">
-                <Mail size={18} className="mt-0.5 shrink-0 text-blue-400" aria-hidden />
-                <div className="min-w-0">
-                    <h2 className="text-base font-bold text-white">
-                        Podsumowanie tygodnia na maila
+                <div className="min-w-0 flex-1">
+                    <h2 className="font-cond text-[22px] font-extrabold leading-snug text-white">
+                        Podsumowanie tygodnia w sobotę rano na maila
                     </h2>
-                    <p className="mt-0.5 text-sm leading-relaxed text-neutral-400">
-                        W sobotę rano jeden mail: co się działo w gminie i co przed nami.
-                        Wystarczy konto — zakładasz je w minutę, bez karty.
+                    {/* Trzy rzeczy, nie dziesięć: obietnica ma się dać przeczytać
+                        jednym rzutem oka — i każda ma pokrycie w kodzie (CLAUDE.md,
+                        „Obietnice oferty a kod”) */}
+                    <ul className="mt-2 space-y-1 text-[15px] leading-snug text-[#d7dbe8]">
+                        <li className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-tv-muted" aria-hidden />Newsletter tygodniowy w sobotę rano</li>
+                        <li className="flex items-start gap-2"><Bell size={15} className="mt-0.5 shrink-0 text-tv-muted" aria-hidden />Powiadomienia o awariach prądu i wody</li>
+                        <li className="flex items-start gap-2"><Sparkles size={15} className="mt-0.5 shrink-0 text-tv-muted" aria-hidden />30 dni Premium gratis: mail codziennie rano i asystent bez limitu</li>
+                    </ul>
+                </div>
+
+                <div className="mt-4 shrink-0 lg:mt-0 lg:w-[300px]">
+                    <button
+                        onClick={onRegister}
+                        className="font-cond group flex min-h-[52px] w-full items-center justify-center gap-2 bg-tv-paper px-6 text-[18px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-white"
+                    >
+                        Załóż konto
+                        <ArrowRight size={18} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                    <p className="mt-2 text-center text-[14px] leading-snug text-tv-muted">
+                        W minutę, bez karty. Po 30 dniach konto działa dalej za darmo.
                     </p>
                 </div>
             </div>
-
-            {/* Co dokładnie dostaje mieszkaniec. Trzy rzeczy, nie lista dziesięciu:
-                obietnica, której nie da się przeczytać jednym rzutem oka, nie
-                działa jak obietnica */}
-            <ul className="mt-3.5 space-y-1.5 pl-1">
-                <li className="flex items-center gap-2 text-sm text-neutral-300">
-                    <Mail size={13} className="shrink-0 text-blue-400" aria-hidden />
-                    Newsletter tygodniowy w sobotę rano
-                </li>
-                <li className="flex items-center gap-2 text-sm text-neutral-300">
-                    <Bell size={13} className="shrink-0 text-amber-400" aria-hidden />
-                    Powiadomienia o awariach prądu i wody
-                </li>
-                <li className="flex items-center gap-2 text-sm text-neutral-300">
-                    <Sparkles size={13} className="shrink-0 text-violet-400" aria-hidden />
-                    30 dni Premium gratis: mail codziennie rano i asystent bez limitu
-                </li>
-            </ul>
-
-            <button
-                onClick={onRegister}
-                className="group mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 text-sm font-bold text-white transition-colors hover:bg-blue-500"
-            >
-                Załóż konto — 30 dni Premium gratis
-                <ArrowRight size={16} aria-hidden className="transition-transform group-hover:translate-x-0.5" />
-            </button>
-
-            <p className="mt-2 text-center text-xs leading-relaxed text-neutral-600">
-                Bez karty i bez zobowiązań. Po 30 dniach konto działa dalej za darmo.
-            </p>
         </section>
     );
 };

@@ -41,7 +41,8 @@ export function useEvents(limit: number = 50) {
                     id: String(item.id),
                     title: item.title,
                     date: item.event_date, // Keep as ISO string for proper parsing
-                    location: item.location || 'Brak lokalizacji',
+                    // Brak miejsca to brak treści, nie napis „Brak lokalizacji” z pinezką
+                    location: item.location || '',
                     category: item.category || 'Inne',
                     isPromoted: item.is_featured,
                     imageUrl: item.image_url || undefined,

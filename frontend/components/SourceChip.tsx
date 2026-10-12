@@ -6,26 +6,31 @@ interface SourceChipProps {
   source: ChatSource;
 }
 
+// Plakietka źródła w tonie szwu (rzecz neutralna). Obrys 44 px to cel dotyku,
+// widoczna plakietka jest niższa — tak jak plakietka nad pasem.
 const SourceChip: React.FC<SourceChipProps> = ({ source }) => {
   const label = source.title || source.source_name || 'Źródło';
+  const tag = 'font-cond inline-flex max-w-[240px] items-center gap-1.5 bg-tv-seam px-2.5 py-1 text-[13px] font-bold leading-tight text-tv-paper';
   if (source.url) {
     return (
       <a
         href={source.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-[11px] text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-400/50 px-2.5 py-1 rounded-full transition-all cursor-pointer max-w-[220px]"
+        className="group inline-flex min-h-[44px] items-center"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-        <span className="truncate">{label}</span>
-        <ExternalLink size={9} className="shrink-0 opacity-70" />
+        <span className={`${tag} transition-colors group-hover:bg-tv-panel2 group-hover:text-white`}>
+          <span className="truncate">{label}</span>
+          <ExternalLink size={12} className="shrink-0 text-tv-bluesoft" aria-hidden />
+        </span>
       </a>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500 bg-gray-900/60 border border-white/5 px-2.5 py-1 rounded-full max-w-[220px]">
-      <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 shrink-0" />
-      <span className="truncate">{label}</span>
+    <span className="inline-flex min-h-[44px] items-center">
+      <span className={tag}>
+        <span className="truncate">{label}</span>
+      </span>
     </span>
   );
 };

@@ -18,6 +18,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { forgotPassword } from '../services/authApi';
 import { ApiError } from '../services/apiError';
+import { Notice, PageHead } from '../../components/simple/tv';
 
 interface PasswordResetPageProps {
   onNavigate: (page: 'login' | 'dashboard') => void;
@@ -25,8 +26,13 @@ interface PasswordResetPageProps {
 
 const tokenFromUrl = () => new URLSearchParams(window.location.search).get('token') ?? '';
 
+// Te same miary co logowanie: pole 52 px, tekst 16 px, błąd = obrys żółty (kolor = stan)
 const inputClass = (invalid: boolean) =>
-  `w-full px-4 py-3 rounded-xl bg-gray-900 border ${invalid ? 'border-red-500' : 'border-gray-700/50'} text-neutral-100 placeholder-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all`;
+  `min-h-[52px] w-full border-2 ${invalid ? 'border-tv-yellow' : 'border-tv-seam'} bg-tv-ink px-4 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper disabled:opacity-60`;
+const LABEL = 'mb-1.5 block text-[15px] font-semibold text-tv-paper';
+const PRIMARY =
+  'font-cond min-h-[52px] w-full bg-tv-blue px-4 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-not-allowed disabled:opacity-50';
+const LINK = 'min-h-[44px] text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline';
 
 const validatePassword = (password: string): string | null => {
   if (password.length < 8) return 'Hasło musi mieć minimum 8 znaków.';
@@ -100,49 +106,45 @@ const PasswordResetPage: React.FC<PasswordResetPageProps> = ({ onNavigate }) => 
 
   const fieldMessage = (field: string) =>
     fieldError?.field === field ? (
-      <p id={`${field}-error`} role="alert" className="mt-1 text-sm text-red-400">{fieldError.message}</p>
+      <p id={`${field}-error`} role="alert" className="mt-1.5 text-[14px] font-semibold text-tv-yellow">{fieldError.message}</p>
     ) : null;
 
   const submitLabel = token ? 'Ustaw nowe hasło' : 'Wyślij link';
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center py-8">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-black mb-2 text-neutral-100">
-            {token ? 'Ustaw nowe hasło' : 'Nie pamiętasz hasła?'}
-          </h1>
-          <p className="text-neutral-400">
-            {token
-              ? 'Po zapisaniu wylogujemy wszystkie inne urządzenia.'
-              : 'Podaj adres konta — wyślemy link do ustawienia nowego hasła.'}
-          </p>
-        </div>
+    <div className="flex min-h-[70vh] items-center justify-center py-8">
+      <div className="w-full max-w-md space-y-5">
+        <PageHead
+          title={token ? 'Ustaw nowe hasło' : 'Nie pamiętasz hasła?'}
+          sub={token
+            ? 'Po zapisaniu wylogujemy wszystkie inne urządzenia.'
+            : 'Podaj adres konta — wyślemy link do ustawienia nowego hasła.'}
+        />
 
-        <div className="bg-gray-950/50 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-gray-800/50">
+        <div className="border-t-2 border-tv-blue bg-tv-panel p-5 sm:p-6">
           {sentMessage ? (
             <div role="status" className="space-y-4">
-              <p className="text-base leading-relaxed text-neutral-200">{sentMessage}</p>
-              <p className="text-sm text-neutral-400">
+              <p className="text-[16px] leading-relaxed text-[#d7dbe8]">{sentMessage}</p>
+              <p className="text-[15px] text-tv-muted">
                 Nie widzisz maila? Sprawdź folder „Oferty” lub „Spam”.
               </p>
               <button
                 type="button"
                 onClick={() => onNavigate('login')}
-                className="min-h-[44px] text-sm font-semibold text-blue-400 hover:text-blue-300"
+                className={LINK}
               >
                 Wróć do logowania
               </button>
             </div>
           ) : linkDead ? (
             <div role="alert" className="space-y-4">
-              <p className="text-base leading-relaxed text-neutral-200">
+              <p className="text-[16px] leading-relaxed text-[#d7dbe8]">
                 Ten link wygasł albo został już użyty. Link działa przez godzinę i tylko raz.
               </p>
               <button
                 type="button"
                 onClick={() => { setLinkDead(false); window.location.assign('/nowe-haslo'); }}
-                className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors"
+                className={PRIMARY}
               >
                 Poproś o nowy link
               </button>
@@ -150,14 +152,12 @@ const PasswordResetPage: React.FC<PasswordResetPageProps> = ({ onNavigate }) => 
           ) : (
             <form onSubmit={token ? setNewPassword : requestLink} className="space-y-5" noValidate>
               {error && (
-                <div role="alert" className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                  {error}
-                </div>
+                <Notice tone="warn" role="alert">{error}</Notice>
               )}
 
               {!token ? (
                 <div>
-                  <label htmlFor="reset-email" className="block text-sm font-semibold text-neutral-300 mb-2">
+                  <label htmlFor="reset-email" className={LABEL}>
                     Email
                   </label>
                   <input
@@ -177,7 +177,7 @@ const PasswordResetPage: React.FC<PasswordResetPageProps> = ({ onNavigate }) => 
               ) : (
                 <>
                   <div>
-                    <label htmlFor="reset-password" className="block text-sm font-semibold text-neutral-300 mb-2">
+                    <label htmlFor="reset-password" className={LABEL}>
                       Nowe hasło
                     </label>
                     <input
@@ -193,10 +193,10 @@ const PasswordResetPage: React.FC<PasswordResetPageProps> = ({ onNavigate }) => 
                       disabled={sending}
                     />
                     {fieldMessage('password')}
-                    <p className="text-xs text-neutral-400 mt-1">Min. 8 znaków, wielka litera i cyfra</p>
+                    <p className="mt-1.5 text-[13px] leading-snug text-tv-muted">Min. 8 znaków, wielka litera i cyfra</p>
                   </div>
                   <div>
-                    <label htmlFor="reset-confirm" className="block text-sm font-semibold text-neutral-300 mb-2">
+                    <label htmlFor="reset-confirm" className={LABEL}>
                       Powtórz hasło
                     </label>
                     <input
@@ -219,7 +219,7 @@ const PasswordResetPage: React.FC<PasswordResetPageProps> = ({ onNavigate }) => 
               <button
                 type="submit"
                 disabled={sending}
-                className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={PRIMARY}
               >
                 {sending ? 'Wysyłam…' : submitLabel}
               </button>
@@ -227,7 +227,7 @@ const PasswordResetPage: React.FC<PasswordResetPageProps> = ({ onNavigate }) => 
               <button
                 type="button"
                 onClick={() => onNavigate('login')}
-                className="w-full min-h-[44px] text-sm font-semibold text-neutral-400 hover:text-neutral-200"
+                className={`${LINK} w-full`}
               >
                 Wróć do logowania
               </button>

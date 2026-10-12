@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ClipboardList, MapPin, ArrowRight, Camera } from 'lucide-react';
 import { fetchReports, getImageUrl, STATUS_CONFIG } from '../../src/services/reportsApi';
 import { Report } from '../../types';
+import { RowLink } from './tv';
 
 interface ReportsMiniProps {
     onOpenReports: () => void;
@@ -78,13 +79,7 @@ const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
 
     return (
         <section aria-label="Zgłoszenia 24">
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-neutral-500">
-                <ClipboardList size={13} className="text-cyan-400" aria-hidden />
-                Zgłoszenia 24
-                <span className="font-medium normal-case tracking-normal text-neutral-600">
-                    · zgłoszone przez mieszkańców
-                </span>
-            </h2>
+            <h2 className="sr-only">Zgłoszenia 24</h2>
 
             {/*
               Pusto znaczy „bądź pierwszy", nie „tu nic nie ma". To jedyna sekcja,
@@ -94,35 +89,33 @@ const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
             {reports.length === 0 ? (
                 <button
                     onClick={onOpenReports}
-                    className="group flex w-full items-center gap-4 rounded-2xl border border-dashed border-cyan-500/25 bg-cyan-500/[0.04] p-5 text-left transition-colors hover:border-cyan-500/40"
+                    className="group flex w-full items-center gap-4 border-t-2 border-tv-blue bg-tv-panel p-4 text-left transition-colors hover:bg-tv-panel2 lg:p-5"
                 >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-500/10">
-                        <Camera size={20} className="text-cyan-400" aria-hidden />
-                    </span>
+                    <Camera size={24} className="shrink-0 text-tv-paper" aria-hidden />
                     <span className="min-w-0 flex-1">
-                        <span className="block text-base font-semibold text-white">
+                        <span className="font-cond block text-[20px] font-extrabold text-white">
                             Zepsuta lampa? Dziura w drodze?
                         </span>
-                        <span className="mt-0.5 block text-sm text-neutral-400">
-                            Zrób zdjęcie i zgłoś. Sprawdzamy i publikujemy jak najszybciej.
+                        <span className="mt-0.5 block text-[15px] text-tv-muted">
+                            Zgłoszenia 24: zrób zdjęcie i zgłoś. Sprawdzamy i publikujemy jak najszybciej.
                         </span>
                     </span>
                     <ArrowRight
                         size={18}
                         aria-hidden
-                        className="shrink-0 text-neutral-600 transition-colors group-hover:text-cyan-300"
+                        className="shrink-0 text-tv-muted transition-colors group-hover:text-white"
                     />
                 </button>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+                    <div className="grid grid-cols-1 gap-px border-t-2 border-tv-blue bg-tv-seam lg:grid-cols-2">
                         {reports.map(report => (
                             <button
                                 key={report.id}
                                 onClick={onOpenReports}
-                                className="flex items-start gap-3 rounded-2xl border border-white/10 bg-[#0d1117] p-4 text-left transition-colors hover:border-white/20"
+                                className="flex items-start gap-3 bg-tv-panel p-4 text-left transition-colors hover:bg-tv-panel2"
                             >
-                                <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-cyan-500/10">
+                                <span className="h-14 w-14 shrink-0 overflow-hidden bg-tv-panel2">
                                     {report.image_url ? (
                                         <img
                                             src={getImageUrl(report.image_url)}
@@ -132,7 +125,7 @@ const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
                                         />
                                     ) : (
                                         <span className="flex h-full w-full items-center justify-center">
-                                            <ClipboardList size={20} className="text-cyan-400/60" aria-hidden />
+                                            <ClipboardList size={20} className="text-tv-muted" aria-hidden />
                                         </span>
                                     )}
                                 </span>
@@ -143,11 +136,11 @@ const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
                                       awaria — a to właśnie zgłaszają mieszkańcy
                                       (brak wody, brak prądu)
                                     */}
-                                    <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-neutral-500">
+                                    <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-tv-muted">
                                         {timeAgo(report.created_at)}
                                         {STATUS_CONFIG[report.status] && (
                                             <span
-                                                className="rounded-full px-1.5 py-px text-[10px] font-semibold"
+                                                className="px-1.5 py-px text-[13px] font-bold"
                                                 style={{
                                                     color: STATUS_CONFIG[report.status].color,
                                                     backgroundColor: `${STATUS_CONFIG[report.status].color}1f`,
@@ -158,11 +151,11 @@ const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
                                         )}
                                     </span>
                                     {/* Bez `block` — kasuje `line-clamp` (patrz NewsMini) */}
-                                    <span className="mt-0.5 line-clamp-2 text-base font-medium leading-snug text-neutral-100">
+                                    <span className="mt-0.5 line-clamp-2 text-[16px] font-semibold leading-snug text-white">
                                         {report.title}
                                     </span>
                                     {report.location_name && (
-                                        <span className="mt-1 flex items-center gap-1 text-[13px] text-neutral-500">
+                                        <span className="mt-1 flex items-center gap-1 text-[14px] text-tv-muted">
                                             <MapPin size={11} aria-hidden />{report.location_name}
                                         </span>
                                     )}
@@ -170,13 +163,7 @@ const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
                             </button>
                         ))}
                     </div>
-                    <button
-                        onClick={onOpenReports}
-                        className="mt-3 flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
-                    >
-                        Zgłoś usterkę albo zobacz mapę
-                        <ArrowRight size={15} aria-hidden />
-                    </button>
+                    <RowLink onClick={onOpenReports}>Zgłoś usterkę albo zobacz mapę</RowLink>
                 </>
             )}
         </section>

@@ -27,7 +27,7 @@
     <meta name="twitter:image"       content="https://rybnolive.pl/og-image.jpg">
 
     <!-- PWA / mobile -->
-    <meta name="theme-color" content="#05080f">
+    <meta name="theme-color" content="#0a0e1a">
     <!-- canonical ustawia frontend/src/seo.ts per trasa — sztywny wpis tutaj
          mówił Google, że każda podstrona to duplikat strony głównej -->
 
@@ -35,7 +35,11 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Archivo (licencja SIL OFL) z własnego serwera, nie z Google Fonts: krój jest
+         częścią marki, a pobranie z CDN Google wysyłało Google adres IP każdego
+         odwiedzającego (RODO). Odświeżenie 10.2026 — zastąpił Outfit -->
+    <link rel="preload" href="/fonts/archivo/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/archivo/archivo-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
     <style>
         /* ── style.txt dark theme tokens ───────────────────────── */
         :root {
@@ -55,12 +59,63 @@
             --foreground: #fafafa;
             --muted-foreground: #a1a1a1;
             --radius: 0.625rem;
+
+            /* ── Pasek informacyjny (10.2026) — tokeny pulpitu i szkieletu ──
+               Granatowa czerń zostaje marką; kolor niesie wyłącznie STAN:
+               chaber = temat/spokój, czerwień = awaria teraz, żółć = kontekst */
+            --tv-ink: #0a0e1a;
+            --tv-panel: #121829;
+            --tv-panel-2: #182036;
+            --tv-seam: #222b45;
+            --tv-paper: #f5f6fa;
+            --tv-muted: #b4bbd0;
+            --tv-blue: #1f4fff;
+            --tv-blue-soft: #8fa8ff;
+            --tv-red: #d42a1f;
+            --tv-yellow: #ffd23f;
+            --tv-green: #3fcf7a;
+        }
+
+        @font-face {
+            font-family: 'Archivo';
+            font-style: normal;
+            font-weight: 400 900;
+            font-stretch: 62% 125%;
+            font-display: swap;
+            src: url('/fonts/archivo/archivo-latin-ext.woff2') format('woff2');
+            unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+        }
+        @font-face {
+            font-family: 'Archivo';
+            font-style: normal;
+            font-weight: 400 900;
+            font-stretch: 62% 125%;
+            font-display: swap;
+            src: url('/fonts/archivo/archivo-latin.woff2') format('woff2');
+            unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
         }
 
         body {
-            font-family: 'Outfit', sans-serif;
-            background: #05080f;
+            font-family: 'Archivo', system-ui, sans-serif;
+            font-stretch: 100%;
+            background: var(--tv-ink);
+            -webkit-font-smoothing: antialiased;
         }
+
+        /* Wąski krój belki, plakietek i liczb — ta sama rodzina, inna szerokość */
+        .font-cond { font-stretch: 78%; letter-spacing: -0.01em; }
+        .tabular { font-variant-numeric: tabular-nums; }
+
+        ::selection { background: var(--tv-yellow); color: var(--tv-ink); }
+        :focus-visible { outline: 3px solid var(--tv-yellow); outline-offset: 2px; }
+
+        /* Belka: biały pas odsłania się od lewej — WYŁĄCZNIE przy zmianie stanu
+           (klucz komponentu), nie przy każdym wejściu na stronę */
+        @keyframes tv-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+        @keyframes tv-tag-in { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
+        .tv-wipe { animation: tv-wipe 220ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .tv-tag-in { animation: tv-tag-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        @media (prefers-reduced-motion: reduce) { .tv-wipe, .tv-tag-in { animation: none; } }
 
         /* ── GlowingTile logic from assets/borders.txt ── */
         @property --glow-angle {
@@ -228,9 +283,9 @@
 
         /* ── Custom Scrollbar ───────────────────────────────────── */
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+        ::-webkit-scrollbar-track { background: var(--tv-ink); }
+        ::-webkit-scrollbar-thumb { background: var(--tv-seam); border-radius: 0; }
+        ::-webkit-scrollbar-thumb:hover { background: #34406a; }
 
         /* ── borders.txt: GlowingShadow CSS properties ─────────── */
         @property --hue          { syntax: "<number>"; inherits: true; initial-value: 0; }

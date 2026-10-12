@@ -1,6 +1,5 @@
 import React from 'react';
 import { Home, Bot, Building2, Store, ClipboardList } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { TabId } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -13,7 +12,9 @@ interface BottomTabBarProps {
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'home', label: 'Start', icon: Home },
   { id: 'assistant', label: 'Asystent', icon: Bot },
-  { id: 'miasto', label: 'Info', icon: Building2 },
+  // „Gmina”, nie „Info”: pod tą zakładką są wiadomości, wydarzenia, odpady,
+  // autobus i pogoda — słowo „Info” nie mówiło, czego tam szukać (krytyka 11.10)
+  { id: 'miasto', label: 'Gmina', icon: Building2 },
   { id: 'dane', label: 'Firmy', icon: Store },
   { id: 'zgloszenia', label: 'Zgłoszenia 24', icon: ClipboardList },
 ];
@@ -21,7 +22,7 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 const BottomTabBar: React.FC<BottomTabBarProps> = React.memo(({ activeTab, onTabChange, isAuthenticated }) => {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-xl border-t border-gray-800/50"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-tv-seam bg-tv-ink lg:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="max-w-lg lg:max-w-2xl mx-auto flex items-center justify-around px-2 py-1">
@@ -34,37 +35,24 @@ const BottomTabBar: React.FC<BottomTabBarProps> = React.memo(({ activeTab, onTab
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                'relative flex flex-col items-center gap-0.5 px-1.5 sm:px-3 py-2 rounded-2xl transition-all duration-200 min-w-[56px]',
+                'relative flex min-h-[56px] min-w-[60px] flex-col items-center justify-center gap-1 px-1.5 transition-colors sm:px-3',
                 isActive
                   ? 'text-white'
-                  : 'text-neutral-500 hover:text-neutral-300 active:scale-95'
+                  : 'text-tv-muted hover:text-white'
               )}
-              aria-label={tab.label}
+              aria-current={isActive ? 'page' : undefined}
             >
               <div className="relative">
-                <Icon
-                  size={22}
-                  className={cn(
-                    'transition-all duration-200',
-                    isActive && 'drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]'
-                  )}
-                  strokeWidth={isActive ? 2.5 : 1.8}
-                />
+                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} aria-hidden />
               </div>
               <span className={cn(
-                'text-[10px] font-medium transition-all duration-200 whitespace-nowrap',
-                isActive ? 'text-white' : 'text-neutral-500'
+                'whitespace-nowrap text-[13px] leading-none',
+                isActive ? 'font-bold text-white' : 'font-medium'
               )}>
                 {tab.label}
               </span>
-              {isActive && (
-                <motion.div
-                  layoutId="tab-indicator"
-                  className="absolute -bottom-1 w-5 h-0.5 rounded-full"
-                  style={{ background: 'linear-gradient(to right, var(--chart-2), var(--chart-3))' }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                />
-              )}
+              {/* Plakietka aktywnej zakładki: pas chabru na górnej krawędzi */}
+              {isActive && <span aria-hidden className="absolute inset-x-2 top-0 h-[3px] bg-tv-blue" />}
             </button>
           );
         })}

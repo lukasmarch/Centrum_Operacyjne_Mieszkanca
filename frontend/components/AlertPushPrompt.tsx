@@ -33,10 +33,12 @@
  */
 import React, { useEffect, useState } from 'react';
 import { track } from '../src/services/analytics';
-import { BellRing, X } from 'lucide-react';
+import { Bell, BellRing, Check, X } from 'lucide-react';
+import { useMyVillage } from '../src/hooks/useMyVillage';
+import { Select } from './simple/tv';
+import { aboutPlace, inPlace } from '../src/utils/placeLocative';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const DISMISS_KEY = 'rl_push_prompt_dismissed_at';
 
@@ -101,19 +103,13 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
   const [fresh] = useState(justRegistered);
   const [busy, setBusy] = useState(false);
   const [justEnabled, setJustEnabled] = useState(false);
-  const [places, setPlaces] = useState<string[]>([]);
-  const [place, setPlace] = useState('');
-
   // Lista miejscowości pochodzi z backendu (`alert_policy.GMINA_RYBNO_PLACES`),
   // nie z `AVAILABLE_LOCATIONS` — tamto to 24 pozycje harmonogramu odpadów
-  // („Rybno R1", „Domki letniskowe"), a nie nazwy wsi. Gdy zapytanie padnie,
-  // wybór po prostu się nie pokaże i baner działa jak dotąd.
-  useEffect(() => {
-    fetch(`${API_URL}/business/gmina-localities`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => Array.isArray(data) && setPlaces(data))
-      .catch(() => setPlaces([]));
-  }, []);
+  // („Rybno R1", „Domki letniskowe"), a nie nazwy wsi. Domyślnie wieś wybrana
+  // na pulpicie (albo z konta) — czytelnik nie odpowiada na to samo pytanie dwa razy
+  const { village, places } = useMyVillage();
+  const [place, setPlace] = useState(village ?? '');
+  useEffect(() => { if (village) setPlace(p => p || village); }, [village]);
 
   const hide =
     (campaignOnly && !cameFromCampaign() && !fresh) ||
@@ -133,10 +129,10 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
 
   if (justEnabled) {
     return (
-      <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-950/30 border border-emerald-800/30 text-sm text-emerald-300">
-        <BellRing size={15} className="flex-shrink-0" />
+      <p className="flex items-center gap-2 border-b border-tv-seam py-2.5 text-[15px] text-tv-muted">
+        <Check size={17} className="shrink-0 text-tv-green" aria-hidden />
         Gotowe — o kolejnej awarii {place ? `w miejscowości ${place}` : 'w gminie Rybno'} dowiesz się od razu.
-      </div>
+      </p>
     );
   }
 
@@ -160,37 +156,31 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
     if (ok) setJustEnabled(true);
   };
 
-  const calm = tone === 'calm';
-
+  // Ten sam układ co `VillagePushCta` na pulpicie: panel, żółty dzwonek, chabrowy
+  // przycisk. Czerwień (dawny wariant `alert`) jest zarezerwowana dla samej awarii
+  // — prośba o zgodę nie jest awarią, nawet gdy stoi obok niej.
+  void tone;
   return (
-    <div
-      className={`relative flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl border ${
-        calm
-          ? 'bg-[#0d1117] border-white/10'
-          : 'bg-gradient-to-r from-red-950/40 to-white/[0.02] border-red-500/20'
-      }`}
-    >
-      <div className="flex items-start gap-3 flex-1 pr-6">
-        <BellRing size={18} className={`flex-shrink-0 mt-0.5 ${calm ? 'text-blue-400' : 'text-red-400'}`} />
-        <div>
-          <p className="text-sm font-bold text-neutral-100">
-            O następnej awarii dowiedz się bez wchodzenia na stronę
-          </p>
-          <p className="text-xs text-neutral-400 mt-0.5">
-            Powiadomimy o wyłączeniach prądu, braku wody, pożarach i wypadkach
-            w gminie Rybno. Za darmo, bez konta — i nic poza tym.
-            {fresh && ' Tym samym kanałem przypomnimy wieczorem o jutrzejszym wywozie odpadów.'}
-          </p>
-        </div>
+    <section aria-label="Powiadomienia o awariach" className="relative bg-tv-panel p-4 pr-12 lg:flex lg:items-center lg:gap-6 lg:pr-14">
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-2 text-[17px] font-bold leading-snug text-white">
+          <BellRing size={18} className="shrink-0 text-tv-yellow" aria-hidden />
+          Dowiedz się o awarii {place ? inPlace(place) : 'w gminie Rybno'}, zanim wejdziesz na stronę
+        </p>
+        <p className="mt-1 text-[15px] leading-snug text-tv-muted">
+          Prąd, woda, pożar, wypadek — nic poza tym. Za darmo, bez konta.
+          {fresh && ' Tym samym kanałem przypomnimy wieczorem o jutrzejszym wywozie odpadów.'}
+        </p>
       </div>
 
-      <div className="flex flex-shrink-0 items-center gap-2">
-        {places.length > 0 && (
-          <select
+      <div className="mt-3 flex shrink-0 flex-col gap-2 sm:flex-row lg:mt-0">
+        {/* Wieś znana (pulpit albo konto) — jeden przycisk, jak `VillagePushCta`.
+            Wybór pokazujemy tylko wtedy, gdy wsi jeszcze nie ma */}
+        {!village && places.length > 0 && (
+          <Select
             value={place}
             onChange={(e) => setPlace(e.target.value)}
             aria-label="Miejscowość, której mają dotyczyć alerty"
-            className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium bg-white/[0.04] border border-white/10 text-neutral-300 focus:outline-none focus:border-white/25"
           >
             <option value="">cała gmina</option>
             {places.map((name) => (
@@ -198,28 +188,26 @@ const AlertPushPrompt: React.FC<Props> = ({ campaignOnly = false, tone = 'alert'
                 {name}
               </option>
             ))}
-          </select>
+          </Select>
         )}
-
         <button
           onClick={enable}
           disabled={busy}
-          className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors disabled:opacity-50 ${
-            calm ? 'bg-blue-600 hover:bg-blue-500' : 'bg-red-600 hover:bg-red-500'
-          }`}
+          className="font-cond flex min-h-[52px] items-center justify-center gap-2 whitespace-nowrap bg-tv-blue px-5 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:opacity-60"
         >
-          {busy ? 'Włączam…' : 'Włącz alerty'}
+          <Bell size={18} aria-hidden />
+          {busy ? 'Włączam…' : place ? `Powiadamiaj ${aboutPlace(place)}` : 'Włącz powiadomienia'}
         </button>
       </div>
 
       <button
         onClick={close}
-        aria-label="Zamknij"
-        className="absolute top-2.5 right-2.5 p-1 rounded-lg text-neutral-600 hover:text-neutral-300 hover:bg-white/5 transition-colors"
+        aria-label="Nie teraz — schowaj na miesiąc"
+        className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-tv-muted hover:text-white"
       >
-        <X size={14} />
+        <X size={18} aria-hidden />
       </button>
-    </div>
+    </section>
   );
 };
 

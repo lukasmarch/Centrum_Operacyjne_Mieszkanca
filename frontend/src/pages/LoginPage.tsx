@@ -4,6 +4,16 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Notice, PageHead } from '../../components/simple/tv';
+
+// Formularz w języku „Paska informacyjnego”: pole 52 px z tekstem 16 px (iOS nie
+// powiększa strony przy fokusie), kąty proste, fokus = obrys w kolorze papieru
+const LABEL = 'mb-1.5 block text-[15px] font-semibold text-tv-paper';
+const INPUT =
+  'min-h-[52px] w-full border-2 border-tv-seam bg-tv-ink px-4 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper disabled:opacity-60';
+const PRIMARY =
+  'font-cond min-h-[52px] w-full bg-tv-blue px-4 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-not-allowed disabled:opacity-50';
+const LINK = 'font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline';
 
 interface LoginPageProps {
   onNavigate: (page: 'register' | 'dashboard' | 'terms' | 'privacy' | 'reset-password') => void;
@@ -40,131 +50,72 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-3xl text-white mx-auto mb-4 shadow-lg shadow-blue-500/30">
-            D
-          </div>
-          <h1 className="text-3xl font-black mb-2 text-neutral-100">Witaj ponownie!</h1>
-          <p className="text-neutral-400">Zaloguj się do Centrum Operacyjnego</p>
-        </div>
+    <div className="flex min-h-[70vh] items-center justify-center py-8">
+      <div className="w-full max-w-md space-y-5">
+        <PageHead title="Witaj ponownie!" sub="Zaloguj się do Centrum Operacyjnego" />
 
-        {/* Form */}
-        <div className="bg-gray-950/50 backdrop-blur-xl rounded-3xl p-8 shadow-xl border border-gray-800/50">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error message */}
+        <div className="border-t-2 border-tv-blue bg-tv-panel p-5 sm:p-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {(error || localError) && (
-              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                {error || localError}
-              </div>
+              <Notice tone="warn" role="alert">{error || localError}</Notice>
             )}
 
-            {/* Email */}
             <div>
-              <label className="block text-sm font-semibold text-neutral-300 mb-2">
-                Email
-              </label>
+              <label htmlFor="login-email" className={LABEL}>Email</label>
               <input
+                id="login-email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="twoj@email.pl"
-                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-gray-700/50 text-neutral-100 placeholder-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className={INPUT}
                 disabled={isLoading}
               />
             </div>
 
-            {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-neutral-300 mb-2">
-                Hasło
-              </label>
+              <label htmlFor="login-password" className={LABEL}>Hasło</label>
               <input
+                id="login-password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl bg-gray-900 border border-gray-700/50 text-neutral-100 placeholder-neutral-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                className={INPUT}
                 disabled={isLoading}
               />
-            </div>
-
-            {/* Forgot password */}
-            <div className="flex justify-end">
               {/* Do 11.10.2026 przycisk nie robił nic — zapomniane hasło = utracone konto */}
               <button
                 type="button"
                 onClick={() => onNavigate('reset-password')}
-                className="min-h-[44px] text-sm text-blue-400 hover:text-blue-300 font-medium"
+                className={`${LINK} mt-1 min-h-[44px]`}
               >
                 Nie pamiętasz hasła?
               </button>
             </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  Logowanie...
-                </span>
-              ) : (
-                'Zaloguj się'
-              )}
+            <button type="submit" disabled={isLoading} className={PRIMARY}>
+              {isLoading ? 'Logowanie…' : 'Zaloguj się'}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-800/50"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-gray-950 text-neutral-500 rounded-full">lub</span>
-            </div>
-          </div>
-
-          {/* Register link */}
-          <p className="text-center text-neutral-400">
-            Nie masz jeszcze konta?{' '}
-            <button
-              onClick={() => onNavigate('register')}
-              className="text-blue-400 font-bold hover:text-blue-300"
-            >
+          <p className="mt-5 flex flex-wrap items-center gap-x-2 border-t border-tv-seam pt-4 text-[15px] text-tv-muted">
+            Nie masz jeszcze konta?
+            <button onClick={() => onNavigate('register')} className={`${LINK} min-h-[44px]`}>
               Zarejestruj się
             </button>
           </p>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-neutral-500 text-sm mt-6">
+        <p className="text-[14px] leading-relaxed text-tv-muted">
           Logując się, akceptujesz{' '}
-          <button onClick={() => onNavigate('terms')} className="text-blue-400 hover:underline">
+          <button onClick={() => onNavigate('terms')} className={LINK}>
             Regulamin
           </button>{' '}
           i{' '}
-          <button onClick={() => onNavigate('privacy')} className="text-blue-400 hover:underline">
+          <button onClick={() => onNavigate('privacy')} className={LINK}>
             Politykę prywatności
           </button>
         </p>

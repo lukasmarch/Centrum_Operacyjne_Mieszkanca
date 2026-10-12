@@ -11,8 +11,11 @@ import { useAuth } from '../context/AuthContext';
 import { AppSection } from '../../types';
 import { PLANS, Frequency } from '../../components/PricingCards';
 import { getAccessToken } from '../services/authApi';
+import { Notice, PageHead, Tag } from '../../components/simple/tv';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+const LINK = 'font-bold text-tv-bluesoft underline underline-offset-2 transition-colors hover:text-white';
 
 interface CheckoutPageProps {
   tierKey: string;
@@ -92,114 +95,120 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ tierKey, frequency, onNavig
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-10">
+    <div className="max-w-3xl space-y-6">
       <button
         onClick={() => onNavigate('premium')}
-        className="flex items-center gap-2 text-sm text-neutral-400 hover:text-white transition-colors mb-6"
+        className="inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline"
       >
-        <ArrowLeft className="w-4 h-4" /> Wróć do cennika
+        <ArrowLeft className="h-4 w-4" aria-hidden /> Wróć do cennika
       </button>
 
-      <h2 className="text-3xl font-black mb-2">Podsumowanie zamówienia</h2>
-      <p className="text-neutral-500 mb-8">Sprawdź, co zamawiasz, i potwierdź — zapłacisz przez Przelewy24.</p>
+      <PageHead
+        title="Podsumowanie zamówienia"
+        sub="Sprawdź, co zamawiasz, i potwierdź — zapłacisz przez Przelewy24."
+      />
 
-      {/* Zamówienie */}
-      <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 mb-6">
-        <div className="flex items-start justify-between gap-4 pb-4 border-b border-white/10">
-          <div>
-            <p className="text-xl font-bold">{plan.name}</p>
-            <p className="text-sm text-neutral-500">Okres rozliczeniowy: {PERIOD_LABEL[frequency]}</p>
+      {/* Zamówienie — plakietka jest nagłówkiem, pod nią panel z chabrową krawędzią */}
+      <section>
+        <Tag as="h2">Zamówienie</Tag>
+        <div className="border-t-2 border-tv-blue bg-tv-panel p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-tv-seam pb-4">
+            <div className="min-w-0">
+              <p className="font-cond text-[24px] font-extrabold leading-tight text-white">{plan.name}</p>
+              <p className="mt-0.5 text-[14px] text-tv-muted">Okres rozliczeniowy: {PERIOD_LABEL[frequency]}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="font-cond tabular text-[34px] font-extrabold leading-none text-white">{priceLabel} zł</p>
+              <p className="mt-1 text-[13px] text-tv-muted">{frequency === 'monthly' ? 'za miesiąc' : 'za rok'} · brutto</p>
+            </div>
           </div>
-          <div className="text-right shrink-0">
-            <p className="text-3xl font-black">{priceLabel} zł</p>
-            <p className="text-xs text-neutral-500">{frequency === 'monthly' ? 'za miesiąc' : 'za rok'} · brutto</p>
+
+          <ul className="grid grid-cols-1 gap-2 pt-4 text-[14px] text-[#d7dbe8] sm:grid-cols-2">
+            {plan.features.map((f) => (
+              <li key={f.text} className="flex items-start gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-tv-bluesoft" aria-hidden />
+                <span>{f.text}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-6 flex items-baseline justify-between gap-4 border-t border-tv-seam pt-4">
+            <span className="text-[15px] text-tv-paper">Do zapłaty dziś</span>
+            <span className="font-cond tabular text-[26px] font-extrabold text-white">{priceLabel} zł</span>
           </div>
         </div>
+      </section>
 
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-4 text-sm text-neutral-400">
-          {plan.features.map((f) => (
-            <li key={f.text} className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
-              <span>{f.text}</span>
-            </li>
-          ))}
-        </ul>
+      <div className="space-y-4">
+        {/* Akceptacja regulaminu — zamówienie z obowiązkiem zapłaty */}
+        <label className="flex min-h-[44px] cursor-pointer items-start gap-3 border border-tv-seam bg-tv-panel px-4 py-3">
+          <span className="relative inline-flex h-6 w-6 shrink-0">
+            <input
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+              className="peer h-6 w-6 cursor-pointer appearance-none border-2 border-tv-muted bg-tv-ink transition-colors checked:border-tv-blue checked:bg-tv-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tv-yellow"
+            />
+            <Check size={16} strokeWidth={3} aria-hidden className="pointer-events-none absolute inset-0 m-auto hidden text-white peer-checked:block" />
+          </span>
+          <span className="text-[15px] leading-relaxed text-[#d7dbe8]">
+            Akceptuję{' '}
+            <button type="button" onClick={() => onNavigate('terms')} className={LINK}>
+              Regulamin
+            </button>{' '}
+            i składam zamówienie z obowiązkiem zapłaty. Zasady przetwarzania danych opisuje{' '}
+            <button type="button" onClick={() => onNavigate('privacy')} className={LINK}>
+              Polityka prywatności
+            </button>.
+          </span>
+        </label>
 
-        <div className="flex items-center justify-between gap-4 mt-6 pt-4 border-t border-white/10">
-          <span className="text-sm text-neutral-400">Do zapłaty dziś</span>
-          <span className="text-xl font-bold">{priceLabel} zł</span>
-        </div>
+        {!isAuthenticated && (
+          <p className="text-[15px] leading-snug text-tv-muted">
+            Kolejny krok: założenie konta — dostęp do planu jest przypisany do konta w serwisie.
+            Zaraz po nim przejdziesz do płatności.
+          </p>
+        )}
+
+        {error && <Notice tone="warn" role="alert">{error}</Notice>}
+        {notice && <Notice tone="warn" role="status">{notice}</Notice>}
+
+        <button
+          onClick={handleOrder}
+          disabled={busy}
+          className="font-cond tabular min-h-[56px] w-full bg-tv-blue px-4 text-[18px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-wait disabled:opacity-60"
+        >
+          {busy ? 'Łączenie z Przelewy24…' : isAuthenticated ? `Zamawiam i płacę ${priceLabel} zł` : 'Przejdź do płatności'}
+        </button>
+
+        <p className="flex items-center justify-center gap-2 text-center text-[13px] text-tv-muted">
+          <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden /> Płatność obsługuje PayPro S.A. (Przelewy24) — BLIK, karta, przelew online
+        </p>
       </div>
 
-      {/* Akceptacja regulaminu — zamówienie z obowiązkiem zapłaty */}
-      <label className="flex items-start gap-3 p-4 bg-white/[0.03] border border-white/10 rounded-xl mb-4 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={acceptTerms}
-          onChange={(e) => setAcceptTerms(e.target.checked)}
-          className="w-5 h-5 rounded accent-blue-600 mt-0.5 shrink-0"
-        />
-        <span className="text-sm text-neutral-300">
-          Akceptuję{' '}
-          <button type="button" onClick={() => onNavigate('terms')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">
-            Regulamin
-          </button>{' '}
-          i składam zamówienie z obowiązkiem zapłaty. Zasady przetwarzania danych opisuje{' '}
-          <button type="button" onClick={() => onNavigate('privacy')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">
-            Polityka prywatności
-          </button>.
-        </span>
-      </label>
-
-      {!isAuthenticated && (
-        <p className="text-sm text-neutral-500 mb-4 px-1">
-          Kolejny krok: założenie konta — dostęp do planu jest przypisany do konta w serwisie.
-          Zaraz po nim przejdziesz do płatności.
-        </p>
-      )}
-
-      {error && (
-        <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300">{error}</div>
-      )}
-      {notice && (
-        <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-200">{notice}</div>
-      )}
-
-      <button
-        onClick={handleOrder}
-        disabled={busy}
-        className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 font-bold text-white transition-colors"
-      >
-        {busy ? 'Łączenie z Przelewy24…' : isAuthenticated ? `Zamawiam i płacę ${priceLabel} zł` : 'Przejdź do płatności'}
-      </button>
-
-      <p className="flex items-center justify-center gap-2 text-xs text-neutral-500 mt-3">
-        <ShieldCheck className="w-4 h-4" /> Płatność obsługuje PayPro S.A. (Przelewy24) — BLIK, karta, przelew online
-      </p>
-
       {/* Dane sprzedawcy i uprawnienia kupującego */}
-      <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-neutral-400">
-        <div>
-          <h3 className="font-bold text-neutral-300 mb-2">Sprzedawca</h3>
-          <p className="leading-relaxed">
+      <div className="grid grid-cols-1 gap-px bg-tv-seam md:grid-cols-2">
+        <section className="bg-tv-panel p-5">
+          <h3 className="font-cond mb-2 text-[18px] font-extrabold text-white">Sprzedawca</h3>
+          <p className="text-[14px] leading-relaxed text-[#d7dbe8]">
             Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz<br />
             Żabiny 96, 13-220 Rybno<br />
-            NIP: 571-156-78-15<br />
-            <a href="tel:+48501081723" className="hover:text-blue-400 transition-colors">+48 501 081 723</a><br />
-            <a href="mailto:biuro@lumargo.pl" className="hover:text-blue-400 transition-colors">biuro@lumargo.pl</a>
+            NIP: <span className="tabular">571-156-78-15</span><br />
+            <a href="tel:+48501081723" className="tabular text-tv-bluesoft underline-offset-2 hover:text-white hover:underline">+48 501 081 723</a><br />
+            <a href="mailto:biuro@lumargo.pl" className="text-tv-bluesoft underline-offset-2 hover:text-white hover:underline">biuro@lumargo.pl</a>
           </p>
-        </div>
-        <div>
-          <h3 className="font-bold text-neutral-300 mb-2">Rezygnacja i odstąpienie</h3>
-          <p className="leading-relaxed">
+        </section>
+        <section className="bg-tv-panel p-5">
+          <h3 className="font-cond mb-2 text-[18px] font-extrabold text-white">Rezygnacja i odstąpienie</h3>
+          <p className="text-[14px] leading-relaxed text-[#d7dbe8]">
             Płatność jest jednorazowa — subskrypcja nie odnawia się automatycznie i wygasa po opłaconym okresie.
             Konsumentowi przysługuje prawo odstąpienia od umowy w terminie 14 dni; wzór oświadczenia
             znajduje się w{' '}
-            <button type="button" onClick={() => onNavigate('terms')} className="text-blue-400 hover:text-blue-300 underline underline-offset-2">
+            <button type="button" onClick={() => onNavigate('terms')} className={LINK}>
               Regulaminie
             </button>.
           </p>
-        </div>
+        </section>
       </div>
     </div>
   );

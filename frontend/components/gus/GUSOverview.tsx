@@ -11,7 +11,8 @@
  */
 
 import React from 'react';
-import { Users, Building2, Wallet, TrendingUp, RefreshCw, AlertCircle } from 'lucide-react';
+import { Users, Building2, Wallet, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { Notice, Skeleton, Tag } from '../simple/tv';
 import { useGUSOverview } from '../../src/hooks/useGUSStats';
 import { useAuth } from '../../src/context/AuthContext';
 import KPICard from './charts/KPICard';
@@ -25,11 +26,13 @@ const GUSOverview: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <RefreshCw className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-gray-600 text-lg font-medium">Ładowanie danych GUS...</p>
-          <p className="text-gray-400 text-sm mt-2">Pobieranie statystyk dla Gminy Rybno</p>
+      <div aria-label="Ładowanie danych GUS..." className="space-y-6">
+        <p className="text-[15px] text-tv-muted">Pobieranie statystyk dla Gminy Rybno…</p>
+        <div className="grid grid-cols-1 gap-px bg-tv-seam md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
+        </div>
+        <div className="grid grid-cols-1 gap-px bg-tv-seam lg:grid-cols-2">
+          {[1, 2].map(i => <Skeleton key={i} className="h-72" />)}
         </div>
       </div>
     );
@@ -38,19 +41,15 @@ const GUSOverview: React.FC = () => {
   // Error state
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto mt-12 p-8 bg-red-50 border border-red-200 rounded-xl">
-        <div className="flex items-start gap-4">
-          <AlertCircle className="text-red-600 flex-shrink-0" size={32} />
-          <div>
-            <h3 className="text-xl font-bold text-red-900 mb-2">Błąd ładowania danych</h3>
-            <p className="text-red-700 mb-4">{error}</p>
-            <button
-              onClick={() => refetch()}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-            >
-              Spróbuj ponownie
-            </button>
-          </div>
+      <div className="max-w-2xl space-y-px" role="alert">
+        <Notice tone="warn"><strong>Błąd ładowania danych.</strong> {error}</Notice>
+        <div className="bg-tv-panel px-4 py-3">
+          <button
+            onClick={() => refetch()}
+            className="font-cond inline-flex min-h-[44px] items-center bg-tv-blue px-4 text-[15px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
+          >
+            Spróbuj ponownie
+          </button>
         </div>
       </div>
     );
@@ -76,9 +75,10 @@ const GUSOverview: React.FC = () => {
   const expenditure = variables.expenditure_per_capita;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Hero KPI Row (8 Free tier variables - Gmina Rybno only) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 min-w-0">
+    <div className="space-y-8">
+      {/* Hero KPI Row (8 Free tier variables - Gmina Rybno only).
+          Siatka `gap-px` na tle szwu, jak kafle „Na dziś” na pulpicie */}
+      <div className="grid min-w-0 grid-cols-2 gap-px border-t-2 border-tv-blue bg-tv-seam lg:grid-cols-4">
         {/* Row 1: Core Metrics */}
         {population && (
           <div className="min-w-0">
@@ -113,7 +113,7 @@ const GUSOverview: React.FC = () => {
             <KPICard
               label="Dochody per capita"
               value={revenue.value}
-              unit="PLN"
+              unit="zł"
               trend={revenue.trend_pct}
               sparklineData={revenue.historical}
               icon={Wallet}
@@ -127,7 +127,7 @@ const GUSOverview: React.FC = () => {
             <KPICard
               label="Wydatki per capita"
               value={expenditure.value}
-              unit="PLN"
+              unit="zł"
               trend={expenditure.trend_pct}
               sparklineData={expenditure.historical}
               icon={Wallet}
@@ -195,23 +195,21 @@ const GUSOverview: React.FC = () => {
       </div>
 
       {/* Historical Trend Charts Section */}
-      <div className="mb-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-neutral-100 mb-2">Trendy historyczne (10 lat)</h2>
-          <p className="text-neutral-400">
-            Wykresy pokazują jak wskaźniki zmieniały się w czasie • Dane od {latest_year - 9} do {latest_year}
-          </p>
-        </div>
+      <section className="flex flex-col">
+        <h2 className="flex"><Tag>Trendy historyczne (10 lat)</Tag></h2>
+        <p className="mb-3 mt-2 text-[15px] text-tv-muted">
+          Wykresy pokazują jak wskaźniki zmieniały się w czasie • Dane od <span className="tabular">{latest_year - 9}</span> do <span className="tabular">{latest_year}</span>
+        </p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
+        <div className="grid min-w-0 grid-cols-1 gap-px border-t-2 border-tv-blue bg-tv-seam lg:grid-cols-2">
           {/* Population Trend */}
           {population && population.historical && population.historical.length > 0 && (
-            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
+            <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-neutral-100 mb-1">Ludność gminy</h3>
-                <p className="text-sm text-neutral-500">
-                  Trend: {population.trend_pct && population.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(population.trend_pct || 0).toFixed(2)}% rok do roku
+                <h3 className="font-cond mb-0.5 text-[20px] font-extrabold leading-snug text-white">Ludność gminy</h3>
+                <p className="tabular flex items-center gap-1 text-[13px] text-tv-muted">
+                  Trend: {population.trend_pct && population.trend_pct > 0 ? <TrendingUp size={14} aria-hidden /> : <TrendingDown size={14} aria-hidden />}
+                  {Math.abs(population.trend_pct || 0).toLocaleString('pl-PL', { maximumFractionDigits: 1 })}% rok do roku
                 </p>
               </div>
               <TrendChart
@@ -219,7 +217,6 @@ const GUSOverview: React.FC = () => {
                 title=""
                 unit="os."
                 height={250}
-                color="#60a5fa"
                 formatType="integer"
               />
             </div>
@@ -227,12 +224,12 @@ const GUSOverview: React.FC = () => {
 
           {/* Births Trend */}
           {births && births.historical && births.historical.length > 0 && (
-            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
+            <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-neutral-100 mb-1">Urodzenia żywe</h3>
-                <p className="text-sm text-neutral-500">
-                  Trend: {births.trend_pct && births.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(births.trend_pct || 0).toFixed(2)}% rok do roku
+                <h3 className="font-cond mb-0.5 text-[20px] font-extrabold leading-snug text-white">Urodzenia żywe</h3>
+                <p className="tabular flex items-center gap-1 text-[13px] text-tv-muted">
+                  Trend: {births.trend_pct && births.trend_pct > 0 ? <TrendingUp size={14} aria-hidden /> : <TrendingDown size={14} aria-hidden />}
+                  {Math.abs(births.trend_pct || 0).toLocaleString('pl-PL', { maximumFractionDigits: 1 })}% rok do roku
                 </p>
               </div>
               <TrendChart
@@ -240,7 +237,6 @@ const GUSOverview: React.FC = () => {
                 title=""
                 unit="os."
                 height={250}
-                color="#34d399"
                 formatType="integer"
               />
             </div>
@@ -248,12 +244,12 @@ const GUSOverview: React.FC = () => {
 
           {/* Migration Balance Trend */}
           {migration && migration.historical && migration.historical.length > 0 && (
-            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
+            <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-neutral-100 mb-1">Saldo migracji na 1000 ludności</h3>
-                <p className="text-sm text-neutral-500">
-                  Trend: {migration.trend_pct && migration.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(migration.trend_pct || 0).toFixed(2)}% zmiana YoY
+                <h3 className="font-cond mb-0.5 text-[20px] font-extrabold leading-snug text-white">Saldo migracji na 1000 ludności</h3>
+                <p className="tabular flex items-center gap-1 text-[13px] text-tv-muted">
+                  Trend: {migration.trend_pct && migration.trend_pct > 0 ? <TrendingUp size={14} aria-hidden /> : <TrendingDown size={14} aria-hidden />}
+                  {Math.abs(migration.trend_pct || 0).toLocaleString('pl-PL', { maximumFractionDigits: 1 })}% rok do roku
                 </p>
               </div>
               <TrendChart
@@ -261,7 +257,6 @@ const GUSOverview: React.FC = () => {
                 title=""
                 unit=""
                 height={250}
-                color="#fbbf24"
                 formatType="decimal"
               />
             </div>
@@ -269,12 +264,12 @@ const GUSOverview: React.FC = () => {
 
           {/* Business Dynamics - Entity Registrations */}
           {entities && entities.historical && entities.historical.length > 0 && (
-            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
+            <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-neutral-100 mb-1">Podmioty REGON na 10k</h3>
-                <p className="text-sm text-neutral-500">
-                  Trend: {entities.trend_pct && entities.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(entities.trend_pct || 0).toFixed(2)}% rok do roku
+                <h3 className="font-cond mb-0.5 text-[20px] font-extrabold leading-snug text-white">Podmioty REGON na 10k</h3>
+                <p className="tabular flex items-center gap-1 text-[13px] text-tv-muted">
+                  Trend: {entities.trend_pct && entities.trend_pct > 0 ? <TrendingUp size={14} aria-hidden /> : <TrendingDown size={14} aria-hidden />}
+                  {Math.abs(entities.trend_pct || 0).toLocaleString('pl-PL', { maximumFractionDigits: 1 })}% rok do roku
                 </p>
               </div>
               <TrendChart
@@ -282,7 +277,6 @@ const GUSOverview: React.FC = () => {
                 title=""
                 unit=""
                 height={250}
-                color="#a78bfa"
                 formatType="decimal"
               />
             </div>
@@ -290,20 +284,19 @@ const GUSOverview: React.FC = () => {
 
           {/* Revenue Per Capita Trend */}
           {revenue && revenue.historical && revenue.historical.length > 0 && (
-            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
+            <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-neutral-100 mb-1">Dochody gminy per capita</h3>
-                <p className="text-sm text-neutral-500">
-                  Trend: {revenue.trend_pct && revenue.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(revenue.trend_pct || 0).toFixed(2)}% rok do roku
+                <h3 className="font-cond mb-0.5 text-[20px] font-extrabold leading-snug text-white">Dochody gminy per capita</h3>
+                <p className="tabular flex items-center gap-1 text-[13px] text-tv-muted">
+                  Trend: {revenue.trend_pct && revenue.trend_pct > 0 ? <TrendingUp size={14} aria-hidden /> : <TrendingDown size={14} aria-hidden />}
+                  {Math.abs(revenue.trend_pct || 0).toLocaleString('pl-PL', { maximumFractionDigits: 1 })}% rok do roku
                 </p>
               </div>
               <TrendChart
                 data={revenue.historical}
                 title=""
-                unit="PLN"
+                unit="zł"
                 height={250}
-                color="#38bdf8"
                 formatType="currency"
               />
             </div>
@@ -311,26 +304,25 @@ const GUSOverview: React.FC = () => {
 
           {/* Expenditure Per Capita Trend */}
           {expenditure && expenditure.historical && expenditure.historical.length > 0 && (
-            <div className="bg-white/[0.04] rounded-xl p-6 min-w-0 border border-white/5">
+            <div className="min-w-0 bg-tv-panel p-4 lg:p-5">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-neutral-100 mb-1">Wydatki gminy per capita</h3>
-                <p className="text-sm text-neutral-500">
-                  Trend: {expenditure.trend_pct && expenditure.trend_pct > 0 ? '▲' : '▼'}{' '}
-                  {Math.abs(expenditure.trend_pct || 0).toFixed(2)}% rok do roku
+                <h3 className="font-cond mb-0.5 text-[20px] font-extrabold leading-snug text-white">Wydatki gminy per capita</h3>
+                <p className="tabular flex items-center gap-1 text-[13px] text-tv-muted">
+                  Trend: {expenditure.trend_pct && expenditure.trend_pct > 0 ? <TrendingUp size={14} aria-hidden /> : <TrendingDown size={14} aria-hidden />}
+                  {Math.abs(expenditure.trend_pct || 0).toLocaleString('pl-PL', { maximumFractionDigits: 1 })}% rok do roku
                 </p>
               </div>
               <TrendChart
                 data={expenditure.historical}
                 title=""
-                unit="PLN"
+                unit="zł"
                 height={250}
-                color="#fb7185"
                 formatType="currency"
               />
             </div>
           )}
         </div>
-      </div>
+      </section>
 
       {/* Premium Upsell - only for free/anonymous users */}
       {(!user || user.tier === 'free') && (
@@ -339,15 +331,13 @@ const GUSOverview: React.FC = () => {
 
       {/* Footer - Data Freshness */}
       {last_refresh && (
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <div className="flex items-center gap-2">
-              <RefreshCw size={16} />
-              <span>Ostatnia aktualizacja danych: {new Date(last_refresh).toLocaleDateString('pl-PL')}</span>
-            </div>
-            <div>
-              <span className="font-medium">Dane gminy Rybno</span> • Powiat Działdowski • Woj. warmińsko-mazurskie
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-tv-seam pt-4 text-[13px] text-tv-muted">
+          <div className="flex items-center gap-2">
+            <RefreshCw size={14} aria-hidden />
+            <span>Ostatnia aktualizacja danych: <span className="tabular">{new Date(last_refresh).toLocaleDateString('pl-PL')}</span></span>
+          </div>
+          <div>
+            <span className="font-bold text-tv-paper">Dane gminy Rybno</span> • Powiat Działdowski • Woj. warmińsko-mazurskie
           </div>
         </div>
       )}

@@ -13,12 +13,13 @@
  * - Tier-specific messaging
  * - Feature highlights
  * - Call-to-action button
- * - Blur/lock visual effect
+ * - Lock icon (płasko — bez rozmycia i gradientów, odświeżenie 10.2026)
  */
 
 import React, { useState } from 'react';
 import { Lock, TrendingUp, BarChart3, Brain, FileDown, Zap, ArrowRight } from 'lucide-react';
 import { UserTier } from '../../../types';
+import { Tag } from '../../simple/tv';
 
 interface GUSTierGateProps {
   requiredTier: 'premium' | 'business';
@@ -38,7 +39,6 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
     if (activeTab === 'premium') {
       return {
         badge: 'Premium',
-        badgeColor: 'from-indigo-500 to-purple-500',
         title: 'Odblokuj pełną analizę statystyczną',
         description: 'Uzyskaj dostęp do 37 wskaźników GUS dla rejonu Rybno, szczegółowych trendów historycznych i porównań między gminami',
         features: [
@@ -48,13 +48,11 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
           { icon: <BarChart3 size={18} />, text: 'Porównania między gminami w powiecie' },
         ],
         buttonText: 'Zobacz plany subskrypcji',
-        buttonColor: 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700',
       };
     } else {
       // Pro tier
       return {
         badge: 'Pro',
-        badgeColor: 'from-amber-500 to-orange-500',
         title: 'Zaawansowane analizy AI + eksport danych',
         description: 'Pełny dostęp do 53 wskaźników GUS dla rejonu Rybno + AI insights + eksport do CSV',
         features: [
@@ -64,7 +62,6 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
           { icon: <Zap size={18} />, text: 'Historia pytań AI bez limitu' },
         ],
         buttonText: 'Zobacz plany subskrypcji',
-        buttonColor: 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700',
       };
     }
   };
@@ -87,70 +84,57 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
     }
   };
 
+  const tabClass = (active: boolean) =>
+    `font-cond inline-flex min-h-[44px] items-center px-4 text-[15px] font-bold uppercase tracking-wide transition-colors ${
+      active ? 'bg-tv-paper text-tv-ink' : 'bg-tv-panel2 text-tv-paper hover:text-white'
+    }`;
+
+  const contextText = getContextText();
+
   return (
-    <div className={`relative bg-gray-950/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8 ${className}`}>
-      {/* Lock icon overlay */}
-      <div className="absolute top-4 right-4">
-        <div className={`p-3 rounded-full bg-gradient-to-br ${content.badgeColor} shadow-lg shadow-purple-500/20`}>
-          <Lock className="text-white" size={24} />
-        </div>
+    <section className={`relative border-t-2 border-tv-blue bg-tv-panel p-4 lg:p-6 ${className}`}>
+      {/* Kłódka w kwadracie panelu — sama ikona, bez kolorowego kółka */}
+      <div className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center bg-tv-panel2" aria-hidden>
+        <Lock className="text-tv-muted" size={20} />
       </div>
 
       {/* Tab switcher */}
-      <div className="inline-flex items-center gap-1 mb-4 p-1 bg-gray-800/60 rounded-full border border-gray-700/50">
-        <button
-          onClick={() => setActiveTab('premium')}
-          className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all duration-200 ${
-            activeTab === 'premium'
-              ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md'
-              : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
+      <div role="group" aria-label="Plan" className="mb-4 inline-flex gap-px bg-tv-seam">
+        <button onClick={() => setActiveTab('premium')} aria-pressed={activeTab === 'premium'} className={tabClass(activeTab === 'premium')}>
           Premium
         </button>
-        <button
-          onClick={() => setActiveTab('business')}
-          className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all duration-200 ${
-            activeTab === 'business'
-              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md'
-              : 'text-neutral-400 hover:text-neutral-200'
-          }`}
-        >
+        <button onClick={() => setActiveTab('business')} aria-pressed={activeTab === 'business'} className={tabClass(activeTab === 'business')}>
           Pro
         </button>
       </div>
 
       {/* Title and description */}
-      <h3 className="text-2xl font-bold text-neutral-100 mb-2">
+      <h3 className="font-cond mb-2 pr-14 text-[24px] font-extrabold leading-tight text-white lg:text-[28px]">
         {content.title}
       </h3>
-      <p className="text-neutral-400 mb-4">
+      <p className="mb-4 max-w-[70ch] text-[15px] leading-relaxed text-[#d7dbe8]">
         {content.description}
       </p>
 
-      {/* Context-specific text */}
-      {getContextText() && (
-        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <p className="text-sm text-blue-300">
-            💡 <strong>Wskazówka:</strong> {getContextText()}
-          </p>
-        </div>
+      {/* Context-specific text — żółć = kontekst */}
+      {contextText && (
+        <p className="mb-5 bg-tv-yellow px-4 py-3 text-[15px] leading-snug text-tv-ink">
+          <strong>Wskazówka:</strong> {contextText}
+        </p>
       )}
 
       {/* Features list */}
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <ul className="mb-5 grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2">
         {content.features.map((feature, index) => (
-          <div key={index} className="flex items-center gap-3 text-neutral-300">
-            <div className={`p-2 rounded-lg bg-gradient-to-br ${content.badgeColor} bg-opacity-10`}>
-              {feature.icon}
-            </div>
-            <span className="text-sm font-medium">{feature.text}</span>
-          </div>
+          <li key={index} className="flex items-center gap-3 text-[15px] text-tv-paper">
+            <span className="shrink-0 text-tv-muted" aria-hidden>{feature.icon}</span>
+            <span>{feature.text}</span>
+          </li>
         ))}
-      </div>
+      </ul>
 
       {/* CTA */}
-      <div className="pt-6 border-t border-gray-700/50">
+      <div className="border-t border-tv-seam pt-5">
         <a
           href="?tab=subscription"
           onClick={(e) => {
@@ -158,13 +142,13 @@ const GUSTierGate: React.FC<GUSTierGateProps> = ({
             // Navigate to profile subscription tab
             window.dispatchEvent(new CustomEvent('navigate-to-subscription'));
           }}
-          className={`inline-flex items-center gap-2 px-8 py-3 rounded-lg text-white font-bold shadow-lg transition-all transform hover:scale-105 ${content.buttonColor}`}
+          className="font-cond inline-flex min-h-[52px] items-center gap-2 bg-tv-blue px-6 text-[16px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
         >
           {content.buttonText}
-          <ArrowRight size={18} />
+          <ArrowRight size={18} aria-hidden />
         </a>
       </div>
-    </div>
+    </section>
   );
 };
 

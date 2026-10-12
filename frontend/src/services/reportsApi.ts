@@ -149,14 +149,21 @@ export const CATEGORY_CONFIG: Record<string, { label: string; emoji: string; col
     other: { label: 'Inne', emoji: '📋', color: '#95a5a6' },
 };
 
-export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-    pending: { label: 'Czeka na moderację', color: '#7f8c8d' },
-    new: { label: 'Nowe', color: '#3498db' },
-    verified: { label: 'Zweryfikowane', color: '#9b59b6' },
-    forwarded: { label: 'Przekazane do urzędu', color: '#2f6fed' },
-    in_progress: { label: 'W realizacji', color: '#f39c12' },
-    resolved: { label: 'Rozwiązane', color: '#27ae60' },
-    rejected: { label: 'Odrzucone', color: '#e74c3c' },
+/**
+ * Statusy w języku „Paska informacyjnego” (11.10.2026): kolor = STAN sprawy.
+ * Szew — czeka, nikt jeszcze nic nie zrobił (albo odrzucone: samo słowo
+ * wystarcza, czerwień czytałaby się jak awaria). Żółć — sprawa w toku.
+ * Papier — załatwione; zieleń wolno pokazać wyłącznie jako ikonę potwierdzenia,
+ * nigdy jako tło. `color` zostaje dla wołających ze `style` (kafel na pulpicie).
+ */
+export const STATUS_CONFIG: Record<string, { label: string; color: string; tone: 'seam' | 'yellow' | 'paper' }> = {
+    pending: { label: 'Czeka na moderację', color: '#b4bbd0', tone: 'seam' },
+    new: { label: 'Nowe', color: '#b4bbd0', tone: 'seam' },
+    verified: { label: 'Zweryfikowane', color: '#b4bbd0', tone: 'seam' },
+    forwarded: { label: 'Przekazane do urzędu', color: '#ffd23f', tone: 'yellow' },
+    in_progress: { label: 'W realizacji', color: '#ffd23f', tone: 'yellow' },
+    resolved: { label: 'Rozwiązane', color: '#f5f6fa', tone: 'paper' },
+    rejected: { label: 'Odrzucone', color: '#b4bbd0', tone: 'seam' },
 };
 
 // ==================== Moderacja (admin) ====================

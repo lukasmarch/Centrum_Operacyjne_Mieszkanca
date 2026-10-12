@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import StaleDataNotice from './StaleDataNotice';
-import { ChevronDown, ChevronUp, AlertTriangle, Megaphone, ExternalLink, MapPin, Globe, Map as MapIcon } from 'lucide-react';
+import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useArticles } from '../src/hooks/useArticles';
-import ArticleImage, { getCategoryTheme } from './ArticleImage';
+import { Chip, EntrySquare, Notice, PageHead, Skeleton, Tag, boardOf } from './simple/tv';
+import { useMyVillage } from '../src/hooks/useMyVillage';
 import AlertPushPrompt from './AlertPushPrompt';
 import { Article } from '../types';
 import { fetchActiveAnnouncements, ActiveAnnouncement } from '../src/services/businessApi';
@@ -22,84 +23,104 @@ interface NewsFeedProps {
 const SCOPE_GROUPS = ['gmina', 'okolice', 'region'] as const;
 type ScopeGroup = typeof SCOPE_GROUPS[number];
 
-const SCOPE_GROUP_LABELS: Record<ScopeGroup, { label: string; icon: React.ReactNode }> = {
-  gmina: { label: 'Gmina Rybno', icon: <MapPin size={12} className="text-blue-400" /> },
-  okolice: { label: 'Powiat i sąsiedzi', icon: <MapIcon size={12} className="text-neutral-500" /> },
-  region: { label: 'Dalej w regionie', icon: <Globe size={12} className="text-neutral-400" /> },
+const SCOPE_GROUP_LABELS: Record<ScopeGroup, string> = {
+  gmina: 'Gmina Rybno',
+  okolice: 'Powiat i sąsiedzi',
+  region: 'Dalej w regionie',
 };
 
-const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
-  const theme = getCategoryTheme(article.category);
-  const isAwaria = (article.category || '').toLowerCase().includes('awari');
 
+/** Wieś z gminy wymieniona we wpisie — plakietka, nie szara meta (najwyżej dwie). */
+// „Rybno” odejmujemy, gdy obok pada inna wieś: każdy komunikat Energi niesie
+// „Rybno gmina wiejska”, więc plakietka RYBNO stała przy co drugim wpisie
+// (ta sama reguła co `alert_policy.same_incident`)
+const placesOf = (article: Article): string[] => {
+  const all = article.alertPlaces ?? [];
+  const rest = all.filter(p => p !== 'Rybno');
+  return (rest.length ? rest : all).slice(0, 2);
+};
+
+/** Meta jednym ciągiem: kategoria · czas · źródło ↗ (13 px, przygaszona). */
+const Meta: React.FC<{ article: Article; withCategory?: boolean }> = ({ article, withCategory = true }) => (
+  <p className="text-[13px] leading-snug text-tv-muted">
+    {/* „Wiadomości” jako kategoria w zakładce Wiadomości to tautologia */}
+    {withCategory && article.category && article.category !== 'Wiadomości' && (
+      <><span className="font-bold text-tv-paper">{article.category}</span>{' · '}</>
+    )}
+    {/* Etykietę składa `useArticles` przez `utils/articleTime` — dla
+        zapowiedzi liczy się TERMIN, nie wiek ogłoszenia */}
+    <span className="tabular">{article.timestamp}</span>
+    {article.sourceLabel && <> · {article.sourceLabel}</>}
+  </p>
+);
+
+/** Tytuł jest linkiem do źródła — osobny wiersz „Czytaj u źródła” kosztował 44 px na wpis. */
+const TitleLink: React.FC<{ article: Article; className: string }> = ({ article, className }) => (
+  <a
+    href={article.url}
+    target="_blank"
+    // Przy prywatnych profilach FB nie pokazujemy nazwy (sourceLabel === null),
+    // ale link zostaje — to atrybucja, a mieszkaniec i tak chce doczytać oryginał
+    rel={article.sourceLabel ? 'noopener noreferrer' : 'noopener noreferrer nofollow'}
+    className={`group/t block underline-offset-4 hover:underline ${className}`}
+  >
+    {article.title}
+    <ExternalLink size={14} aria-hidden className="ml-1.5 inline-block align-[-1px] text-tv-muted group-hover/t:text-white" />
+    <span className="sr-only"> (otwiera się w nowej karcie u źródła)</span>
+  </a>
+);
+
+/**
+ * Pełny wpis — sekcja „Gmina Rybno”. Kwadrat (zdjęcie → tablica z terminem →
+ * piktogram), plakietka wsi, meta, tytuł-link, wypis najwyżej 2 linie.
+ * Do 11.10.2026 wiersz miał ~10 linii i ~255 px — na telefonie 360 px
+ * mieściły się 2 wpisy, a pierwszy zaczynał się pod zgięciem (krytyka 23/36).
+ */
+const ArticleRow: React.FC<{ article: Article; span?: boolean }> = ({ article, span = false }) => {
+  const board = boardOf(article);
+  const places = placesOf(article);
+  const hasSummary = article.summary && article.summary !== 'Brak opisu';
   return (
-    <div className={`group glass-panel rounded-2xl overflow-hidden border shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full hover:bg-white/5 ${isAwaria ? 'border-red-500/30 hover:border-red-500/50' : 'border-white/10'
-      }`}>
-      {/* Image */}
-      <div className="h-44 overflow-hidden relative">
-        <ArticleImage
-          imageUrl={article.imageUrl}
-          category={article.category}
-          source={article.source}
-          className="group-hover:scale-105 transition-transform duration-500"
-          iconSize="lg"
-        />
-        {/* Category badge overlay */}
-        <div className="absolute top-3 left-3">
-          <span className={`backdrop-blur-md px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wide border bg-gray-950/80 ${theme.badge}`}>
-            {article.category || 'INFO'}
-          </span>
-        </div>
-        {/* Time badge */}
-        <div className="absolute top-3 right-3">
-          <span className="backdrop-blur-md bg-gray-950/70 text-neutral-100 px-2 py-1 rounded-lg text-[13px] font-semibold border border-white/10">
-            {/* Etykietę składa `useArticles` przez `utils/articleTime` — dla
-                zapowiedzi liczy się TERMIN, nie wiek ogłoszenia */}
-            {article.timestamp}
-          </span>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 flex flex-col p-4">
-        {article.sourceLabel && (
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-neutral-400 font-bold uppercase tracking-wide">
-              {article.sourceLabel}
-            </span>
+    <article className={`flex gap-3 bg-tv-panel p-3 sm:gap-4 sm:p-4 ${span ? 'lg:col-span-2' : ''}`}>
+      <EntrySquare
+        imageUrl={article.imageUrl}
+        when={board.when}
+        allDay={board.allDay}
+        tone={board.tone}
+        category={article.category}
+      />
+      <div className="min-w-0 flex-1">
+        {places.length > 0 && (
+          <div className="mb-1 flex flex-wrap gap-1">
+            {places.map(p => <Tag key={p} tone="paper">{p}</Tag>)}
           </div>
         )}
-        <h3 className="text-base font-bold text-neutral-200 mb-2 group-hover:text-blue-400 transition-colors leading-snug line-clamp-2">
-          {article.title}
-        </h3>
-        {article.summary && article.summary !== 'Brak opisu' && (
-          <p className="text-sm text-neutral-400 line-clamp-3 mb-4 flex-1">
-            {article.summary}
-          </p>
+        <Meta article={article} />
+        <TitleLink article={article} className="mt-0.5 line-clamp-3 text-[17px] font-semibold leading-snug text-white" />
+        {hasSummary && (
+          <p className="mt-1 line-clamp-2 max-w-[68ch] text-[15px] leading-snug text-[#d7dbe8]">{article.summary}</p>
         )}
-        {/* Każdy wpis prowadzi do pełnej treści u źródła. Przy prywatnych profilach FB
-            nie pokazujemy nazwy (sourceLabel === null), ale link zostaje — to atrybucja,
-            a mieszkaniec i tak chce doczytać oryginał */}
-        <a
-          href={article.url}
-          target="_blank"
-          rel={article.sourceLabel ? 'noopener noreferrer' : 'noopener noreferrer nofollow'}
-          className="w-full py-2.5 rounded-xl bg-white/5 text-neutral-300 font-bold text-sm hover:bg-blue-600 hover:text-white transition-all text-center border border-white/5 mt-auto inline-flex items-center justify-center gap-1.5"
-        >
-          Czytaj więcej
-          <ExternalLink size={12} />
-        </a>
       </div>
-    </div>
+    </article>
   );
 };
 
-const VISIBLE_CHIPS = 4;
+/** Zwarty wpis — powiat i region: sama meta i tytuł. Sprawa sąsiadów nie
+ *  waży tyle co sprawa gminy (PRODUCT.md, zasada 1). */
+const CompactRow: React.FC<{ article: Article }> = ({ article }) => (
+  <li className="bg-tv-panel px-3 py-2.5 sm:px-4">
+    <Meta article={article} />
+    <TitleLink article={article} className="mt-0.5 line-clamp-2 text-[16px] font-semibold leading-snug text-white" />
+  </li>
+);
 
 const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
-  const { articles, loading, error, fetchedAt } = useArticles({ limit: 50, perSource: 5 });
+  // Wieś czytelnika — tylko po to, by backend powiedział, czy awaria go dotyczy
+  // (`concerns_location`); bez niej każda awaria świeciłaby na czerwono
+  const { village } = useMyVillage();
+  const { articles, loading, error, fetchedAt } = useArticles({ limit: 50, perSource: 5, location: village });
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory || 'Wszystkie');
-  const [chipsExpanded, setChipsExpanded] = useState(false);
+  const [regionOpen, setRegionOpen] = useState(false);
   const [announcements, setAnnouncements] = useState<ActiveAnnouncement[]>([]);
 
   // Reklamy widzi wyłącznie plan darmowy — cennik sprzedaje ich brak w planach
@@ -145,11 +166,6 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
       .map(([cat]) => cat);
   }, [categoryCounts, articles]);
 
-  const visibleCategories = chipsExpanded
-    ? sortedCategories
-    : sortedCategories.slice(0, VISIBLE_CHIPS);
-
-  const overflowCount = sortedCategories.length - VISIBLE_CHIPS;
 
   // Filtered articles
   const filteredArticles = useMemo(() => {
@@ -213,148 +229,141 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ initialCategory }) => {
   }, [filteredArticles]);
 
   if (loading) return (
-    <div className="space-y-6">
-      <div className="h-8 w-40 bg-gray-900/50 rounded-xl animate-pulse" />
-      <div className="flex gap-2">
-        {[1, 2, 3, 4].map(i => <div key={i} className="h-8 w-24 bg-gray-900/50 rounded-full animate-pulse" />)}
+    <div className="space-y-6" aria-busy="true">
+      <PageHead title="Wiadomości" sub="Wczytuję…" />
+      <div className="flex gap-1.5">
+        {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-11 w-24" />)}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3, 4, 5, 6].map(i => (
-          <div key={i} className="h-72 bg-gray-900/30 rounded-2xl animate-pulse" />
-        ))}
+      <div className="grid grid-cols-1 gap-px bg-tv-seam lg:grid-cols-2">
+        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-36" />)}
       </div>
     </div>
   );
 
   // Błąd bez żadnych danych — przy danych lista zostaje, a nad nią `StaleDataNotice`
-  if (error && !articles) return <div className="text-center p-8 text-neutral-400">Nie udało się pobrać wiadomości. Sprawdź połączenie i spróbuj za chwilę.</div>;
-  if (!articles || articles.length === 0) return <div className="text-center p-8 text-neutral-500">Brak wiadomości.</div>;
+  if (error && !articles) return (
+    <div className="space-y-6">
+      <PageHead title="Wiadomości" />
+      <Notice tone="warn" role="alert">Nie udało się pobrać wiadomości. Sprawdź połączenie i spróbuj za chwilę.</Notice>
+    </div>
+  );
+  if (!articles || articles.length === 0) return (
+    <div className="space-y-6">
+      <PageHead title="Wiadomości" />
+      <Notice>W ostatnich dniach nie pojawiła się żadna wiadomość z gminy ani okolicy.</Notice>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 lg:space-y-8">
+      <PageHead
+        title="Wiadomości"
+        sub={<>Najpierw gmina Rybno, potem powiat i region. <span className="tabular">{filteredArticles.length}</span> {filteredArticles.length === 1 ? 'wpis' : 'wpisów'}{activeCategory !== 'Wszystkie' && <> w kategorii „{activeCategory}”</>}.</>}
+      />
       {error && <StaleDataNotice fetchedAt={fetchedAt} />}
-      {/* Title */}
-      <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Aktualności</h2>
-        {/* Licznik pokazuje to, co widać na ekranie — inaczej suma chipów nie zgadza się z nagłówkiem */}
-        <span className="text-xs font-bold text-neutral-400 bg-gray-900/50 px-2 py-0.5 rounded-full">{filteredArticles.length} artykułów</span>
-      </div>
 
-      {/* Categories – compact chips with overflow */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {/* "Wszystkie" chip */}
-        <button
-          onClick={() => setActiveCategory('Wszystkie')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${activeCategory === 'Wszystkie'
-              ? 'bg-blue-600/20 text-blue-300 border-blue-500/30 shadow-lg shadow-blue-500/10'
-              : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10'
-            }`}
-        >
+      {/* Filtry w JEDNYM rzędzie przewijanym w poziomie (telefon), od `lg` zawijane.
+          Trzy rzędy chipów (~150 px) spychały pierwszą wiadomość pod zgięcie */}
+      <div
+        role="group"
+        aria-label="Kategorie"
+        className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 md:-mx-8 md:px-8 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0"
+      >
+        <Chip active={activeCategory === 'Wszystkie'} onClick={() => setActiveCategory('Wszystkie')} count={articles.length}>
           Wszystkie
-          <span className="text-[10px] font-black bg-white/10 px-1.5 rounded">{articles.length}</span>
-        </button>
-
-        {/* Visible category chips */}
-        {visibleCategories.map(cat => {
+        </Chip>
+        {sortedCategories.map(cat => {
           const isAwaria = cat.toLowerCase().includes('awari');
-          const count = categoryCounts[cat] || 0;
-          const theme = getCategoryTheme(cat);
           return (
-            <button
+            <Chip
               key={cat}
+              active={activeCategory === cat}
+              alert={isAwaria}
               onClick={() => setActiveCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${activeCategory === cat
-                  ? `${theme.badge} shadow-lg`
-                  : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10'
-                }`}
+              count={categoryCounts[cat] || 0}
             >
-              {isAwaria && <AlertTriangle size={10} />}
-              <div className={`w-1.5 h-1.5 rounded-full ${theme.dot}`} />
               {cat}
-              <span className="text-[10px] font-black bg-white/10 px-1.5 rounded">{count}</span>
-            </button>
+            </Chip>
           );
         })}
-
-        {/* Overflow toggle */}
-        {overflowCount > 0 && (
-          <button
-            onClick={() => setChipsExpanded(prev => !prev)}
-            className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-neutral-400 border border-white/5 hover:bg-white/10 transition-all flex items-center gap-1"
-          >
-            {chipsExpanded ? (
-              <>Ukryj <ChevronUp size={10} /></>
-            ) : (
-              <>+{overflowCount} więcej <ChevronDown size={10} /></>
-            )}
-          </button>
-        )}
       </div>
 
-      {/* Zgoda na powiadomienia — prosimy tylko wtedy, gdy w feedzie stoi awaria.
-          Wartość alertu jest wtedy widoczna, a nie deklarowana. */}
-      {hasAwaria && <AlertPushPrompt />}
+      {/* Sekcje po zasięgu. Gmina — pełne wpisy; powiat — zwarta lista;
+          region — zwarty i domyślnie zwinięty (kto z Rybna przewija do Mławy?) */}
+      {SCOPE_GROUPS.map(group => {
+        const groupArticles = groupedArticles[group];
+        if (groupArticles.length === 0) return null;
+        const isGmina = group === 'gmina';
+        const collapsed = group === 'region' && !regionOpen;
+        return (
+          <React.Fragment key={group}>
+            <section aria-label={SCOPE_GROUP_LABELS[group]}>
+              <div className="flex items-baseline gap-3">
+                <Tag as="h2" tone={isGmina ? 'blue' : 'seam'}>{SCOPE_GROUP_LABELS[group]}</Tag>
+                <span className="tabular text-[14px] text-tv-muted">{groupArticles.length}</span>
+              </div>
+              {isGmina ? (
+                <div className="grid grid-cols-1 gap-px border-t-2 border-tv-blue bg-tv-seam lg:grid-cols-2">
+                  {/* Nieparzysta liczba: ostatni wpis na całą szerokość — inaczej od `lg` zostaje pusta komórka w kolorze szwu */}
+                  {groupArticles.map((article, i) => (
+                    <ArticleRow key={article.id} article={article} span={groupArticles.length % 2 === 1 && i === groupArticles.length - 1} />
+                  ))}
+                </div>
+              ) : collapsed ? (
+                <button
+                  onClick={() => setRegionOpen(true)}
+                  aria-expanded={false}
+                  className="flex min-h-[48px] w-full items-center justify-between border-t border-tv-seam bg-tv-panel px-4 text-left text-[15px] font-bold text-tv-bluesoft transition-colors hover:bg-tv-panel2 hover:text-white"
+                >
+                  Pokaż {groupArticles.length} {groupArticles.length === 1 ? 'wpis' : groupArticles.length < 5 ? 'wpisy' : 'wpisów'} z dalszych okolic
+                  <ChevronDown size={18} aria-hidden />
+                </button>
+              ) : (
+                <ul className="grid grid-cols-1 gap-px border-t border-tv-seam bg-tv-seam lg:grid-cols-2 [&>li:last-child:nth-child(odd)]:lg:col-span-2">
+                  {groupArticles.map(article => <CompactRow key={article.id} article={article} />)}
+                </ul>
+              )}
+            </section>
 
-      {/* Ogłoszenia firm (plan Firma lokalna) — oznaczone jako materiał reklamowy */}
+            {/* Zgoda na powiadomienia — pod sprawami gminy, nie nad nimi: najpierw
+                czytelnik widzi awarię, potem pytamy, czy chce o następnej wiedzieć */}
+            {isGmina && hasAwaria && <AlertPushPrompt />}
+          </React.Fragment>
+        );
+      })}
+
+      {/* Ogłoszenia firm (plan Firma lokalna) — pod treścią gminną, pod plakietką
+          „Reklama” jak na pulpicie (`AdBoard`): reklama jest gościem, nie nagłówkiem */}
       {announcements.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
-            <span className="h-px flex-1 bg-white/5" />
-            <Megaphone size={12} className="text-amber-500" />
-            Ogłoszenia firm
-            <span className="text-xs text-neutral-400 normal-case font-medium">materiał reklamowy</span>
-            <span className="h-px flex-1 bg-white/5" />
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section aria-label="Reklama">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Tag as="h2" tone="seam">Reklama</Tag>
+            <span className="text-[15px] text-tv-muted">ogłoszenia firm z gminy</span>
+          </div>
+          <div className="grid grid-cols-1 gap-px border-t border-tv-seam bg-tv-seam md:grid-cols-2">
             {announcements.map(a => (
-              <div key={a.id} className="p-4 bg-gradient-to-br from-amber-500/8 to-white/[0.02] border border-amber-500/20 rounded-2xl">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <p className="text-sm font-bold text-neutral-100">{a.title}</p>
+              <div key={a.id} className="bg-tv-panel p-4">
+                <div className="mb-1 flex items-start justify-between gap-3">
+                  <p className="text-[16px] font-bold leading-snug text-white">{a.title}</p>
                   {a.type === 'okazja' && a.valid_until && (
-                    <span className="text-xs text-amber-300 font-medium whitespace-nowrap">
+                    <span className="font-cond tabular whitespace-nowrap bg-tv-yellow px-2 py-1 text-[13px] font-extrabold uppercase leading-none text-tv-ink">
                       do {new Date(a.valid_until).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-neutral-400 leading-relaxed">{a.body}</p>
-                <p className="text-[13px] text-neutral-400 mt-2">
+                <p className="text-[15px] leading-snug text-[#d7dbe8]">{a.body}</p>
+                <p className="mt-2 text-[13px] text-tv-muted">
                   {a.nazwa} · {a.miasto}
-                  {a.telefon && <> · 📞 {a.telefon}</>}
+                  {a.telefon && <> · <a href={`tel:${a.telefon.replace(/\s/g, '')}`} className="tabular font-semibold text-tv-bluesoft underline underline-offset-2 hover:text-white">{a.telefon}</a></>}
                 </p>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Sekcje po zasięgu: najpierw gmina, potem powiat, na końcu reszta regionu */}
-      {SCOPE_GROUPS.map(group => {
-        const groupArticles = groupedArticles[group];
-        if (groupArticles.length === 0) return null;
-        const groupInfo = SCOPE_GROUP_LABELS[group];
-        return (
-          <div key={group} className="space-y-4">
-            <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-2">
-              <span className="h-px flex-1 bg-white/5" />
-              {groupInfo.icon}
-              {groupInfo.label}
-              <span className="text-neutral-400 font-medium">({groupArticles.length})</span>
-              <span className="h-px flex-1 bg-white/5" />
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {groupArticles.map(article => (
-                <ArticleCard key={article.id} article={article} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
-
       {filteredArticles.length === 0 && (
-        <div className="text-center py-16 text-neutral-500">
-          <div className="text-4xl mb-3">📰</div>
-          Brak artykułów w kategorii „{activeCategory}".
-        </div>
+        <Notice>Brak wpisów w kategorii „{activeCategory}”.</Notice>
       )}
     </div>
   );

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=1440">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden;background:#05070c;font-family:'Onest',sans-serif;color:#f2f4f8;font-variant-numeric:tabular-nums}
+.stage{display:grid;grid-template-columns:1000px 390px;gap:26px;padding:28px 12px}
+.lbl{position:absolute;top:6px;font-size:12px;color:#6c7488;letter-spacing:.1em;text-transform:uppercase}
+.www{position:relative;background:#0b0f19;height:844px;overflow:hidden;border:1px solid #1b2232}
+.ph{position:relative;background:#0b0f19;height:844px;overflow:hidden;border:1px solid #1b2232;border-radius:28px}
+nav.top{display:flex;align-items:center;gap:22px;padding:14px 28px;border-bottom:1px solid #1b2232;font-size:14px;color:#a9b1c4}
+.logo{font-weight:800;font-size:19px;color:#f2f4f8;letter-spacing:-.02em;margin-right:10px}.logo b{color:#3d7bff}
+nav.top .on{color:#f2f4f8;font-weight:600}
+.chip{margin-left:auto;border:1px solid #3d7bff;color:#f2f4f8;border-radius:999px;padding:6px 12px;font-weight:600}
+.btn{background:#3d7bff;color:#fff;border-radius:999px;padding:7px 14px;font-weight:600}
+.head{display:flex;justify-content:space-between;align-items:flex-end;padding:26px 28px 18px}
+.head small{font-size:14px;color:#a9b1c4}
+.head h1{font-size:44px;font-weight:800;letter-spacing:-.035em;line-height:1.05;margin-top:4px}
+.head h1 em{font-style:normal;color:#2ecc71}
+.wx{text-align:right}.wx .t{font-size:44px;font-weight:700}.wx .s{font-size:14px;color:#a9b1c4}
+.axis{margin:0 28px;border:1px solid #1b2232}
+.days{display:grid;grid-template-columns:150px repeat(7,1fr);font-size:13px;color:#a9b1c4;border-bottom:1px solid #1b2232}
+.days div{padding:8px 10px;border-left:1px solid #1b2232}.days .now{color:#f2f4f8;font-weight:700;background:#121a2b}
+.lane{display:grid;grid-template-columns:150px repeat(7,1fr);border-bottom:1px solid #1b2232;height:52px;position:relative}
+.lane:last-child{border-bottom:0}
+.lane .n{padding:0 12px;font-size:13px;font-weight:600;display:flex;align-items:center}
+.lane i{border-left:1px solid #1b2232}
+.mk{position:absolute;top:10px;height:32px;border-radius:6px;font-size:12px;font-weight:600;display:flex;align-items:center;padding:0 8px;white-space:nowrap}
+.mods{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:1px;background:#1b2232;margin:18px 28px 0;border:1px solid #1b2232}
+.mod{background:#0b0f19;padding:14px 16px;height:200px}
+.mod h3{font-size:13px;color:#a9b1c4;font-weight:600;margin-bottom:8px}
+.it{font-size:15px;line-height:1.35;padding:6px 0;border-top:1px solid #1b2232}.it span{color:#a9b1c4;font-size:13px;display:block}
+/* phone */
+.pt{display:flex;justify-content:space-between;align-items:center;padding:14px 16px}
+.pt .chip{margin:0}
+.ph .head{padding:4px 16px 14px;display:block}.ph .head h1{font-size:30px}
+.pax{margin:0 12px;border:1px solid #1b2232}
+.pax .days{grid-template-columns:repeat(7,1fr);font-size:11px}.pax .days div{padding:6px 0;text-align:center}
+.pax .lane{grid-template-columns:repeat(7,1fr);height:34px}
+.pax .mk{top:6px;height:22px;font-size:11px;padding:0 5px}
+.row{display:grid;grid-template-columns:1fr auto;padding:12px 16px;border-bottom:1px solid #1b2232;align-items:baseline}
+.row .k{font-size:13px;color:#a9b1c4;font-weight:600}.row .v{font-size:20px;font-weight:700}.row .t{font-size:15px;color:#a9b1c4}
+.cta{margin:14px 16px;background:#3d7bff;border-radius:14px;padding:14px;text-align:center;font-weight:700;font-size:16px}
+.tabs{position:absolute;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #1b2232;background:#0b0f19}
+.tabs div{padding:10px 0 20px;text-align:center;font-size:13px;color:#a9b1c4}.tabs .on{color:#f2f4f8;font-weight:700}
+</style></head><body>
+<div class="stage">
+<div class="www"><nav class="top"><span class="logo">Rybno<b>Live</b></span><span class="on">Pulpit</span><span>Wiadomości</span><span>Wydarzenia</span><span>Odpady</span><span>Autobus</span><span>Firmy</span><span>Zapytaj</span><span class="chip">Żabiny ▾</span><span class="btn">Zaloguj</span></nav>
+ <div class="head"><div><small>Niedziela 11 października · imieniny Aldony, Emila</small><h1>W Żabinach <em>spokojnie</em>.<br>We wtorek wyłączenie w Grądach.</h1></div><div class="wx"><div class="t">9°</div><div class="s">zachmurzenie · powietrze czyste</div></div></div>
+ <div class="axis">
+  <div class="days"><div>Tydzień</div><div class="now">nd 11</div><div>pn 12</div><div>wt 13</div><div>śr 14</div><div>czw 15</div><div>pt 16</div><div>sb 17</div></div>
+  <div class="lane"><span class="n">Prąd i woda</span><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span class="mk" style="left:525px;width:88px;background:#ff4d3d22;border:1px solid #ff4d3d;color:#ffb3ab">9–13 Grądy</span></div>
+  <div class="lane"><span class="n">Wywóz</span><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span class="mk" style="left:420px;width:100px;background:#ffb020;color:#0b0f19">6:00 zmieszane</span></div>
+  <div class="lane"><span class="n">Autobus</span><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span class="mk" style="left:315px;width:300px;background:#3d7bff33;border:1px solid #3d7bff;color:#cfe0ff">od 06:40 · 6 kursów dziennie</span></div>
+  <div class="lane"><span class="n">W gminie</span><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span class="mk" style="left:630px;width:110px;background:#f2f4f8;color:#0b0f19">10:00 sesja Rady</span></div>
+ </div>
+ <div class="mods">
+  <div class="mod"><h3>Ostatnio w gminie</h3><div class="it">Nabór wniosków do funduszu sołeckiego<span>BIP · wczoraj</span></div><div class="it">Turniej halowy w Rybnie — wyniki<span>Gmina Rybno · pt</span></div></div>
+  <div class="mod"><h3>Rada Gminy</h3><div class="it">Czwartek 10:00 — XXVI sesja<span>porządek obrad w BIP</span></div></div>
+  <div class="mod"><h3>Kino w Działdowie</h3><div class="it">Dziś 17:30, 20:00<span>repertuar tygodnia</span></div></div>
+ </div>
+</div>
+<div class="ph"><div class="pt"><span class="logo">Rybno<b>Live</b></span><span class="chip">Żabiny ▾</span></div>
+ <div class="head"><small>Niedziela 11.10 · 9°</small><h1>W Żabinach <em>spokojnie</em>. We wtorek wyłączenie w Grądach.</h1></div>
+ <div class="pax"><div class="days"><div class="now">nd</div><div>pn</div><div>wt</div><div>śr</div><div>cz</div><div>pt</div><div>sb</div></div>
+  <div class="lane"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span class="mk" style="left:104px;width:46px;background:#ff4d3d22;border:1px solid #ff4d3d;color:#ffb3ab">prąd</span></div>
+  <div class="lane"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span class="mk" style="left:104px;width:46px;background:#ffb020;color:#0b0f19">wywóz</span></div>
+  <div class="lane"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span class="mk" style="left:212px;width:46px;background:#f2f4f8;color:#0b0f19">sesja</span></div></div>
+ <div class="row"><div><div class="k">Prąd i woda</div><div class="v">wt 9:00–13:00 · Grądy</div></div><span class="t">nie Żabiny</span></div>
+ <div class="row"><div><div class="k">Wywóz · zmieszane</div><div class="v">wtorek 13.10</div></div><span class="t">6:00</span></div>
+ <div class="row"><div><div class="k">Autobus do Działdowa</div><div class="v">jutro</div></div><span class="t">06:40</span></div>
+ <div class="cta">Powiadamiaj o Żabinach</div>
+ <nav class="tabs"><div class="on">Pulpit</div><div>Gmina</div><div>Zapytaj</div><div>Więcej</div></nav>
+</div></div>
+</body></html>

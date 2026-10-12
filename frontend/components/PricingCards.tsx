@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { CheckCircle, Zap, Crown, Store } from 'lucide-react';
+import { Check, Zap, Crown, Store, HelpCircle } from 'lucide-react';
+import { Chip, Tag } from './simple/tv';
 import { cn } from '../lib/utils';
 
 export type Frequency = 'monthly' | 'yearly';
@@ -111,38 +112,59 @@ interface PricingCardsProps {
   onSelect?: (tierId: string, frequency: Frequency) => void;
 }
 
-export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelect }) => {
+// Kwoty po polsku: „9,99 zł”, nie „9.99 zł” — sama prezentacja, ceny w PLANS bez zmian
+const zl = (value: number) => value.toLocaleString('pl-PL', { maximumFractionDigits: 2 });
+
+export /**
+ * Pozycja planu z wyjaśnieniem. Do 11.10.2026 wyjaśnienie żyło w `title` pod
+ * znakiem „?” 10 px — na telefonie i z klawiatury nie istniało. Teraz przycisk
+ * 44 px rozwija je pod pozycją.
+ */
+const FeatureText: React.FC<{ text: string; tooltip?: string }> = ({ text, tooltip }) => {
+  const [open, setOpen] = useState(false);
+  if (!tooltip) return <span className="text-[14px] leading-snug text-[#d7dbe8]">{text}</span>;
+  return (
+    <span className="min-w-0 flex-1">
+      <span className="flex items-start justify-between gap-1">
+        <span className="pt-0.5 text-[14px] leading-snug text-[#d7dbe8]">{text}</span>
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          aria-expanded={open}
+          aria-label={open ? 'Schowaj wyjaśnienie' : `Co to znaczy: ${text}`}
+          className="-mr-2 -mt-2.5 flex h-11 w-11 shrink-0 items-center justify-center text-tv-muted transition-colors hover:text-white"
+        >
+          <HelpCircle size={16} aria-hidden />
+        </button>
+      </span>
+      {open && <span className="mt-1 block text-[13px] leading-snug text-tv-muted">{tooltip}</span>}
+    </span>
+  );
+};
+
+const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelect }) => {
   const [frequency, setFrequency] = useState<Frequency>('monthly');
 
   return (
-    <div className="space-y-6">
-      {/* Toggle */}
-      <div className="flex justify-center">
-        <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-full p-1">
-          {(['monthly', 'yearly'] as Frequency[]).map((freq) => (
-            <button
-              key={freq}
-              onClick={() => setFrequency(freq)}
-              className={cn(
-                'relative px-5 py-1.5 rounded-full text-sm font-medium transition-all duration-200',
-                frequency === freq
-                  ? 'bg-white text-black shadow'
-                  : 'text-neutral-400 hover:text-white'
-              )}
-            >
-              {freq === 'monthly' ? 'Miesięcznie' : 'Rocznie'}
-              {freq === 'yearly' && (
-                <span className="absolute -top-2.5 -right-1 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                  do -30%
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-5">
+      {/* Okres rozliczenia — dwa filtry jak w reszcie podstron, aktywny = papier.
+          Obrys szwem, bo w profilu przełącznik stoi na panelu w kolorze filtra */}
+      <div role="group" aria-label="Okres rozliczenia" className="inline-flex flex-wrap gap-px border border-tv-seam bg-tv-seam">
+        {(['monthly', 'yearly'] as Frequency[]).map((freq) => (
+          <Chip key={freq} active={frequency === freq} onClick={() => setFrequency(freq)}>
+            {freq === 'monthly' ? 'Miesięcznie' : 'Rocznie'}
+            {freq === 'yearly' && (
+              <span className={`tabular text-[13px] font-extrabold normal-case ${frequency === freq ? 'opacity-70' : 'text-tv-muted'}`}>
+                do -30%
+              </span>
+            )}
+          </Chip>
+        ))}
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Plany w siatce na szwie. Wyróżniony = górna krawędź 2 px chabru
+          i plakietka, bez gradientu, poświaty i powiększenia */}
+      <div className="grid grid-cols-1 gap-px bg-tv-seam md:grid-cols-3">
         {PLANS.map((plan) => {
           const Icon = plan.icon;
           const price = plan.price[frequency];
@@ -155,97 +177,71 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
             <div
               key={plan.id}
               className={cn(
-                'relative flex flex-col rounded-2xl border overflow-hidden transition-all duration-200',
-                plan.highlighted
-                  ? 'border-blue-500/40 bg-gradient-to-b from-blue-950/60 to-blue-900/30 shadow-lg shadow-blue-500/10 scale-[1.02]'
-                  : 'border-white/8 bg-white/3 hover:border-white/15'
+                'flex flex-col border-t-2 bg-tv-panel',
+                plan.highlighted ? 'border-tv-blue' : 'border-tv-seam'
               )}
             >
-              {/* Popular badge */}
-              {plan.highlighted && (
-                <div className="absolute top-3 right-3 bg-blue-500 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">
-                  Najpopularniejszy
-                </div>
-              )}
-
-              {/* Yearly savings badge */}
-              {frequency === 'yearly' && savingPct > 0 && (
-                <div className="absolute top-3 left-3 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  -{savingPct}%
-                </div>
-              )}
-
               {/* Header */}
-              <div className={cn('p-5 border-b', plan.highlighted ? 'border-blue-500/20' : 'border-white/6')}>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className={cn(
-                    'w-8 h-8 rounded-lg flex items-center justify-center',
-                    plan.highlighted ? 'bg-blue-500/30' : 'bg-white/8'
-                  )}>
-                    <Icon size={15} className={plan.highlighted ? 'text-blue-300' : 'text-neutral-400'} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm text-white">{plan.name}</p>
-                    <p className="text-[11px] text-neutral-500">{plan.info}</p>
+              <div className="border-b border-tv-seam p-5">
+                <div className="flex min-h-[26px] flex-wrap items-center gap-1.5">
+                  {plan.highlighted && <Tag tone="blue">Najpopularniejszy</Tag>}
+                  {frequency === 'yearly' && savingPct > 0 && (
+                    <Tag tone="paper"><span className="tabular">-{savingPct}%</span></Tag>
+                  )}
+                </div>
+                <div className="mt-3 flex items-start gap-2.5">
+                  <Icon size={20} className="mt-0.5 shrink-0 text-tv-muted" aria-hidden />
+                  <div className="min-w-0">
+                    <h3 className="font-cond text-[22px] font-extrabold leading-tight text-white">{plan.name}</h3>
+                    <p className="mt-0.5 text-[14px] leading-snug text-tv-muted">{plan.info}</p>
                   </div>
                 </div>
-                <div className="flex items-end gap-1">
-                  <span className="text-3xl font-black text-white">{price === 0 ? '0' : price} zł</span>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="font-cond tabular text-[36px] font-extrabold leading-none text-white">{price === 0 ? '0' : zl(price)} zł</span>
                   {price > 0 && (
-                    <span className="text-neutral-500 text-sm mb-0.5">
+                    <span className="text-[15px] text-tv-muted">
                       /{frequency === 'monthly' ? 'mc' : 'rok'}
                     </span>
                   )}
                 </div>
                 {frequency === 'yearly' && savingPct > 0 && (
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    zamiast {plan.price.monthly * 12} zł/rok
+                  <p className="tabular mt-1 text-[13px] text-tv-muted">
+                    zamiast {zl(plan.price.monthly * 12)} zł/rok
                   </p>
                 )}
               </div>
 
               {/* Features */}
-              <div className="flex-1 p-5 space-y-3">
+              <ul className="flex-1 space-y-2.5 p-5">
                 {plan.features.map((f, i) => (
-                  <div key={i} className="flex items-start gap-2.5">
-                    <CheckCircle
-                      size={14}
-                      className={cn(
-                        'mt-0.5 flex-shrink-0',
-                        plan.highlighted ? 'text-blue-400' : 'text-neutral-500'
-                      )}
+                  <li key={i} className="flex items-start gap-2.5">
+                    <Check
+                      size={16}
+                      strokeWidth={2.5}
+                      aria-hidden
+                      className={cn('mt-0.5 shrink-0', plan.highlighted ? 'text-tv-bluesoft' : 'text-tv-muted')}
                     />
-                    <span
-                      className="text-xs text-neutral-300 leading-snug"
-                      title={f.tooltip}
-                    >
-                      {f.text}
-                      {f.tooltip && (
-                        <span className="ml-1 text-neutral-600 cursor-help underline decoration-dashed decoration-neutral-600">
-                          ?
-                        </span>
-                      )}
-                    </span>
-                  </div>
+                    <FeatureText text={f.text} tooltip={f.tooltip} />
+                  </li>
                 ))}
-              </div>
+              </ul>
 
               {/* CTA */}
-              <div className={cn('p-4 border-t', plan.highlighted ? 'border-blue-500/20' : 'border-white/6')}>
+              <div className="border-t border-tv-seam p-4">
                 {/* Plan darmowy nie jest do kupienia — nigdy nie dostaje przycisku,
                     inaczej „Aktualny plan" świeci się także u kogoś z Premium */}
                 {isCurrent || plan.tierKey === 'free' ? (
-                  <div className="w-full py-2.5 rounded-xl text-center text-sm font-semibold text-neutral-500 border border-white/8">
+                  <div className="font-cond flex min-h-[52px] w-full items-center justify-center border-2 border-tv-seam text-[16px] font-bold uppercase tracking-wide text-tv-muted">
                     {isCurrent ? 'Aktualny plan' : 'Dostępny bez opłat'}
                   </div>
                 ) : (
                   <button
                     onClick={() => onSelect?.(plan.tierKey, frequency)}
                     className={cn(
-                      'w-full py-2.5 rounded-xl text-sm font-bold transition-all',
+                      'font-cond min-h-[52px] w-full px-4 text-[17px] font-extrabold uppercase tracking-wide transition-colors',
                       plan.highlighted
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow shadow-blue-500/30'
-                        : 'bg-white/8 hover:bg-white/12 text-white border border-white/10'
+                        ? 'bg-tv-blue text-white hover:bg-[#3a63ff]'
+                        : 'bg-tv-paper text-tv-ink hover:bg-white'
                     )}
                   >
                     {plan.btnText}
@@ -257,9 +253,9 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
         })}
       </div>
 
-      <div className="text-center text-xs text-neutral-600 space-y-1.5">
+      <div className="space-y-1.5 text-[13px] leading-relaxed text-tv-muted">
         <p>
-          Ceny brutto w PLN · Płatność z góry za wybrany okres · <strong className="text-neutral-500">bez automatycznego odnawiania</strong>
+          Ceny brutto w PLN · Płatność z góry za wybrany okres · <strong className="text-tv-paper">bez automatycznego odnawiania</strong>
           {' '}· Dostęp aktywowany od razu po potwierdzeniu płatności
         </p>
         <p>
@@ -267,9 +263,9 @@ export const PricingCards: React.FC<PricingCardsProps> = ({ currentTier, onSelec
           {' '}· Plan „Firma lokalna" to usługa B2B (§ 11 Regulaminu)
         </p>
         <p>
-          Szczegóły: <a href="/regulamin" className="text-neutral-500 hover:text-blue-400 underline">Regulamin</a>
+          Szczegóły: <a href="/regulamin" className="text-tv-bluesoft underline underline-offset-2 hover:text-white">Regulamin</a>
           {' · '}
-          <a href="/polityka-prywatnosci" className="text-neutral-500 hover:text-blue-400 underline">Polityka prywatności</a>
+          <a href="/polityka-prywatnosci" className="text-tv-bluesoft underline underline-offset-2 hover:text-white">Polityka prywatności</a>
         </p>
       </div>
     </div>

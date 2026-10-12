@@ -75,13 +75,11 @@ const RoadStatusStrip: React.FC = () => {
        Kolorowe tło daje jej powierzchnię i od razu niesie stan: zielony/bursztyn */
     if (stale && !trouble.length) {
         return (
-            <p className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                    <CircleHelp size={20} className="text-neutral-300" aria-hidden />
-                </span>
-                <span className="text-[15px] leading-snug text-neutral-200">
-                    Brak aktualnego odczytu dróg
-                    {readTime && <span className="text-neutral-400"> — ostatni z {readTime}</span>}
+            <p className="flex items-center gap-3 bg-tv-panel px-4 py-3">
+                <CircleHelp size={20} className="shrink-0 text-tv-muted" aria-hidden />
+                <span className="text-[15px] leading-snug text-tv-paper">
+                    Drogi: brak aktualnego odczytu
+                    {readTime && <span className="text-tv-muted"> — ostatni z {readTime}</span>}
                 </span>
             </p>
         );
@@ -89,40 +87,36 @@ const RoadStatusStrip: React.FC = () => {
 
     if (!trouble.length) {
         return (
-            <p className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.07] px-4 py-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15">
-                    <Route size={20} className="text-emerald-400" aria-hidden />
-                </span>
-                <span className="text-[15px] leading-snug text-neutral-200">
-                    Drogi w okolicy <span className="font-bold text-emerald-300">przejezdne</span>
-                    <span className="text-neutral-400"> — bez zgłoszonych utrudnień</span>
+            <p className="flex items-center gap-3 bg-tv-panel px-4 py-3">
+                <Route size={20} className="shrink-0 text-tv-green" aria-hidden />
+                <span className="text-[15px] leading-snug text-tv-paper">
+                    Drogi w okolicy <span className="font-bold text-white">przejezdne</span>
+                    <span className="text-tv-muted"> — bez zgłoszonych utrudnień</span>
                 </span>
             </p>
         );
     }
 
     return (
-        <div className="space-y-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] px-4 py-3">
+        <div className="space-y-2 bg-tv-yellow px-4 py-3 text-tv-ink">
             {trouble.map(road => (
                 <p key={road.id} className="flex items-start gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15">
-                        <Construction size={20} className="text-amber-400" aria-hidden />
-                    </span>
+                    <Construction size={20} className="mt-0.5 shrink-0" aria-hidden />
                     <span className="min-w-0 flex-1">
                         {/* Tu nazwa trasy JEST komunikatem — bez niej kierowca
                             nie wie, czy zmienia plan, czy nie */}
-                        <span className="text-[15px] font-bold leading-snug text-amber-300">
+                        <span className="text-[15px] font-extrabold leading-snug">
                             {road.name.replace(/^Rybno[-–]/, 'Trasa do ')}
                         </span>
                         {road.delayMinutes > 0 && (
-                            <span className="text-[15px] font-semibold text-amber-200/80"> · +{road.delayMinutes} min</span>
+                            <span className="text-[15px] font-bold"> · +{road.delayMinutes} min</span>
                         )}
-                        <span className="mt-0.5 block text-sm leading-snug text-neutral-300">{road.description}</span>
+                        <span className="mt-0.5 block text-[15px] leading-snug">{road.description}</span>
                     </span>
                 </p>
             ))}
             {stale && (
-                <p className="pl-12 text-sm text-neutral-400">
+                <p className="pl-8 text-[15px] font-semibold">
                     Odczyt{readTime ? ` z ${readTime}` : ''} — może być już nieaktualny
                 </p>
             )}

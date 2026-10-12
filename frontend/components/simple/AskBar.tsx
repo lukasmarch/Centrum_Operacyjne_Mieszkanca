@@ -24,24 +24,24 @@ const AskBar: React.FC<AskBarProps> = ({ onAsk }) => {
     return (
         <form
             onSubmit={submit}
-            className="flex min-h-[56px] items-center gap-3 rounded-full border border-blue-500/30 bg-[#0d1117] px-5 py-2 transition-colors focus-within:border-blue-500/60"
+            className="flex min-h-[60px] items-center gap-3 border-2 border-tv-seam bg-tv-panel pl-4 transition-colors focus-within:border-tv-paper"
         >
-            <MessageCircle size={20} className="shrink-0 text-blue-400" aria-hidden />
+            <MessageCircle size={20} className="shrink-0 text-tv-muted" aria-hidden />
             <input
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Zapytaj o cokolwiek w gminie…"
+                placeholder="Zapytaj asystenta o gminę…"
                 aria-label="Zapytaj asystenta o cokolwiek w gminie"
-                className="min-w-0 flex-1 bg-transparent text-base text-white placeholder:text-neutral-500 outline-none"
+                className="min-w-0 flex-1 bg-transparent py-3 text-[17px] text-white placeholder:text-tv-muted outline-none focus-visible:outline-none"
             />
             <button
                 type="submit"
                 aria-label="Zapytaj"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white transition-colors hover:bg-blue-400 lg:w-auto lg:px-5"
+                className="font-cond flex min-h-[56px] w-14 shrink-0 items-center justify-center self-stretch bg-tv-blue text-white transition-colors hover:bg-[#3a63ff] lg:w-auto lg:px-6"
             >
                 <ArrowUp size={18} className="lg:hidden" aria-hidden />
-                <span className="hidden lg:inline text-sm font-semibold">Zapytaj</span>
+                <span className="hidden lg:inline text-[17px] font-extrabold uppercase tracking-wide">Zapytaj</span>
             </button>
         </form>
     );

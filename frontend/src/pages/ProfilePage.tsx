@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera, Check, LogOut } from 'lucide-react';
+import { Notice, PageHead, Select, Skeleton, Tag, TagTone } from '../../components/simple/tv';
 import { useAuth } from '../context/AuthContext';
 import { AVAILABLE_LOCATIONS, UserTier } from '../../types';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -15,6 +16,49 @@ import { MyRole, PERM_SOLECTWO_POST, fetchMyRoles } from '../services/solectwaAp
 import { getAccessToken } from '../services/authApi';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+// Język „Paska informacyjnego”: pole 52 px z tekstem 16 px (iOS nie powiększa),
+// kąty proste, fokus = obrys papieru. Przycisk główny chabrowy, drugorzędny papierowy
+const LABEL = 'mb-1.5 block text-[15px] font-semibold text-tv-paper';
+const INPUT =
+  'min-h-[52px] w-full border-2 border-tv-seam bg-tv-ink px-4 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper disabled:opacity-60';
+const HINT = 'mt-1.5 text-[13px] leading-snug text-tv-muted';
+const PRIMARY =
+  'font-cond min-h-[52px] bg-tv-blue px-6 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-not-allowed disabled:opacity-50';
+const SECONDARY =
+  'min-h-[44px] whitespace-nowrap bg-tv-paper px-4 text-[15px] font-bold text-tv-ink transition-colors hover:bg-white disabled:opacity-50';
+const LINK = 'font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline';
+
+/** Sekcja ustawień: plakietka JEST nagłówkiem, pod nią panel z chabrową krawędzią */
+const Section: React.FC<{ title: string; tone?: TagTone; aside?: React.ReactNode; children: React.ReactNode }> = ({
+  title, tone = 'blue', aside, children,
+}) => (
+  <section aria-label={title}>
+    <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+      <Tag as="h2" tone={tone}>{title}</Tag>
+      {aside && <div className="pb-1">{aside}</div>}
+    </div>
+    <div className={`border-t-2 bg-tv-panel p-5 sm:p-6 ${tone === 'blue' ? 'border-tv-blue' : 'border-tv-seam'}`}>
+      {children}
+    </div>
+  </section>
+);
+
+/** Kwadratowe pole wyboru 24 px — natywny checkbox bez wyglądu, znaczek z lucide */
+const SquareCheck: React.FC<{ checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }> = ({
+  checked, onChange, disabled,
+}) => (
+  <span className="relative inline-flex h-6 w-6 shrink-0">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      disabled={disabled}
+      className="peer h-6 w-6 cursor-pointer appearance-none border-2 border-tv-muted bg-tv-ink transition-colors checked:border-tv-blue checked:bg-tv-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tv-yellow disabled:opacity-60"
+    />
+    <Check size={16} strokeWidth={3} aria-hidden className="pointer-events-none absolute inset-0 m-auto hidden text-white peer-checked:block" />
+  </span>
+);
 
 interface ProfilePageProps {
   onNavigate: (section: 'dashboard' | 'premium' | 'terms' | 'privacy' | 'business') => void;
@@ -84,75 +128,74 @@ const NewsletterPrefs: React.FC<{ isPremium: boolean; apiBase: string }> = ({ is
   };
 
   if (subscribed === null) return (
-    <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-      <h2 className="text-xl font-bold mb-4">Newsletter</h2>
-      <div className="h-20 flex items-center justify-center">
-        <div className="w-5 h-5 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin" />
-      </div>
-    </div>
+    <Section title="Newsletter">
+      <Skeleton className="h-20" />
+    </Section>
   );
 
   return (
-    <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Newsletter</h2>
-        {saving && <span className="text-xs text-neutral-500">Zapisywanie...</span>}
-        {saved && !saving && <span className="text-xs text-emerald-400">Zapisano ✓</span>}
-      </div>
-
+    <Section
+      title="Newsletter"
+      aside={<>
+        {saving && <span className="text-[13px] text-tv-muted">Zapisywanie...</span>}
+        {saved && !saving && (
+          <span className="inline-flex items-center gap-1 text-[13px] text-tv-paper">
+            <Check size={15} className="text-tv-green" aria-hidden /> Zapisano
+          </span>
+        )}
+      </>}
+    >
       {!subscribed ? (
-        <div className="p-4 bg-gray-900 rounded-xl">
-          <p className="font-semibold">Newsletter jest wyłączony</p>
-          <p className="text-sm text-neutral-500 mt-1">
+        <div>
+          <p className="text-[16px] font-semibold text-white">Newsletter jest wyłączony</p>
+          <p className="mt-1 text-[15px] leading-snug text-[#d7dbe8]">
             Nie wysyłamy Ci żadnych podsumowań. Możesz to zmienić jednym kliknięciem.
           </p>
           <button
             onClick={() => save(isPremium ? 'daily' : 'weekly')}
             disabled={saving}
-            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl text-sm font-semibold transition-colors"
+            className={`${PRIMARY} mt-4`}
           >
             Włącz {isPremium ? 'poranny briefing' : 'newsletter tygodniowy'}
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="-mx-5 -mb-5 grid gap-px border-t border-tv-seam bg-tv-seam sm:-mx-6 sm:-mb-6">
           {/* Częstotliwość to jedna wartość w bazie, nie dwie niezależne flagi —
               tygodnik jest podstawą subskrypcji, dzienny go zastępuje. */}
-          <div className="flex items-center justify-between p-4 bg-gray-900 rounded-xl">
+          <div className="flex items-center justify-between gap-4 bg-tv-panel px-5 py-4 sm:px-6">
             <div>
-              <p className="font-semibold">Newsletter tygodniowy</p>
-              <p className="text-sm text-neutral-500">Podsumowanie tygodnia co sobotę</p>
+              <p className="text-[16px] font-semibold text-white">Newsletter tygodniowy</p>
+              <p className="text-[14px] text-tv-muted">Podsumowanie tygodnia co sobotę</p>
             </div>
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
+            <span className="shrink-0 text-[14px] font-semibold text-tv-paper">
               {daily ? 'zastąpiony dziennym' : 'włączony'}
             </span>
           </div>
 
           {isPremium ? (
-            <label className="flex items-center justify-between p-4 bg-gray-900 rounded-xl cursor-pointer">
+            <label className="flex cursor-pointer items-center justify-between gap-4 bg-tv-panel px-5 py-4 transition-colors hover:bg-tv-panel2 sm:px-6">
               <div>
-                <p className="font-semibold">Newsletter dzienny</p>
-                <p className="text-sm text-neutral-500">Poranny briefing pon–pt o 7:15 — newsy, śmietnik, BIP, pogoda</p>
+                <p className="text-[16px] font-semibold text-white">Newsletter dzienny</p>
+                <p className="text-[14px] text-tv-muted">Poranny briefing pon–pt o 7:15 — newsy, śmietnik, BIP, pogoda</p>
               </div>
-              <input
-                type="checkbox"
+              <SquareCheck
                 checked={daily}
-                onChange={e => save(e.target.checked ? 'daily' : 'weekly')}
-                className="w-5 h-5 rounded accent-blue-600"
+                onChange={v => save(v ? 'daily' : 'weekly')}
               />
             </label>
           ) : (
-            <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl opacity-50">
+            <div className="flex items-center justify-between gap-4 bg-tv-panel px-5 py-4 sm:px-6">
               <div>
-                <p className="font-semibold">Newsletter dzienny</p>
-                <p className="text-sm text-neutral-500">Dostępny w planie Premium</p>
+                <p className="text-[16px] font-semibold text-tv-muted">Newsletter dzienny</p>
+                <p className="text-[14px] text-tv-muted">Dostępny w planie Premium</p>
               </div>
-              <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-lg">Premium</span>
+              <Tag tone="seam">Premium</Tag>
             </div>
           )}
         </div>
       )}
-    </div>
+    </Section>
   );
 };
 
@@ -343,268 +386,205 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
 
   const daysLeft = trialDaysLeft(user?.trial_ends_at);
 
+  // Plan jako plakietka: okres próbny = żółć (ma termin), Premium = chaber,
+  // Firma = papier, darmowy = szew
   const getTierBadge = (tier: UserTier) => {
     switch (tier) {
       case 'premium':
         return daysLeft !== null ? (
-          <span className="px-3 py-1 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded-full text-sm font-bold">
-            Premium &middot; okres próbny
-          </span>
+          <Tag tone="yellow">Premium &middot; okres próbny</Tag>
         ) : (
-          <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
-            Premium
-          </span>
+          <Tag tone="blue">Premium</Tag>
         );
       case 'business':
-        return (
-          <span className="px-3 py-1 bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full text-sm font-bold">
-            Firma lokalna
-          </span>
-        );
+        return <Tag tone="paper">Firma lokalna</Tag>;
       default:
-        return (
-          <span className="px-3 py-1 bg-gray-950 text-neutral-600 rounded-full text-sm font-medium">
-            Free
-          </span>
-        );
+        return <Tag tone="seam">Free</Tag>;
     }
   };
 
   if (!user) {
     return (
-      <div className="p-8 text-center">
-        <p>Musisz być zalogowany</p>
+      <div className="mx-auto max-w-md py-8">
+        <Notice>Musisz być zalogowany</Notice>
       </div>
     );
   }
 
+  const initials = user.full_name.split(' ').map(n => n[0]).join('').toUpperCase();
+
+  // Pozycja menu ustawień: wąski krój jak nawigacja sekcji, aktywna = papier
+  const tabClass = (tab: typeof activeTab) =>
+    `font-cond flex min-h-[44px] w-full items-center gap-2 px-3 text-left text-[16px] font-bold uppercase tracking-wide transition-colors ${
+      activeTab === tab
+        ? 'bg-tv-paper text-tv-ink'
+        : 'bg-tv-panel text-tv-paper hover:bg-tv-panel2 hover:text-white'
+    }`;
+
   return (
-    <div className={activeTab === 'subscription' ? 'max-w-6xl mx-auto' : 'max-w-4xl mx-auto'}>
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-black mb-2">Ustawienia konta</h1>
-        <p className="text-neutral-500">Zarządzaj swoim profilem i preferencjami</p>
-      </div>
+    <div className={`space-y-6 ${activeTab === 'subscription' ? 'max-w-6xl' : 'max-w-4xl'}`}>
+      <PageHead title="Ustawienia konta" sub="Zarządzaj swoim profilem i preferencjami" />
 
       {/* Success message */}
       {successMessage && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-xl text-green-600 text-sm">
+        <p role="status" className="flex items-center gap-2 bg-tv-panel px-4 py-3 text-[15px] text-tv-paper">
+          <Check size={17} className="shrink-0 text-tv-green" aria-hidden />
           {successMessage}
-        </div>
+        </p>
       )}
 
       {/* Error message */}
       {(error || localError) && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm">
-          {error || localError}
-        </div>
+        <Notice tone="warn" role="alert">{error || localError}</Notice>
       )}
 
-      <div className={`grid grid-cols-1 gap-8 ${activeTab === 'subscription' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+      <div className={`grid grid-cols-1 gap-6 lg:gap-8 ${activeTab === 'subscription' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
         {/* Sidebar */}
         <div className="lg:col-span-1">
-          <div className="bg-gray-950 rounded-2xl p-6 border border-gray-800/50 sticky top-24">
+          <div className="border-t-2 border-tv-blue bg-tv-panel lg:sticky lg:top-32">
             {/* User info */}
-            <div className="text-center mb-6">
+            <div className="flex items-center gap-4 p-4 lg:flex-col lg:items-start">
               {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 border border-gray-800/50" />
+                <img src={user.avatarUrl} alt="Avatar" className="h-16 w-16 shrink-0 object-cover lg:h-20 lg:w-20" />
               ) : (
-                <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-2xl mx-auto mb-3">
-                  {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                <div className="font-cond flex h-16 w-16 shrink-0 items-center justify-center bg-tv-panel2 text-[24px] font-extrabold text-white lg:h-20 lg:w-20">
+                  {initials}
                 </div>
               )}
-              <h3 className="font-bold text-lg">{user.full_name}</h3>
-              <p className="text-neutral-400 text-sm">{user.email}</p>
-              <div className="mt-2">{getTierBadge(user.tier as UserTier)}</div>
-              {roles.map((r) => (
-                <p key={r.id} className="mt-2 text-xs font-semibold text-emerald-300">{r.signed_as}</p>
-              ))}
-              {daysLeft !== null && user.trial_ends_at && (
-                <p className="mt-2 text-xs text-neutral-400 leading-relaxed">
-                  do <span className="font-semibold text-neutral-200">{formatTrialEnd(user.trial_ends_at)}</span>
-                  {' '}({daysLeft} {daysLeft === 1 ? 'dzień' : 'dni'})
-                  <br />
-                  potem plan Dla Każdego — nic nie pobieramy
-                </p>
-              )}
+              <div className="min-w-0">
+                <h2 className="text-[17px] font-bold leading-snug text-white">{user.full_name}</h2>
+                <p className="break-all text-[14px] text-tv-muted">{user.email}</p>
+                <div className="mt-2">{getTierBadge(user.tier as UserTier)}</div>
+                {roles.map((r) => (
+                  <p key={r.id} className="mt-2 text-[14px] font-semibold text-tv-paper">{r.signed_as}</p>
+                ))}
+                {daysLeft !== null && user.trial_ends_at && (
+                  <p className="mt-2 text-[13px] leading-relaxed text-tv-muted">
+                    do <span className="tabular font-semibold text-tv-paper">{formatTrialEnd(user.trial_ends_at)}</span>
+                    {' '}(<span className="tabular">{daysLeft}</span> {daysLeft === 1 ? 'dzień' : 'dni'})
+                    <br />
+                    potem plan Dla Każdego — nic nie pobieramy
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Navigation */}
-            <nav className="space-y-1">
-              <button
-                onClick={() => setActiveTab('profile')}
-                className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
-                  activeTab === 'profile'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-neutral-600 hover:bg-gray-950'
-                }`}
-              >
+            {/* Navigation — na telefonie dwie kolumny, żeby menu nie zjadało ekranu */}
+            <nav aria-label="Ustawienia konta" className="grid grid-cols-2 gap-px border-t border-tv-seam bg-tv-seam lg:grid-cols-1">
+              <button onClick={() => setActiveTab('profile')} aria-current={activeTab === 'profile' ? 'page' : undefined} className={tabClass('profile')}>
                 Profil
               </button>
-              <button
-                onClick={() => setActiveTab('password')}
-                className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
-                  activeTab === 'password'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-neutral-600 hover:bg-gray-950'
-                }`}
-              >
+              <button onClick={() => setActiveTab('password')} aria-current={activeTab === 'password' ? 'page' : undefined} className={tabClass('password')}>
                 Hasło
               </button>
-              <button
-                onClick={() => setActiveTab('preferences')}
-                className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
-                  activeTab === 'preferences'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-neutral-600 hover:bg-gray-950'
-                }`}
-              >
+              <button onClick={() => setActiveTab('preferences')} aria-current={activeTab === 'preferences' ? 'page' : undefined} className={tabClass('preferences')}>
                 Preferencje
               </button>
-              <button
-                onClick={() => setActiveTab('subscription')}
-                className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
-                  activeTab === 'subscription'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-neutral-600 hover:bg-gray-950'
-                }`}
-              >
+              <button onClick={() => setActiveTab('subscription')} aria-current={activeTab === 'subscription' ? 'page' : undefined} className={tabClass('subscription')}>
                 Subskrypcja
               </button>
               {postingRole && (
-                <button
-                  onClick={() => setActiveTab('solectwo')}
-                  className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
-                    activeTab === 'solectwo'
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-neutral-600 hover:bg-gray-950'
-                  }`}
-                >
+                <button onClick={() => setActiveTab('solectwo')} aria-current={activeTab === 'solectwo' ? 'page' : undefined} className={tabClass('solectwo')}>
                   Sołectwo
                 </button>
               )}
               {user.is_admin && (
-                <button
-                  onClick={() => setActiveTab('solectwa-admin')}
-                  className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
-                    activeTab === 'solectwa-admin'
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-neutral-600 hover:bg-gray-950'
-                  }`}
-                >
+                <button onClick={() => setActiveTab('solectwa-admin')} aria-current={activeTab === 'solectwa-admin' ? 'page' : undefined} className={tabClass('solectwa-admin')}>
                   Redakcja sołectw
                 </button>
               )}
-              <button
-                onClick={() => setActiveTab('firma')}
-                className={`w-full text-left px-4 py-3 rounded-xl transition-colors ${
-                  activeTab === 'firma'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-neutral-600 hover:bg-gray-950'
-                }`}
-              >
+              <button onClick={() => setActiveTab('firma')} aria-current={activeTab === 'firma' ? 'page' : undefined} className={tabClass('firma')}>
                 Moja firma
               </button>
-              <button
-                onClick={() => setActiveTab('polecaj')}
-                className={`w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-2 ${
-                  activeTab === 'polecaj'
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-neutral-600 hover:bg-gray-950'
-                }`}
-              >
+              <button onClick={() => setActiveTab('polecaj')} aria-current={activeTab === 'polecaj' ? 'page' : undefined} className={tabClass('polecaj')}>
                 Polecaj
-                <span className="ml-auto text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">+14 dni</span>
+                <span className={`tabular ml-auto text-[13px] font-extrabold ${activeTab === 'polecaj' ? 'opacity-70' : 'text-tv-muted'}`}>+14 dni</span>
+              </button>
+              {/* Wyloguj zamyka siatkę — przy nieparzystej liczbie pozycji wypełnia wiersz */}
+              <button
+                onClick={handleLogout}
+                className="flex min-h-[44px] w-full items-center gap-2 bg-tv-panel px-3 text-left text-[15px] font-semibold text-tv-muted transition-colors hover:bg-tv-panel2 hover:text-white"
+              >
+                <LogOut size={17} aria-hidden />
+                Wyloguj się
               </button>
             </nav>
-
-            <hr className="my-4 border-gray-800/50" />
-
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              className="w-full text-left px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
-            >
-              Wyloguj się
-            </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className={activeTab === 'subscription' ? 'lg:col-span-4' : 'lg:col-span-3'}>
+        <div className={`min-w-0 ${activeTab === 'subscription' ? 'lg:col-span-4' : 'lg:col-span-3'}`}>
           {/* Profile Tab */}
           {activeTab === 'profile' && (
-            <>
-            <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-              <h2 className="text-xl font-bold mb-6">Dane profilu</h2>
+            <div className="space-y-6 lg:space-y-8">
+            <Section title="Dane profilu">
+              <form onSubmit={handleProfileSubmit} className="space-y-5">
 
-              <form onSubmit={handleProfileSubmit} className="space-y-6">
-                
                 {/* Avatar Upload */}
-                <div className="flex items-center gap-6 mb-8">
-                  <div className="relative">
-                    {profileData.avatarUrl ? (
-                      <img 
-                        src={profileData.avatarUrl} 
-                        alt="Avatar preview" 
-                        className="w-24 h-24 rounded-full object-cover border-4 border-gray-800/50"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600 text-3xl border-4 border-gray-800/50">
-                        {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                      </div>
-                    )}
-                    <label className="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors shadow-lg">
-                      <Camera size={16} className="text-white" />
-                      <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
-                    </label>
-                  </div>
+                <div className="flex items-center gap-4">
+                  {profileData.avatarUrl ? (
+                    <img
+                      src={profileData.avatarUrl}
+                      alt="Avatar preview"
+                      className="h-20 w-20 shrink-0 object-cover"
+                    />
+                  ) : (
+                    <div className="font-cond flex h-20 w-20 shrink-0 items-center justify-center bg-tv-panel2 text-[28px] font-extrabold text-white">
+                      {initials}
+                    </div>
+                  )}
                   <div>
-                    <h3 className="font-bold text-lg">Zmień zdjęcie profilowe</h3>
-                    <p className="text-sm text-neutral-500">JPG, PNG lub GIF. Max 2MB.</p>
+                    <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 bg-tv-paper px-4 text-[15px] font-bold text-tv-ink transition-colors hover:bg-white">
+                      <Camera size={17} aria-hidden />
+                      Zmień zdjęcie profilowe
+                      <input type="file" className="sr-only" accept="image/*" onChange={handleAvatarChange} />
+                    </label>
+                    <p className="mt-1.5 text-[13px] text-tv-muted">JPG, PNG lub GIF. Max 2MB.</p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
+                  <label htmlFor="profile-name" className={LABEL}>
                     Imię i nazwisko
                   </label>
                   <input
+                    id="profile-name"
                     type="text"
                     value={profileData.full_name}
                     onChange={(e) =>
                       setProfileData((p) => ({ ...p, full_name: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className={INPUT}
                     disabled={isLoading}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
+                  <label htmlFor="profile-email" className={LABEL}>
                     Email
                   </label>
                   <input
+                    id="profile-email"
                     type="email"
                     value={user.email}
                     disabled
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-950 text-neutral-500"
+                    className={`${INPUT} bg-tv-panel text-tv-muted disabled:opacity-100`}
                   />
-                  <p className="text-xs text-neutral-400 mt-1">
+                  <p className={HINT}>
                     Email nie może być zmieniony
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
-                    Miejscowość
+                  <label htmlFor="profile-location" className={LABEL}>
+                    Twoja miejscowość
                   </label>
-                  <select
+                  <Select
+                    id="profile-location"
                     value={profileData.location}
                     onChange={(e) =>
                       setProfileData((p) => ({ ...p, location: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-gray-950"
                     disabled={isLoading}
                   >
                     {AVAILABLE_LOCATIONS.map((loc) => (
@@ -612,98 +592,106 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                         {loc}
                       </option>
                     ))}
-                  </select>
-                  <p className="text-xs text-neutral-400 mt-1">
-                    Twoja lokalizacja wpływa na spersonalizowane informacje (pogoda,
-                    wydarzenia, wywóz śmieci)
+                  </Select>
+                  {/* 11.10.2026: to jedyne miejsce STAŁEJ zmiany wsi — główka pulpitu
+                      przełącza tylko podgląd na czas wizyty (`useMyVillage`). Zdanie
+                      mówi tyle, ile robi kod: pulpit startuje od wsi z konta, wywóz
+                      i wieczorny push o odpadach czytają `users.location`
+                      (`waste_policy`), a alerty o awariach mają wieś zapisaną na
+                      SUBSKRYPCJI push, nie na koncie */}
+                  <p className={HINT}>
+                    Od tej miejscowości startuje pulpit, terminy wywozu odpadów i wieczorne
+                    przypomnienie o wywozie; alerty o awariach mają osobny wybór wsi przy zgodzie
+                    na powiadomienia.
                   </p>
                 </div>
 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className={PRIMARY}
                 >
                   {isLoading ? 'Zapisywanie...' : 'Zapisz zmiany'}
                 </button>
               </form>
-            </div>
+            </Section>
 
             {/* Prywatność i dane (RODO art. 15/17/20) */}
-            <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50 mt-8">
-              <h2 className="text-xl font-bold mb-2">Prywatność i dane</h2>
-              <p className="text-sm text-neutral-500 mb-6">
+            <Section title="Prywatność i dane" tone="seam">
+              <p className="text-[15px] leading-snug text-[#d7dbe8]">
                 Masz prawo do kopii swoich danych oraz do usunięcia konta (RODO).
                 Szczegóły w Polityce prywatności.
               </p>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 bg-gray-900 rounded-xl">
+              <div className="-mx-5 -mb-5 mt-5 grid gap-px border-t border-tv-seam bg-tv-seam sm:-mx-6 sm:-mb-6">
+                <div className="flex flex-col gap-3 bg-tv-panel px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                   <div>
-                    <p className="font-semibold">Pobierz moje dane</p>
-                    <p className="text-sm text-neutral-500">
+                    <p className="text-[16px] font-semibold text-white">Pobierz moje dane</p>
+                    <p className="text-[14px] leading-snug text-tv-muted">
                       Kopia wszystkich Twoich danych w formacie JSON (profil, zgody, rozmowy z AI, subskrypcje)
                     </p>
                   </div>
                   <button
                     onClick={handleExportData}
                     disabled={exporting}
-                    className="px-4 py-2 bg-gray-800 text-neutral-100 font-semibold rounded-xl hover:bg-gray-700 transition-colors disabled:opacity-50 whitespace-nowrap"
+                    className={`${SECONDARY} shrink-0`}
                   >
                     {exporting ? 'Przygotowuję...' : 'Pobierz (JSON)'}
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-red-950/30 border border-red-900/40 rounded-xl">
+                <div className="flex flex-col gap-3 bg-tv-panel px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                   <div>
-                    <p className="font-semibold text-red-300">Usuń konto</p>
-                    <p className="text-sm text-neutral-500">
+                    <p className="text-[16px] font-semibold text-white">Usuń konto</p>
+                    <p className="text-[14px] leading-snug text-tv-muted">
                       Trwale usuwa konto, rozmowy z AI, powiadomienia i newsletter. Tej operacji nie można cofnąć.
                     </p>
                   </div>
                   <button
                     onClick={() => { setDeleteConfirmText(''); setDeleteModalOpen(true); }}
-                    className="px-4 py-2 bg-red-600/20 text-red-300 border border-red-600/40 font-semibold rounded-xl hover:bg-red-600/30 transition-colors whitespace-nowrap"
+                    className="min-h-[44px] shrink-0 whitespace-nowrap border-2 border-tv-seam px-4 text-[15px] font-bold text-tv-paper transition-colors hover:border-tv-paper hover:text-white"
                   >
                     Usuń konto
                   </button>
                 </div>
               </div>
-            </div>
+            </Section>
 
-            {/* Modal potwierdzenia usunięcia konta */}
+            {/* Modal potwierdzenia usunięcia konta — płaski panel, tło bez rozmycia.
+                Potwierdzenie na żółci: to ostrzeżenie, nie awaria (czerwień = awaria) */}
             {deleteModalOpen && (
-              <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div className="bg-gray-950 border border-red-900/50 rounded-2xl p-8 max-w-md w-full shadow-2xl">
-                  <h3 className="text-xl font-bold text-red-300 mb-3">Usunąć konto na zawsze?</h3>
-                  <p className="text-sm text-neutral-400 mb-4">
+              <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4">
+                <div role="dialog" aria-modal="true" aria-labelledby="delete-title" className="w-full max-w-md border border-t-2 border-tv-seam border-t-tv-blue bg-tv-panel p-5 sm:p-6">
+                  <h3 id="delete-title" className="font-cond mb-3 text-[22px] font-extrabold leading-snug text-white">Usunąć konto na zawsze?</h3>
+                  <p className="mb-4 text-[15px] leading-relaxed text-[#d7dbe8]">
                     Usuniemy Twoje konto, rozmowy z AI, subskrypcje powiadomień i newsletter.
                     Historia płatności zostanie zanonimizowana (obowiązek podatkowy).
-                    <strong className="text-neutral-200"> Tej operacji nie można cofnąć.</strong>
+                    <strong className="text-white"> Tej operacji nie można cofnąć.</strong>
                   </p>
-                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
-                    Wpisz <span className="text-red-300 font-mono">USUŃ</span> aby potwierdzić
+                  <label htmlFor="delete-confirm" className={LABEL}>
+                    Wpisz <span className="font-cond font-extrabold text-tv-yellow">USUŃ</span> aby potwierdzić
                   </label>
                   <input
+                    id="delete-confirm"
                     type="text"
                     value={deleteConfirmText}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 outline-none transition-all mb-4"
+                    className={`${INPUT} mb-4`}
                     placeholder="USUŃ"
                     autoFocus
                   />
-                  <div className="flex gap-3 justify-end">
+                  <div className="flex flex-wrap justify-end gap-3">
                     <button
                       onClick={() => setDeleteModalOpen(false)}
                       disabled={deleting}
-                      className="px-4 py-2 bg-gray-800 text-neutral-100 font-semibold rounded-xl hover:bg-gray-700 transition-colors"
+                      className={SECONDARY}
                     >
                       Anuluj
                     </button>
                     <button
                       onClick={handleDeleteAccount}
                       disabled={deleteConfirmText !== 'USUŃ' || deleting}
-                      className="px-4 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40"
+                      className="font-cond min-h-[44px] bg-tv-yellow px-4 text-[16px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-[#ffe27a] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {deleting ? 'Usuwanie...' : 'Usuń konto na zawsze'}
                     </button>
@@ -711,59 +699,63 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                 </div>
               </div>
             )}
-            </>
+            </div>
           )}
 
           {/* Password Tab */}
           {activeTab === 'password' && (
-            <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-              <h2 className="text-xl font-bold mb-6">Zmiana hasła</h2>
-
-              <form onSubmit={handlePasswordSubmit} className="space-y-6">
+            <Section title="Zmiana hasła">
+              <form onSubmit={handlePasswordSubmit} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
+                  <label htmlFor="pw-current" className={LABEL}>
                     Aktualne hasło
                   </label>
                   <input
+                    id="pw-current"
                     type="password"
+                    autoComplete="current-password"
                     value={passwordData.currentPassword}
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, currentPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className={INPUT}
                     disabled={isLoading}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
+                  <label htmlFor="pw-new" className={LABEL}>
                     Nowe hasło
                   </label>
                   <input
+                    id="pw-new"
                     type="password"
+                    autoComplete="new-password"
                     value={passwordData.newPassword}
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, newPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className={INPUT}
                     disabled={isLoading}
                   />
-                  <p className="text-xs text-neutral-400 mt-1">
+                  <p className={HINT}>
                     Min. 8 znaków, wielka litera i cyfra
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-neutral-300 mb-2">
+                  <label htmlFor="pw-confirm" className={LABEL}>
                     Potwierdź nowe hasło
                   </label>
                   <input
+                    id="pw-confirm"
                     type="password"
+                    autoComplete="new-password"
                     value={passwordData.confirmPassword}
                     onChange={(e) =>
                       setPasswordData((p) => ({ ...p, confirmPassword: e.target.value }))
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-800/50 bg-gray-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className={INPUT}
                     disabled={isLoading}
                   />
                 </div>
@@ -771,36 +763,32 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  className={PRIMARY}
                 >
                   {isLoading ? 'Zmieniam...' : 'Zmień hasło'}
                 </button>
               </form>
-            </div>
+            </Section>
           )}
 
           {/* Subscription Tab */}
           {activeTab === 'subscription' && (
-            <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-              <h2 className="text-xl font-bold mb-2">Subskrypcja</h2>
-              <p className="text-sm text-neutral-500 mb-6">
-                Aktualny plan: {getTierBadge(user.tier as UserTier)}
-              </p>
-
+            <Section
+              title="Subskrypcja"
+              aside={<span className="flex items-center gap-2 text-[14px] text-tv-muted">Aktualny plan: {getTierBadge(user.tier as UserTier)}</span>}
+            >
               {/* Wymóg konsumencki: zamówienie z obowiązkiem zapłaty wymaga akceptacji regulaminu */}
-              <label className="flex items-start gap-3 p-4 bg-gray-900 rounded-xl mb-6 cursor-pointer">
-                <input
-                  type="checkbox"
+              <label className="mb-6 flex min-h-[44px] cursor-pointer items-start gap-3 border border-tv-seam bg-tv-ink px-4 py-3">
+                <SquareCheck
                   checked={acceptTerms}
-                  onChange={(e) => setAcceptTerms(e.target.checked)}
-                  className="w-5 h-5 rounded accent-blue-600 mt-0.5 shrink-0"
+                  onChange={setAcceptTerms}
                 />
-                <span className="text-sm text-neutral-300">
+                <span className="text-[15px] leading-relaxed text-[#d7dbe8]">
                   Akceptuję{' '}
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); onNavigate('terms'); }}
-                    className="text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                    className={LINK}
                   >
                     Regulamin
                   </button>{' '}
@@ -809,7 +797,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); onNavigate('privacy'); }}
-                    className="text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                    className={LINK}
                   >
                     Polityka prywatności
                   </button>.
@@ -853,41 +841,41 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                   }
                 }}
               />
-            </div>
+            </Section>
           )}
 
           {/* Preferences Tab */}
           {activeTab === 'preferences' && (
-            <div className="space-y-6">
+            <div className="space-y-6 lg:space-y-8">
               {/* Newsletter */}
               <NewsletterPrefs isPremium={isPremium} apiBase={API_BASE_URL} />
 
               {/* Push Notifications — dla WSZYSTKICH.
                   Alerty o awariach i zagrożeniach nigdy nie trafiają za paywall. */}
-              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-                  <h2 className="text-xl font-bold mb-1">Powiadomienia push</h2>
-                  <p className="text-sm text-neutral-500 mb-5">
+              <Section title="Powiadomienia push">
+                  <p className="mb-5 text-[15px] leading-snug text-[#d7dbe8]">
                     Alerty pilne w czasie rzeczywistym — nie pokrywają się z newsletterem.
                   </p>
 
                   {!pushSupported ? (
-                    <p className="text-sm text-neutral-500">Twoja przeglądarka nie obsługuje powiadomień push.</p>
+                    <Notice>Twoja przeglądarka nie obsługuje powiadomień push.</Notice>
                   ) : pushStatus === 'denied' ? (
-                    <div className="p-4 bg-amber-950/30 border border-amber-800/30 rounded-xl text-amber-400 text-sm">
+                    <Notice tone="warn">
                       Powiadomienia zablokowane w ustawieniach przeglądarki. Zmień pozwolenia ręcznie.
-                    </div>
+                    </Notice>
                   ) : (
                     <div className="space-y-3">
-                      <label className="flex items-center justify-between p-4 bg-blue-950/30 border border-blue-800/30 rounded-xl cursor-pointer">
-                        <div className="flex-1 pr-4">
-                          <p className="font-semibold">Alerty o awariach i zagrożeniach</p>
-                          <p className="text-sm text-neutral-400 mt-0.5">
+                      <div className="flex items-center justify-between gap-4 border border-tv-seam bg-tv-ink px-4 py-3">
+                        <div className="flex-1">
+                          <p id="push-alerts-label" className="text-[16px] font-semibold text-white">Alerty o awariach i zagrożeniach</p>
+                          <p className="mt-0.5 text-[14px] text-[#d7dbe8]">
                             Prąd · Woda · Pożary · Wypadki · Smog · Mróz &lt; −5°C
                           </p>
-                          <p className="text-xs text-neutral-600 mt-1">
+                          <p className="mt-1 text-[13px] text-tv-muted">
                             Tylko zdarzenia z gminy Rybno — sąsiednie gminy pomijamy.
                           </p>
                         </div>
+                        {/* Przełącznik kanciasty, cel dotyku 44 px wokół toru 48×28 */}
                         <button
                           onClick={async () => {
                             setPushLoading(true);
@@ -899,36 +887,42 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                             setPushLoading(false);
                           }}
                           disabled={pushLoading || pushStatus === 'loading'}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            pushSubscribed ? 'bg-blue-600' : 'bg-gray-600'
-                          } disabled:opacity-50`}
+                          className="group inline-flex h-11 shrink-0 cursor-pointer items-center disabled:cursor-not-allowed disabled:opacity-50"
                           role="switch"
                           aria-checked={pushSubscribed}
+                          aria-labelledby="push-alerts-label"
                         >
-                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${pushSubscribed ? 'translate-x-5' : 'translate-x-0'}`} />
+                          <span className={`relative inline-flex h-7 w-12 items-center border-2 transition-colors ${
+                            pushSubscribed ? 'border-tv-blue bg-tv-blue' : 'border-tv-muted bg-tv-ink'
+                          }`}>
+                            <span className={`inline-block h-5 w-5 transition-transform duration-200 ${
+                              pushSubscribed ? 'translate-x-[22px] bg-white' : 'translate-x-0.5 bg-tv-muted'
+                            }`} />
+                          </span>
                         </button>
-                      </label>
+                      </div>
                       {pushSubscribed && (
-                        <p className="text-xs text-neutral-600 px-1">Alerty aktywne — otrzymasz wszystkie pilne powiadomienia.</p>
+                        <p className="flex items-center gap-2 text-[14px] text-tv-muted">
+                          <Check size={16} className="shrink-0 text-tv-green" aria-hidden />
+                          Alerty aktywne — otrzymasz wszystkie pilne powiadomienia.
+                        </p>
                       )}
                     </div>
                   )}
-              </div>
+              </Section>
 
               {/* Account info */}
-              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-                <h2 className="text-xl font-bold mb-4">Informacje o koncie</h2>
-
-                <dl className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-neutral-500">Data rejestracji</dt>
-                    <dd className="font-medium">
+              <Section title="Informacje o koncie" tone="seam">
+                <dl className="space-y-3 text-[15px]">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-tv-muted">Data rejestracji</dt>
+                    <dd className="tabular font-medium text-white">
                       {new Date(user.created_at).toLocaleDateString('pl-PL')}
                     </dd>
                   </div>
-                  <div className="flex justify-between">
-                    <dt className="text-neutral-500">Ostatnie logowanie</dt>
-                    <dd className="font-medium">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-tv-muted">Ostatnie logowanie</dt>
+                    <dd className="tabular text-right font-medium text-white">
                       {user.last_login
                         ? new Date(user.last_login).toLocaleString('pl-PL')
                         : '-'}
@@ -939,15 +933,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                       Obecnie email_verified nigdy nie jest ustawiane, więc pole
                       pokazywało "Nie" wszystkim. Przywrócić po implementacji. */}
                 </dl>
-              </div>
+              </Section>
             </div>
           )}
           {/* Sołectwo — ogłoszenia sołtysa (zdjęcie pisma → redakcja → strona) */}
           {activeTab === 'solectwo' && (postingRole
             ? <SolectwoPanel role={postingRole} />
-            : <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50 text-neutral-400">
+            : <Notice>
                 To konto nie ma roli sołtysa. Link z zaproszeniem otrzymasz od redakcji RybnoLive.
-              </div>)}
+              </Notice>)}
           {/* Redakcja sołectw — moderacja, zaproszenia, role (tylko admin) */}
           {activeTab === 'solectwa-admin' && user.is_admin && <SolectwaAdminPanel />}
           {/* Moja firma — wizytówki przypisane do tego konta */}
@@ -959,30 +953,28 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
           )}
           {/* Polecaj Tab */}
           {activeTab === 'polecaj' && (
-            <div className="space-y-6">
-              {/* Hero card */}
-              <div className="bg-gradient-to-br from-blue-900/40 to-violet-900/30 rounded-2xl p-8 border border-blue-500/20">
-                <h2 className="text-xl font-bold mb-1">Program Polecający</h2>
-                <p className="text-neutral-400 text-sm mb-6">Zaproś znajomych — oboje dostaniecie <span className="text-emerald-400 font-semibold">+14 dni Premium</span> za każde polecenie.</p>
+            <div className="space-y-6 lg:space-y-8">
+              <Section title="Program Polecający">
+                <p className="mb-5 text-[15px] leading-snug text-[#d7dbe8]">Zaproś znajomych — oboje dostaniecie <span className="font-semibold text-white">+14 dni Premium</span> za każde polecenie.</p>
 
                 {referralData ? (
                   <div className="space-y-4">
                     {/* Code */}
-                    <div className="bg-slate-950/70 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="flex flex-col gap-4 border border-tv-seam bg-tv-ink p-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-xs text-neutral-500 mb-1">Twój kod polecający</p>
-                        <p className="text-2xl font-mono font-bold tracking-widest text-white">{referralData.referral_code.toUpperCase()}</p>
+                        <p className="mb-1 text-[13px] text-tv-muted">Twój kod polecający</p>
+                        <p className="font-cond tabular text-[28px] font-extrabold tracking-widest text-white">{referralData.referral_code.toUpperCase()}</p>
                       </div>
-                      <div className="flex flex-col gap-2 shrink-0">
+                      <div className="flex shrink-0 flex-wrap gap-2">
                         <button
                           onClick={copyReferralLink}
-                          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-semibold rounded-xl transition-colors"
+                          className={`${SECONDARY} inline-flex items-center gap-1.5`}
                         >
-                          {referralCopied ? '✓ Skopiowano' : 'Kopiuj link'}
+                          {referralCopied ? <><Check size={16} className="text-tv-green" aria-hidden /> Skopiowano</> : 'Kopiuj link'}
                         </button>
                         <button
                           onClick={shareReferralLink}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors"
+                          className="font-cond min-h-[44px] bg-tv-blue px-4 text-[16px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
                         >
                           Udostępnij
                         </button>
@@ -990,33 +982,30 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                     </div>
 
                     {/* Link preview */}
-                    <div className="bg-slate-900/50 rounded-xl px-4 py-3">
-                      <p className="text-xs text-neutral-500 mb-1">Link do zaproszenia</p>
-                      <p className="text-sm text-blue-400 break-all font-mono">{referralData.referral_link}</p>
+                    <div className="border border-tv-seam px-4 py-3">
+                      <p className="mb-1 text-[13px] text-tv-muted">Link do zaproszenia</p>
+                      <p className="break-all text-[14px] text-tv-bluesoft">{referralData.referral_link}</p>
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                      <div className="bg-slate-900/50 rounded-xl p-4 text-center">
-                        <p className="text-3xl font-bold text-white">{referralData.referrals_count}</p>
-                        <p className="text-xs text-neutral-500 mt-1">Zaproszonych osób</p>
+                    <div className="grid grid-cols-2 gap-px border border-tv-seam bg-tv-seam">
+                      <div className="bg-tv-ink p-4">
+                        <p className="font-cond tabular text-[30px] font-extrabold leading-none text-white">{referralData.referrals_count}</p>
+                        <p className="mt-1.5 text-[13px] text-tv-muted">Zaproszonych osób</p>
                       </div>
-                      <div className="bg-slate-900/50 rounded-xl p-4 text-center">
-                        <p className="text-3xl font-bold text-emerald-400">{referralData.referrals_count * 14}</p>
-                        <p className="text-xs text-neutral-500 mt-1">Dni Premium zdobytych</p>
+                      <div className="bg-tv-ink p-4">
+                        <p className="font-cond tabular text-[30px] font-extrabold leading-none text-white">{referralData.referrals_count * 14}</p>
+                        <p className="mt-1.5 text-[13px] text-tv-muted">Dni Premium zdobytych</p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-32 flex items-center justify-center">
-                    <div className="w-6 h-6 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin" />
-                  </div>
+                  <Skeleton className="h-32" />
                 )}
-              </div>
+              </Section>
 
-              {/* How it works */}
-              <div className="bg-gray-950 rounded-2xl p-8 border border-gray-800/50">
-                <h3 className="font-bold mb-4">Jak to działa?</h3>
+              {/* How it works — numery zostają: kolejność kroków jest tu treścią */}
+              <Section title="Jak to działa?" tone="seam">
                 <ol className="space-y-4">
                   {[
                     ['1', 'Udostępnij swój link znajomym z Gminy Rybno'],
@@ -1024,12 +1013,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, initialTab }) => 
                     ['3', 'Oboje otrzymujecie +14 dni Premium — automatycznie'],
                   ].map(([n, text]) => (
                     <li key={n} className="flex items-start gap-4">
-                      <span className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 text-blue-400 text-sm font-bold flex items-center justify-center">{n}</span>
-                      <span className="text-neutral-300 text-sm pt-0.5">{text}</span>
+                      <span className="font-cond tabular flex h-7 w-7 shrink-0 items-center justify-center bg-tv-panel2 text-[15px] font-extrabold text-white">{n}</span>
+                      <span className="pt-0.5 text-[15px] text-[#d7dbe8]">{text}</span>
                     </li>
                   ))}
                 </ol>
-              </div>
+              </Section>
             </div>
           )}
         </div>

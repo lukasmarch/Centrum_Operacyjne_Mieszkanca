@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { GUS_CHART, TOOLTIP_CLASS } from './palette';
 
 interface ComparisonData {
   unit_name: string;
@@ -65,7 +66,7 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
       case 'decimal':
         return val.toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
       case 'percentage':
-        return `${val.toFixed(1)}%`;
+        return `${val.toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
       case 'currency':
         return `${val.toLocaleString('pl-PL')} PLN`;
       default:
@@ -78,14 +79,14 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
       const item = payload[0].payload;
       const isRybno = item.unit_id === highlightUnitId;
       return (
-        <div className="bg-gray-800 border border-white/10 px-4 py-3 rounded-lg shadow-xl">
-          <p className={`text-sm font-semibold mb-1 ${isRybno ? 'text-blue-400' : 'text-neutral-200'}`}>
+        <div className={TOOLTIP_CLASS}>
+          <p className={`mb-0.5 text-[13px] font-bold ${isRybno ? 'text-tv-bluesoft' : 'text-tv-paper'}`}>
             {item.unit_name}
           </p>
-          <p className="text-lg font-bold text-neutral-100">
+          <p className="font-cond tabular text-[20px] font-extrabold text-white">
             {formatValue(item.value)} {unit}
           </p>
-          <p className="text-xs text-neutral-500 mt-1">
+          <p className="tabular mt-0.5 text-[13px] text-tv-muted">
             Pozycja #{item.rank} w powiecie
           </p>
         </div>
@@ -95,15 +96,15 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
   };
 
   const getBarColor = (unitId: string) => {
-    return unitId === highlightUnitId ? '#3b82f6' : '#334155';
+    return unitId === highlightUnitId ? GUS_CHART.series : GUS_CHART.compare;
   };
 
   const rybnoItem = sortedData.find(item => item.unit_id === highlightUnitId);
 
   return (
-    <div className="bg-white/[0.04] rounded-xl border border-white/5 p-5 min-w-0">
+    <div className="h-full min-w-0 bg-tv-panel p-4 lg:p-5">
       {title && (
-        <h3 className="text-lg font-bold text-neutral-100 mb-4">{title}</h3>
+        <h3 className="font-cond mb-3 text-[20px] font-extrabold leading-snug text-white">{title}</h3>
       )}
 
       <div style={{ width: '100%', height: `${height}px`, minWidth: 0 }}>
@@ -113,30 +114,31 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
             layout="vertical"
             margin={{ top: 5, right: 30, left: 5, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+            <CartesianGrid stroke={GUS_CHART.seam} horizontal={false} />
 
             <XAxis
               type="number"
-              stroke="#334155"
-              style={{ fontSize: '12px', fontWeight: 500 }}
-              tick={{ fill: '#64748b' }}
+              stroke={GUS_CHART.seam}
+              style={{ fontSize: '13px', fontVariantNumeric: 'tabular-nums' }}
+              tick={{ fill: GUS_CHART.muted }}
+              tickLine={false}
               tickFormatter={(value) => formatValue(value).split(',')[0]}
             />
 
             <YAxis
               type="category"
               dataKey="display_name"
-              stroke="#334155"
-              style={{ fontSize: '12px', fontWeight: 500 }}
-              tick={{ fill: '#94a3b8' }}
+              stroke={GUS_CHART.seam}
+              style={{ fontSize: '13px' }}
+              tick={{ fill: GUS_CHART.paper }}
+              tickLine={false}
               width={120}
             />
 
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: GUS_CHART.panel2 }} />
 
             <Bar
               dataKey="value"
-              radius={[0, 4, 4, 0]}
               animationDuration={800}
               animationEasing="ease-out"
             >
@@ -144,7 +146,7 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
                 <Cell
                   key={`cell-${index}`}
                   fill={getBarColor(entry.unit_id)}
-                  opacity={entry.unit_id === highlightUnitId ? 1 : 0.7}
+                  fillOpacity={entry.unit_id === highlightUnitId ? 1 : 0.45}
                 />
               ))}
             </Bar>
@@ -153,26 +155,24 @@ const ComparisonBar: React.FC<ComparisonBarProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-center gap-4 text-sm">
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-tv-seam pt-3 text-[13px]">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-          <span className="text-neutral-400 font-medium">Gmina Rybno</span>
+          <span className="inline-block h-3 w-3 bg-tv-blue" aria-hidden></span>
+          <span className="font-bold text-tv-paper">Gmina Rybno</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#334155' }}></div>
-          <span className="text-neutral-500">Pozostałe gminy</span>
+          <span className="inline-block h-3 w-3" style={{ backgroundColor: GUS_CHART.compare, opacity: 0.45 }} aria-hidden></span>
+          <span className="text-tv-muted">Pozostałe gminy</span>
         </div>
       </div>
 
       {/* Rybno's ranking */}
       {rybnoItem && (
-        <div className="mt-3 p-3 bg-blue-900/20 rounded-lg border border-blue-500/20">
-          <p className="text-sm text-neutral-300">
-            <span className="font-bold text-blue-400">Gmina Rybno</span> zajmuje{' '}
-            <span className="font-bold text-blue-400">#{rybnoItem.rank}</span>{' '}
-            miejsce w powiecie
-          </p>
-        </div>
+        <p className="mt-3 bg-tv-panel2 px-3 py-2.5 text-[15px] text-[#d7dbe8]">
+          <span className="font-bold text-white">Gmina Rybno</span> zajmuje{' '}
+          <span className="tabular font-bold text-white">#{rybnoItem.rank}</span>{' '}
+          miejsce w powiecie
+        </p>
       )}
     </div>
   );

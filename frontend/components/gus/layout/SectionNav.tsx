@@ -19,7 +19,7 @@
  *
  * Features:
  * - Active section highlighting
- * - Tier badges (Free/Premium/Business)
+ * - Brak dostępu = kłódka zamiast ikony (+ nazwa planu dla czytnika ekranu)
  * - Lock icons for restricted sections
  * - Responsive horizontal scroll on mobile
  */
@@ -37,6 +37,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { UserTier } from '../../../types';
+import { Tag } from '../../simple/tv';
 
 interface Section {
   key: string;
@@ -53,14 +54,14 @@ interface SectionNavProps {
 }
 
 const SECTIONS: Section[] = [
-  { key: 'overview', name: 'Przegląd', icon: <LayoutDashboard size={18} />, tier: 'free' },
-  { key: 'demografia', name: 'Demografia', icon: <Users size={18} />, tier: 'premium' },
-  { key: 'rynek_pracy', name: 'Rynek Pracy', icon: <Briefcase size={18} />, tier: 'premium' },
-  { key: 'przedsiebiorczosc', name: 'Przedsiębiorczość', icon: <TrendingUp size={18} />, tier: 'premium' },
-  { key: 'finanse_gminy', name: 'Finanse Gminy', icon: <Wallet size={18} />, tier: 'premium' },
-  { key: 'mieszkalnictwo', name: 'Mieszkalnictwo', icon: <Home size={18} />, tier: 'premium' },
-  { key: 'edukacja', name: 'Edukacja', icon: <GraduationCap size={18} />, tier: 'premium' },
-  { key: 'zdrowie', name: 'Zdrowie', icon: <HeartPulse size={18} />, tier: 'premium' },
+  { key: 'overview', name: 'Przegląd', icon: <LayoutDashboard size={16} />, tier: 'free' },
+  { key: 'demografia', name: 'Demografia', icon: <Users size={16} />, tier: 'premium' },
+  { key: 'rynek_pracy', name: 'Rynek Pracy', icon: <Briefcase size={16} />, tier: 'premium' },
+  { key: 'przedsiebiorczosc', name: 'Przedsiębiorczość', icon: <TrendingUp size={16} />, tier: 'premium' },
+  { key: 'finanse_gminy', name: 'Finanse Gminy', icon: <Wallet size={16} />, tier: 'premium' },
+  { key: 'mieszkalnictwo', name: 'Mieszkalnictwo', icon: <Home size={16} />, tier: 'premium' },
+  { key: 'edukacja', name: 'Edukacja', icon: <GraduationCap size={16} />, tier: 'premium' },
+  { key: 'zdrowie', name: 'Zdrowie', icon: <HeartPulse size={16} />, tier: 'premium' },
 ];
 
 const SectionNav: React.FC<SectionNavProps> = ({
@@ -77,29 +78,14 @@ const SectionNav: React.FC<SectionNavProps> = ({
     return false;
   };
 
-  // Get tier badge color
-  const getTierBadgeColor = (tier: UserTier): string => {
-    switch (tier) {
-      case 'free':
-        return 'bg-gray-900 text-neutral-400 border border-gray-700/50';
-      case 'premium':
-        return 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
-      case 'business':
-        return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
-      default:
-        return 'bg-gray-900 text-neutral-400';
-    }
-  };
-
   return (
-    <div className={`rounded-xl border border-white/5 p-4 ${className}`}>
+    <div className={className}>
       {/* Header */}
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-neutral-100">Kategorie Statystyk</h3>
-      </div>
+      <h2 className="flex"><Tag tone="seam">Kategorie Statystyk</Tag></h2>
 
-      {/* Sections grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+      {/* Kategorie jak filtry pulpitu: kwadratowe pola 44 px, aktywne = papier.
+          Szew między polami zamiast odstępów i obramowań */}
+      <div className="grid grid-cols-2 gap-px border-t border-tv-seam bg-tv-seam md:grid-cols-4">
         {SECTIONS.map((section) => {
           const isActive = activeSection === section.key;
           const isAccessible = hasAccess(section);
@@ -116,62 +102,25 @@ const SectionNav: React.FC<SectionNavProps> = ({
                 }
               }}
               disabled={!isAccessible && !isActive}
-              className={`
-                relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all
-                ${isActive
-                  ? 'border-blue-500/50 bg-blue-500/10 shadow-lg shadow-blue-500/10'
+              aria-pressed={isActive}
+              className={`font-cond flex min-h-[52px] items-center gap-2 px-3 text-left text-[15px] font-bold uppercase leading-tight tracking-wide transition-colors ${
+                isActive
+                  ? 'bg-tv-paper text-tv-ink'
                   : isAccessible
-                    ? 'border-white/8 bg-white/4 hover:border-white/15 hover:bg-white/7'
-                    : 'border-white/5 bg-white/2 opacity-40 cursor-not-allowed grayscale'
-                }
-              `}
+                    ? 'bg-tv-panel text-tv-paper hover:bg-tv-panel2 hover:text-white'
+                    : 'cursor-not-allowed bg-tv-panel text-tv-muted'
+              }`}
             >
-              {/* Lock icon for restricted sections */}
-              {!isAccessible && (
-                <div className="absolute top-2 right-2">
-                  <Lock size={14} className="text-gray-400" />
-                </div>
-              )}
-
-              {/* Icon */}
-              <div
-                className={`
-                  p-2 rounded-lg
-                  ${isActive
-                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                    : isAccessible
-                      ? 'bg-white/8 text-neutral-400'
-                      : 'bg-white/4 text-neutral-600'
-                  }
-                `}
-              >
-                {section.icon}
-              </div>
-
-              {/* Name */}
-              <span
-                className={`
-                  text-xs font-semibold text-center leading-tight
-                  ${isActive
-                    ? 'text-blue-400'
-                    : isAccessible
-                      ? 'text-neutral-400 group-hover:text-neutral-200'
-                      : 'text-neutral-600'
-                  }
-                `}
-              >
-                {section.name}
+              {/* Na telefonie ikona tematu ustępuje miejsca nazwie; kłódka zostaje zawsze */}
+              <span className={`shrink-0 ${isAccessible ? 'hidden sm:inline' : ''} ${isActive ? '' : 'text-tv-muted'}`} aria-hidden>
+                {isAccessible ? section.icon : <Lock size={16} />}
               </span>
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{section.name}</span>
 
               {/* Tier badge — only when user lacks access */}
               {section.tier !== 'free' && !isAccessible && (
-                <span
-                  className={`
-                    text-[10px] font-bold px-2 py-0.5 rounded-full uppercase
-                    ${getTierBadgeColor(section.tier)}
-                  `}
-                >
-                  {section.tier === 'business' ? 'Pro' : 'Premium'}
+                <span className="sr-only">
+                  {section.tier === 'business' ? '(plan Pro)' : '(plan Premium)'}
                 </span>
               )}
             </button>
@@ -181,15 +130,13 @@ const SectionNav: React.FC<SectionNavProps> = ({
 
       {/* Upgrade prompt for free users */}
       {userTier === 'free' && (
-        <div className="mt-4 p-3 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-lg">
-          <p className="text-sm text-indigo-300">
-            <Lock size={14} className="inline mr-1" />
-            <strong>7 kategorii Premium</strong> z pełnymi danymi dostępne po upgradzie.
-            <button className="ml-2 text-indigo-400 hover:text-indigo-300 font-semibold underline decoration-indigo-500/30">
-              Zobacz plany
-            </button>
-          </p>
-        </div>
+        <p className="mt-px flex flex-wrap items-center gap-x-2 bg-tv-panel px-4 py-1 text-[15px] text-tv-paper">
+          <Lock size={14} className="text-tv-muted" aria-hidden />
+          <span><strong className="text-white">7 kategorii Premium</strong> z pełnymi danymi dostępne po upgradzie.</span>
+          <button className="inline-flex min-h-[44px] items-center font-bold text-tv-bluesoft underline-offset-4 hover:text-white hover:underline">
+            Zobacz plany
+          </button>
+        </p>
       )}
     </div>
   );

@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
 import {
-    ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudLightning,
+    Cloud, CloudDrizzle, CloudFog, CloudLightning,
     CloudRain, CloudSnow, CloudSun, Moon, Sun, LucideIcon,
 } from 'lucide-react';
 import type { WeatherFull } from '../../src/hooks/useWeather';
 import { clockLabel, parseUtc } from '../../src/utils/articleTime';
+import { Plate } from './tv';
 
 /**
  * Pogoda w sekcji „Na dziś" — kafel, nie podpis.
@@ -20,13 +21,16 @@ import { clockLabel, parseUtc } from '../../src/utils/articleTime';
  *
  * ⚠️ Ikona NIE jest pobierana z openweathermap.org, choć tak robi stary
  * `WeatherTile`. To PWA — kafel ma się rysować także wtedy, gdy telefon jest
- * bez zasięgu, a dane pogodowe idą z pamięci podręcznej. Orb jest gradientem
- * CSS, ikona pochodzi z tego samego zestawu (lucide), co reszta serwisu.
+ * bez zasięgu, a dane pogodowe idą z pamięci podręcznej. Ikona pochodzi
+ * z tego samego zestawu (lucide), co reszta serwisu.
+ *
+ * 11.10.2026 (odświeżenie „Pasek informacyjny”): bez orba i poświaty — kafel
+ * stoi na wspólnej plakietce `Plate`, kolor niesie wyłącznie stan.
  */
 
 interface ConditionLook {
     Icon: LucideIcon;
-    /** Kolor przewodni — orb, poświata i nazwa zjawiska */
+    /** Kolor zjawiska — dziś nieużywany na pulpicie, zostaje dla strony pogody */
     glow: string;
     label: string;
 }
@@ -107,72 +111,34 @@ const WeatherTodayCard: React.FC<WeatherTodayCardProps> = ({ weather, loading = 
         : loading ? 'Ładuję…' : 'brak danych';
     const { Icon } = look;
 
+    // Opis z OpenWeather przychodzi małą literą („zachmurzenie umiarkowane”).
+    // Wielka litera tylko na początku — CSS `capitalize` dawał „Zachmurzenie Umiarkowane”
+    const sentence = description ? description.charAt(0).toUpperCase() + description.slice(1) : '';
+
     return (
-        <button
+        <Plate
+            tag="Pogoda · Rybno"
             onClick={onClick}
-            aria-label={
+            ariaLabel={
                 weather
                     ? `Pogoda w gminie: ${Math.round(weather.temperature)} stopni, ${description}. Otwórz pełną prognozę`
                     : 'Otwórz pełną prognozę pogody'
             }
-            className="group relative flex min-h-[72px] w-full items-center gap-4 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1117] p-4 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04] lg:block lg:min-h-0 lg:p-5"
-        >
-            {/* Poświata w kolorze zjawiska — jedyna „grafika" w tym kaflu i jedyne
-                miejsce, w którym pogoda zmienia wygląd karty, a nie tylko tekst.
-                Oddech zamiast migotania: 3 s, i nic przy `prefers-reduced-motion` */}
-            <span
-                aria-hidden
-                className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full animate-pulse-slow motion-reduce:animate-none"
-                style={{ background: look.glow, filter: 'blur(46px)', opacity: 0.22 }}
-            />
-
-            {/* Orb: kula światła w kolorze pogody z ikoną w środku. Na telefonie
-                stoi tam, gdzie u sąsiadów ikona kategorii — rytm sekcji zostaje.
-                Na desktopie odpływa w prawo, a tekst układa się obok, tak jak
-                na kaflu z panelu, z którego ten układ pochodzi */}
-            <span className="relative flex h-12 w-12 shrink-0 items-center justify-center lg:float-right lg:ml-2 lg:h-16 lg:w-16">
-                {/* Kula, nie plama: pełne koło z rozjaśnieniem w lewym górnym
-                    rogu i poświatą na zewnątrz. Sam gradient promienisty
-                    rozmywał krawędź i wyglądał jak smuga */}
-                <span
-                    aria-hidden
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                        background: `radial-gradient(circle at 32% 28%, #ffffffcc, ${look.glow} 58%)`,
-                        boxShadow: `0 0 18px 2px ${look.glow}66`,
-                    }}
-                />
-                <Icon
-                    aria-hidden
-                    className="relative h-6 w-6 text-[#05080f]/80 lg:h-8 lg:w-8"
-                    strokeWidth={2.25}
-                />
-            </span>
-
-            <span className="relative block min-w-0 flex-1">
-                {/* Na telefonie temperatura i zjawisko dzielą wiersz, na desktopie
-                    stoją jedno pod drugim — ta sama treść, inna wysokość kafla */}
-                <span className="flex flex-wrap items-baseline gap-x-2 lg:block">
-                    <span className="text-2xl font-black leading-none tracking-tight text-white lg:block lg:text-4xl">
-                        {weather ? `${Math.round(weather.temperature)}°` : '—'}
-                    </span>
-                    <span
-                        className="text-sm font-semibold capitalize lg:mt-1.5 lg:block"
-                        style={{ color: look.glow }}
-                    >
-                        {description}
-                    </span>
+            value={
+                <span className="flex items-center gap-2">
+                    {weather ? `${Math.round(weather.temperature)}°` : '—'}
+                    <Icon aria-hidden className="h-6 w-6 text-tv-muted" strokeWidth={2} />
                 </span>
-
-                <span className="mt-1 block text-[13px] leading-snug text-neutral-400 lg:text-xs">
-                    {details ?? 'Prognoza i jakość powietrza dla gminy'}
-                    {details && airLabel && <span className="text-neutral-400"> · {airLabel}</span>}
-                    {staleAt && <span className="block text-amber-300/90">pomiar z {staleAt}</span>}
-                </span>
-            </span>
-
-            <ChevronRight size={18} className="relative shrink-0 text-neutral-600 lg:hidden" aria-hidden />
-        </button>
+            }
+            sub={
+                <>
+                    <span className="block font-semibold text-tv-paper">{sentence}</span>
+                    {details && <span className="block">{details}</span>}
+                    {details && airLabel && <span className="block">{airLabel.charAt(0).toUpperCase() + airLabel.slice(1)}</span>}
+                    {staleAt && <span className="block font-semibold text-tv-yellow">pomiar z {staleAt}</span>}
+                </>
+            }
+        />
     );
 };
 

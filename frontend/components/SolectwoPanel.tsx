@@ -7,7 +7,8 @@
  * a redakcja sprawdza przed publikacją.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, CheckCircle2, ExternalLink, ImagePlus, Loader2, Send, X } from 'lucide-react';
+import { Camera, CheckCircle2, ExternalLink, ImagePlus, Send, X } from 'lucide-react';
+import { Notice, Tag, TagTone } from './simple/tv';
 import {
     MyPost, MyRole, STATUS_LABELS, createPost, fetchMyPosts, parseUtc,
 } from '../src/services/solectwaApi';
@@ -21,6 +22,14 @@ const NOTE_MAX = 500;
 interface Props {
     role: MyRole;
 }
+
+const POST_TONE: Partial<Record<MyPost['status'], TagTone>> = {
+    processing: 'seam',
+    pending: 'yellow',
+    failed: 'yellow',
+    published: 'blue',
+    rejected: 'seam',
+};
 
 const formatDate = (value: string | null) => {
     const d = parseUtc(value);
@@ -101,19 +110,22 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="bg-gray-950 rounded-2xl p-6 sm:p-8 border border-gray-800/50">
-                <p className="text-xs font-bold uppercase tracking-wider text-neutral-500">Twoja rola</p>
-                <h2 className="text-xl font-bold mt-1">{role.signed_as}</h2>
-                <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
-                    Zrób zdjęcie pisma albo ogłoszenia i wyślij. Odczytamy treść, przygotujemy
-                    przedruk i krótkie podsumowanie, a redakcja sprawdzi je przed publikacją.
-                </p>
-            </div>
+        <div className="space-y-6 lg:space-y-8">
+            {/* Bez kickera „Twoja rola” nad nazwą — słowo przeszło do plakietki */}
+            <section>
+                <Tag as="h2">Twoja rola</Tag>
+                <div className="border-t-2 border-tv-blue bg-tv-panel p-5 sm:p-6">
+                    <p className="font-cond text-[22px] font-extrabold leading-snug text-white">{role.signed_as}</p>
+                    <p className="mt-2 max-w-[70ch] text-[15px] leading-relaxed text-[#d7dbe8]">
+                        Zrób zdjęcie pisma albo ogłoszenia i wyślij. Odczytamy treść, przygotujemy
+                        przedruk i krótkie podsumowanie, a redakcja sprawdzi je przed publikacją.
+                    </p>
+                </div>
+            </section>
 
-            <div className="bg-gray-950 rounded-2xl p-6 sm:p-8 border border-gray-800/50">
-                <h3 className="text-lg font-bold mb-4">Dodaj ogłoszenie</h3>
-
+            <section>
+                <Tag as="h2">Dodaj ogłoszenie</Tag>
+                <div className="border-t-2 border-tv-blue bg-tv-panel p-5 sm:p-6">
                 <input
                     ref={inputRef}
                     type="file"
@@ -127,29 +139,29 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
                     <button
                         type="button"
                         onClick={() => inputRef.current?.click()}
-                        className="w-full flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-blue-500/40 bg-blue-500/5 hover:bg-blue-500/10 py-10 px-4 transition-colors"
+                        className="flex w-full flex-col items-center justify-center gap-3 border-2 border-dashed border-tv-muted bg-tv-ink px-4 py-10 transition-colors hover:border-tv-paper hover:bg-tv-panel2"
                     >
-                        <Camera className="w-10 h-10 text-blue-400" />
-                        <span className="text-base font-semibold text-neutral-100">
+                        <Camera className="h-10 w-10 text-tv-paper" aria-hidden />
+                        <span className="text-[16px] font-semibold text-white">
                             Zrób zdjęcie pisma lub wybierz z galerii
                         </span>
-                        <span className="text-xs text-neutral-500">do {MAX_IMAGES} stron, każda do {MAX_FILE_MB} MB</span>
+                        <span className="tabular text-[13px] text-tv-muted">do {MAX_IMAGES} stron, każda do {MAX_FILE_MB} MB</span>
                     </button>
                 ) : (
-                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-3 gap-px bg-tv-seam sm:grid-cols-5">
                         {previews.map((url, i) => (
-                            <div key={url} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                                <img src={url} alt={`Strona ${i + 1}`} className="w-full h-full object-cover" />
-                                <span className="absolute bottom-1 left-1 text-[10px] font-bold bg-black/70 text-white px-1.5 py-0.5 rounded">
+                            <div key={url} className="relative aspect-[3/4] overflow-hidden bg-tv-ink">
+                                <img src={url} alt={`Strona ${i + 1}`} className="h-full w-full object-cover" />
+                                <span className="font-cond tabular absolute bottom-0 left-0 bg-tv-ink px-2 py-1 text-[13px] font-extrabold leading-none text-white">
                                     {i + 1}
                                 </span>
                                 <button
                                     type="button"
                                     onClick={() => removeFile(i)}
                                     aria-label={`Usuń stronę ${i + 1}`}
-                                    className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center"
+                                    className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center bg-tv-ink/85 text-white transition-colors hover:bg-tv-ink"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <X className="h-5 w-5" aria-hidden />
                                 </button>
                             </div>
                         ))}
@@ -157,17 +169,17 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
                             <button
                                 type="button"
                                 onClick={() => inputRef.current?.click()}
-                                className="aspect-[3/4] rounded-xl border-2 border-dashed border-gray-700 hover:border-blue-500/60 flex flex-col items-center justify-center gap-1 text-neutral-400 text-xs"
+                                className="flex aspect-[3/4] flex-col items-center justify-center gap-1 bg-tv-ink text-[13px] text-tv-paper transition-colors hover:bg-tv-panel2"
                             >
-                                <ImagePlus className="w-6 h-6" />
+                                <ImagePlus className="h-6 w-6 text-tv-muted" aria-hidden />
                                 Kolejna strona
                             </button>
                         )}
                     </div>
                 )}
 
-                <label className="block mt-5 text-sm font-medium text-neutral-300" htmlFor="solectwo-note">
-                    Jedno zdanie od siebie <span className="text-neutral-500 font-normal">(nieobowiązkowe)</span>
+                <label className="mt-5 block text-[15px] font-semibold text-tv-paper" htmlFor="solectwo-note">
+                    Jedno zdanie od siebie <span className="font-normal text-tv-muted">(nieobowiązkowe)</span>
                 </label>
                 <textarea
                     id="solectwo-note"
@@ -175,13 +187,13 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
                     onChange={(e) => setNote(e.target.value.slice(0, NOTE_MAX))}
                     rows={2}
                     placeholder="np. Proszę o publikację do piątku"
-                    className="mt-2 w-full rounded-xl bg-gray-900 border border-gray-800 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="mt-1.5 w-full border-2 border-tv-seam bg-tv-ink px-4 py-3 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper"
                 />
 
-                {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+                {error && <div className="mt-4"><Notice tone="warn" role="alert">{error}</Notice></div>}
                 {sent && (
-                    <p className="mt-4 text-sm text-emerald-300 flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                    <p role="status" className="mt-4 flex items-start gap-2 text-[15px] text-tv-paper">
+                        <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-tv-green" aria-hidden />
                         Wysłane. Odczytujemy pismo, potem sprawdzi je redakcja — dostaniesz maila, gdy ogłoszenie się ukaże.
                     </p>
                 )}
@@ -190,52 +202,52 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
                     type="button"
                     onClick={submit}
                     disabled={!files.length || sending}
-                    className="mt-5 w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:hover:bg-blue-600 px-6 py-3 font-semibold text-white transition-colors"
+                    className="font-cond mt-5 inline-flex min-h-[52px] w-full items-center justify-center gap-2 bg-tv-blue px-6 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-tv-blue sm:w-auto"
                 >
-                    {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {!sending && <Send className="h-[18px] w-[18px]" aria-hidden />}
                     {sending ? 'Wysyłam…' : 'Wyślij do redakcji'}
                 </button>
 
-                <details className="mt-6 text-sm text-neutral-400">
-                    <summary className="cursor-pointer text-neutral-300">Co warto publikować, a czego nie wysyłać</summary>
-                    <ul className="mt-3 space-y-1.5 list-disc pl-5">
+                <details className="mt-6 border-t border-tv-seam pt-2 text-[15px] text-[#d7dbe8]">
+                    <summary className="flex min-h-[44px] cursor-pointer items-center font-bold text-tv-bluesoft hover:text-white">Co warto publikować, a czego nie wysyłać</summary>
+                    <ul className="mt-2 list-disc space-y-1.5 pl-5 leading-relaxed">
                         <li>Pisma i obwieszczenia urzędowe, zebrania wiejskie, fundusz sołecki.</li>
                         <li>Wydarzenia w sołectwie i utrudnienia (woda, droga, wywóz odpadów).</li>
                         <li>Nie wysyłaj list nazwisk, adresów i numerów PESEL — wycinamy dane osób prywatnych z przedruku, ale lepiej, żeby do nas nie trafiały.</li>
                         <li>Zdjęcie oryginału widzi tylko redakcja; na stronie pokazujemy przedruk.</li>
                     </ul>
                 </details>
-            </div>
+                </div>
+            </section>
 
-            <div className="bg-gray-950 rounded-2xl p-6 sm:p-8 border border-gray-800/50">
-                <h3 className="text-lg font-bold mb-4">Twoje ogłoszenia</h3>
+            <section>
+                <Tag as="h2" tone="seam">Twoje ogłoszenia</Tag>
                 {posts.length === 0 ? (
-                    <p className="text-sm text-neutral-500">Tu pojawią się wysłane ogłoszenia i ich stan.</p>
+                    <div className="border-t-2 border-tv-seam"><Notice>Tu pojawią się wysłane ogłoszenia i ich stan.</Notice></div>
                 ) : (
-                    <ul className="divide-y divide-gray-800/70">
+                    <ul className="grid gap-px border-t-2 border-tv-seam bg-tv-seam">
                         {posts.map((post) => {
                             const status = STATUS_LABELS[post.status];
                             return (
-                                <li key={post.id} className="py-4 first:pt-0 last:pb-0">
+                                <li key={post.id} className="bg-tv-panel px-5 py-4 sm:px-6">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${status.tone}`}>
-                                            {post.status === 'processing' && <Loader2 className="inline w-3 h-3 mr-1 animate-spin" />}
-                                            {status.label}
-                                        </span>
-                                        <span className="text-xs text-neutral-500">{formatDate(post.created_at)}</span>
+                                        {/* Kolor stanu liczony tu, nie z `STATUS_LABELS.tone`
+                                            (klasy starego świata): czeka = żółć, opublikowane = chaber */}
+                                        <Tag tone={POST_TONE[post.status] ?? 'seam'}>{status.label}</Tag>
+                                        <span className="tabular text-[13px] text-tv-muted">{formatDate(post.created_at)}</span>
                                     </div>
-                                    <p className="mt-1.5 font-medium text-neutral-100">
+                                    <p className="mt-1.5 text-[16px] font-semibold text-white">
                                         {post.title || 'Ogłoszenie w trakcie odczytu'}
                                     </p>
                                     {post.status === 'rejected' && post.reject_reason && (
-                                        <p className="text-sm text-neutral-400 mt-1">Powód: {post.reject_reason}</p>
+                                        <p className="mt-1 text-[15px] text-[#d7dbe8]">Powód: {post.reject_reason}</p>
                                     )}
                                     {post.url && (
                                         <a
                                             href={post.url}
-                                            className="mt-1.5 inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
+                                            className="mt-1 inline-flex min-h-[44px] items-center gap-1 text-[15px] font-bold text-tv-bluesoft underline-offset-4 hover:text-white hover:underline"
                                         >
-                                            Zobacz na stronie <ExternalLink className="w-3.5 h-3.5" />
+                                            Zobacz na stronie <ExternalLink className="h-4 w-4" aria-hidden />
                                         </a>
                                     )}
                                 </li>
@@ -243,7 +255,7 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
                         })}
                     </ul>
                 )}
-            </div>
+            </section>
         </div>
     );
 };

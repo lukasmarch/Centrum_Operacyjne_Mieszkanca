@@ -1,4 +1,5 @@
 import React from 'react';
+import { PageHead } from './simple/tv';
 
 interface LegalLayoutProps {
   title: string;
@@ -9,28 +10,33 @@ interface LegalLayoutProps {
 /**
  * Wspólny layout dokumentów prawnych (Regulamin, Polityka prywatności, Cookies).
  * Typografia przez selektory arbitralne — treść stron pisana czystym HTML.
+ *
+ * Tryb czytania (10.2026): miara ~68 znaków, akapit 16 px / 1,6 normalną
+ * szerokością kroju, nagłówki wąskim. Tabela na telefonie przewija się sama
+ * (`display:block` + `overflow-x-auto`), żeby strona nie jeździła w poziomie.
  */
 export const LegalLayout: React.FC<LegalLayoutProps> = ({ title, updated, children }) => (
-  <div
-    className="max-w-3xl mx-auto py-6 text-neutral-300
-      [&_h2]:text-white [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mt-8 [&_h2]:mb-3
-      [&_h3]:text-white [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2
-      [&_p]:mb-3 [&_p]:text-sm [&_p]:leading-relaxed
-      [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:mb-3 [&_ul]:text-sm [&_ul]:space-y-1
-      [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:mb-3 [&_ol]:text-sm [&_ol]:space-y-1
-      [&_li]:leading-relaxed
-      [&_strong]:text-neutral-100
-      [&_blockquote]:border-l-2 [&_blockquote]:border-white/15 [&_blockquote]:bg-white/[0.03]
-      [&_blockquote]:rounded-r-lg [&_blockquote]:pl-4 [&_blockquote]:pr-4 [&_blockquote]:py-4 [&_blockquote]:my-4
-      [&_table]:w-full [&_table]:text-xs [&_table]:mb-4 [&_table]:border-collapse
-      [&_th]:text-left [&_th]:text-neutral-400 [&_th]:font-semibold [&_th]:py-2 [&_th]:px-2 [&_th]:border-b [&_th]:border-white/10
-      [&_td]:py-2 [&_td]:px-2 [&_td]:border-b [&_td]:border-white/5 [&_td]:align-top"
-  >
-    <h1 className="text-2xl md:text-3xl font-black text-white mb-1">{title}</h1>
-    <p className="text-xs text-neutral-500 mb-6">
-      Wersja z dnia {updated} · RybnoLive.pl — Centrum Operacyjne Mieszkańca
-    </p>
-    {children}
+  <div className="mx-auto max-w-[68ch] pb-6 pt-2">
+    <PageHead
+      title={title}
+      sub={<>Wersja z dnia <span className="tabular">{updated}</span> · RybnoLive.pl — Centrum Operacyjne Mieszkańca</>}
+    />
+    <div
+      className="mt-6 text-[16px] leading-[1.6] text-[#d7dbe8]
+        [&_h2]:[font-stretch:78%] [&_h2]:tracking-[-0.01em] [&_h2]:text-[22px] [&_h2]:font-extrabold [&_h2]:leading-tight [&_h2]:text-white [&_h2]:mt-10 [&_h2]:mb-3
+        [&_h3]:[font-stretch:78%] [&_h3]:text-[18px] [&_h3]:font-bold [&_h3]:leading-tight [&_h3]:text-white [&_h3]:mt-6 [&_h3]:mb-2
+        [&_p]:mb-4
+        [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4 [&_ul]:space-y-1.5
+        [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4 [&_ol]:space-y-1.5
+        [&_li]:marker:text-tv-muted
+        [&_strong]:font-semibold [&_strong]:text-white
+        [&_blockquote]:my-5 [&_blockquote]:border [&_blockquote]:border-tv-seam [&_blockquote]:bg-tv-panel [&_blockquote]:px-4 [&_blockquote]:pt-4 [&_blockquote]:pb-1
+        [&_table]:mb-5 [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto [&_table]:border-collapse [&_table]:text-[14px] [&_table]:leading-snug
+        [&_th]:[font-stretch:78%] [&_th]:whitespace-nowrap [&_th]:border-b [&_th]:border-tv-seam [&_th]:px-2 [&_th]:py-2 [&_th]:text-left [&_th]:text-[13px] [&_th]:font-bold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-tv-muted
+        [&_td]:border-b [&_td]:border-tv-seam [&_td]:px-2 [&_td]:py-2 [&_td]:align-top"
+    >
+      {children}
+    </div>
   </div>
 );
 

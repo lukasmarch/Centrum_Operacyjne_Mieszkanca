@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { AppSection } from '../../types';
 import { useAuth } from '../context/AuthContext';
 import { useWasteSchedule } from '../hooks/useWasteSchedule';
 import { resolveWasteTown, rememberWasteTown, wasteTowns } from '../utils/wasteTown';
 import WasteWidget from '../../components/WasteWidget';
+import { Notice, PageHead, Select } from '../../components/simple/tv';
 
 /**
  * Harmonogram wywozu odpadów — cel „rozwiń" z karty na stronie głównej.
@@ -28,41 +28,24 @@ const WastePage: React.FC<{ onNavigate: (section: AppSection) => void }> = ({ on
     };
 
     return (
-        <div className="mx-auto max-w-3xl px-4 py-6 lg:py-10">
-            <button
-                onClick={() => onNavigate('dashboard')}
-                className="mb-5 flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-neutral-400 transition-colors hover:text-neutral-200"
-            >
-                <ArrowLeft size={16} aria-hidden />
-                Wróć na stronę główną
-            </button>
+        <div className="max-w-3xl space-y-6">
+            <PageHead title="Harmonogram wywozu odpadów" sub="Gmina Rybno — wszystkie miejscowości i frakcje" />
 
-            <h1 className="text-2xl lg:text-3xl font-bold text-white">Harmonogram wywozu odpadów</h1>
-            <p className="mt-1 text-sm text-neutral-400">Gmina Rybno — wszystkie miejscowości i frakcje</p>
-
-            <label className="mt-6 block">
-                <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">Twoja miejscowość</span>
-                <select
-                    value={town}
-                    onChange={e => chooseTown(e.target.value)}
-                    className="mt-2 min-h-[56px] w-full rounded-xl border border-white/10 bg-[#0d1117] px-4 text-base text-white outline-none transition-colors focus:border-blue-500/60"
-                >
+            <label className="block">
+                <span className="text-[15px] font-semibold text-tv-paper">Twoja miejscowość</span>
+                <Select value={town} onChange={e => chooseTown(e.target.value)} className="mt-2">
                     {!town && <option value="" disabled>Wybierz miejscowość…</option>}
                     {towns.map(name => <option key={name} value={name}>{name}</option>)}
-                </select>
-                <span className="mt-2 block text-sm text-neutral-400">
+                </Select>
+                <span className="mt-2 block text-[15px] leading-snug text-tv-muted">
                     Rybno ma dwa rejony wywozu (R1 i R2) — terminy różnią się o tydzień.
                 </span>
             </label>
 
             {town ? (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1117]">
-                    <WasteWidget events={events} town={town} />
-                </div>
+                <WasteWidget events={events} town={town} />
             ) : (
-                <p className="mt-6 rounded-2xl border border-white/10 bg-[#0d1117] p-5 text-base text-neutral-300">
-                    Wybierz miejscowość, a pokażemy najbliższe terminy wywozu.
-                </p>
+                <Notice>Wybierz miejscowość, a pokażemy najbliższe terminy wywozu.</Notice>
             )}
         </div>
     );

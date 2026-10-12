@@ -77,12 +77,12 @@ export const VoiceMicButton: React.FC<Props> = ({
         />
         <label
           htmlFor={inputId}
-          className={`cursor-pointer select-none ${className} ${fileError ? 'text-amber-500' : ''}`}
+          className={`cursor-pointer select-none ${className} ${fileError ? 'text-tv-yellow' : ''}`}
           title={isProc ? 'Przetwarzam...' : 'Nagraj wiadomość głosową'}
           aria-label="Mikrofon"
         >
           {isProc
-            ? <Loader2 size={iconSize} className="animate-spin text-blue-400" />
+            ? <Loader2 size={iconSize} className="animate-spin text-tv-bluesoft" />
             : <Mic size={iconSize} />}
         </label>
       </>
@@ -103,11 +103,11 @@ export const VoiceMicButton: React.FC<Props> = ({
           : speech.isListening ? 'Zatrzymaj nagrywanie'
           : 'Mów do mikrofonu'
       }
-      className={`${className} ${hasError ? 'text-amber-500' : ''}`}
+      className={`${className} ${hasError ? 'text-tv-yellow' : ''}`}
       aria-label="Mikrofon"
     >
       {speech.isProcessing
-        ? <Loader2 size={iconSize} className="animate-spin text-blue-400" />
+        ? <Loader2 size={iconSize} className="animate-spin text-tv-bluesoft" />
         : speech.isListening
         ? <MicOff size={iconSize} />
         : <Mic size={iconSize} />}

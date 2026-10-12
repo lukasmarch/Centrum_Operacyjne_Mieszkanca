@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Landmark, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useEvents } from '../../src/hooks/useEvents';
 import { useCouncilSessions } from '../../src/hooks/useCouncil';
 import { phaseOf, upcomingFirst } from '../../src/utils/eventTime';
@@ -113,42 +113,37 @@ const CouncilCard: React.FC<CouncilCardProps> = ({ onClick }) => {
 
     const footer = next
         ? [duration, latest ? 'Skrót z obrad damy tu po sesji.' : null].filter(Boolean).join(' ')
-        : 'Zobacz, co ustalono';
+        : null;
 
     return (
-        <button
-            onClick={onClick}
-            className="group flex w-full items-start gap-4 rounded-2xl border border-white/10 bg-[#0d1117] p-4 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04] lg:p-5"
-        >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/10">
-                <Landmark size={19} className="text-sky-400" aria-hidden />
-            </span>
-
-            <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-sky-300">
+        <section aria-label="Rada Gminy" className="flex flex-col">
+            <button
+                onClick={onClick}
+                className="group flex flex-1 flex-col items-start border-t-2 border-tv-blue bg-tv-panel px-4 pb-1 pt-3 text-left transition-colors hover:bg-tv-panel2 lg:px-5"
+            >
+                <h2 className="font-cond text-[21px] font-extrabold leading-snug text-white lg:text-[23px]">
+                    {title}
+                </h2>
+                {/* Termin i stan w linii pod nagłówkiem, nie jako etykieta nad nim */}
+                <span className={`mt-1 text-[14px] font-bold ${ongoing ? 'text-[#ff8a80]' : 'text-tv-paper'}`}>
                     {kicker}
                 </span>
-                <span className="mt-1 text-[15px] font-bold leading-snug text-white">
-                    {title}
-                </span>
                 {body && (
-                    <span className="mt-1.5 line-clamp-2 text-[13.5px] leading-relaxed text-neutral-400">
+                    <span className="mt-1.5 line-clamp-3 text-[15px] leading-relaxed text-[#d7dbe8]">
                         {body}
                     </span>
                 )}
                 {footer && (
-                    <span className="mt-2 text-[12.5px] leading-relaxed text-neutral-500">
+                    <span className="mt-2 text-[14px] leading-relaxed text-tv-muted">
                         {footer}
                     </span>
                 )}
-            </span>
-
-            <ChevronRight
-                size={18}
-                aria-hidden
-                className="mt-1 shrink-0 text-neutral-600 transition-colors group-hover:text-neutral-300"
-            />
-        </button>
+                <span className="inline-flex min-h-[44px] items-center gap-1 text-[15px] font-bold text-tv-bluesoft group-hover:text-white">
+                    {next ? 'Porządek obrad i sesje' : 'Co ustalono'}
+                    <ChevronRight size={16} aria-hidden />
+                </span>
+            </button>
+        </section>
     );
 };
 

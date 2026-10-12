@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, Download } from 'lucide-react';
+import { Tag } from './simple/tv';
 
 const VISIT_KEY = 'pwa_visit_count';
 const DISMISSED_KEY = 'pwa_install_dismissed';
@@ -68,39 +69,43 @@ export const PWAInstallPrompt: React.FC = () => {
     if (!show) return null;
 
     return (
-        <div className="fixed bottom-20 left-4 right-4 z-[200] md:left-auto md:right-6 md:w-80 animate-in slide-in-from-bottom-4 duration-300">
-            <div className="glass-panel rounded-2xl p-4 border border-blue-500/20 shadow-xl">
-                <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                        <Download size={18} className="text-blue-400" />
+        // Płaski panel nad dolną belką zakładek (telefon); na desktopie w prawym dolnym rogu
+        <div
+            role="dialog"
+            aria-labelledby="pwa-install-title"
+            className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-[200] flex flex-col lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-96"
+        >
+            <Tag as="h2" className="ml-4 lg:ml-0">
+                <span id="pwa-install-title">Dodaj do ekranu głównego</span>
+            </Tag>
+            <div className="flex items-start gap-2 border-t-2 border-tv-blue bg-tv-panel py-3 pl-4 pr-1 lg:border-x lg:border-b lg:border-x-tv-seam lg:border-b-tv-seam">
+                <div className="min-w-0 flex-1">
+                    <p className="text-[15px] leading-snug text-[#d7dbe8]">
+                        Centrum Operacyjne Rybna jako aplikacja — szybki dostęp bez przeglądarki.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                            onClick={handleInstall}
+                            className="font-cond inline-flex min-h-[44px] items-center gap-2 bg-tv-blue px-4 text-[15px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
+                        >
+                            <Download size={16} aria-hidden />
+                            Zainstaluj
+                        </button>
+                        <button
+                            onClick={handleDismiss}
+                            className="min-h-[44px] px-2 text-[15px] font-bold text-tv-bluesoft transition-colors hover:text-white"
+                        >
+                            Nie teraz
+                        </button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white">Dodaj do ekranu głównego</p>
-                        <p className="text-xs text-neutral-400 mt-0.5">
-                            Centrum Operacyjne Rybna jako aplikacja — szybki dostęp bez przeglądarki.
-                        </p>
-                        <div className="flex gap-2 mt-3">
-                            <button
-                                onClick={handleInstall}
-                                className="btn-primary text-xs py-1.5 px-3 rounded-lg"
-                            >
-                                Zainstaluj
-                            </button>
-                            <button
-                                onClick={handleDismiss}
-                                className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
-                            >
-                                Nie teraz
-                            </button>
-                        </div>
-                    </div>
-                    <button
-                        onClick={handleDismiss}
-                        className="text-neutral-600 hover:text-neutral-400 transition-colors flex-shrink-0"
-                    >
-                        <X size={14} />
-                    </button>
                 </div>
+                <button
+                    onClick={handleDismiss}
+                    aria-label="Zamknij"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center text-tv-muted transition-colors hover:text-white"
+                >
+                    <X size={18} />
+                </button>
             </div>
         </div>
     );

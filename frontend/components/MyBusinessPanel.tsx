@@ -13,7 +13,8 @@
  * znikało z ekranu i wyglądało jak awaria serwisu.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { BadgeCheck, Star, Pencil, Megaphone, EyeOff, Clock, XCircle, Store } from 'lucide-react';
+import { BadgeCheck, Star, Pencil, Megaphone, EyeOff, Clock, XCircle, Store, ChevronRight } from 'lucide-react';
+import { Tag, Skeleton } from './simple/tv';
 import { fetchMyClaims, getAssetUrl, MyClaim } from '../src/services/businessApi';
 import { EditProfileModal, AnnouncementsModal } from './BusinessOwnerModals';
 
@@ -44,8 +45,9 @@ const MyBusinessPanel: React.FC<{
 
     if (claims === null) {
         return (
-            <div className="h-32 flex items-center justify-center">
-                <div className="w-6 h-6 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin" />
+            <div className="space-y-3" aria-busy="true">
+                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-32" />
             </div>
         );
     }
@@ -57,23 +59,27 @@ const MyBusinessPanel: React.FC<{
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-xl font-bold mb-1">Moja firma</h2>
-                <p className="text-neutral-400 text-sm">
+                <h2 className="font-cond text-[24px] font-extrabold leading-tight text-white">Moja firma</h2>
+                <p className="mt-0.5 text-[15px] text-tv-muted">
                     Wizytówki przypisane do tego konta. Tylko Ty możesz je edytować.
                 </p>
             </div>
 
             {claims.length === 0 && (
-                <div className="bg-gradient-to-br from-blue-900/30 to-violet-900/20 rounded-2xl p-8 border border-blue-500/20 text-center">
-                    <Store size={32} className="mx-auto mb-3 text-blue-400" />
-                    <h3 className="font-bold text-lg mb-1">Nie masz jeszcze wizytówki</h3>
-                    <p className="text-neutral-400 text-sm max-w-md mx-auto mb-5">
-                        Jeśli prowadzisz firmę w gminie Rybno, jej karta prawdopodobnie już jest
-                        w katalogu — tylko pusta. Przejęcie jest bezpłatne.
-                    </p>
+                <div className="border-t-2 border-tv-blue bg-tv-panel p-4 lg:p-5">
+                    <div className="flex items-start gap-3">
+                        <Store size={22} className="mt-1 shrink-0 text-tv-muted" aria-hidden />
+                        <div>
+                            <h3 className="font-cond text-[21px] font-extrabold leading-snug text-white">Nie masz jeszcze wizytówki</h3>
+                            <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-[#d7dbe8]">
+                                Jeśli prowadzisz firmę w gminie Rybno, jej karta prawdopodobnie już jest
+                                w katalogu — tylko pusta. Przejęcie jest bezpłatne.
+                            </p>
+                        </div>
+                    </div>
                     <button
                         onClick={onGoToCatalog}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors"
+                        className="font-cond mt-4 inline-flex min-h-[52px] items-center bg-tv-blue px-5 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
                     >
                         Przejmij wizytówkę firmy
                     </button>
@@ -82,25 +88,21 @@ const MyBusinessPanel: React.FC<{
 
             {/* ── Wizytówki potwierdzone ── */}
             {verified.map(claim => (
-                <div key={claim.business_id} className="bg-slate-900/50 rounded-2xl p-6 border border-gray-800/50">
-                    <div className="flex items-start gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                <div key={claim.business_id} className="border-t-2 border-tv-blue bg-tv-panel p-4 lg:p-5">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden bg-tv-panel2">
                             {claim.profile?.logo_url
-                                ? <img src={getAssetUrl(claim.profile.logo_url)} alt="" className="w-full h-full object-cover" />
-                                : <span className="text-2xl">🏪</span>}
+                                ? <img src={getAssetUrl(claim.profile.logo_url)} alt="" className="h-full w-full object-cover" />
+                                : <Store size={20} className="text-tv-muted" aria-hidden />}
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                                <h3 className="font-bold text-lg text-neutral-100 truncate">{claim.nazwa}</h3>
+                        <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex flex-wrap items-center gap-2">
+                                <h3 className="truncate text-[18px] font-bold text-white">{claim.nazwa}</h3>
                                 {claim.is_premium
-                                    ? <span className="flex items-center gap-1 text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">
-                                        <Star size={10} /> Firma lokalna
-                                      </span>
-                                    : <span className="flex items-center gap-1 text-[10px] font-bold bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
-                                        <BadgeCheck size={10} /> Zweryfikowana
-                                      </span>}
+                                    ? <Tag tone="paper"><span className="inline-flex items-center gap-1"><Star size={12} aria-hidden /> Firma lokalna</span></Tag>
+                                    : <Tag tone="seam"><span className="inline-flex items-center gap-1"><BadgeCheck size={12} aria-hidden /> Zweryfikowana</span></Tag>}
                             </div>
-                            <p className="text-xs text-neutral-500">
+                            <p className="text-[13px] text-tv-muted">
                                 {claim.miasto}
                                 {claim.verified_at && ` · potwierdzona ${fmtDate(claim.verified_at)}`}
                             </p>
@@ -108,20 +110,20 @@ const MyBusinessPanel: React.FC<{
                     </div>
 
                     {/* Dwie różne miary — pokazy to zasięg, kontakty to zainteresowanie */}
-                    <div className="grid grid-cols-2 gap-3 mt-5">
-                        <div className="bg-slate-950/70 rounded-xl p-3 text-center">
-                            <p className="text-2xl font-bold text-white">{claim.views_count}</p>
-                            <p className="text-[11px] text-neutral-500 mt-0.5">kliknięć w kontakt</p>
+                    <div className="mt-4 grid grid-cols-2 gap-px bg-tv-seam">
+                        <div className="bg-tv-panel2 px-3.5 py-3">
+                            <p className="font-cond tabular text-[26px] font-extrabold leading-none text-white">{claim.views_count}</p>
+                            <p className="mt-1 text-[13px] text-tv-muted">kliknięć w kontakt</p>
                         </div>
-                        <div className="bg-slate-950/70 rounded-xl p-3 text-center">
-                            <p className="text-2xl font-bold text-neutral-300">{claim.impressions_count ?? 0}</p>
-                            <p className="text-[11px] text-neutral-500 mt-0.5">pokazów karty</p>
+                        <div className="bg-tv-panel2 px-3.5 py-3">
+                            <p className="font-cond tabular text-[26px] font-extrabold leading-none text-tv-paper">{claim.impressions_count ?? 0}</p>
+                            <p className="mt-1 text-[13px] text-tv-muted">pokazów karty</p>
                         </div>
                     </div>
 
                     {claim.is_hidden && (
-                        <p className="mt-4 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-start gap-2">
-                            <EyeOff size={14} className="shrink-0 mt-0.5" />
+                        <p className="mt-4 flex items-start gap-2 bg-tv-yellow px-3 py-2.5 text-[14px] leading-snug text-tv-ink">
+                            <EyeOff size={16} className="mt-0.5 shrink-0" aria-hidden />
                             <span>
                                 Karta jest ukryta w katalogu na wniosek o zaprzestanie przetwarzania
                                 danych. Edycja działa, ale mieszkańcy jej nie widzą — napisz na
@@ -130,33 +132,33 @@ const MyBusinessPanel: React.FC<{
                         </p>
                     )}
 
-                    <div className="flex flex-wrap gap-2 mt-5">
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
                         <button
                             onClick={() => setEditClaim(claim)}
-                            className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-colors"
+                            className="font-cond inline-flex min-h-[44px] items-center gap-1.5 bg-tv-blue px-4 text-[16px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff]"
                         >
-                            <Pencil size={13} /> Edytuj wizytówkę
+                            <Pencil size={15} aria-hidden /> Edytuj wizytówkę
                         </button>
                         {claim.is_premium ? (
                             <button
                                 onClick={() => setAnnClaim(claim)}
-                                className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-sm font-bold rounded-xl transition-colors"
+                                className="font-cond inline-flex min-h-[44px] items-center gap-1.5 bg-tv-paper px-4 text-[16px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-white"
                             >
-                                <Megaphone size={13} /> Ogłoszenia
+                                <Megaphone size={15} aria-hidden /> Ogłoszenia
                             </button>
                         ) : (
                             <button
                                 onClick={onGoToPricing}
-                                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-neutral-300 text-sm font-bold rounded-xl transition-colors"
+                                className="font-cond inline-flex min-h-[44px] items-center gap-1.5 bg-tv-paper px-4 text-[16px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-white"
                             >
-                                <Star size={13} /> Wyróżnij firmę
+                                <Star size={15} aria-hidden /> Wyróżnij firmę
                             </button>
                         )}
                         <button
                             onClick={onGoToCatalog}
-                            className="px-4 py-2.5 text-sm font-semibold text-neutral-400 hover:text-neutral-200 transition-colors"
+                            className="inline-flex min-h-[44px] items-center gap-1 px-2 text-[15px] font-bold text-tv-bluesoft underline-offset-4 transition-colors hover:text-white hover:underline"
                         >
-                            Zobacz w katalogu →
+                            Zobacz w katalogu <ChevronRight size={16} aria-hidden />
                         </button>
                     </div>
                 </div>
@@ -164,16 +166,16 @@ const MyBusinessPanel: React.FC<{
 
             {/* ── Zgłoszenia w toku ── */}
             {pending.map(claim => (
-                <div key={claim.business_id} className="bg-blue-500/5 rounded-2xl p-5 border border-blue-500/20">
+                <div key={claim.business_id} className="bg-tv-panel p-4">
                     <div className="flex items-start gap-3">
-                        <Clock size={18} className="text-blue-400 shrink-0 mt-0.5" />
+                        <Clock size={18} className="mt-0.5 shrink-0 text-tv-muted" aria-hidden />
                         <div>
-                            <h3 className="font-bold text-neutral-100">{claim.nazwa}</h3>
-                            <p className="text-sm text-neutral-400 mt-1">
+                            <h3 className="text-[16px] font-bold text-white">{claim.nazwa}</h3>
+                            <p className="mt-1 text-[15px] leading-relaxed text-[#d7dbe8]">
                                 Zgłoszenie czeka na potwierdzenie — sprawdzamy je w ciągu 2 dni
                                 roboczych. Odezwiemy się mailem.
                             </p>
-                            <p className="text-xs text-neutral-500 mt-2">
+                            <p className="mt-2 text-[13px] text-tv-muted">
                                 {claim.source === 'manual'
                                     ? 'Firma dopisana ręcznie — do czasu potwierdzenia nie jest widoczna w katalogu.'
                                     : 'Dane firmy pochodzą z CEIDG — potwierdzamy tylko, że karta należy do Ciebie.'}
@@ -186,18 +188,18 @@ const MyBusinessPanel: React.FC<{
 
             {/* ── Odmowy ── */}
             {rejected.map(claim => (
-                <div key={claim.business_id} className="bg-slate-900/50 rounded-2xl p-5 border border-gray-800/50">
+                <div key={claim.business_id} className="bg-tv-panel p-4">
                     <div className="flex items-start gap-3">
-                        <XCircle size={18} className="text-neutral-500 shrink-0 mt-0.5" />
+                        <XCircle size={18} className="mt-0.5 shrink-0 text-tv-muted" aria-hidden />
                         <div>
-                            <h3 className="font-bold text-neutral-300">{claim.nazwa}</h3>
-                            <p className="text-sm text-neutral-400 mt-1">
+                            <h3 className="text-[16px] font-bold text-tv-paper">{claim.nazwa}</h3>
+                            <p className="mt-1 text-[15px] leading-relaxed text-[#d7dbe8]">
                                 Nie potwierdziliśmy tego zgłoszenia{claim.decided_at && ` (${fmtDate(claim.decided_at)})`},
                                 więc karta wróciła do puli.
                             </p>
-                            <p className="text-xs text-neutral-500 mt-2">
+                            <p className="mt-2 text-[13px] text-tv-muted">
                                 Jeśli to Twoja firma, napisz na{' '}
-                                <a href="mailto:biuro@lumargo.pl" className="text-blue-400 hover:text-blue-300">
+                                <a href="mailto:biuro@lumargo.pl" className="font-semibold text-tv-bluesoft underline underline-offset-2 hover:text-white">
                                     biuro@lumargo.pl
                                 </a>{' '}
                                 — wystarczy cokolwiek, co wiąże Cię z firmą. Załatwimy to bez

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=390">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden;background:#05080f;color:#f5f5f0;font-family:'Atkinson Hyperlegible',sans-serif}
+.tt{font-family:'VT323',monospace}
+.head{display:flex;justify-content:space-between;align-items:baseline;padding:14px 16px 8px;font-size:22px;color:#ffe14d}
+.head b{color:#f5f5f0;font-weight:400}
+.date{padding:0 16px 12px;font-size:15px;color:#b9bcc4}
+.date strong{color:#f5f5f0}
+.band{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;font-weight:700;font-size:17px}
+.cyan{background:#2ee6f0;color:#05080f}
+.row{border-top:1px solid #1d222c;padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:2px 12px}
+.lbl{font-size:13px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.pg{font-family:'VT323',monospace;font-size:22px;color:#ffe14d;grid-row:1/3;grid-column:2;align-self:center}
+.big{font-size:30px;font-weight:700;line-height:1.1}
+.sub{font-size:15px;color:#c9ccd3;grid-column:1}
+.ok .lbl{color:#3ddc6a}.warn .lbl{color:#ff4a3d}.y .lbl{color:#ffe14d}.c .lbl{color:#2ee6f0}
+.warnbar{background:#ff4a3d;color:#05080f;padding:3px 8px;font-weight:700;font-size:13px;display:inline-block;margin-top:6px}
+.push{margin:14px 16px 0;border:1px solid #2ee6f0;padding:14px}
+.push p{font-size:16px;line-height:1.35}
+.btn{display:block;margin-top:12px;background:#ffe14d;color:#05080f;font-weight:700;font-size:17px;text-align:center;padding:14px}
+.tabs{position:absolute;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #1d222c;background:#05080f}
+.tabs div{padding:10px 0 18px;text-align:center;font-size:13px;color:#b9bcc4}
+.tabs .on{color:#ffe14d;font-weight:700}
+</style></head><body>
+<div class="head tt"><span>RybnoLive <b>100</b></span><span>14:05:32</span></div>
+<div class="date">niedz. <strong>11 października</strong> · imieniny Aldony, Emila</div>
+<div class="band cyan"><span>Twoja wieś: Żabiny</span><span>zmień ▾</span></div>
+<div class="row ok"><span class="lbl">Prąd i woda</span><span class="pg">101</span>
+ <span class="big">W Żabinach spokojnie</span>
+ <span class="sub">W gminie: wt 14.10 09:00–13:00 wyłączenie prądu — Grądy</span></div>
+<div class="row y"><span class="lbl">Wywóz odpadów</span><span class="pg">102</span>
+ <span class="big">wtorek 13.10</span>
+ <span class="sub">Zmieszane · Żabiny · wystaw pojemnik do 6:00</span></div>
+<div class="row c"><span class="lbl">Autobus do Działdowa</span><span class="pg">103</span>
+ <span class="big">jutro 06:40</span>
+ <span class="sub">Dziś już nie kursuje</span></div>
+<div class="row y"><span class="lbl">Pogoda</span><span class="pg">104</span>
+ <span class="big">9° <span style="font-size:17px;font-weight:400;color:#c9ccd3">zachmurzenie, odczuwalnie 6°</span></span>
+ <span class="sub">Powietrze czyste</span></div>
+<div class="push"><p>Dać znać, gdy w <b>Żabinach</b> zapowiedzą wyłączenie prądu albo wody?</p>
+ <span class="btn">Tak, powiadamiaj o Żabinach</span></div>
+<nav class="tabs"><div class="on">Pulpit</div><div>Gmina</div><div>Zapytaj</div><div>Więcej</div></nav>
+</body></html>

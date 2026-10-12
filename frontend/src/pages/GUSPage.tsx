@@ -25,6 +25,7 @@ import { useAuth } from '../context/AuthContext';
 import GUSOverview from '../../components/gus/GUSOverview';
 import GUSSectionPage from '../../components/gus/GUSSectionPage';
 import SectionNav from '../../components/gus/layout/SectionNav';
+import { PageHead } from '../../components/simple/tv';
 
 // Valid section keys (10 Premium categories)
 const VALID_SECTIONS = [
@@ -77,23 +78,18 @@ const GUSPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-black text-neutral-100 tracking-tight">Statystyki GUS</h1>
-        <p className="text-neutral-400 mt-1 font-medium">
-          Bank Danych Lokalnych GUS · Gmina Rybno · Powiat Działdowski
-        </p>
-      </div>
+    <div className="space-y-6 lg:space-y-8">
+      <PageHead
+        title="Statystyki GUS"
+        sub="Bank Danych Lokalnych GUS · Gmina Rybno · Powiat Działdowski"
+      />
 
       {/* Section Navigation - always visible */}
-      <div className="border-b border-white/5 pb-4">
-        <SectionNav
-          activeSection={activeSection}
-          onSectionChange={handleSectionChange}
-          userTier={user?.tier || 'free'}
-        />
-      </div>
+      <SectionNav
+        activeSection={activeSection}
+        onSectionChange={handleSectionChange}
+        userTier={user?.tier || 'free'}
+      />
 
       {/* Main Content - Conditional Rendering */}
       <div>

@@ -8,12 +8,66 @@
  * jak wejść w jej edycję.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Megaphone, Tag } from 'lucide-react';
+import { Megaphone, Tag as TagIcon, X, Eye, Store, AlertTriangle } from 'lucide-react';
+import { Tag } from './simple/tv';
 import {
     updateBusinessProfile, uploadBusinessLogo, getAssetUrl,
     fetchMyAnnouncements, createAnnouncement, deactivateAnnouncement,
     CatalogCard, MyClaim, BusinessAnnouncement, AnnouncementType,
 } from '../src/services/businessApi';
+
+// ==================== Klocki okien (świat „Pasek informacyjny”) ====================
+
+/** Pole formularza: obramowanie 2 px szwem, fokus papierem, 16 px — iOS nie powiększa. */
+export const FIELD =
+    'min-h-[48px] w-full border-2 border-tv-seam bg-tv-ink px-3 py-2.5 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper';
+
+/** Przycisk główny: chaber, wąskie wersaliki, 52 px. */
+export const PRIMARY_BTN =
+    'font-cond inline-flex min-h-[52px] w-full items-center justify-center gap-2 bg-tv-blue px-4 text-[17px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:opacity-50 disabled:hover:bg-tv-blue';
+
+/** Błąd formularza — żółty pas z ikoną (czerwień jest zarezerwowana dla awarii). */
+export const FormError: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <p role="alert" className="flex items-start gap-2 bg-tv-yellow px-3 py-2.5 text-[15px] leading-snug text-tv-ink">
+        <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
+        <span>{children}</span>
+    </p>
+);
+
+/**
+ * Płaski panel okna: krawędź 2 px w chabrze, tło przyciemnione jednolicie
+ * (bez rozmycia), zamknięcie w kwadracie 44 px.
+ */
+export const ModalShell: React.FC<{
+    title: React.ReactNode;
+    sub?: React.ReactNode;
+    onClose: () => void;
+    wide?: boolean;
+    children: React.ReactNode;
+}> = ({ title, sub, onClose, wide = false, children }) => (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+        <div
+            role="dialog"
+            aria-modal="true"
+            className={`max-h-[85vh] w-full overflow-y-auto border border-tv-seam border-t-2 border-t-tv-blue bg-tv-panel p-4 sm:p-6 ${wide ? 'max-w-xl' : 'max-w-lg'}`}
+            onClick={e => e.stopPropagation()}
+        >
+            <div className="flex items-start justify-between gap-3">
+                <h2 className="font-cond pt-1.5 text-[22px] font-extrabold leading-tight text-white">{title}</h2>
+                <button
+                    onClick={onClose}
+                    aria-label="Zamknij"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center text-tv-muted transition-colors hover:bg-tv-panel2 hover:text-white"
+                >
+                    <X size={20} aria-hidden />
+                </button>
+            </div>
+            {sub && <div className="mb-5 mt-1 text-[14px] leading-snug text-tv-muted">{sub}</div>}
+            {!sub && <div className="mb-4" />}
+            {children}
+        </div>
+    </div>
+);
 
 // ==================== Modal: edycja wizytówki (właściciel) ====================
 
@@ -78,52 +132,47 @@ export const EditProfileModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-xl font-black text-neutral-100">Edytuj wizytówkę</h2>
-                    <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
-                </div>
-                <p className="text-xs text-neutral-500 mb-5">{claim.nazwa} · 👁 {claim.views_count} wyświetleń</p>
-
-                <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-white/[0.06] border border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
-                            {logoUrl
-                                ? <img src={getAssetUrl(logoUrl)} alt="Logo" className="w-full h-full object-cover" />
-                                : <span className="text-neutral-500 text-2xl">🏪</span>}
-                        </div>
-                        <div className="flex-1">
-                            <label className="inline-block px-4 py-2 bg-white/[0.06] border border-white/10 rounded-xl text-xs font-bold text-neutral-300 hover:bg-white/[0.1] cursor-pointer transition-all">
-                                {uploadingLogo ? 'Wysyłam…' : logoUrl ? 'Zmień logo' : 'Dodaj logo'}
-                                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                                    disabled={uploadingLogo}
-                                    onChange={e => onLogoSelected(e.target.files?.[0])} />
-                            </label>
-                            <p className="text-[10px] text-neutral-500 mt-1.5">JPG, PNG lub WEBP, max 2MB</p>
-                        </div>
+        <ModalShell
+            title="Edytuj wizytówkę"
+            onClose={onClose}
+            sub={<span className="inline-flex flex-wrap items-center gap-x-1.5">{claim.nazwa} · <Eye size={14} aria-hidden /> <span className="tabular">{claim.views_count}</span> wyświetleń</span>}
+        >
+            <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden bg-tv-panel2">
+                        {logoUrl
+                            ? <img src={getAssetUrl(logoUrl)} alt="Logo" className="h-full w-full object-cover" />
+                            : <Store size={26} className="text-tv-muted" aria-hidden />}
                     </div>
-                    <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={600}
-                        placeholder="Opis firmy — czym się zajmujecie, co Was wyróżnia (max 600 znaków)"
-                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500 resize-none" />
-                    <div className="grid grid-cols-2 gap-3">
-                        <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Telefon"
-                            className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail"
-                            className="px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
+                    <div className="flex-1">
+                        <label className="font-cond inline-flex min-h-[44px] cursor-pointer items-center bg-tv-paper px-4 text-[15px] font-extrabold uppercase tracking-wide text-tv-ink transition-colors hover:bg-white focus-within:outline focus-within:outline-2 focus-within:outline-tv-yellow">
+                            {uploadingLogo ? 'Wysyłam…' : logoUrl ? 'Zmień logo' : 'Dodaj logo'}
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                                disabled={uploadingLogo}
+                                onChange={e => onLogoSelected(e.target.files?.[0])} />
+                        </label>
+                        <p className="mt-1.5 text-[13px] text-tv-muted">JPG, PNG lub WEBP, max 2MB</p>
                     </div>
-                    <input type="text" value={www} onChange={e => setWww(e.target.value)} placeholder="Strona WWW"
-                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                    <input type="text" value={godziny} onChange={e => setGodziny(e.target.value)} placeholder="Godziny otwarcia, np. pn-pt 8-17, sb 8-13"
-                        className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-blue-500 outline-none placeholder:text-neutral-500" />
-                    {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠️ {error}</p>}
-                    <button onClick={save} disabled={saving}
-                        className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-black rounded-xl hover:from-blue-500 hover:to-violet-500 disabled:opacity-50 transition-all">
-                        {saving ? 'Zapisuję…' : 'Zapisz wizytówkę'}
-                    </button>
                 </div>
+                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={600}
+                    placeholder="Opis firmy — czym się zajmujecie, co Was wyróżnia (max 600 znaków)"
+                    className={`${FIELD} resize-none`} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <input type="tel" value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Telefon"
+                        className={FIELD} />
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="E-mail"
+                        className={FIELD} />
+                </div>
+                <input type="text" value={www} onChange={e => setWww(e.target.value)} placeholder="Strona WWW"
+                    className={FIELD} />
+                <input type="text" value={godziny} onChange={e => setGodziny(e.target.value)} placeholder="Godziny otwarcia, np. pn-pt 8-17, sb 8-13"
+                    className={FIELD} />
+                {error && <FormError>{error}</FormError>}
+                <button onClick={save} disabled={saving} className={PRIMARY_BTN}>
+                    {saving ? 'Zapisuję…' : 'Zapisz wizytówkę'}
+                </button>
             </div>
-        </div>
+        </ModalShell>
     );
 };
 
@@ -194,92 +243,87 @@ export const AnnouncementsModal: React.FC<{
         a.is_active && (!a.valid_until || new Date(a.valid_until) > now);
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-gray-950 rounded-3xl border border-gray-800/50 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-8" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-xl font-black text-neutral-100">📣 Ogłoszenia firmy</h2>
-                    <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-neutral-400 hover:bg-gray-800 border border-gray-700/50">✕</button>
+        <ModalShell title="Ogłoszenia firmy" sub={claim.nazwa} onClose={onClose}>
+            {!claim.is_premium ? (
+                <div className="bg-tv-panel2 p-4">
+                    <Tag tone="paper">Funkcja planu „Firma lokalna"</Tag>
+                    <p className="mt-3 text-[15px] leading-relaxed text-[#d7dbe8]">
+                        Ogłoszenia i okazje publikują firmy z planem Firma lokalna (49 zł/mc):
+                        2 ogłoszenia + 8 okazji miesięcznie, widoczne na stronie głównej,
+                        w feedzie i newsletterze. Napisz do nas: biuro@lumargo.pl
+                    </p>
                 </div>
-                <p className="text-xs text-neutral-500 mb-5">{claim.nazwa}</p>
-
-                {!claim.is_premium ? (
-                    <div className="p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center">
-                        <p className="text-sm font-bold text-amber-300 mb-1">Funkcja planu „Firma lokalna"</p>
-                        <p className="text-xs text-neutral-400 leading-relaxed">
-                            Ogłoszenia i okazje publikują firmy z planem Firma lokalna (49 zł/mc):
-                            2 ogłoszenia + 8 okazji miesięcznie, widoczne na stronie głównej,
-                            w feedzie i newsletterze. Napisz do nas: biuro@lumargo.pl
-                        </p>
+            ) : (
+                <div className="space-y-4">
+                    {/* Formularz publikacji */}
+                    <div role="group" aria-label="Rodzaj wpisu" className="grid grid-cols-1 gap-px bg-tv-seam sm:grid-cols-2">
+                        {(Object.keys(QUOTA_INFO) as AnnouncementType[]).map(t => (
+                            <button key={t} onClick={() => setType(t)} aria-pressed={type === t}
+                                className={`min-h-[44px] p-3 text-left transition-colors ${
+                                    type === t ? 'bg-tv-paper text-tv-ink' : 'bg-tv-panel2 text-white hover:bg-tv-seam'
+                                }`}>
+                                <p className="font-cond text-[16px] font-extrabold uppercase tracking-wide">{QUOTA_INFO[t].label}</p>
+                                <p className={`mt-0.5 text-[13px] leading-snug ${type === t ? 'text-tv-ink/75' : 'text-tv-muted'}`}>{QUOTA_INFO[t].hint}</p>
+                                <p className={`tabular mt-1 text-[13px] font-semibold ${type === t ? 'text-tv-ink' : 'text-tv-paper'}`}>
+                                    {usedThisMonth(t)}/{QUOTA_INFO[t].limit} w tym miesiącu
+                                </p>
+                            </button>
+                        ))}
                     </div>
-                ) : (
-                    <div className="space-y-4">
-                        {/* Formularz publikacji */}
-                        <div className="grid grid-cols-2 gap-2">
-                            {(Object.keys(QUOTA_INFO) as AnnouncementType[]).map(t => (
-                                <button key={t} onClick={() => setType(t)}
-                                    className={`p-3 rounded-xl border text-left transition-all ${
-                                        type === t ? 'bg-amber-500/15 border-amber-500/40' : 'bg-gray-900 border-gray-700/50 hover:border-gray-600'
-                                    }`}>
-                                    <p className={`text-xs font-bold ${type === t ? 'text-amber-300' : 'text-neutral-300'}`}>{QUOTA_INFO[t].label}</p>
-                                    <p className="text-[10px] text-neutral-500 mt-0.5">{QUOTA_INFO[t].hint}</p>
-                                    <p className="text-[10px] text-neutral-400 mt-1">
-                                        {usedThisMonth(t)}/{QUOTA_INFO[t].limit} w tym miesiącu
-                                    </p>
-                                </button>
+                    <input type="text" value={title} onChange={e => setTitle(e.target.value)} maxLength={120}
+                        placeholder={type === 'okazja' ? 'Np. Truskawki 50% taniej do 16:00' : 'Tytuł ogłoszenia'}
+                        className={FIELD} />
+                    <textarea value={body} onChange={e => setBody(e.target.value)} rows={3} maxLength={500}
+                        placeholder="Treść (max 500 znaków)"
+                        className={`${FIELD} resize-none`} />
+                    {type === 'okazja' && (
+                        <label className="block text-[14px] text-tv-muted">
+                            Ważna do (maks. 7 dni):
+                            <input type="datetime-local" value={validUntil} onChange={e => setValidUntil(e.target.value)}
+                                className={`${FIELD} mt-1 [color-scheme:dark]`} />
+                        </label>
+                    )}
+                    {error && <FormError>{error}</FormError>}
+                    <button onClick={publish} disabled={saving || !title.trim() || !body.trim()} className={PRIMARY_BTN}>
+                        {saving ? 'Publikuję…' : 'Opublikuj'}
+                    </button>
+
+                    {/* Lista ogłoszeń */}
+                    {loading ? (
+                        <p className="py-3 text-center text-[14px] text-tv-muted">Wczytuję…</p>
+                    ) : items.length > 0 && (
+                        <div className="grid grid-cols-1 gap-px border-t border-tv-seam bg-tv-seam">
+                            {items.map(a => (
+                                <div key={a.id} className="bg-tv-panel py-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="flex items-center gap-1.5 text-[15px] font-bold text-white">
+                                                {a.type === 'okazja'
+                                                    ? <TagIcon size={14} className="shrink-0 text-tv-muted" aria-hidden />
+                                                    : <Megaphone size={14} className="shrink-0 text-tv-muted" aria-hidden />}
+                                                {a.title}
+                                            </p>
+                                            <p className="mt-0.5 line-clamp-2 text-[14px] text-[#d7dbe8]">{a.body}</p>
+                                            <p className="tabular mt-1 text-[13px] text-tv-muted">
+                                                {isLive(a)
+                                                    ? <span className="font-bold text-tv-paper">aktywne</span>
+                                                    : 'nieaktywne'}
+                                                {a.valid_until && ` · do ${new Date(a.valid_until).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                                            </p>
+                                        </div>
+                                        {isLive(a) && (
+                                            <button onClick={() => withdraw(a.id)}
+                                                className="min-h-[44px] shrink-0 whitespace-nowrap px-2 text-[14px] font-bold text-tv-bluesoft underline-offset-4 hover:text-white hover:underline">
+                                                Wycofaj
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             ))}
                         </div>
-                        <input type="text" value={title} onChange={e => setTitle(e.target.value)} maxLength={120}
-                            placeholder={type === 'okazja' ? 'Np. Truskawki 50% taniej do 16:00' : 'Tytuł ogłoszenia'}
-                            className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-amber-500 outline-none placeholder:text-neutral-500" />
-                        <textarea value={body} onChange={e => setBody(e.target.value)} rows={3} maxLength={500}
-                            placeholder="Treść (max 500 znaków)"
-                            className="w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-amber-500 outline-none placeholder:text-neutral-500 resize-none" />
-                        {type === 'okazja' && (
-                            <label className="block text-xs text-neutral-400">
-                                Ważna do (maks. 7 dni):
-                                <input type="datetime-local" value={validUntil} onChange={e => setValidUntil(e.target.value)}
-                                    className="mt-1 w-full px-3 py-2.5 bg-gray-900 border border-gray-700/50 rounded-xl text-sm text-neutral-200 focus:border-amber-500 outline-none" />
-                            </label>
-                        )}
-                        {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠️ {error}</p>}
-                        <button onClick={publish} disabled={saving || !title.trim() || !body.trim()}
-                            className="w-full py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white font-black rounded-xl hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 transition-all">
-                            {saving ? 'Publikuję…' : 'Opublikuj'}
-                        </button>
-
-                        {/* Lista ogłoszeń */}
-                        {loading ? (
-                            <p className="text-neutral-500 text-xs text-center py-3">Ładowanie…</p>
-                        ) : items.length > 0 && (
-                            <div className="space-y-2 pt-2 border-t border-white/8">
-                                {items.map(a => (
-                                    <div key={a.id} className="p-3 bg-white/[0.03] border border-white/8 rounded-xl">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
-                                                    {a.type === 'okazja' ? <Tag size={10} className="text-amber-400" /> : <Megaphone size={10} className="text-blue-400" />}
-                                                    {a.title}
-                                                </p>
-                                                <p className="text-[11px] text-neutral-500 mt-0.5 line-clamp-2">{a.body}</p>
-                                                <p className="text-[10px] text-neutral-600 mt-1">
-                                                    {isLive(a) ? '🟢 aktywne' : '⚪ nieaktywne'}
-                                                    {a.valid_until && ` · do ${new Date(a.valid_until).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
-                                                </p>
-                                            </div>
-                                            {isLive(a) && (
-                                                <button onClick={() => withdraw(a.id)}
-                                                    className="text-[10px] text-red-400 hover:text-red-300 whitespace-nowrap flex-shrink-0">
-                                                    Wycofaj
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
+                    )}
+                </div>
+            )}
+        </ModalShell>
     );
 };

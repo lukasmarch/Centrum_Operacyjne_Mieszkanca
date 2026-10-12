@@ -8,7 +8,8 @@
  * nie pod nim.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Check, Copy, Loader2, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Check, Copy, RefreshCw, X } from 'lucide-react';
+import { Chip, Notice, Skeleton, Tag, TagTone } from './simple/tv';
 import {
     AdminInvitation, AdminPost, AdminRole, RoleDefinition, STATUS_LABELS,
     approvePost, createInvitation, editPost, fetchAdminPosts, fetchAdminRoles,
@@ -18,8 +19,23 @@ import {
 
 type Section = 'posts' | 'invitations' | 'roles';
 
-const card = 'bg-gray-950 rounded-2xl p-6 border border-gray-800/50';
-const input = 'w-full rounded-xl bg-gray-900 border border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50';
+// Panel redakcji w języku „Paska informacyjnego”: płaski panel z chabrową
+// krawędzią, pola z obrysem 2 px, przyciski 44 px, kąty proste
+const card = 'border-t-2 border-tv-blue bg-tv-panel p-5 sm:p-6';
+const input = 'min-h-[44px] w-full border-2 border-tv-seam bg-tv-ink px-3 py-2 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper disabled:opacity-60';
+const fieldLabel = 'font-cond mb-1 block text-[13px] font-extrabold uppercase tracking-wide text-tv-muted';
+const btnPrimary = 'font-cond inline-flex min-h-[44px] items-center justify-center gap-2 bg-tv-blue px-4 text-[16px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-not-allowed disabled:opacity-40';
+const btnLine = 'inline-flex min-h-[44px] items-center justify-center gap-2 border-2 border-tv-seam px-4 text-[15px] font-semibold text-tv-paper transition-colors hover:border-tv-paper hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+const errorText = 'text-[15px] font-semibold text-tv-yellow';
+
+// Kolor stanu liczony tu, nie z `STATUS_LABELS.tone` (klasy starego świata)
+const POST_TONE: Partial<Record<AdminPost['status'], TagTone>> = {
+    processing: 'seam',
+    pending: 'yellow',
+    failed: 'yellow',
+    published: 'blue',
+    rejected: 'seam',
+};
 
 const dateLabel = (value: string | null) => {
     const d = parseUtc(value);
@@ -58,16 +74,16 @@ const PostImages: React.FC<{ post: AdminPost }> = ({ post }) => {
     }, [post.id, post.image_count]);
 
     if (!post.image_count) {
-        return <p className="text-xs text-neutral-500">Zdjęcia oryginału skasowane (retencja).</p>;
+        return <p className="text-[14px] text-tv-muted">Zdjęcia oryginału skasowane (retencja).</p>;
     }
     return (
-        <div className="space-y-2">
+        <div className="space-y-px bg-tv-seam">
             {urls.map((url, i) => (
                 <a key={url} href={url} target="_blank" rel="noreferrer" className="block">
-                    <img src={url} alt={`Strona ${i + 1}`} className="w-full rounded-lg border border-gray-800" />
+                    <img src={url} alt={`Strona ${i + 1}`} className="w-full" />
                 </a>
             ))}
-            {urls.length < post.image_count && <Loader2 className="w-5 h-5 animate-spin text-neutral-500" />}
+            {urls.length < post.image_count && <Skeleton className="h-40" />}
         </div>
     );
 };
@@ -106,81 +122,81 @@ const PostModeration: React.FC<{ post: AdminPost; onChanged: () => void }> = ({ 
 
     return (
         <div className={card}>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${status.tone}`}>{status.label}</span>
-                <span className="text-sm font-semibold">{post.signed_as}</span>
-                <span className="text-xs text-neutral-500">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Tag tone={POST_TONE[post.status] ?? 'seam'}>{status.label}</Tag>
+                <span className="text-[15px] font-semibold text-white">{post.signed_as}</span>
+                <span className="tabular text-[13px] text-tv-muted">
                     {dateLabel(post.created_at)} · {post.author_name} ({post.author_email})
                 </span>
             </div>
 
             {post.ai_error && (
-                <p className="mb-3 text-sm text-amber-300 flex gap-2"><AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />{post.ai_error}</p>
+                <p className="mb-3 flex gap-2 bg-tv-yellow px-4 py-3 text-[15px] text-tv-ink"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{post.ai_error}</p>
             )}
             {!!post.personal_data?.length && (
-                <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-200">
-                    <p className="font-semibold mb-1">Dane osobowe w piśmie — sprawdź przedruk:</p>
+                <div className="mb-3 bg-tv-yellow px-4 py-3 text-[15px] text-tv-ink">
+                    <p className="mb-1 font-bold">Dane osobowe w piśmie — sprawdź przedruk:</p>
                     <ul className="list-disc pl-5 space-y-0.5">
                         {post.personal_data.map((item) => <li key={item}>{item}</li>)}
                     </ul>
                 </div>
             )}
             {!!post.illegible?.length && (
-                <p className="mb-3 text-sm text-neutral-400">Nieczytelne: {post.illegible.join('; ')}</p>
+                <p className="mb-3 text-[15px] text-[#d7dbe8]">Nieczytelne: {post.illegible.join('; ')}</p>
             )}
-            {post.note && <p className="mb-3 text-sm text-neutral-300">Dopisek sołtysa: „{post.note}”</p>}
+            {post.note && <p className="mb-3 text-[15px] text-[#d7dbe8]">Dopisek sołtysa: „{post.note}”</p>}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">Oryginał (tylko redakcja)</p>
+                    <p className={fieldLabel}>Oryginał (tylko redakcja)</p>
                     <PostImages post={post} />
                 </div>
                 <div className="space-y-3">
                     <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">Tytuł</label>
+                        <label className={fieldLabel}>Tytuł</label>
                         <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} disabled={decided} />
                     </div>
                     <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">Podsumowanie</label>
+                        <label className={fieldLabel}>Podsumowanie</label>
                         <textarea className={input} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} disabled={decided} />
                     </div>
                     <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">Przedruk</label>
-                        <textarea className={`${input} font-mono text-xs`} rows={14} value={transcript} onChange={(e) => setTranscript(e.target.value)} disabled={decided} />
+                        <label className={fieldLabel}>Przedruk</label>
+                        <textarea className={`${input} text-[14px] leading-relaxed`} rows={14} value={transcript} onChange={(e) => setTranscript(e.target.value)} disabled={decided} />
                     </div>
-                    <p className="text-xs text-neutral-500">
+                    <p className="tabular text-[13px] text-tv-muted">
                         {post.doc_type ? `${post.doc_type} · ` : ''}
                         termin: {eventAt ? eventAt.toLocaleString('pl-PL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : 'brak'}
                     </p>
                 </div>
             </div>
 
-            {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+            {error && <p role="alert" className={`mt-3 ${errorText}`}>{error}</p>}
 
             {!decided && (
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                     <button onClick={approve} disabled={busy || post.status === 'processing'}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
-                        <Check className="w-4 h-4" /> Publikuj{dirty ? ' z poprawkami' : ''}
+                        className={btnPrimary}>
+                        <Check className="h-4 w-4" aria-hidden /> Publikuj{dirty ? ' z poprawkami' : ''}
                     </button>
                     {dirty && (
                         <button onClick={() => run(save)} disabled={busy}
-                            className="rounded-xl border border-gray-700 px-4 py-2 text-sm hover:bg-white/5">Zapisz poprawki</button>
+                            className={btnLine}>Zapisz poprawki</button>
                     )}
                     <button onClick={() => run(() => rereadPost(post.id))} disabled={busy || !post.image_count}
-                        className="inline-flex items-center gap-2 rounded-xl border border-gray-700 px-4 py-2 text-sm hover:bg-white/5 disabled:opacity-40">
-                        <RefreshCw className="w-4 h-4" /> Odczytaj ponownie
+                        className={btnLine}>
+                        <RefreshCw className="h-4 w-4" aria-hidden /> Odczytaj ponownie
                     </button>
                     <input className={`${input} sm:max-w-xs`} placeholder="Powód odrzucenia (trafi do sołtysa)"
                         value={reason} onChange={(e) => setReason(e.target.value)} />
                     <button onClick={() => run(() => rejectPost(post.id, reason))} disabled={busy}
-                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/40 text-red-300 px-4 py-2 text-sm hover:bg-red-500/10">
-                        <X className="w-4 h-4" /> Odrzuć
+                        className={btnLine}>
+                        <X className="h-4 w-4" aria-hidden /> Odrzuć
                     </button>
                 </div>
             )}
             {post.url && (
-                <a href={post.url} className="mt-4 inline-block text-sm text-blue-400 hover:text-blue-300">Zobacz na stronie →</a>
+                <a href={post.url} className="mt-3 inline-flex min-h-[44px] items-center text-[15px] font-bold text-tv-bluesoft underline-offset-4 hover:text-white hover:underline">Zobacz na stronie →</a>
             )}
         </div>
     );
@@ -208,17 +224,16 @@ const PostsSection: React.FC = () => {
 
     return (
         <div className="space-y-4">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-1.5">
                 {(['queue', 'all'] as const).map((f) => (
-                    <button key={f} onClick={() => setFilter(f)}
-                        className={`rounded-full px-4 py-1.5 text-sm ${filter === f ? 'bg-blue-600 text-white' : 'bg-white/5 text-neutral-300'}`}>
+                    <Chip key={f} active={filter === f} onClick={() => setFilter(f)}>
                         {f === 'queue' ? 'Do decyzji' : 'Wszystkie'}
-                    </button>
+                    </Chip>
                 ))}
             </div>
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            {posts === null ? <Loader2 className="w-5 h-5 animate-spin text-neutral-500" /> :
-                posts.length === 0 ? <p className="text-sm text-neutral-500">Nic nie czeka na decyzję.</p> :
+            {error && <Notice tone="warn" role="alert">{error}</Notice>}
+            {posts === null ? <Skeleton className="h-40" /> :
+                posts.length === 0 ? <Notice>Nic nie czeka na decyzję.</Notice> :
                     posts.map((p) => <PostModeration key={`${p.id}-${p.status}`} post={p} onChanged={load} />)}
         </div>
     );
@@ -267,8 +282,8 @@ const InvitationsSection: React.FC = () => {
     return (
         <div className="space-y-4">
             <div className={card}>
-                <h3 className="font-bold mb-1">Nowe zaproszenie dla sołtysa</h3>
-                <p className="text-sm text-neutral-400 mb-4">
+                <h3 className="font-cond mb-1 text-[20px] font-extrabold text-white">Nowe zaproszenie dla sołtysa</h3>
+                <p className="mb-4 max-w-[70ch] text-[15px] leading-relaxed text-[#d7dbe8]">
                     Po rozmowie telefonicznej wygeneruj link i wyślij go SMS-em. Kto go otworzy i założy konto
                     (albo się zaloguje), od razu zostaje sołtysem wybranego sołectwa. Link działa 14 dni, jeden raz.
                 </p>
@@ -280,44 +295,44 @@ const InvitationsSection: React.FC = () => {
                     <input className={input} placeholder="Dla kogo (tylko dla Ciebie)" value={label}
                         onChange={(e) => setLabel(e.target.value)} maxLength={100} />
                     <button onClick={create} disabled={!scope}
-                        className="rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
+                        className={btnPrimary}>
                         Generuj link
                     </button>
                 </div>
                 {created && (
-                    <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
-                        <p className="text-emerald-300 font-semibold mb-1">{created.signed_as} — link gotowy</p>
-                        <div className="flex gap-2 items-center">
-                            <code className="flex-1 truncate text-xs text-neutral-300">{created.url}</code>
-                            <button onClick={() => copy(created)} className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs inline-flex items-center gap-1">
-                                <Copy className="w-3.5 h-3.5" /> {copied === created.id ? 'Skopiowano' : 'Kopiuj'}
+                    <div className="mt-4 border border-tv-seam bg-tv-ink p-3 text-[15px]">
+                        <p className="mb-1 flex items-center gap-2 font-semibold text-white"><Check className="h-4 w-4 shrink-0 text-tv-green" aria-hidden />{created.signed_as} — link gotowy</p>
+                        <div className="flex items-center gap-2">
+                            <span className="min-w-0 flex-1 truncate text-[14px] text-tv-bluesoft">{created.url}</span>
+                            <button onClick={() => copy(created)} className={btnLine}>
+                                <Copy className="h-4 w-4" aria-hidden /> {copied === created.id ? 'Skopiowano' : 'Kopiuj'}
                             </button>
                         </div>
                     </div>
                 )}
-                {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+                {error && <p role="alert" className={`mt-3 ${errorText}`}>{error}</p>}
             </div>
 
             <div className={card}>
-                <h3 className="font-bold mb-3">Wystawione zaproszenia</h3>
-                {invitations.length === 0 ? <p className="text-sm text-neutral-500">Brak zaproszeń.</p> : (
-                    <ul className="divide-y divide-gray-800/70 text-sm">
+                <h3 className="font-cond mb-3 text-[20px] font-extrabold text-white">Wystawione zaproszenia</h3>
+                {invitations.length === 0 ? <p className="text-[15px] text-tv-muted">Brak zaproszeń.</p> : (
+                    <ul className="divide-y divide-tv-seam text-[15px]">
                         {invitations.map((inv) => (
                             <li key={inv.id} className="py-3 flex flex-wrap items-center gap-2">
-                                <span className="font-medium">{inv.signed_as}</span>
-                                {inv.invitee_label && <span className="text-neutral-400">· {inv.invitee_label}</span>}
-                                <span className="text-xs text-neutral-500">
+                                <span className="font-semibold text-white">{inv.signed_as}</span>
+                                {inv.invitee_label && <span className="text-[#d7dbe8]">· {inv.invitee_label}</span>}
+                                <span className="tabular text-[13px] text-tv-muted">
                                     · {INVITATION_STATE[inv.state]}
                                     {inv.state === 'used' && inv.used_by_email ? ` przez ${inv.used_by_email}` : ''}
                                     {inv.state === 'active' ? ` do ${dateLabel(inv.expires_at)}` : ''}
                                 </span>
                                 {inv.state === 'active' && (
                                     <span className="ml-auto flex gap-2">
-                                        <button onClick={() => copy(inv)} className="rounded-lg border border-gray-700 px-3 py-1 text-xs inline-flex items-center gap-1">
-                                            <Copy className="w-3.5 h-3.5" /> {copied === inv.id ? 'Skopiowano' : 'Kopiuj link'}
+                                        <button onClick={() => copy(inv)} className={btnLine}>
+                                            <Copy className="h-4 w-4" aria-hidden /> {copied === inv.id ? 'Skopiowano' : 'Kopiuj link'}
                                         </button>
                                         <button onClick={() => revokeInvitation(inv.id).then(load).catch((e) => setError(e.message))}
-                                            className="rounded-lg border border-red-500/40 text-red-300 px-3 py-1 text-xs">Wycofaj</button>
+                                            className={btnLine}>Wycofaj</button>
                                     </span>
                                 )}
                             </li>
@@ -351,17 +366,17 @@ const RolesSection: React.FC = () => {
 
     return (
         <div className={card}>
-            <h3 className="font-bold mb-3">Sołtysi z kontem</h3>
-            {error && <p className="text-sm text-red-400 mb-2">{error}</p>}
-            {roles === null ? <Loader2 className="w-5 h-5 animate-spin text-neutral-500" /> :
-                roles.length === 0 ? <p className="text-sm text-neutral-500">Nikt jeszcze nie przyjął zaproszenia.</p> : (
-                    <ul className="divide-y divide-gray-800/70 text-sm">
+            <h3 className="font-cond mb-3 text-[20px] font-extrabold text-white">Sołtysi z kontem</h3>
+            {error && <p role="alert" className={`mb-2 ${errorText}`}>{error}</p>}
+            {roles === null ? <Skeleton className="h-20" /> :
+                roles.length === 0 ? <p className="text-[15px] text-tv-muted">Nikt jeszcze nie przyjął zaproszenia.</p> : (
+                    <ul className="divide-y divide-tv-seam text-[15px]">
                         {roles.map((r) => (
                             <li key={r.id} className="py-3 flex flex-wrap items-center gap-2">
-                                <span className="font-medium">{r.signed_as}</span>
-                                <span className="text-neutral-400">· {r.user_name} ({r.user_email})</span>
-                                <span className="text-xs text-neutral-500">· od {dateLabel(r.verified_at)}</span>
-                                <button onClick={() => revoke(r)} className="ml-auto rounded-lg border border-red-500/40 text-red-300 px-3 py-1 text-xs">
+                                <span className="font-semibold text-white">{r.signed_as}</span>
+                                <span className="text-[#d7dbe8]">· {r.user_name} ({r.user_email})</span>
+                                <span className="tabular text-[13px] text-tv-muted">· od {dateLabel(r.verified_at)}</span>
+                                <button onClick={() => revoke(r)} className={`${btnLine} ml-auto`}>
                                     Odbierz rolę
                                 </button>
                             </li>
@@ -381,12 +396,11 @@ const SolectwaAdminPanel: React.FC = () => {
     ];
     return (
         <div className="space-y-5">
-            <div className="flex gap-2 overflow-x-auto">
+            <div role="group" aria-label="Redakcja sołectw" className="flex flex-wrap gap-1.5">
                 {tabs.map((t) => (
-                    <button key={t.id} onClick={() => setSection(t.id)}
-                        className={`rounded-xl px-4 py-2 text-sm font-semibold whitespace-nowrap ${section === t.id ? 'bg-blue-600 text-white' : 'bg-gray-950 border border-gray-800/50 text-neutral-300'}`}>
+                    <Chip key={t.id} active={section === t.id} onClick={() => setSection(t.id)}>
                         {t.label}
-                    </button>
+                    </Chip>
                 ))}
             </div>
             {section === 'posts' && <PostsSection />}

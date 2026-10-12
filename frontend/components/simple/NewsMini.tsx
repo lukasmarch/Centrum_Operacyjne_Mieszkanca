@@ -1,7 +1,6 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
 import { Article } from '../../types';
-import ArticleImage, { getCategoryTheme } from '../ArticleImage';
+import { EntrySquare, RowLink, Tag, boardOf } from './tv';
 
 interface NewsMiniProps {
     articles: Article[];
@@ -25,75 +24,60 @@ interface NewsMiniProps {
  * na jednolitym tle; te dwie rzeczy nie mogą dzielić tych samych pikseli.
  *
  * Zdjęcie ma dziś jeden wpis na cztery, więc miniatura NIE może zależeć od zdjęcia:
- * `ArticleImage` podstawia gradient z ikoną kategorii i lista zostaje równa.
+ * bez niego kwadrat pokazuje termin albo piktogram kategorii (`EntrySquare`).
  */
 const NewsMini: React.FC<NewsMiniProps> = ({ articles, loading = false, onShowAll }) => (
-    <section aria-label="Ostatnie wiadomości" className="rounded-2xl border border-white/10 bg-[#0d1117] p-5">
-        <h3 className="text-lg font-bold text-white">Ostatnio w gminie</h3>
-        {loading && (
-            <ul className="mt-3 space-y-3" aria-hidden>
-                {[1, 2, 3].map(i => <li key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}
-            </ul>
-        )}
-        {!loading && articles.length === 0 && (
-            <p className="mt-3 text-base leading-snug text-neutral-300">
-                W ostatnich dniach nie pojawiło się nic nowego z gminy Rybno.
-                Wiadomości z okolicy są w pełnym feedzie.
-            </p>
-        )}
-        <ul className="mt-3 divide-y divide-white/5">
-            {articles.map(article => {
-                const theme = getCategoryTheme(article.category);
-                return (
+    <section aria-label="Ostatnie wiadomości" className="flex flex-col">
+        <Tag as="h2">Ostatnio w gminie</Tag>
+        <div className="flex-1 border-t-2 border-tv-blue bg-tv-panel px-4 pb-1 lg:px-5">
+            {loading && (
+                <ul className="space-y-3 py-3" aria-hidden>
+                    {[1, 2, 3].map(i => <li key={i} className="h-14 animate-pulse bg-tv-panel2" />)}
+                </ul>
+            )}
+            {!loading && articles.length === 0 && (
+                <p className="py-3 text-[16px] leading-snug text-tv-paper">
+                    W ostatnich dniach nie pojawiło się nic nowego z gminy Rybno.
+                    Wiadomości z okolicy są w pełnym feedzie.
+                </p>
+            )}
+            <ul className="divide-y divide-tv-seam">
+                {articles.map(article => (
                     <li key={article.id}>
                         <button onClick={onShowAll} className="group flex w-full items-start gap-3 py-3 text-left">
-                            {/* 56 px: duże na tyle, żeby ikona kategorii była czytelna,
-                                małe na tyle, żeby nagłówkowi na telefonie zostało
-                                ponad 240 px — czyli około 28 znaków w wierszu */}
-                            <span className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10">
-                                <ArticleImage
-                                    imageUrl={article.imageUrl}
-                                    category={article.category}
-                                    iconSize="sm"
-                                />
-                            </span>
-
+                            {/* 56 px: ikona kategorii czytelna, a nagłówkowi na telefonie
+                                zostaje ponad 240 px. Miniatura OBOK tytułu, nigdy pod nim */}
+                            {/* Zdjęcie → tablica z terminem w kolorze stanu → piktogram kategorii
+                                (`EntrySquare`, ten sam co w Wiadomościach; krytyka 11.10.2026) */}
+                            {(() => {
+                                const board = boardOf(article);
+                                return (
+                                    <EntrySquare
+                                        imageUrl={article.imageUrl}
+                                        when={board.when}
+                                        allDay={board.allDay}
+                                        tone={board.tone}
+                                        category={article.category}
+                                        className="h-14 w-14"
+                                    />
+                                );
+                            })()}
                             <span className="min-w-0 flex-1">
-                                {/* Kategoria i wiek w JEDNYM wierszu — osobna plakietka
-                                    nad tytułem kosztowałaby trzeci wiersz w kafelku,
-                                    w którym i tak walczymy o miejsce */}
-                                <span className="flex flex-wrap items-center gap-x-2 text-[11px] font-bold uppercase tracking-wider">
-                                    <span className={`rounded px-1.5 py-0.5 ${theme.badge} border`}>
-                                        {article.category}
-                                    </span>
-                                    <span className="font-medium normal-case tracking-normal text-neutral-500">
-                                        {article.timestamp}
-                                    </span>
+                                <span className="block text-[13px] text-tv-muted">
+                                    <span className="font-bold text-tv-paper">{article.category}</span>
+                                    {' · '}{article.timestamp}
                                 </span>
-                                {/* Rozmiar nagłówka bez zmian (16 px). Miniatura zabrała
-                                    szerokość, więc kusiło, żeby zejść do 14 px — ale to
-                                    właśnie ten tekst mieszkaniec ma przeczytać na telefonie.
-                                    Trzy wiersze wystarczą na najdłuższe nagłówki AI,
-                                    a przycięcie chroni rytm listy */}
-                                {/* ⚠️ Bez `block`: `line-clamp-3` ustawia `display:-webkit-box`,
-                                    a klasa `block` wygrywa w arkuszu i wycina przycinanie
-                                    po cichu — tekst leci wtedy na cztery i pięć wierszy */}
-                                <span className="mt-1 line-clamp-3 text-base font-medium leading-snug text-neutral-100 transition-colors group-hover:text-white">
+                                {/* ⚠️ Bez `block`: `line-clamp-3` ustawia `display:-webkit-box` */}
+                                <span className="mt-0.5 line-clamp-3 text-[16px] font-semibold leading-snug text-white group-hover:underline group-hover:underline-offset-4">
                                     {article.title}
                                 </span>
                             </span>
                         </button>
                     </li>
-                );
-            })}
-        </ul>
-        <button
-            onClick={onShowAll}
-            className="mt-2 flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-blue-400 transition-colors hover:text-blue-300"
-        >
-            Wszystkie wiadomości
-            <ArrowRight size={15} aria-hidden />
-        </button>
+                ))}
+            </ul>
+            <RowLink onClick={onShowAll}>Wszystkie wiadomości</RowLink>
+        </div>
     </section>
 );
 

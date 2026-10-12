@@ -1,35 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import StaleDataNotice from './StaleDataNotice';
-import { ChevronDown, ChevronUp, MapPin, Clock, Calendar } from 'lucide-react';
+import { MapPin, CalendarPlus, ExternalLink } from 'lucide-react';
+import { useMyVillage } from '../src/hooks/useMyVillage';
 import { useEvents } from '../src/hooks/useEvents';
 import { TimedEvent, endOf, isAllDay, phaseOf } from '../src/utils/eventTime';
-import { Event } from '../types';
-
-/* ── Category chip / badge colors ── */
-const CATEGORY_CHIP: Record<string, { active: string; dot: string; badge: string }> = {
-    kultura:   { active: 'bg-violet-600/20 text-violet-300 border-violet-500/30',  dot: 'bg-violet-400',  badge: 'bg-violet-600/30 text-violet-300 border-violet-500/30' },
-    sport:     { active: 'bg-orange-600/20 text-orange-300 border-orange-500/30',  dot: 'bg-orange-400',  badge: 'bg-orange-600/30 text-orange-300 border-orange-500/30' },
-    rozrywka:  { active: 'bg-pink-600/20 text-pink-300 border-pink-500/30',         dot: 'bg-pink-400',    badge: 'bg-pink-600/30 text-pink-300 border-pink-500/30' },
-    społeczne: { active: 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30', dot: 'bg-emerald-400', badge: 'bg-emerald-600/30 text-emerald-300 border-emerald-500/30' },
-    edukacja:  { active: 'bg-cyan-600/20 text-cyan-300 border-cyan-500/30',          dot: 'bg-cyan-400',    badge: 'bg-cyan-600/30 text-cyan-300 border-cyan-500/30' },
-    koncert:   { active: 'bg-rose-600/20 text-rose-300 border-rose-500/30',          dot: 'bg-rose-400',    badge: 'bg-rose-600/30 text-rose-300 border-rose-500/30' },
-    festiwal:  { active: 'bg-fuchsia-600/20 text-fuchsia-300 border-fuchsia-500/30', dot: 'bg-fuchsia-400', badge: 'bg-fuchsia-600/30 text-fuchsia-300 border-fuchsia-500/30' },
-    targi:     { active: 'bg-amber-600/20 text-amber-300 border-amber-500/30',       dot: 'bg-amber-400',   badge: 'bg-amber-600/30 text-amber-300 border-amber-500/30' },
-};
-
-const DEFAULT_CHIP = {
-    active: 'bg-blue-600/20 text-blue-300 border-blue-500/30',
-    dot: 'bg-blue-400',
-    badge: 'bg-blue-600/30 text-blue-300 border-blue-500/30',
-};
-
-function getCategoryChip(cat: string) {
-    const key = cat.toLowerCase();
-    for (const [k, v] of Object.entries(CATEGORY_CHIP)) {
-        if (key.includes(k) || k.includes(key)) return v;
-    }
-    return DEFAULT_CHIP;
-}
+import { Chip, Notice, PageHead, Skeleton, Tag, categoryGlyph, dayWord, hm } from './simple/tv';
 
 /* ── Google Calendar ── */
 // Wpis całodniowy idzie jako DZIEŃ (YYYYMMDD/następny dzień), nie jako
@@ -58,133 +33,144 @@ function generateGoogleCalendarUrl(event: TimedEvent): string {
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-/* ── Month group helpers ── */
-const MONTH_NAMES = [
-    'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
-    'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
-];
+/* ── Dni jako sekcje ── */
+// Do 11.10.2026 lista dzieliła się na MIESIĄCE, a datę niosła kostka w każdej
+// karcie. W kalendarzu gminy pytanie brzmi „co jest dziś / jutro / w sobotę”,
+// więc sekcją jest DZIEŃ, a jego plakietka („DZIŚ”, „JUTRO”, „SB 18.10”) jest
+// nagłówkiem. Wydarzenie wielodniowe, które zaczęło się wcześniej i wciąż trwa,
+// stoi pod „dziś” — tam go szukamy, a nie pod wczorajszą datą.
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-function getMonthKey(dateStr: string): string {
-    const d = new Date(dateStr);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+function dayKeyOf(event: TimedEvent, todayStart: Date): number {
+    const day = startOfDay(new Date(event.date));
+    return Math.max(day.getTime(), todayStart.getTime());
 }
 
-function getMonthLabel(key: string): string {
-    const [year, month] = key.split('-');
-    const now = new Date();
-    const label = `${MONTH_NAMES[parseInt(month) - 1]} ${year}`;
-    if (parseInt(year) === now.getFullYear() && parseInt(month) === now.getMonth() + 1) {
-        return `${label} — ten miesiąc`;
-    }
-    return label;
+/** Pierwsza wieś z gminy w miejscu albo tytule wydarzenia. */
+function villageOf(event: TimedEvent, places: string[]): string | null {
+    const hay = `${event.location ?? ''} ${event.title}`.toLowerCase();
+    // Dłuższe nazwy najpierw — „Rybno” siedzi w „Gminie Rybno” i w wielu nazwach organizatorów
+    return [...places].sort((a, b) => b.length - a.length).find(p => hay.includes(p.toLowerCase().slice(0, Math.max(4, p.length - 2)))) ?? null;
 }
 
-/* ── Single event card ── */
+/** „za 10 dni” — odległość dnia od dziś; dziś/jutro mówi już plakietka. */
+function distanceWord(day: Date): string | null {
+    const diff = Math.round((startOfDay(day).getTime() - startOfDay(new Date()).getTime()) / 86_400_000);
+    if (diff < 2) return null;
+    return diff < 7 ? `za ${diff} dni` : diff < 14 ? 'za tydzień' : `za ${Math.round(diff / 7)} tyg.`;
+}
+
+const countWord = (n: number) =>
+    n === 1 ? 'wydarzenie' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'wydarzenia' : 'wydarzeń';
+
+/* ── Wiersz wydarzenia ── */
 /**
- * Karta wydarzenia — układ pod telefon 375 px (audyt V13, F-043).
+ * Wiersz wydarzenia — układ pod telefon 375 px (audyt V13, F-043).
  *
  * Do 11.10.2026 w jednym wierszu stały: data, miniatura, treść i przycisk
  * „Google Cal”, więc na tytuł zostawało 54 px, a terminy i źródło miały
  * 7–11 px przy kontraście 1,9–2,5:1 — „kiedy” i „skąd” były nieczytelne
  * dla starszych mieszkańców. Do tego cała karta była linkiem z przyciskiem
  * w środku (zagnieżdżone elementy interaktywne).
- * Dziś: górny wiersz to data + treść (miniatura dopiero od `sm`), dolny —
- * źródło i „Dodaj do kalendarza”; linkiem jest tytuł. Metadane ≥ 13 px.
+ * Dziś: datę niesie plakietka dnia nad sekcją, a wiersz zaczyna się od
+ * GODZINY — wartości wąskim krojem, jak na kaflach pulpitu. Obok treść
+ * (miniatura dopiero od `sm`), pod nią źródło i „Dodaj do kalendarza”;
+ * linkiem jest tytuł. Metadane ≥ 13 px.
  */
-const EventCard: React.FC<{ event: TimedEvent }> = ({ event }) => {
+const EventRow: React.FC<{ event: TimedEvent; places: string[] }> = ({ event, places }) => {
     const d = new Date(event.date);
-    const chip = getCategoryChip(event.category || '');
-    const timeStr = isAllDay(event)
-        ? 'cały dzień'
-        : d.toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' });
+    const allDay = isAllDay(event);
+    // Trwające = żółta plakietka (zapowiedź/kontekst), NIE czerwień — ta należy do awarii
+    const ongoing = phaseOf(event) === 'ongoing';
+    // Koniec pokazujemy tylko podany przez źródło; domyślne +3 h z `endOf`
+    // to reguła ważności, a nie godzina, którą wolno wydrukować
+    const end = event.endDate ? endOf(event) : null;
+    // Wieś z gminy jako plakietka (krytyka 11.10: „Działdowo” i „Kopaniarze”
+    // w tej samej szarej linii — nie było widać, co jest u nas)
+    const village = villageOf(event, places);
+    const Glyph = categoryGlyph(event.category);
 
     return (
-        <div className="group rounded-2xl border border-white/5 bg-gray-900/40 p-4 transition-all hover:border-white/10 hover:bg-gray-900/60">
-            <div className="flex gap-3 sm:gap-4">
-                {/* Data — pierwsze, czego szuka się w kalendarzu */}
-                <div className="flex h-16 w-14 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/5">
-                    <span className="text-xs font-bold uppercase leading-none text-neutral-300">
-                        {d.toLocaleDateString('pl-PL', { month: 'short' }).replace('.', '')}
-                    </span>
-                    <span className="my-0.5 text-2xl font-black leading-none text-neutral-100">
-                        {d.getDate()}
-                    </span>
-                    <span className="text-xs font-medium leading-none text-neutral-400">
-                        {d.toLocaleDateString('pl-PL', { weekday: 'short' }).replace('.', '')}
-                    </span>
-                </div>
+        <article className="flex gap-3 bg-tv-panel p-3 sm:gap-4 sm:p-4">
+            {/* Kolumna godziny: wartość, koniec, piktogram rodzaju i kalendarz */}
+            <div className="flex w-[72px] shrink-0 flex-col items-start sm:w-24">
+                {allDay ? (
+                    <span className="font-cond text-[17px] font-extrabold uppercase leading-tight text-tv-paper">cały dzień</span>
+                ) : (
+                    <span className="font-cond tabular text-[26px] font-extrabold leading-none text-white">{hm(d)}</span>
+                )}
+                {end && (
+                    <span className="tabular mt-1 text-[13px] leading-none text-tv-muted">do {hm(end)}</span>
+                )}
+                {ongoing && <Tag tone="yellow" className="mt-1.5">trwa</Tag>}
+                <span className="mt-auto flex items-center gap-1 pt-2">
+                    <Glyph size={20} strokeWidth={1.75} aria-hidden className="text-tv-muted" />
+                    <a
+                        href={generateGoogleCalendarUrl(event)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Dodaj do kalendarza: ${event.title}`}
+                        title="Dodaj do kalendarza Google"
+                        className="flex h-11 w-11 items-center justify-center text-tv-bluesoft transition-colors hover:bg-tv-panel2 hover:text-white"
+                    >
+                        <CalendarPlus size={20} aria-hidden />
+                    </a>
+                </span>
+            </div>
 
-                <div className="min-w-0 flex-1">
-                    {event.category && (
-                        <span className={`mb-1 inline-block rounded border px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide ${chip.badge}`}>
-                            {event.category}
-                        </span>
-                    )}
-                    <h4 className="mb-1.5 text-base font-bold leading-snug text-neutral-100">
-                        {event.externalUrl ? (
-                            <a
-                                href={event.externalUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="transition-colors hover:text-blue-300"
-                            >
-                                {event.title}
-                            </a>
-                        ) : event.title}
-                    </h4>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-neutral-300">
-                        <span className="flex items-center gap-1">
-                            <Clock size={13} className="shrink-0 text-neutral-400" aria-hidden />
-                            {timeStr}
-                        </span>
+            <div className="min-w-0 flex-1">
+                {village && <Tag tone="paper" className="mb-1">{village}</Tag>}
+                {(event.category || event.location) && (
+                    <p className="text-[13px] leading-snug text-tv-muted">
+                        {event.category && <span className="font-bold text-tv-paper">{event.category}</span>}
+                        {event.category && event.location && ' · '}
                         {event.location && (
-                            <span className="flex min-w-0 items-center gap-1">
-                                <MapPin size={13} className="shrink-0 text-neutral-400" aria-hidden />
-                                <span className="truncate">{event.location}</span>
+                            <span className="inline-flex items-center gap-1">
+                                <MapPin size={13} className="shrink-0" aria-hidden />
+                                {event.location}
                             </span>
                         )}
-                    </div>
-                    {event.description && (
-                        <p className="mt-1.5 line-clamp-2 text-sm text-neutral-400">{event.description}</p>
-                    )}
-                </div>
-
-                {/* Miniatura poza kolumną tekstu: na telefonie jej nie ma —
-                    zabierała tytułowi 56 px z i tak wąskiego wiersza */}
-                {event.imageUrl && (
-                    <div className="hidden h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-white/5 sm:block">
-                        <img
-                            src={event.imageUrl}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                    </div>
+                    </p>
+                )}
+                <h3 className="mt-0.5 text-[17px] font-semibold leading-snug text-white">
+                    {event.externalUrl ? (
+                        <a
+                            href={event.externalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group/t inline-block py-1 underline-offset-4 hover:underline"
+                        >
+                            {event.title}
+                            <ExternalLink size={14} aria-hidden className="ml-1.5 inline-block align-[-1px] text-tv-muted group-hover/t:text-white" />
+                            <span className="sr-only"> (otwiera się w nowej karcie)</span>
+                        </a>
+                    ) : event.title}
+                </h3>
+                {event.description && (
+                    <p className="mt-0.5 line-clamp-2 max-w-[62ch] text-[15px] leading-snug text-[#d7dbe8]">{event.description}</p>
+                )}
+                {event.sourceName && (
+                    <p className="mt-1 text-[13px] text-tv-muted">Źródło: {event.sourceName}</p>
                 )}
             </div>
 
-            <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-2">
-                <p className="min-w-0 truncate text-[13px] text-neutral-400">
-                    {event.sourceName && (
-                        <>Źródło: <span className="font-medium text-neutral-300">{event.sourceName}</span></>
-                    )}
-                </p>
-                <a
-                    href={generateGoogleCalendarUrl(event)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-blue-300 transition-colors hover:bg-blue-500/10 hover:text-blue-200"
-                >
-                    <Calendar size={14} aria-hidden />
-                    Dodaj do kalendarza
-                </a>
-            </div>
-        </div>
+            {/* Prawdziwe zdjęcie tylko od `sm` — na telefonie zabierało tytułowi miejsce */}
+            {event.imageUrl && (
+                <div className="hidden h-20 w-20 shrink-0 overflow-hidden bg-tv-panel2 sm:block">
+                    <img
+                        src={event.imageUrl}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                </div>
+            )}
+        </article>
     );
 };
 
 /* ── Main Component ── */
-const VISIBLE_CHIPS = 5;
 
 const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory }) => {
     const { events: allEvents, loading, error, fetchedAt } = useEvents(100);
@@ -198,7 +184,7 @@ const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory })
         [allEvents, fetchedAt],
     );
     const [activeCategory, setActiveCategory] = useState<string>(initialCategory || 'Wszystkie');
-    const [chipsExpanded, setChipsExpanded] = useState(false);
+    const { places } = useMyVillage();
 
     const categoryCounts = useMemo(() => {
         if (!events) return {} as Record<string, number>;
@@ -216,8 +202,6 @@ const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory })
             .map(([cat]) => cat);
     }, [categoryCounts]);
 
-    const visibleCategories = chipsExpanded ? sortedCategories : sortedCategories.slice(0, VISIBLE_CHIPS);
-    const overflowCount = Math.max(0, sortedCategories.length - VISIBLE_CHIPS);
 
     // Filter & dedupe
     const filteredEvents = useMemo(() => {
@@ -234,127 +218,127 @@ const EventsFeed: React.FC<{ initialCategory?: string }> = ({ initialCategory })
         );
     }, [events, activeCategory]);
 
-    // Group events by month
+    // Sekcje po dniach (lokalna doba), w dniu — po godzinie
     const groupedEvents = useMemo(() => {
-        const groups: Record<string, Event[]> = {};
+        const todayStart = startOfDay(new Date());
+        const groups = new Map<number, TimedEvent[]>();
         filteredEvents.forEach(ev => {
-            const key = getMonthKey(ev.date);
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(ev);
+            const key = dayKeyOf(ev, todayStart);
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(ev);
         });
-        return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-    }, [filteredEvents]);
+        return [...groups.entries()]
+            .sort(([a], [b]) => a - b)
+            .map(([key, list]) => ({
+                day: new Date(key),
+                events: [...list].sort((a, b) => +new Date(a.date) - +new Date(b.date)),
+            }));
+    }, [filteredEvents, fetchedAt]);
+
+    // Czy dziś i jutro są puste (po filtrze) — wtedy jedno zdanie nad listą
+    const quietSoon = useMemo(() => {
+        if (!groupedEvents.length) return false;
+        const word = dayWord(groupedEvents[0].day);
+        return word !== 'dziś' && word !== 'jutro';
+    }, [groupedEvents]);
 
     if (loading) return (
-        <div className="space-y-4">
-            <div className="h-8 w-56 bg-gray-900/50 rounded-xl animate-pulse" />
-            <div className="h-10 bg-gray-900/30 rounded-xl animate-pulse" />
-            {[1, 2, 3].map(i => (
-                <div key={i} className="h-24 bg-gray-900/30 rounded-2xl animate-pulse" />
-            ))}
+        <div className="space-y-6" aria-busy="true">
+            <PageHead title="Nadchodzące wydarzenia" sub="Wczytuję…" />
+            <div className="flex gap-1.5">
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-11 w-24" />)}
+            </div>
+            <div className="grid grid-cols-1 gap-px bg-tv-seam">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-28" />)}
+            </div>
         </div>
     );
 
     // Błąd bez żadnych danych — przy danych lista zostaje, a nad nią `StaleDataNotice`
-    if (error && !events) return <div className="text-center p-8 text-neutral-400">Nie udało się pobrać wydarzeń. Sprawdź połączenie i spróbuj za chwilę.</div>;
+    if (error && !events) return (
+        <div className="space-y-6">
+            <PageHead title="Nadchodzące wydarzenia" />
+            <Notice tone="warn" role="alert">Nie udało się pobrać wydarzeń. Sprawdź połączenie i spróbuj za chwilę.</Notice>
+        </div>
+    );
     if (!events || events.length === 0) return (
-        <div className="text-center p-12 text-neutral-500">
-            <div className="text-4xl mb-3">📅</div>
-            Brak nadchodzących wydarzeń.
+        <div className="space-y-6">
+            <PageHead title="Nadchodzące wydarzenia" />
+            <Notice>Brak nadchodzących wydarzeń.</Notice>
         </div>
     );
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-6 lg:space-y-8">
+            <PageHead
+                title="Nadchodzące wydarzenia"
+                sub={<>
+                    <span className="tabular">{filteredEvents.length}</span>
+                    {activeCategory !== 'Wszystkie' && <> z <span className="tabular">{events.length}</span></>}
+                    {' '}{countWord(filteredEvents.length)}
+                    {activeCategory !== 'Wszystkie' && <> w kategorii „{activeCategory}”</>}, najbliższe pierwsze.
+                </>}
+            />
             {error && <StaleDataNotice fetchedAt={fetchedAt} />}
-            {/* ── Title ── */}
-            <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                    Nadchodzące Wydarzenia
-                </h2>
-                <span className="text-xs font-bold text-neutral-400 bg-gray-900/50 px-2 py-0.5 rounded-full">
-                    {filteredEvents.length} {activeCategory !== 'Wszystkie' ? `/ ${events.length}` : ''}
-                </span>
-            </div>
 
-            {/* ── Category Chips ── */}
-            <div className="flex flex-wrap gap-2 items-center">
-                <button
-                    onClick={() => setActiveCategory('Wszystkie')}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${
-                        activeCategory === 'Wszystkie'
-                            ? 'bg-purple-600/20 text-purple-300 border-purple-500/30 shadow-lg shadow-purple-500/10'
-                            : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10'
-                    }`}
-                >
+            {/* Filtry kategorii — kwadratowe, jak w Wiadomościach; kolor kategorii
+                nie niesie stanu, więc go nie ma */}
+            {/* Jeden rząd przewijany na telefonie, jak w Wiadomościach */}
+            <div
+                role="group"
+                aria-label="Kategorie"
+                className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 md:-mx-8 md:px-8 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0"
+            >
+                <Chip active={activeCategory === 'Wszystkie'} onClick={() => setActiveCategory('Wszystkie')} count={events.length}>
                     Wszystkie
-                    <span className="text-[10px] font-black bg-white/10 px-1.5 rounded">{events.length}</span>
-                </button>
-
-                {visibleCategories.map(cat => {
-                    const chip = getCategoryChip(cat);
-                    const count = categoryCounts[cat] || 0;
-                    return (
-                        <button
-                            key={cat}
-                            onClick={() => setActiveCategory(cat)}
-                            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap flex items-center gap-1.5 border ${
-                                activeCategory === cat
-                                    ? `${chip.active} shadow-lg`
-                                    : 'bg-white/5 text-neutral-400 border-white/5 hover:bg-white/10'
-                            }`}
-                        >
-                            <div className={`w-1.5 h-1.5 rounded-full ${chip.dot}`} />
-                            {cat}
-                            <span className="text-[10px] font-black bg-white/10 px-1.5 rounded">{count}</span>
-                        </button>
-                    );
-                })}
-
-                {overflowCount > 0 && (
-                    <button
-                        onClick={() => setChipsExpanded(p => !p)}
-                        className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 text-neutral-400 border border-white/5 hover:bg-white/10 transition-all flex items-center gap-1"
+                </Chip>
+                {sortedCategories.map(cat => (
+                    <Chip
+                        key={cat}
+                        active={activeCategory === cat}
+                        onClick={() => setActiveCategory(cat)}
+                        count={categoryCounts[cat] || 0}
                     >
-                        {chipsExpanded
-                            ? <><span>Ukryj</span> <ChevronUp size={10} /></>
-                            : <><span>+{overflowCount} więcej</span> <ChevronDown size={10} /></>
-                        }
-                    </button>
-                )}
+                        {cat}
+                    </Chip>
+                ))}
             </div>
 
-            {/* ── Events list grouped by month ── */}
+            {/* Pusty „dziś i jutro” też jest odpowiedzią — lista bez tego zdania
+                zaczynała się od dnia za tydzień, jakby był najbliższy */}
+            {quietSoon && groupedEvents.length > 0 && (
+                <p className="bg-tv-yellow px-4 py-2.5 text-[15px] leading-snug text-tv-ink">
+                    <span className="font-bold">Dziś i jutro nic w kalendarzu.</span> Najbliższe: {dayWord(groupedEvents[0].day)}.
+                </p>
+            )}
+
+            {/* ── Dni: plakietka dnia JEST nagłówkiem sekcji ── */}
             {filteredEvents.length === 0 ? (
-                <div className="text-center py-16 text-neutral-500">
-                    <div className="text-4xl mb-3">📅</div>
-                    Brak wydarzeń w kategorii „{activeCategory}".
-                </div>
+                <Notice>Brak wydarzeń w kategorii „{activeCategory}”.</Notice>
             ) : (
-                <div className="space-y-6">
-                    {groupedEvents.map(([monthKey, monthEvents]) => (
-                        <div key={monthKey}>
-                            {/* Month header */}
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-1 h-4 rounded-full bg-gradient-to-b from-purple-400 to-pink-400" />
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-neutral-300">
-                                    {getMonthLabel(monthKey)}
-                                </h3>
-                                <div className="flex-1 h-px bg-white/5" />
-                                <span className="text-xs text-neutral-400">
-                                    {monthEvents.length} {monthEvents.length === 1 ? 'wydarzenie' : monthEvents.length < 5 ? 'wydarzenia' : 'wydarzeń'}
+                groupedEvents.map(({ day, events: dayEvents }) => {
+                    const word = dayWord(day);
+                    const isToday = word === 'dziś';
+                    const fullDate = day.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+                    const far = distanceWord(day);
+                    return (
+                        <section key={day.getTime()} aria-label={fullDate}>
+                            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                <Tag as="h2" tone={isToday ? 'blue' : 'paper'} className="tabular">{word}</Tag>
+                                {/* Plakietka ma już dzień i datę („ŚR 21.10”) — obok tylko odległość
+                                    i liczba; pełna data zostaje dla czytnika ekranu (aria-label) */}
+                                <span className="text-[14px] text-tv-muted">
+                                    {far && <span className="font-semibold text-tv-paper">{far}</span>}
+                                    {far && dayEvents.length > 1 && ' · '}
+                                    {dayEvents.length > 1 && <><span className="tabular">{dayEvents.length}</span> {countWord(dayEvents.length)}</>}
                                 </span>
                             </div>
-
-                            {/* Event cards */}
-                            <div className="space-y-2">
-                                {monthEvents.map(event => (
-                                    <EventCard key={event.id} event={event} />
-                                ))}
+                            <div className={`grid grid-cols-1 gap-px border-t-2 bg-tv-seam ${isToday ? 'border-tv-blue' : 'border-tv-paper'}`}>
+                                {dayEvents.map(event => <EventRow key={event.id} event={event} places={places} />)}
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        </section>
+                    );
+                })
             )}
         </div>
     );

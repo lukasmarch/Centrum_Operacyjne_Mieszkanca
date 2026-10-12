@@ -148,9 +148,9 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
 
     <h2>§ 14. Dane osobowe</h2>
     <p>Zasady przetwarzania danych osobowych oraz prawa osób, których dane dotyczą, opisuje{' '}
-      <button onClick={() => onNavigate('privacy')} className="text-blue-400 hover:underline">Polityka prywatności</button>.
+      <button onClick={() => onNavigate('privacy')} className="text-tv-bluesoft underline underline-offset-4 transition-colors hover:text-white">Polityka prywatności</button>.
       Zasady wykorzystania plików cookies opisuje{' '}
-      <button onClick={() => onNavigate('cookies')} className="text-blue-400 hover:underline">Polityka cookies</button>.
+      <button onClick={() => onNavigate('cookies')} className="text-tv-bluesoft underline underline-offset-4 transition-colors hover:text-white">Polityka cookies</button>.
     </p>
 
     <h2>§ 15. Postanowienia końcowe</h2>
@@ -162,7 +162,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
     </ol>
 
     <h2>Załącznik nr 1 — wzór oświadczenia o odstąpieniu od umowy</h2>
-    <p className="text-neutral-400 text-sm">(formularz należy wypełnić i odesłać tylko w przypadku chęci odstąpienia od umowy)</p>
+    <p className="text-[15px] text-tv-muted">(formularz należy wypełnić i odesłać tylko w przypadku chęci odstąpienia od umowy)</p>
     <blockquote>
       <p>Adresat: <strong>Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz</strong>, Żabiny 96, 13-220 Rybno, e-mail: biuro@lumargo.pl</p>
       <p>Ja/My (*) niniejszym informuję/informujemy (*) o moim/naszym (*) odstąpieniu od umowy o świadczenie następującej usługi:</p>
@@ -173,7 +173,7 @@ const TermsPage: React.FC<TermsPageProps> = ({ onNavigate }) => (
       <p>Adres konsumenta(-ów): …………………………………</p>
       <p>Podpis konsumenta(-ów) (tylko jeżeli formularz jest przesyłany w wersji papierowej): …………………………………</p>
       <p>Data: …………………………………</p>
-      <p className="text-neutral-500 text-sm">(*) Niepotrzebne skreślić.</p>
+      <p className="text-[15px] text-tv-muted">(*) Niepotrzebne skreślić.</p>
     </blockquote>
 
   </LegalLayout>

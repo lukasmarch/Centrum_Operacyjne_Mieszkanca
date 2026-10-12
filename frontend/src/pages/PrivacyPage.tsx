@@ -134,7 +134,7 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
 
     <h2>10. Pliki cookies</h2>
     <p>Zasady wykorzystania plików cookies i podobnych technologii opisuje{' '}
-      <button onClick={() => onNavigate('cookies')} className="text-blue-400 hover:underline">Polityka cookies</button>.
+      <button onClick={() => onNavigate('cookies')} className="text-tv-bluesoft underline underline-offset-4 transition-colors hover:text-white">Polityka cookies</button>.
     </p>
 
     <h2>11. Zmiany polityki</h2>

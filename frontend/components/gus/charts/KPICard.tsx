@@ -4,7 +4,6 @@
  * Displays a single KPI metric with:
  * - Current value with unit
  * - Year-over-year trend (arrow + percentage)
- * - Optional sparkline showing 5-year trend
  * - Optional icon
  *
  * Used in GUSOverview and GUSSectionPage
@@ -12,7 +11,7 @@
 
 import React from 'react';
 import { TrendingUp, TrendingDown, Minus, LucideIcon } from 'lucide-react';
-import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { Tag } from '../../simple/tv';
 
 interface KPICardProps {
   label: string;
@@ -51,26 +50,19 @@ const KPICard: React.FC<KPICardProps> = ({
         return val.toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
       case 'percentage':
         // Zaokrąglij procenty do 1 miejsca
-        return `${val.toFixed(1)}%`;
+        return `${val.toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
       case 'currency':
-        // Zaokrąglij kwoty do pełnych złotych (bez groszy)
-        return `${Math.round(val).toLocaleString('pl-PL')} PLN`;
+        // Zaokrąglij kwoty do pełnych złotych (bez groszy). Jednostkę podaje
+        // `unit` obok wartości — doklejona tutaj dawała „9370 PLN PLN”
+        return Math.round(val).toLocaleString('pl-PL');
       default:
         return Math.round(val).toLocaleString('pl-PL');
     }
   };
 
-  // Determine trend styling
-  const getTrendColor = () => {
-    if (!trend || trend === 0) return 'text-gray-500';
-    return trend > 0 ? 'text-green-600' : 'text-red-600';
-  };
-
-  const getTrendBgColor = () => {
-    if (!trend || trend === 0) return 'bg-gray-900';
-    return trend > 0 ? 'bg-green-500/10' : 'bg-red-500/10';
-  };
-
+  // Kierunek zmiany bez oceny kolorem: wzrost liczby wykreślonych firm i wzrost
+  // dochodów to ta sama strzałka w górę — zieleń/czerwień sugerowałyby werdykt,
+  // a czerwień w tym systemie znaczy wyłącznie awarię.
   const getTrendIcon = () => {
     if (!trend || trend === 0) return <Minus size={14} />;
     return trend > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />;
@@ -78,60 +70,36 @@ const KPICard: React.FC<KPICardProps> = ({
 
   return (
     <div
-      className={`bg-white/[0.04] rounded-lg border border-white/5 p-3 hover:border-blue-500/30 hover:bg-gray-900/80 transition-all relative overflow-hidden min-w-0 ${className}`}
+      className={`relative h-full min-w-0 bg-tv-panel px-3.5 pb-3 pt-3 transition-colors hover:bg-tv-panel2 ${className}`}
     >
-      {/* Level Badge (if powiat) */}
+      {/* Wskaźnik bez danych gminnych — żółć = kontekst: liczba dotyczy powiatu */}
       {level === 'powiat' && (
-        <div className="absolute top-0 right-0 bg-amber-500/10 text-amber-500 text-[9px] font-bold px-1.5 py-0.5 rounded-bl-lg uppercase tracking-wide border-b border-l border-amber-500/20">
-          Powiat
-        </div>
+        <Tag tone="yellow" className="absolute right-0 top-0">Powiat</Tag>
       )}
 
       {/* Label */}
-      <p className="text-xs text-neutral-500 font-medium mb-1.5 line-clamp-2 leading-tight" title={label}>{label}</p>
+      <p className={`mb-1.5 line-clamp-2 text-[13px] leading-snug text-tv-muted ${level === 'powiat' ? 'pr-16' : ''}`} title={label}>{label}</p>
 
       {/* Value */}
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-xl font-bold text-neutral-100 leading-none">{formatValue(value)}</span>
-        <span className="text-xs text-neutral-500">{unit}</span>
+      <div className="flex flex-wrap items-baseline gap-x-1.5">
+        <span className="font-cond tabular text-[26px] font-extrabold leading-[1.05] text-white">{formatValue(value)}</span>
+        <span className="text-[13px] text-tv-muted">{unit}</span>
       </div>
 
       {/* Trend indicator */}
       {trend !== undefined && (
-        <div className="flex items-center gap-1.5 mt-2">
-          <span
-            className={`flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded-full ${getTrendBgColor()} ${getTrendColor()}`}
-          >
+        <div className="mt-1.5 flex items-center gap-1.5 text-[13px]">
+          <span className="tabular inline-flex items-center gap-0.5 font-bold text-tv-paper">
             {getTrendIcon()}
-            {Math.abs(trend).toFixed(1)}%
+            {Math.abs(trend).toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
           </span>
-          <span className="text-[11px] text-neutral-600">r/r</span>
+          <span className="text-tv-muted">r/r</span>
         </div>
       )}
 
-      {/* Sparkline */}
-      {sparklineData && sparklineData.length > 0 && (
-        <div className="mt-2 h-8" style={{ minWidth: 0 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparklineData}>
-              <defs>
-                <linearGradient id="sparklineGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="#60a5fa"
-                strokeWidth={1.5}
-                fill="url(#sparklineGradient)"
-                animationDuration={600}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      {/* Sparkline usunięty (przegląd 11.10.2026): mała linia pod każdą liczbą to szablon
+          „hero-metric”, a pełne wykresy trendu stoją tuż pod kaflami. `sparklineData`
+          zostaje w interfejsie, żeby nie ruszać wołających */}
     </div>
   );
 };

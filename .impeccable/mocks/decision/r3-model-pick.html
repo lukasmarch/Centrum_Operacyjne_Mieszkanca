@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=1440">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden;background:#05070c;font-family:'Archivo',sans-serif;color:#fff}
+.stage{display:grid;grid-template-columns:1000px 390px;gap:26px;padding:28px 12px}
+.www,.ph{position:relative;background:#0a0e1a;height:844px;overflow:hidden;border:1px solid #1c2338}
+.ph{border-radius:28px}
+nav.top{display:flex;gap:22px;align-items:center;padding:14px 28px;font-size:14px;color:#aab}
+.logo{font-weight:900;font-size:20px;color:#fff;font-stretch:80%}
+.chip{margin-left:auto;background:#fff;color:#0a0e1a;font-weight:800;padding:6px 12px}
+.belt{margin:18px 28px 0;display:grid;grid-template-columns:auto 1fr}
+.tag{background:#e63027;font-weight:900;font-stretch:80%;font-size:22px;padding:14px 18px;text-transform:uppercase}
+.tag.calm{background:#1f4fff}
+.bar{background:#fff;color:#0a0e1a;font-weight:800;font-size:30px;padding:10px 20px;font-stretch:85%}
+.sub{margin:0 28px;background:#ffd23f;color:#0a0e1a;font-weight:700;font-size:16px;padding:8px 18px;display:inline-block}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:28px 28px 0}
+.p .t{display:inline-block;background:#1f4fff;font-weight:800;font-size:13px;padding:4px 8px;text-transform:uppercase}
+.p .b{background:#151b2e;padding:14px;font-size:26px;font-weight:800;font-stretch:85%}
+.p .b small{display:block;font-size:14px;font-weight:500;color:#c7cbe0;font-stretch:100%}
+.news{margin:28px;border-top:3px solid #fff}
+.news div{padding:12px 0;border-bottom:1px solid #1c2338;font-size:17px;font-weight:600}
+.ph nav.top{padding:14px 16px}.ph .belt{margin:6px 12px 0;grid-template-columns:1fr}.ph .tag{font-size:16px;padding:8px 12px}
+.ph .bar{font-size:24px;padding:10px 12px}.ph .sub{margin:0 12px;font-size:14px}
+.ph .grid{grid-template-columns:1fr 1fr;margin:18px 12px 0;gap:10px}.ph .p .b{font-size:21px}
+.tabs{position:absolute;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #1c2338}
+.tabs div{padding:10px 0 20px;text-align:center;font-size:13px;color:#aab}.tabs .on{color:#fff;font-weight:800}
+</style></head><body>
+<div class="stage">
+<div class="www"><nav class="top"><span class="logo">RybnoLive</span><span>Pulpit</span><span>Wiadomości</span><span>Wydarzenia</span><span>Odpady</span><span>Autobus</span><span>Firmy</span><span>Zapytaj</span><span class="chip">Żabiny ▾</span></nav>
+ <div class="belt"><span class="tag calm">Żabiny · teraz</span><span class="bar">Bez wyłączeń prądu i wody</span></div>
+ <span class="sub">W gminie: wtorek 14.10, 9:00–13:00 — wyłączenie prądu w Grądach</span>
+ <div class="grid">
+  <div class="p"><span class="t">Wywóz</span><div class="b">wtorek 13.10<small>zmieszane · do 6:00</small></div></div>
+  <div class="p"><span class="t">Autobus</span><div class="b">jutro 06:40<small>do Działdowa</small></div></div>
+  <div class="p"><span class="t">Pogoda</span><div class="b">9°<small>odczuwalnie 6°</small></div></div>
+  <div class="p"><span class="t">Rada</span><div class="b">czw 10:00<small>XXVI sesja</small></div></div>
+ </div>
+ <div class="news"><div>Nabór wniosków do funduszu sołeckiego</div><div>Turniej halowy w Rybnie — wyniki</div><div>Kino w Działdowie: dziś 17:30 i 20:00</div></div>
+</div>
+<div class="ph"><nav class="top"><span class="logo">RybnoLive</span><span class="chip">Żabiny ▾</span></nav>
+ <div class="belt"><span class="tag calm">Żabiny · teraz</span><span class="bar">Bez wyłączeń prądu i wody</span></div>
+ <span class="sub">Wt 14.10 9:00–13:00 — Grądy</span>
+ <div class="grid">
+  <div class="p"><span class="t">Wywóz</span><div class="b">wt 13.10<small>zmieszane</small></div></div>
+  <div class="p"><span class="t">Autobus</span><div class="b">06:40<small>jutro</small></div></div>
+  <div class="p"><span class="t">Pogoda</span><div class="b">9°<small>pochmurno</small></div></div>
+  <div class="p"><span class="t">Rada</span><div class="b">czw<small>sesja 10:00</small></div></div>
+ </div>
+ <nav class="tabs"><div class="on">Pulpit</div><div>Gmina</div><div>Zapytaj</div><div>Więcej</div></nav>
+</div></div>
+</body></html>

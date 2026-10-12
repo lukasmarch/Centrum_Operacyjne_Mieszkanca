@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, Trash2, Bus } from 'lucide-react';
 import { AppSection, BusStatusResponse, BusStop } from '../../types';
 import { useAuth } from '../context/AuthContext';
 import { useArticles } from '../hooks/useArticles';
@@ -7,19 +6,21 @@ import { useWeather } from '../hooks/useWeather';
 import { useWasteSchedule } from '../hooks/useWasteSchedule';
 import { resolveWasteTown } from '../utils/wasteTown';
 import { useEvents } from '../hooks/useEvents';
+import { useMyVillage } from '../hooks/useMyVillage';
+import { useOutageOutlook } from '../hooks/useOutageOutlook';
 import {
-    dayLabel,
     endOf,
     isInWeekend,
     phaseOf,
     timeSuffix,
     upcomingFirst,
 } from '../utils/eventTime';
-import HeroBand from '../../components/simple/HeroBand';
 import BriefingCard from '../../components/simple/BriefingCard';
-import AlertOfTheDay from '../../components/simple/AlertOfTheDay';
-import AlertPushPrompt from '../../components/AlertPushPrompt';
-import TodayCard from '../../components/simple/TodayCard';
+import Masthead from '../../components/simple/Masthead';
+import StatusBelt from '../../components/simple/StatusBelt';
+import VillagePushCta from '../../components/simple/VillagePushCta';
+import { Plate, dayWord } from '../../components/simple/tv';
+import WeekendCard from '../../components/simple/WeekendCard';
 import WeatherTodayCard from '../../components/simple/WeatherTodayCard';
 import KadrCard from '../../components/simple/KadrCard';
 import NewsMini from '../../components/simple/NewsMini';
@@ -37,9 +38,11 @@ const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000
 /**
  * Strona główna — jedyna wersja serwisu, nie „tryb prosty obok pełnego".
  *
- * Kolejność odpowiada temu, jak mieszkaniec czyta stronę: najpierw co się
- * dzieje (briefing), potem co go dotknie dziś (alert), potem cztery rzeczy
- * do sprawdzenia, na końcu weekend, wiadomości i pytanie do asystenta.
+ * Kolejność odpowiada temu, jak mieszkaniec czyta stronę (odświeżenie
+ * 11.10.2026, kierunek „Pasek informacyjny”): najpierw JEGO WIEŚ — stan prądu
+ * i wody na belce i prośba o powiadomienia — potem cztery plakietki „Na dziś”,
+ * dopiero niżej briefing, wiadomości, rada, weekend i pytanie do asystenta.
+ * Wcześniej pierwszy ekran zajmowało hasło, a odpowiedzi stały 3–4 ekrany niżej.
  *
  * Każda karta prowadzi GŁĘBIEJ w swój temat (pełna prognoza, cały harmonogram,
  * rozkład z mapą), nigdy „w bok" do innego układu tych samych danych —
@@ -65,10 +68,20 @@ interface SimpleHomePageProps {
 
 const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubmit }) => {
     const { user } = useAuth();
-    // Pozycja harmonogramu albo `null` — „Rybno” bez rejonu to niewiadoma, nie R1 (F-039)
-    const town = resolveWasteTown(user?.location);
+    // Wieś czytelnika — jedno pytanie, z którego korzystają belka, wywóz i push
+    const { village, accountVillage, isPreview, places, setVillage } = useMyVillage();
+    const [pickerRequest, setPickerRequest] = useState(0);
+    const openPicker = () => {
+        setPickerRequest(n => n + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    // Pozycja harmonogramu albo `null` — „Rybno” bez rejonu to niewiadoma, nie R1 (F-039).
+    // Konto z rejonem („Rybno R2”) wie więcej niż sama nazwa wsi, więc ma pierwszeństwo —
+    // ale tylko dla wsi z konta. Podgląd cudzej wsi liczy wywóz dla niej
+    const town = resolveWasteTown(isPreview ? village : (user?.location ?? village));
+    const outlook = useOutageOutlook(village);
 
-    const { articles, loading: articlesLoading } = useArticles({ limit: 20, location: user?.location });
+    const { articles, loading: articlesLoading } = useArticles({ limit: 20, location: village ?? undefined });
     const { weather, loading: weatherLoading } = useWeather('Rybno');
     const wasteEvents = useWasteSchedule(town);
     const { events } = useEvents(30);
@@ -118,8 +131,15 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
      * Komunikat bez nazwy wsi — ostrzeżenie meteo dla powiatu — dotyczy
      * każdego, tak samo jak dla push.
      */
-    const alertArticle = useMemo(
-        () => articles?.find(a => a.isPinnedAlert && a.concernsLocation !== false) ?? null,
+    // Awarie (prąd, woda, pożar, wypadek) mówi belka z `/alerts/outlook`.
+    // Z przypiętych wpisów feedu zostaje tylko to, czego tam nie ma: obowiązujące
+    // ostrzeżenie meteo (feed przypina je obok awarii — `is_pinned_alert`)
+    const weatherWarning = useMemo(
+        () => articles?.find(a =>
+            a.isPinnedAlert
+            && a.concernsLocation !== false
+            && !(a.category || '').toLowerCase().includes('awari'),
+        ) ?? null,
         [articles],
     );
 
@@ -149,8 +169,8 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
      * sam DZIEŃ, więc o 10:25 zapraszała na posiedzenie komisji zakończone
      * o 9:00. `phaseOf` rozstrzyga, co minęło, co trwa, a co dopiero będzie.
      */
-    const todaySubtitle = useMemo(() => {
-        if (!events?.length) return 'Sprawdź, co się dzieje w okolicy';
+    const today = useMemo<{ value: string; sub: string }>(() => {
+        if (!events?.length) return { value: 'Kalendarz', sub: 'Sprawdź, co się dzieje w okolicy' };
         const now = new Date();
         const ahead = upcomingFirst(events, now);
         const todayAhead = ahead.filter(e => {
@@ -163,30 +183,40 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
             const more = todayAhead.length > 1 ? ` (i ${todayAhead.length - 1} więcej)` : '';
             if (phaseOf(first, now) === 'ongoing') {
                 const until = endOf(first).toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' });
-                return `teraz: ${first.title}, do ${until}${more}`;
+                return { value: 'Trwa teraz', sub: `${first.title}, do ${until}${more}` };
             }
-            return `${first.title}${timeSuffix(first)}${more}`;
+            const at = new Date(first.date);
+            const hasHour = at.getHours() !== 0 || at.getMinutes() !== 0;
+            return {
+                value: hasHour ? `dziś ${at.toLocaleTimeString('pl-PL', { hour: 'numeric', minute: '2-digit' })}` : 'dziś',
+                sub: `${first.title}${more}`,
+            };
         }
 
         const next = ahead[0];
-        if (!next) return 'Dziś spokojnie — zajrzyj po nowe wydarzenia';
-        // Rozróżniamy dwa różne dni: „nic nie planowano" znaczy co innego niż
-        // „było, ale się skończyło" — a mieszkaniec o 20:00 pyta o to drugie
+        if (!next) return { value: 'Spokojnie', sub: 'W kalendarzu nic przed nami' };
+        // „nic nie planowano” znaczy co innego niż „było, ale się skończyło”
         const somethingHappenedToday = events.some(
             e => new Date(e.date).toDateString() === now.toDateString() && phaseOf(e, now) === 'past',
         );
-        const opener = somethingHappenedToday ? 'Dziś już po wszystkim' : 'Dziś nic nie planowano';
-        return `${opener} · najbliższe: ${next.title}, ${dayLabel(next)}`;
+        return {
+            value: dayWord(new Date(next.date)),
+            sub: `${somethingHappenedToday ? 'Dziś już po wszystkim. ' : ''}Najbliżej: ${next.title}${timeSuffix(next)}`,
+        };
     }, [events]);
 
-    const wasteSubtitle = useMemo(() => {
-        if (!town) return 'Wybierz miejscowość — pokażemy termin wywozu';
+    const waste = useMemo<{ value: string; sub: string; needsVillage: boolean }>(() => {
+        if (!town) {
+            // „Rybno” ma dwa rejony różniące się o tydzień — zgadywanie podałoby
+            // połowie mieszkańców cudzy termin (F-039). Pytamy wprost
+            if (village) return { value: `${village}: który rejon?`, sub: 'Wybierz rejon w harmonogramie — różnią się o tydzień', needsVillage: false };
+            return { value: 'Wybierz wieś', sub: 'Pokażemy najbliższy termin wywozu', needsVillage: true };
+        }
         const next = wasteEvents[0];
-        if (!next) return `${town}: brak zaplanowanych odbiorów`;
+        if (!next) return { value: 'Brak terminu', sub: `${town}: nie ma zaplanowanych odbiorów`, needsVillage: false };
         const [day, month] = next.originalDateString.split('.');
-        // Dzień tygodnia liczymy z `daysRemaining`, nie z „dzień.miesiąc + bieżący
-        // rok": w grudniu styczniowy odbiór wypadał wtedy o rok wstecz i karta
-        // podawała zły dzień tygodnia przy poprawnej dacie
+        // Dzień tygodnia z `daysRemaining`, nie z „dzień.miesiąc + bieżący rok”:
+        // w grudniu styczniowy odbiór wypadał wtedy o rok wstecz
         const date = new Date();
         date.setHours(0, 0, 0, 0);
         date.setDate(date.getDate() + next.daysRemaining);
@@ -195,42 +225,41 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
             : next.daysRemaining === 1 ? 'jutro'
             : `${WEEKDAYS[date.getDay()]} ${day}.${month}`;
         // Nazwa miejscowości przy terminie: czytelnik widzi, CZYJ to termin
-        return `${next.type} — ${when} · ${town}`;
-    }, [wasteEvents, town]);
+        return { value: when, sub: `${next.type} · ${town}`, needsVillage: false };
+    }, [wasteEvents, town, village]);
 
     /**
-     * Autobus mówi jedno zdanie: jedzie / za ile odjeżdża / kiedy następny.
+     * Autobus: liczba (godzina) jako odpowiedź, zdanie jako dopowiedzenie.
      * Kierunek do Działdowa jest domyślny — to nim jedzie się do pracy,
      * szkoły i lekarza; kurs powrotny pokazujemy, gdy akurat jest w trasie.
      */
-    const busSubtitle = useMemo(() => {
-        if (!bus) return 'Rozkład jazdy i najbliższy kurs';
+    const busInfo = useMemo<{ value: string; sub: string }>(() => {
+        if (!bus) return { value: 'Rozkład', sub: 'Kursy do Działdowa i z powrotem' };
         const out = bus.directions.RYBNO_DZIALDOWO;
         const back = bus.directions.DZIALDOWO_RYBNO;
         const stopName = (id?: string) =>
             busStops.find(stop => stop.stop_id === id)?.name.replace(/\s*\(.*\)/, '');
 
-        // Kurs w trasie: gdzie jest teraz. Sama informacja „jedzie" nie mówi,
-        // czy zdążę na przystanek — nazwa mijanego przystanku mówi
+        // Kurs w trasie: gdzie jest teraz — nazwa mijanego przystanku mówi,
+        // czy zdążę, sama informacja „jedzie” nie mówi nic
         for (const [dir, label] of [[out, 'do Działdowa'], [back, 'do Rybna']] as const) {
             if (dir.is_active && dir.active_bus) {
                 const where = stopName(dir.active_bus.next_stop_id);
-                return where
-                    ? `Wg rozkładu jedzie ${label} — zbliża się do: ${where}`
-                    : `Wg rozkładu jedzie ${label}`;
+                return { value: 'W trasie', sub: where ? `Wg rozkładu jedzie ${label} — zbliża się do: ${where}` : `Wg rozkładu jedzie ${label}` };
             }
         }
 
         if (out.next_departure) {
             const mins = out.next_departure.in_minutes;
-            return mins <= 60
-                ? `Odjazd do Działdowa za ${mins} min (${out.next_departure.time})`
-                : `Najbliższy odjazd do Działdowa o ${out.next_departure.time}`;
+            return {
+                value: out.next_departure.time,
+                sub: mins <= 60 ? `Do Działdowa — odjazd za ${mins} min` : 'Do Działdowa — najbliższy odjazd dziś',
+            };
         }
         if (out.next_service) {
-            return `Dziś już nie kursuje · następny ${out.next_service.day_label} o ${out.next_service.time}`;
+            return { value: `${out.next_service.day_label} ${out.next_service.time}`, sub: 'Do Działdowa — dziś już nie kursuje' };
         }
-        return 'Dziś już nie kursuje';
+        return { value: 'Nie kursuje', sub: 'Dziś już nie ma kursów' };
     }, [bus, busStops]);
 
     /**
@@ -261,120 +290,107 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
     };
 
     return (
-        <div className="mx-auto max-w-5xl px-4 py-6 lg:py-10 space-y-6 lg:space-y-8">
-            <HeroBand onOpenCalendar={() => onNavigate('events')} />
+        <div className="space-y-6 pb-10 lg:space-y-8">
+            <Masthead
+                village={village}
+                accountVillage={accountVillage}
+                isPreview={isPreview}
+                onOpenProfile={() => onNavigate('profile')}
+                places={places}
+                onSelectVillage={setVillage}
+                pickerRequest={pickerRequest}
+            />
 
-            <BriefingCard onShowAll={() => onNavigate('news')} />
+            {/* Pierwszy ekran = odpowiedzi. Belka mówi o prądzie i wodzie w Twojej
+                wsi, prośba o powiadomienia stoi tuż pod nią — w jedynym miejscu,
+                w którym jej wartość jest oczywista (pomiar: 73 wyświetlenia
+                starego banera na piątym miejscu, 0 kliknięć) */}
+            <div className="space-y-3">
+                <StatusBelt
+                    outlook={outlook}
+                    village={village}
+                    weatherWarning={weatherWarning}
+                    onOpenDetails={() => onNavigate('news')}
+                />
+                <VillagePushCta village={village} onPickVillage={openPicker} />
+            </div>
 
-            {/*
-              Push to jedyna rzecz, którą ten serwis może dać mieszkańcowi, gdy
-              nie patrzy na stronę — i jedyny mierzalny cel kampanii. Przy awarii
-              prosi o zgodę AlertOfTheDay (kontekst mówi sam za siebie), w każdy
-              inny dzień spokojny baner. Nigdy oba naraz.
-            */}
-            {alertArticle
-                ? <AlertOfTheDay article={alertArticle} />
-                : <AlertPushPrompt tone="calm" />}
-
-            <section aria-label="Na dziś">
-                <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
-                    Na dziś
-                </h2>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-4 lg:gap-4">
-                    {/* Pogoda ma własny kafel: jako jedyna z czterech odpowiada
-                        liczbą, nie zdaniem, więc temperatura musi być widoczna
-                        z odległości ręki. Powierzchnia bez zmian — jedno pole */}
+            <section aria-labelledby="na-dzis">
+                <h2 id="na-dzis" className="sr-only">Na dziś</h2>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-4 lg:grid-cols-4 lg:gap-x-4">
+                    <Plate
+                        tag="Wywóz"
+                        value={waste.value}
+                        sub={waste.sub}
+                        onClick={waste.needsVillage ? openPicker : () => onNavigate('waste')}
+                    />
+                    <Plate
+                        tag="Autobus"
+                        value={busInfo.value}
+                        sub={busInfo.sub}
+                        onClick={() => onNavigate('bus')}
+                    />
+                    {/* Pogoda odpowiada liczbą — temperatura jest tu tym, czym
+                        u sąsiadów termin albo godzina */}
                     <WeatherTodayCard
                         weather={weather}
                         loading={weatherLoading}
                         airLabel={airLevel ? AIR_WORDS[airLevel] ?? null : null}
                         onClick={() => onNavigate('weather')}
                     />
-                    <TodayCard
-                        icon={Calendar}
-                        iconClass="text-amber-400"
-                        iconBgClass="bg-amber-500/10"
-                        title="Dziś w gminie"
-                        subtitle={todaySubtitle}
+                    <Plate
+                        tag="Wydarzenia"
+                        value={today.value}
+                        sub={today.sub}
                         onClick={() => onNavigate('events')}
-                    />
-                    <TodayCard
-                        icon={Trash2}
-                        iconClass="text-emerald-400"
-                        iconBgClass="bg-emerald-500/10"
-                        title="Wywóz śmieci"
-                        subtitle={wasteSubtitle}
-                        onClick={() => onNavigate('waste')}
-                    />
-                    <TodayCard
-                        icon={Bus}
-                        iconClass="text-violet-400"
-                        iconBgClass="bg-violet-500/10"
-                        title="Autobus do Działdowa"
-                        subtitle={busSubtitle}
-                        onClick={() => onNavigate('bus')}
                     />
                 </div>
 
-                {/* Zdrowie i drogi jako stopka sekcji, nie kolejne karty w siatce:
-                    oba przez większość dni mówią „bez zmian", więc nie zasługują
-                    na własne pole — ale gdy coś się dzieje (lekarz dziś nie
-                    przyjmuje, droga zamknięta), mają być widoczne od razu.
-                    Zdrowie idzie pierwsze: dotyczy wizyty, którą trzeba odwołać */}
-                <div className="mt-3 space-y-3">
+                {/* Zdrowie i drogi jako pasy pod plakietkami: przez większość dni
+                    mówią „bez zmian”, więc nie dostają własnego pola — ale zmiana
+                    (lekarz nie przyjmuje, droga zamknięta) zapala je na żółto */}
+                <div className="mt-3 space-y-px">
                     <HealthTodayCard />
                     <RoadStatusStrip />
                 </div>
             </section>
 
-            {/* Rada Gminy — jedyna rubryka, w której serwis mówi o decyzjach,
-                a nie o zdarzeniach. Kafel sam wybiera, czy zapowiada najbliższą
-                sesję, czy pokazuje ostatni skrót; znika tylko, gdy nie ma ani
-                jednego, ani drugiego */}
-            <CouncilCard onClick={() => onNavigate('council')} />
+            <BriefingCard onShowAll={() => onNavigate('news')} />
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_1fr] lg:gap-5">
-                <KadrCard
-                    weekendSubtitle={weekendSubtitle ?? ''}
-                    hasWeekendEvents={weekendSubtitle !== null}
-                    onOpenEvents={() => onNavigate('events')}
-                />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr] lg:gap-6">
                 <NewsMini
                     articles={newsArticles}
                     loading={articlesLoading && !articles}
                     onShowAll={() => onNavigate('news')}
                 />
+                {/* Rada Gminy — jedyna rubryka o decyzjach, nie o zdarzeniach.
+                    Sama wybiera: zapowiedź najbliższej sesji albo ostatni skrót */}
+                <CouncilCard onClick={() => onNavigate('council')} />
             </div>
 
-            {/* Wypoczynek — na razie samo kino. Kafel sam się chowa, gdy nie ma
-                seansu przed nami, więc sekcja nie zostaje z pustym miejscem */}
-            <section aria-label="Wypoczynek">
-                <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-neutral-500">
-                    Wypoczynek
-                </h2>
-                <CinemaCard onClick={() => onNavigate('cinema')} />
-            </section>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start lg:gap-6">
+                <KadrCard />
+                {/* Wolny czas: kino (chowa się, gdy nie ma seansu przed nami) i weekend */}
+                <div className="flex flex-col gap-6">
+                    <CinemaCard onClick={() => onNavigate('cinema')} />
+                    <WeekendCard subtitle={weekendSubtitle} onOpenEvents={() => onNavigate('events')} />
+                </div>
+            </div>
 
-            {/*
-              Prośba o adres e-mail dopiero POD treścią: mieszkaniec zdążył
-              przeczytać briefing i wiadomości, więc „to samo co tydzień na maila"
-              jest propozycją, a nie bramką przy wejściu.
-            */}
+            {/* Konto to DRUGI krok, po wsi i powiadomieniach — propozycja
+                pod treścią, nie bramka przy wejściu */}
             <NewsletterCta onRegister={() => onNavigate('register')} />
 
-            {/*
-              Zgłoszenia 24 PRZED reklamą: to jedyne miejsce, w którym mieszkaniec
-              coś od siebie wnosi, więc stoi wyżej niż to, za co ktoś zapłacił
-            */}
+            {/* Zgłoszenia 24 PRZED reklamą: miejsce, w którym mieszkaniec
+                coś wnosi, stoi wyżej niż to, za co ktoś zapłacił */}
             <ReportsMini onOpenReports={() => onNavigate('reports')} />
 
-            {/*
-              Reklama stoi PONIŻEJ treści i jest nazwana po imieniu. Komunikaty
-              sołtysów dostaną osobną sekcję i nigdy nie zmieszają się z tą
-            */}
             <AdBoard onOpenBusinesses={() => onNavigate('business')} />
 
-            <AskBar onAsk={ask} />
+            <section aria-labelledby="zapytaj">
+                <h2 id="zapytaj" className="sr-only">Zapytaj asystenta</h2>
+                <AskBar onAsk={ask} />
+            </section>
         </div>
     );
 };

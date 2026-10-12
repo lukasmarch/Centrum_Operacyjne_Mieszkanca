@@ -75,7 +75,7 @@ const CookiePolicyPage: React.FC<CookiePolicyPageProps> = ({ onNavigate }) => (
       <li>Decyzję wyrażoną w banerze cookies można zmienić w każdej chwili —{' '}
         <button
           onClick={() => { resetCookieConsent(); window.location.reload(); }}
-          className="text-blue-400 hover:underline"
+          className="text-tv-bluesoft underline underline-offset-4 transition-colors hover:text-white"
         >
           kliknij tutaj, aby ponownie wyświetlić baner
         </button>.
@@ -85,9 +85,9 @@ const CookiePolicyPage: React.FC<CookiePolicyPageProps> = ({ onNavigate }) => (
 
     <h2>5. Powiązane dokumenty</h2>
     <p>Zasady przetwarzania danych osobowych opisuje{' '}
-      <button onClick={() => onNavigate('privacy')} className="text-blue-400 hover:underline">Polityka prywatności</button>,
+      <button onClick={() => onNavigate('privacy')} className="text-tv-bluesoft underline underline-offset-4 transition-colors hover:text-white">Polityka prywatności</button>,
       a zasady świadczenia usług —{' '}
-      <button onClick={() => onNavigate('terms')} className="text-blue-400 hover:underline">Regulamin</button>.
+      <button onClick={() => onNavigate('terms')} className="text-tv-bluesoft underline underline-offset-4 transition-colors hover:text-white">Regulamin</button>.
     </p>
 
   </LegalLayout>
