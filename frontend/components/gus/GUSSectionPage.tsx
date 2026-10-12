@@ -31,7 +31,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import KPICard from './charts/KPICard';
 import TrendChart from './charts/TrendChart';
 import ComparisonBar from './charts/ComparisonBar';
-import GaugeChart from './charts/GaugeChart';
 import GUSTierGate from './layout/GUSTierGate';
 
 interface GUSSectionPageProps {

@@ -80,7 +80,8 @@ const countWord = (n: number) =>
 const EventRow: React.FC<{ event: TimedEvent; places: string[] }> = ({ event, places }) => {
     const d = new Date(event.date);
     const allDay = isAllDay(event);
-    // Trwające = żółta plakietka (zapowiedź/kontekst), NIE czerwień — ta należy do awarii
+    // Trwające = chabrowa plakietka, jak tablica `boardOf` dla „trwa” (żółć = zapowiedź,
+    // czerwień = awaria) — do 12.10 była żółta i mówiła co innego niż Wiadomości
     const ongoing = phaseOf(event) === 'ongoing';
     // Koniec pokazujemy tylko podany przez źródło; domyślne +3 h z `endOf`
     // to reguła ważności, a nie godzina, którą wolno wydrukować
@@ -102,7 +103,7 @@ const EventRow: React.FC<{ event: TimedEvent; places: string[] }> = ({ event, pl
                 {end && (
                     <span className="tabular mt-1 text-[13px] leading-none text-tv-muted">do {hm(end)}</span>
                 )}
-                {ongoing && <Tag tone="yellow" className="mt-1.5">trwa</Tag>}
+                {ongoing && <Tag tone="blue" className="mt-1.5">trwa</Tag>}
                 <span className="mt-auto flex items-center gap-1 pt-2">
                     <Glyph size={20} strokeWidth={1.75} aria-hidden className="text-tv-muted" />
                     <a

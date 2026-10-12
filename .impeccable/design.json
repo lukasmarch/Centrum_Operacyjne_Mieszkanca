@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-11T20:00:00+02:00",
+  "generatedAt": "2026-10-12T12:00:00+02:00",
   "title": "Design System: RybnoLive",
   "extensions": {
     "colorMeta": {
@@ -247,6 +247,18 @@
       "meta": {
         "displayName": "Meta",
         "purpose": "Kategoria, czas, statusy 13–14 px; dolna granica tekstu 13 px."
+      },
+      "page-title": {
+        "displayName": "Tytuł podstrony",
+        "purpose": "h1 główki podstrony (PageHead), 26 → 34 px od lg."
+      },
+      "chip": {
+        "displayName": "Filtr",
+        "purpose": "Etykieta filtra (Chip) — wąskie wersaliki 15 px."
+      },
+      "chat-body": {
+        "displayName": "Odpowiedź Asystenta",
+        "purpose": "Jedyny długi tekst ciągły: 16 px / 1.6, miara 62ch, tekst miękki."
       }
     },
     "shadows": [],
@@ -366,27 +378,73 @@
       "description": "Poniżej lg; aktywna zakładka ma pasek 3 px w chabrze na górnej krawędzi.",
       "html": "<nav class=\"ds-tabs\"><button class=\"is-active\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><path d=\"M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z\"/></svg><span>Start</span></button><button><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg><span>Asystent</span></button></nav>",
       "css": ".ds-tabs{display:flex;justify-content:space-around;width:390px;background:#0a0e1a;border-top:1px solid #222b45;padding:4px 8px}.ds-tabs button{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:56px;min-width:60px;border:0;background:transparent;color:#b4bbd0;font-family:Archivo,system-ui,sans-serif;cursor:pointer}.ds-tabs button span{font-size:13px;line-height:1}.ds-tabs button:hover{color:#fff}.ds-tabs button.is-active{color:#fff;font-weight:700}.ds-tabs button.is-active::before{content:'';position:absolute;left:8px;right:8px;top:0;height:3px;background:#1f4fff}"
+    },
+    {
+      "name": "Filtr (Chip)",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Filtr kategorii 44 px; aktywny = papier, aktywny filtr Awaria = czerwień.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip ds-chip-on\" aria-pressed=\"true\">Wszystkie <span class=\"ds-n\">38</span></button><button class=\"ds-chip\">Awaria <span class=\"ds-n\">2</span></button><button class=\"ds-chip ds-chip-alert\" aria-pressed=\"true\">Awaria <span class=\"ds-n\">2</span></button><button class=\"ds-chip\">Sport <span class=\"ds-n\">7</span></button></div>",
+      "css": ".ds-chips{display:flex;gap:6px;flex-wrap:wrap;background:#0a0e1a;padding:16px}.ds-chip{font-family:Archivo,system-ui,sans-serif;font-stretch:78%;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:0;border-radius:0;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.025em;background:#121829;color:#f5f6fa;cursor:pointer;transition:background .15s,color .15s}.ds-chip:hover{background:#182036;color:#fff}.ds-chip:focus-visible{outline:3px solid #ffd23f;outline-offset:2px}.ds-n{font-size:13px;font-weight:800;color:#b4bbd0;font-variant-numeric:tabular-nums}.ds-chip-on{background:#f5f6fa;color:#0a0e1a}.ds-chip-on:hover{background:#f5f6fa;color:#0a0e1a}.ds-chip-on .ds-n,.ds-chip-alert .ds-n{color:inherit;opacity:.7}.ds-chip-alert,.ds-chip-alert:hover{background:#d42a1f;color:#fff}"
+    },
+    {
+      "name": "Pole wyboru (Select)",
+      "kind": "input",
+      "refersTo": "select",
+      "description": "52 px, obrys 2 px szwu, własny chevron; fokus = obrys papierowy.",
+      "html": "<label class=\"ds-sel\"><select><option>Rybno R1</option><option>Żabiny</option></select><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m6 9 6 6 6-6\"/></svg></label>",
+      "css": ".ds-sel{position:relative;display:block;max-width:320px;background:#0a0e1a;padding:16px}.ds-sel select{font-family:Archivo,system-ui,sans-serif;width:100%;min-height:52px;appearance:none;-webkit-appearance:none;border:2px solid #222b45;border-radius:0;background:#121829;color:#f5f6fa;font-size:16px;font-weight:600;padding:8px 40px 8px 12px;transition:border-color .15s}.ds-sel select:focus,.ds-sel select:focus-visible{border-color:#f5f6fa;outline:3px solid #ffd23f;outline-offset:2px}.ds-sel svg{position:absolute;right:28px;top:50%;transform:translateY(-50%);color:#b4bbd0;pointer-events:none}"
+    },
+    {
+      "name": "Komunikat (Notice)",
+      "kind": "custom",
+      "refersTo": "notice",
+      "description": "Stan pusty (panel) albo błąd pobrania (żółć) — jedno zdanie, bez ilustracji.",
+      "html": "<div class=\"ds-notices\"><p class=\"ds-notice\">Brak wpisów w kategorii „Sport”.</p><p class=\"ds-notice ds-notice-warn\" role=\"alert\">Nie udało się pobrać wiadomości. Sprawdź połączenie i spróbuj za chwilę.</p></div>",
+      "css": ".ds-notices{display:flex;flex-direction:column;gap:12px;background:#0a0e1a;padding:16px}.ds-notice{font-family:Archivo,system-ui,sans-serif;margin:0;padding:12px 16px;font-size:15px;line-height:1.375;background:#121829;color:#f5f6fa}.ds-notice-warn{background:#ffd23f;color:#0a0e1a}"
+    },
+    {
+      "name": "Kwadrat wpisu (EntrySquare)",
+      "kind": "custom",
+      "refersTo": "entry-square",
+      "description": "Zdjęcie → tablica terminu w kolorze stanu → piktogram kategorii; nigdy pustka.",
+      "html": "<div class=\"ds-sq-row\"><span class=\"ds-sq ds-b-red\"><b>14</b><i>paź</i><em>9:00</em></span><span class=\"ds-sq ds-b-yellow\"><b>18</b><i>paź</i></span><span class=\"ds-sq ds-b-blue\"><b>12</b><i>paź</i><em>10:00</em></span><span class=\"ds-sq ds-b-quiet\"><b>2</b><i>paź</i><em>18:00</em></span><span class=\"ds-sq ds-b-quiet\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 9H4.5a2.5 2.5 0 0 1 0-5H6\"/><path d=\"M18 9h1.5a2.5 2.5 0 0 0 0-5H18\"/><path d=\"M4 22h16\"/><path d=\"M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22\"/><path d=\"M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22\"/><path d=\"M18 2H6v7a6 6 0 0 0 12 0V2Z\"/></svg></span></div>",
+      "css": ".ds-sq-row{display:flex;gap:12px;flex-wrap:wrap;background:#121829;padding:16px}.ds-sq{font-family:Archivo,system-ui,sans-serif;font-stretch:78%;width:80px;height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;border-radius:0}.ds-sq b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}.ds-sq i{font-style:normal;margin-top:2px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.025em}.ds-sq em{font-style:normal;margin-top:4px;font-size:13px;font-weight:700;opacity:.9;font-variant-numeric:tabular-nums}.ds-b-red{background:#d42a1f;color:#fff}.ds-b-yellow{background:#ffd23f;color:#0a0e1a}.ds-b-blue{background:#1f4fff;color:#fff}.ds-b-quiet{background:#182036;color:#f5f6fa}"
+    },
+    {
+      "name": "Odpowiedź Asystenta",
+      "kind": "custom",
+      "refersTo": "chat-answer",
+      "description": "Plakietka agenta, tekst 16/1.6 w 62ch; najwyżej trzy fakty-kotwice żółcią i wagą 700; pytanie = panel-2 przy prawej.",
+      "html": "<div class=\"ds-chat\"><p class=\"ds-q\">Kiedy wywóz w Żabinach?</p><article><span class=\"ds-agent\">Organizator</span><p class=\"ds-a\">Najbliższy wywóz odpadów zmieszanych w Żabinach jest <strong class=\"ds-k\">jutro</strong>, <strong class=\"ds-k\">14 października</strong>. Pojemnik wystaw do <strong class=\"ds-k\">6:00</strong>. Segregowane odbiera <strong class=\"ds-w\">ten sam</strong> pojazd.</p></article></div>",
+      "css": ".ds-chat{font-family:Archivo,system-ui,sans-serif;max-width:768px;margin:0 auto;display:flex;flex-direction:column;gap:16px;background:#0a0e1a;padding:16px}.ds-q{align-self:flex-end;max-width:70%;margin:0;background:#182036;color:#fff;padding:12px 16px;font-size:16px;line-height:1.375}.ds-agent{font-stretch:78%;display:inline-block;margin-bottom:8px;padding:4px 10px;background:#1f4fff;color:#fff;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.025em;line-height:1}.ds-a{margin:0;max-width:62ch;font-size:16px;line-height:1.6;color:#d7dbe8}.ds-k{font-weight:700;color:#ffd23f}.ds-w{font-weight:700;color:#fff}"
     }
   ],
   "narrative": {
     "northStar": "Pasek informacyjny",
-    "overview": "**Creative North Star: \"Pasek informacyjny\"**\n\nPulpit mówi językiem grafiki telewizji informacyjnej: plakietka tematu (wąskie wersaliki na pełnym kolorze) stoi nad pasem treści, a pod nim leży żółty pasek kontekstu. Sprawa wsi czytelnika jest belką na górze strony; reszta dnia to plakietki z jedną wartością (termin, godzina, temperatura) i zdaniem dopowiedzenia. Tło to granatowa czerń, panele są o stopień jaśniejsze, podziały to szew 1 px.\n\nŚwiat jest płaski i kanciasty. Nie ma cieni, poświaty, gradientów ani zaokrągleń; hierarchię robią kolor plakietki, szerokość kroju i biały pas, nie głębia. Kolor nie dekoruje — niesie stan. Gęstość jest umiarkowana: odpowiedź najpierw, szczegół w zdaniu pod nią, przejście głębiej przez link w chabrze.\n\nRuch jest jeden i znaczący: przy zmianie stanu belki plakietka wjeżdża, a biały pas odsłania się od lewej. Przy zwykłym wejściu na stronę nic się nie rusza.",
+    "overview": "**Creative North Star: \"Pasek informacyjny\"**\n\nPulpit i podstrony mówią językiem grafiki telewizji informacyjnej: plakietka tematu (wąskie wersaliki na pełnym kolorze) stoi nad pasem treści, a pod nim leży żółty pasek kontekstu. Sprawa wsi czytelnika jest belką na górze strony; reszta dnia to plakietki z jedną wartością (termin, godzina, temperatura) i zdaniem dopowiedzenia. Tło to granatowa czerń, panele są o stopień jaśniejsze, podziały to szew 1 px.\n\nŚwiat jest płaski i kanciasty. Nie ma cieni, poświaty, gradientów ani zaokrągleń; hierarchię robią kolor plakietki, szerokość kroju i biały pas, nie głębia. Kolor nie dekoruje — niesie stan. Gęstość jest umiarkowana: odpowiedź najpierw, szczegół w zdaniu pod nią, przejście głębiej przez link w chabrze.\n\nRuch jest jeden i znaczący: przy zmianie stanu belki plakietka wjeżdża, a biały pas odsłania się od lewej. Przy zwykłym wejściu na stronę nic się nie rusza.",
     "keyCharacteristics": [
       "Plakietka nad pasem — ten sam układ w belce, kaflach „Na dziś”, nagłówkach sekcji i znaku „Rybno LIVE”.",
       "Kolor = stan: chaber, czerwień, żółć, papier; nic więcej na powierzchniach pulpitu.",
       "Jedna rodzina (Archivo) w dwóch szerokościach: wąska gruba dla belki, liczb i etykiet, normalna dla treści.",
       "Kąty proste, szew 1 px, zero cieni.",
-      "Cyfry tabelaryczne we wszystkich terminach i godzinach."
+      "Cyfry tabelaryczne we wszystkich terminach i godzinach.",
+      "Kwadrat przy wpisie niesie informację (zdjęcie, termin albo rodzaj sprawy), nigdy pustkę."
     ],
     "rules": [
       {
         "name": "The Color Is State Rule",
-        "body": "Kolor plakietki niesie znaczenie i nic poza nim: chaber = temat/spokój, czerwień = awaria teraz lub ≤ 36 h, żółć = kontekst/zapowiedź, papier = neutralne wyróżnienie, szew = brak wiedzy. Nowy kolor na pulpicie wymaga nowego stanu, nie nowej ozdoby.",
+        "body": "Kolor plakietki niesie znaczenie i nic poza nim: chaber = temat/spokój, czerwień = awaria teraz lub ≤ 36 h, żółć = kontekst/zapowiedź, papier = neutralne wyróżnienie, szew = brak wiedzy, „Reklama” albo sprawa drugiego planu (sekcja, która waży mniej niż sprawa gminy). Nowy kolor wymaga nowego stanu, nie nowej ozdoby.",
         "section": "colors"
       },
       {
         "name": "The Red Is Rare Rule",
-        "body": "Czerwień tylko dla awarii, która dotyczy czytelnika teraz albo jutro. Zapowiedź za trzy dni jest żółta; awaria w cudzej wsi stoi w żółtym pasku kontekstu.",
+        "body": "Czerwień tylko dla awarii, która dotyczy czytelnika teraz albo jutro. Zapowiedź za trzy dni jest żółta; awaria w cudzej wsi stoi w żółtym pasku kontekstu; złe powietrze jest żółte; zgłoszenie o wysokim priorytecie bez żywego alarmu jest papierowe.",
+        "section": "colors"
+      },
+      {
+        "name": "The Anchor Rule",
+        "body": "W odpowiedzi Asystenta żółć znaczy fakt-kotwicę: termin, godzinę, wieś, kwotę — to, po co mieszkaniec pytał. Najwyżej trzy wyróżnienia na odpowiedź (`MAX_HIGHLIGHTS`); dalsze pogrubienia zostają białe. Waga 700 jest drugim nośnikiem (sam odcień nie wystarcza przy deuteranopii). Żółć działa, dopóki jest rzadka.",
         "section": "colors"
       },
       {
@@ -401,18 +459,23 @@
       },
       {
         "name": "The 13 px Floor",
-        "body": "Żaden tekst na pulpicie i w szkielecie poniżej 13 px.",
+        "body": "Żaden tekst na pulpicie, w szkielecie i na podstronach poniżej 13 px.",
         "section": "typography"
       },
       {
         "name": "The Flat Plate Rule",
-        "body": "Rzecz ważniejsza jest jaśniejsza albo ma kolor stanu — nie jest wyżej. `box-shadow` na pulpicie i w szkielecie nie występuje.",
+        "body": "Rzecz ważniejsza jest jaśniejsza albo ma kolor stanu — nie jest wyżej. `box-shadow` w tym świecie nie występuje. Okno dialogowe stoi na zasłonie `black/70`, z obrysem szwu i górną krawędzią 2 px w chabrze — bez cienia.",
         "section": "elevation"
       },
       {
         "name": "The Square Corner Rule",
-        "body": "Zaokrąglenie nie istnieje w tym świecie. Element z `border-radius` pochodzi ze starego świata.",
+        "body": "Zaokrąglenie nie istnieje w tym świecie (poza znakiem miejsca na mapie). Element z `border-radius` pochodzi ze starego świata. Systemowy `select` dostaje `appearance: none` i własny chevron, bo na iOS ma zaokrąglone rogi i połysk.",
         "section": "shapes"
+      },
+      {
+        "name": "The Square Carries Information Rule",
+        "body": "Kwadrat niesie informację, nigdy pustkę: zdjęcie, termin w kolorze stanu albo rodzaj sprawy. Generowanych ilustracji kategorii nie używamy — udawałyby zdjęcie z miejsca zdarzenia. Szesnaście identycznych szarych gazet czytało się jak niezaładowane obrazki.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -422,17 +485,24 @@
       "Do trzymać tekst ≥ 13 px i zostawić globalny pierścień fokusu: 3 px żółci z odstępem 2 px.",
       "Do dzielić powierzchnie szwem 1 px albo `gap-px` na tle szwu; panel sekcji otwierać krawędzią 2 px w chabrze.",
       "Do grać ruch belki tylko przy zmianie stanu i wyłączać go przy `prefers-reduced-motion`.",
-      "Do pisać czas w zdaniu („Najbliższe 7 dni: …”) i podawać źródło z godziną sprawdzenia w żółtym pasku."
+      "Do pisać czas w zdaniu („Najbliższe 7 dni: …”) i podawać źródło z godziną sprawdzenia w żółtym pasku.",
+      "Do składać podstronę z klocków `tv.tsx` (PageHead, Chip, Notice, Skeleton, Select, Tag, EntrySquare) i stawiać ją od lewej krawędzi szkieletu; wyśrodkowana kolumna przysługuje czatowi.",
+      "Do dzielić listę według tego, czyja to sprawa (gmina → powiat → region), a sprawy drugiego planu otwierać plakietką w szwie.",
+      "Do dawać kwadratowi wpisu zdjęcie, termin w kolorze stanu albo piktogram kategorii — w tej kolejności.",
+      "Do wyróżniać w odpowiedzi Asystenta najwyżej trzy fakty-kotwice żółcią i wagą 700."
     ],
     "donts": [
       "Don't używać gradientów (tła, tekstu, miniatur), poświaty, `backdrop-filter` ani cieni.",
       "Don't zaokrąglać narożników kart, przycisków, pól ani miniatur.",
       "Don't stawiać kickerów/eyebrow nad nagłówkiem — plakietka jest nagłówkiem, nie ozdobnikiem nad nim.",
-      "Don't podstawiać kolorowych miniatur kategorii (fiolet, róż, cyjan); bez zdjęcia jest płaski kwadrat panelu z jedną ikoną.",
-      "Don't używać czerwieni dla zapowiedzi dalszej niż 36 h ani dla awarii w cudzej wsi.",
+      "Don't podstawiać kolorowych ani generowanych miniatur kategorii (fiolet, róż, cyjan, ilustracje AI) — udawałyby zdjęcie z miejsca zdarzenia; bez zdjęcia kwadrat pokazuje termin albo piktogram kategorii.",
+      "Don't zostawiać kwadratu wpisu pustego ani z tym samym symbolem przy każdym wpisie.",
+      "Don't używać czerwieni dla zapowiedzi dalszej niż 36 h, awarii w cudzej wsi, złej jakości powietrza ani zgłoszenia bez żywego alarmu.",
+      "Don't wyróżniać żółcią w odpowiedzi Asystenta więcej niż trzech miejsc ani samym kolorem bez wagi 700.",
       "Don't mówić „bez awarii”, gdy sprawdzenie się nie udało.",
       "Don't składać akapitów wąskim krojem ani używać kroju systemowego jako display.",
-      "Don't wprowadzać kolorów spoza palety tv-* na pulpicie i w szkielecie."
+      "Don't wprowadzać kolorów spoza palety tv-* na pulpicie, w szkielecie i na podstronach.",
+      "Don't centrować podstrony `mx-auto` (wyjątek: czat i wąskie formularze jednego zadania)."
     ]
   }
 }
