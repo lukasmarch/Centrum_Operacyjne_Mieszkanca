@@ -17,7 +17,7 @@ from src.ai.models import ArticleCategory
 from src.ai.prompts import CATEGORIZATION_PROMPT
 from src.database.schema import Article
 from src.services import alert_policy, time_span, energa, weather_alert
-from src.services.alert_policy import _flat, is_foreign_region, places_in
+from src.services.alert_policy import _flat, gmina_subject, is_foreign_region, places_in
 from src.services.feed_policy import LOCAL_TZ
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
@@ -304,16 +304,33 @@ async def ground_categorization(
         logger.info(f"Grounding: miejsca spoza tekstu odrzucone: {set(places) - set(grounded)}")
         output.event_places = grounded
 
-    if grounded and not is_foreign_region(source.title, source.body):
+    #    „KOGO dotyczy” przed „gdzie” (decyzja 11.10.2026, audyt E1): mecz wyjazdowy
+    #    Delfina Rybno, jubileusz OSP Truszczyny, orkiestra z Rybna na przeglądzie
+    #    w Kurzętniku są sprawą gminy. Pomiar 30 dni: 32 wpisy z oceną < 3 wymieniały
+    #    wieś gminy — w tym 4 wyjazdowe mecze Delfina i 4 sprawy wprost w gminie,
+    #    które model ocenił na 1–2. Tylko instytucje i drużyny (`gmina_subject`),
+    #    nie „mieszkańcy gminy” — lekcja z 3.09 (akcja zdrowotna w Lubawie).
+    #    Tytuł ze ŹRÓDŁA, nie nagłówek AI: model potrafi dopisać wieś (art. 5936).
+    foreign = is_foreign_region(source.title, source.body)
+    subject_local = not foreign and gmina_subject(source.title, source.body)
+
+    if grounded and not foreign:
         if any(places_in(p) for p in grounded):
             if output.locality < 3:
                 logger.info(
                     f"Grounding: locality {output.locality}→3, zdarzenie dzieje się w {grounded}"
                 )
                 output.locality = 3
+        elif subject_local:
+            if output.locality < 3:
+                logger.info(f"Grounding: locality {output.locality}→3, dzieje się w {grounded}, ale dotyczy instytucji z gminy")
+                output.locality = 3
         elif output.locality >= 3:
             logger.info(f"Grounding: locality 3→2, zdarzenie dzieje się w {grounded} (spoza gminy)")
             output.locality = 2
+    elif subject_local and output.locality < 3:
+        logger.info(f"Grounding: locality {output.locality}→3, dotyczy instytucji z gminy")
+        output.locality = 3
     elif output.locality >= 3 and not places_in(source.title, source.body):
         # Bez wskazanego miejsca zostaje dawna reguła: „to pewnie u nas" nie jest dowodem
         logger.info("Grounding: locality 3→2, w tekście nie pada nazwa z gminy")

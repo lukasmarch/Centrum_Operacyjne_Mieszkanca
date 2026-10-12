@@ -200,7 +200,9 @@ GMINA_SOURCES: frozenset[str] = frozenset({
     "BIP Gminy Rybno",
     "Facebook - Rybno",
     "Facebook - ZakladGospodarkiKomunalnej",
-    "Facebook - Syla",
+    # ⚠️ BEZ „Facebook - Syla” (decyzja 11.10.2026, audyt E1): to profil prowadzony
+    # przez mieszkańca, nie źródło gminne — pisze też o Lubawie i Działdowie.
+    # Lokalność jego wpisów rozstrzyga ocena wpisu, a bez niej nazwa wsi w treści.
     "Łaciate Mazury MTB",
     # Jednostki gminy i sołectwa — piszą o swojej wsi i o gminie, nigdy
     # o sąsiednim powiecie

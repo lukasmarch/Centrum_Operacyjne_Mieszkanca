@@ -207,6 +207,42 @@ def places_in(title: Optional[str], content: Optional[str] = None) -> tuple[str,
     return tuple(place for place, pattern in _PLACE_RE if pattern.search(text))
 
 
+# Instytucja albo drużyna, która nosi nazwę wsi z gminy — „KOGO dotyczy” wpis
+# (decyzja 11.10.2026, audyt E1): mecz wyjazdowy Delfina Rybno, jubileusz OSP
+# Truszczyny, szkoła w Rumianie na konkursie w Lubawie są sprawą GMINY, choć
+# dzieją się gdzie indziej. Model ocenia „gdzie”, a ten wzorzec dokłada „kogo”.
+#
+# ⚠️ Celowo instytucje, NIE ludzie. „Mieszkanki gminy Rybno wspierają akcję
+# zdrowotną w Lubawie” otworzyło 3.09.2026 briefing jako lokalna sprawa — i to
+# był błąd. Stąd „Gmina/Gminy Rybno” liczy się WYŁĄCZNIE wielką literą (urząd),
+# a „mieszkańcy/seniorzy z gminy” nie są podmiotem.
+_ORG_WORDS = (
+    r"delfin\w*|gszs|osp|ochotnicz\w* straż\w*|kgw|koł\w* gospodyń\w*|"
+    r"szkoł\w*|sp|zesp\w* szk\w*|przedszkol\w*|żłob\w*|orkiestr\w*|"
+    r"parafi\w*|sołectw\w*|sołtys\w*|klub\w*|uks|gops|zgk|biblio\w*|osir"
+)
+_GMINA_OFFICE = re.compile(r"\b(?:Gmin[aeyę]|Urz[ąę]d\w* Gminy|Wójt\w*)\s+(?:Rybno|Rybna)\b")
+
+
+def gmina_subject(title: Optional[str], content: Optional[str] = None) -> bool:
+    """Czy podmiotem wpisu jest instytucja/drużyna z gminy Rybno (patrz `_ORG_WORDS`).
+
+    Okno: słowo instytucji i do czterech kolejnych słów („OSP Truszczyny”,
+    „Szkoła Podstawowa w Rumianie”, „trampkarze Delfina Rybno”) — nazwa wsi
+    musi paść W TYM OKNIE, nie gdziekolwiek w tekście.
+    """
+    text = f"{title or ''} {content or ''}"
+    if _GMINA_OFFICE.search(text):
+        return True
+    for match in re.finditer(rf"\b(?:{_ORG_WORDS})\b", text, re.IGNORECASE):
+        window = text[match.start(): match.end() + 60]
+        window = re.split(r"[.!?\n]", window, maxsplit=1)[0]  # okno nie przechodzi do następnego zdania
+        window = " ".join(window.split()[:6])
+        if places_in(window):
+            return True
+    return False
+
+
 def norm_place(value: Optional[str]) -> str:
     """
     Nazwa miejscowości do porównania: bez ogonków, wielkości liter i ogona

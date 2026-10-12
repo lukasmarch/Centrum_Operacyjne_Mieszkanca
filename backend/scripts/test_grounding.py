@@ -165,6 +165,27 @@ def main() -> int:
         title="Nabór wniosków na usuwanie azbestu",
         body="Wójt Gminy Rybno ogłasza nabór wniosków dla mieszkańców.",
     )
+    # „Kogo dotyczy” przed „gdzie” (decyzja 11.10.2026, E1) — prawdziwe tytuły z 30 dni
+    away_match = run_grounding(
+        category(locality=1, event_places=["Biskupiec"]),
+        title="Delfin Rybno zagra na wyjeździe z GKS Ossa Biskupiec",
+        body="Trampkarze GSZS Delfin Rybno jadą w sobotę do Biskupca.",
+    )
+    osp_jubilee = run_grounding(
+        category(locality=1),
+        title="Jubileusz OSP Truszczyny",
+        body="Jednostka obchodziła 70-lecie istnienia.",
+    )
+    residents_elsewhere = run_grounding(
+        category(locality=2, event_places=["Lubawa"]),
+        title="Akcja zdrowotna w Lubawie",
+        body="Mieszkanki gminy Rybno wspierają akcję zdrowotną w Lubawie.",
+    )
+    foreign_school = run_grounding(
+        category(locality=2, event_places=["Lubawa"]),
+        title="Festyn w szkole w Lubawie",
+        body="Szkoła Podstawowa w Lubawie zaprasza na festyn.",
+    )
     emoji_title = run_grounding(
         category(display_title="⚠️ UWAGA! Brak wody w Tuczkach!"),
         title="x",
@@ -271,6 +292,26 @@ def main() -> int:
             "„Wójt Gminy Rybno\" wystarcza za dowód lokalności (locality=3 zostaje)",
             wojt.locality == 3,
             f"locality={wojt.locality}",
+        ),
+        (
+            "mecz wyjazdowy Delfina Rybno → sprawa gminy (locality 1→3)",
+            away_match.locality == 3,
+            f"locality={away_match.locality}",
+        ),
+        (
+            "OSP Truszczyny — instytucja z gminy (locality 1→3)",
+            osp_jubilee.locality == 3,
+            f"locality={osp_jubilee.locality}",
+        ),
+        (
+            "„mieszkanki gminy Rybno” w Lubawie zostają 2 (lekcja z 3.09 — ludzie, nie instytucja)",
+            residents_elsewhere.locality == 2,
+            f"locality={residents_elsewhere.locality}",
+        ),
+        (
+            "szkoła spoza gminy nie podnosi oceny",
+            foreign_school.locality == 2,
+            f"locality={foreign_school.locality}",
         ),
         (
             "emoji i wykrzykniki znikają z display_title",
