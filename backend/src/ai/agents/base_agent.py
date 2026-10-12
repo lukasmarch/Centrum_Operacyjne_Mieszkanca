@@ -90,7 +90,9 @@ COMPLETENESS = """ZANIM ODPOWIESZ — sprawdź, czy masz to, O CO PYTANO:
   znają szczegóły, dokumenty znają procedurę — jedno pytanie często wymaga dwóch.
 - Czego i tak nie znalazłeś, nazwij WPROST („godziny startu nie ma w ogłoszeniu”)
   i wskaż, gdzie mieszkaniec to sprawdzi. Nie zastępuj brakującego szczegółu
-  ogólnikiem ani własnym domysłem."""
+  ogólnikiem ani własnym domysłem.
+- Pogrub (**…**) 1–3 fakty-kotwice odpowiedzi: termin, godzinę, wieś albo kwotę.
+  Nic poza nimi — strona pokazuje pogrubienie na żółto i wyróżnia tylko trzy."""
 
 
 def base_context_messages() -> list[dict]:
