@@ -51,7 +51,18 @@ export interface InvitationPublic {
     message: string | null;
 }
 
-export type PostStatus = 'processing' | 'pending' | 'published' | 'rejected' | 'failed';
+export type PostStatus = 'processing' | 'pending' | 'published' | 'rejected' | 'failed' | 'withdrawn';
+
+/** Prośba sołtysa o korektę albo odwołanie opublikowanego ogłoszenia (E7). */
+export type ChangeKind = 'correction' | 'withdrawal';
+
+export interface ChangeRequest {
+    id: number;
+    kind: ChangeKind;
+    message: string;
+    status: 'open' | 'done' | 'dismissed';
+    created_at: string;
+}
 
 export interface MyPost {
     id: number;
@@ -64,6 +75,11 @@ export interface MyPost {
     published_at: string | null;
     reject_reason: string | null;
     url: string | null;
+    version: number;
+    corrected_at: string | null;
+    withdrawn_at: string | null;
+    withdraw_reason: string | null;
+    open_requests: ChangeRequest[];
 }
 
 export interface AdminPost extends MyPost {
@@ -91,6 +107,43 @@ export interface PublicPost {
     event_at: string | null;
     event_until: string | null;
     published_at: string | null;
+    status: 'published' | 'withdrawn';
+    corrected_at: string | null;
+    withdrawn_at: string | null;
+    withdraw_reason: string | null;
+    /** Kiedy i dlaczego zmieniono — bez starej treści (ta zostaje u redakcji). */
+    changes: { kind: 'correction' | 'withdrawal'; at: string; reason: string | null }[];
+}
+
+/** Pełna wersja z historii — tylko dla redakcji. */
+export interface PostVersion {
+    version: number;
+    kind: 'publication' | 'correction' | 'withdrawal';
+    title: string | null;
+    summary: string | null;
+    transcript: string | null;
+    event_at: string | null;
+    event_until: string | null;
+    reason: string | null;
+    changed_by: string | null;
+    created_at: string;
+}
+
+/** Termin w czasie LOKALNYM; bez godziny = cały dzień (konwencja backendu). */
+export interface TermInput {
+    day: string;
+    start: string | null;
+    end: string | null;
+}
+
+export interface Correction {
+    reason: string;
+    title?: string;
+    summary?: string;
+    transcript?: string;
+    term_action: 'keep' | 'set' | 'clear';
+    term?: TermInput;
+    request_id?: number;
 }
 
 export interface RoleDefinition {
@@ -129,6 +182,7 @@ export const STATUS_LABELS: Record<PostStatus, { label: string; tone: string }> 
     published: { label: 'Opublikowane', tone: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' },
     rejected: { label: 'Nieopublikowane', tone: 'text-neutral-300 bg-white/5 border-white/15' },
     failed: { label: 'Czeka na redakcję', tone: 'text-amber-300 bg-amber-500/10 border-amber-500/30' },
+    withdrawn: { label: 'Odwołane', tone: 'text-red-300 bg-red-500/10 border-red-500/30' },
 };
 
 /** Backend oddaje naiwny UTC bez strefy (poza polami, które dostają „Z")
@@ -177,6 +231,14 @@ export async function fetchMyPosts(): Promise<MyPost[]> {
     const res = await fetch(`${API_BASE}/solectwa/posts/mine`, { headers: authHeaders() });
     if (!res.ok) return [];
     return res.json();
+}
+
+export async function requestChange(postId: number, kind: ChangeKind, message: string): Promise<MyPost> {
+    return ok(await fetch(`${API_BASE}/solectwa/posts/${postId}/requests`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify({ kind, message: message.trim() }),
+    }));
 }
 
 // ── Publicznie ──
@@ -232,6 +294,34 @@ export async function rereadPost(postId: number): Promise<MyPost> {
         method: 'POST',
         headers: authHeaders(),
     }));
+}
+
+export async function correctPost(postId: number, data: Correction): Promise<MyPost> {
+    return ok(await fetch(`${API_BASE}/solectwa/admin/posts/${postId}/correct`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify(data),
+    }));
+}
+
+export async function withdrawPost(postId: number, reason: string, requestId?: number): Promise<MyPost> {
+    return ok(await fetch(`${API_BASE}/solectwa/admin/posts/${postId}/withdraw`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify({ reason: reason.trim(), request_id: requestId ?? null }),
+    }));
+}
+
+export async function dismissRequest(requestId: number, reason: string): Promise<MyPost> {
+    return ok(await fetch(`${API_BASE}/solectwa/admin/requests/${requestId}/dismiss`, {
+        method: 'POST',
+        headers: authHeaders(true),
+        body: JSON.stringify({ reason: reason.trim() || null }),
+    }));
+}
+
+export async function fetchPostVersions(postId: number): Promise<PostVersion[]> {
+    return ok(await fetch(`${API_BASE}/solectwa/admin/posts/${postId}/versions`, { headers: authHeaders() }));
 }
 
 export async function fetchRoleDefinitions(): Promise<RoleDefinition[]> {
