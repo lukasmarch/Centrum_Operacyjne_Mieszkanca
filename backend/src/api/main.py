@@ -154,6 +154,10 @@ from src.api.endpoints.solectwa import router as solectwa_router
 app.include_router(roles_router)  # /api/roles/*
 app.include_router(solectwa_router)  # /api/solectwa/*
 
+# Przegląd awarii dla belki „Prąd i woda” na pulpicie (trwające + 7 dni w przód)
+from src.api.endpoints.outlook import router as outlook_router
+app.include_router(outlook_router)  # /api/alerts/outlook
+
 @app.on_event("startup")
 async def startup_event():
     """Start scheduler and register AI agents on app startup"""
