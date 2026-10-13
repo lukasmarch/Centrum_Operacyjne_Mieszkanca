@@ -20,12 +20,36 @@ from sqlmodel import select
 from src.database.schema import (
     User, Subscription, NewsletterSubscriber, Report, PushSubscription,
     BusinessProfile, BusinessAnnouncement, CEIDGBusiness, BusinessClaimLog,
-    SolectwoPost, SolectwoPostRequest, UserRole,
+    SolectwoPost, SolectwoPostRequest, SiteEvent, UserRole,
 )
 from src.database.vectors import Conversation, ChatMessage, APICostLog
 from src.utils.logger import setup_logger
 
 logger = setup_logger("DSAR")
+
+# Ile zdarzeń z pomiaru strony trafia do eksportu — wiek ogranicza retencja (180 dni), limit chroni
+# przed gigantycznym plikiem, gdyby ktoś ręcznie wygenerował ruch.
+EXPORT_SITE_EVENTS_LIMIT = 1000
+
+
+async def _acquisition_session_ids(session: AsyncSession, user: User) -> set:
+    """Identyfikatory wizyt przypisane do osoby: z konta i z jej subskrypcji push.
+    Po nich `site_events` wiążą się z człowiekiem także PRZED rejestracją (nie tylko po `user_id`)."""
+    ids = {user.acq_session_id} if user.acq_session_id else set()
+    rows = (await session.execute(
+        select(PushSubscription.acq_session_id).where(
+            or_(PushSubscription.user_id == user.id, PushSubscription.email == user.email),
+            PushSubscription.acq_session_id.is_not(None),
+        )
+    )).scalars().all()
+    return ids | set(rows)
+
+
+def _site_event_scope(user: User, session_ids: set):
+    conditions = [SiteEvent.user_id == user.id]
+    if session_ids:
+        conditions.append(SiteEvent.session_id.in_(session_ids))
+    return or_(*conditions)
 
 
 async def export_user_data(session: AsyncSession, user: User) -> dict:
@@ -178,6 +202,32 @@ async def export_user_data(session: AsyncSession, user: User) -> dict:
         "created_at": _iso(r.created_at),
     } for r in request_rows]
 
+    # Pomiar strony i pozyskanie (art. 15): skąd przyszła osoba i co robiła na stronie.
+    # Zdarzenia wiążą się z nią przez `user_id` albo przez identyfikator wizyty z konta/push.
+    session_ids = await _acquisition_session_ids(session, user)
+    event_rows = (await session.execute(
+        select(SiteEvent).where(_site_event_scope(user, session_ids))
+        .order_by(SiteEvent.occurred_at.desc()).limit(EXPORT_SITE_EVENTS_LIMIT)
+    )).scalars().all()
+    acquisition = {
+        "session_id": user.acq_session_id,
+        "utm_campaign": user.acq_utm_campaign,
+        "landing": user.acq_landing,
+        "first_seen": _iso(user.acq_first_seen),
+    }
+    site_events = [{
+        "occurred_at": _iso(e.occurred_at),
+        "event": e.event,
+        "section": e.section,
+        "path": e.path,
+        "referrer_host": e.referrer_host,
+        "utm_source": e.utm_source,
+        "utm_medium": e.utm_medium,
+        "utm_campaign": e.utm_campaign,
+        "utm_content": e.utm_content,
+        "device": e.device,
+    } for e in event_rows]
+
     return {
         "format": "RODO art. 15/20 data export",
         "service": "rybnolive.pl",
@@ -192,6 +242,8 @@ async def export_user_data(session: AsyncSession, user: User) -> dict:
         "roles": roles,
         "solectwo_posts": solectwo_posts,
         "solectwo_requests": solectwo_requests,
+        "acquisition": acquisition,
+        "site_events": site_events,
     }
 
 
@@ -203,6 +255,15 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
     - anonimizuje rekord users (subscriptions/referrals zostają dla rozliczeń).
     """
     user_email = user.email
+
+    # 0. Pomiar strony. Identyfikatory wizyt zbieramy PRZED skasowaniem subskrypcji push
+    # (krok 3) i wyczyszczeniem `acq_*` (krok 6) — to one wiążą zdarzenia z osobą także sprzed
+    # rejestracji. Do 13.10.2026 anonimizacja zostawiała `acq_session_id` na rekordzie,
+    # więc „usunięte" konto dalej wskazywało swoje wiersze w `site_events`.
+    session_ids = await _acquisition_session_ids(session, user)
+    removed_events = (await session.execute(
+        delete(SiteEvent).where(_site_event_scope(user, session_ids))
+    )).rowcount
 
     # 1. Rozmowy z AI + wiadomości
     conv_ids = (await session.execute(
@@ -322,11 +383,16 @@ async def delete_user_account(session: AsyncSession, user: User) -> None:
     user.consent_marketing = False
     user.referral_code = None
     user.trial_ends_at = None
+    # Dane pozyskania nie mają podstawy po usunięciu konta (zdarzenia skasowane w kroku 0)
+    user.acq_session_id = None
+    user.acq_utm_campaign = None
+    user.acq_landing = None
+    user.acq_first_seen = None
     session.add(user)
 
     await session.commit()
     logger.info(f"DSAR delete: user {user.id} anonymized, artifacts purged "
-                f"({len(conv_ids)} conversations, {len(business_ids)} wizytówek)")
+                f"({len(conv_ids)} conversations, {len(business_ids)} wizytówek, {removed_events} zdarzeń strony)")
 
 
 def _iso(dt) -> Optional[str]:

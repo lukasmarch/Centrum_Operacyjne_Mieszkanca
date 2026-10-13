@@ -119,7 +119,7 @@ jobs:
           failed=""
           for t in \
             test_job_runs:--db test_p24_ipn test_auth test_trial_lifecycle \
-            test_batch_resilience test_solectwa
+            test_batch_resilience test_privacy_retention test_solectwa
           do
             name="${t%%:*}"; args=""; [ "$name" != "$t" ] && args="${t#*:}"
             echo "::group::$name $args"

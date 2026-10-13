@@ -13,17 +13,21 @@ retencji w Polityce prywatności):
     cały wiersz po 180 (liczniki narzędzi zostają do analityki)
   - site_events: session_id i user_id znikają po 90 dniach, cały wiersz po 180
     (liczniki zdarzeń i kampanii zostają do analityki)
+  - users.acq_* / push_subscriptions.acq_session_id: identyfikator wizyty znika po 90 dniach
+    (jak w site_events), kampania, strona wejścia i data pierwszej wizyty po 24 miesiącach
 """
 import asyncio
 from datetime import datetime, timedelta, date
 
-from sqlalchemy import delete, update, or_
+from sqlalchemy import delete, update, or_, func
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
 
 from src.config import settings
-from src.database.schema import AnonymousChatUsage, NewsletterLog, Report, SiteEvent
+from src.database.schema import (
+    AnonymousChatUsage, NewsletterLog, PushSubscription, Report, SiteEvent, User,
+)
 from src.database.vectors import Conversation, ChatMessage, APICostLog, AgentToolCall
 from src.utils.logger import setup_logger
 
@@ -44,6 +48,45 @@ RETENTION_TOOL_CALL_DAYS = 180
 # a zestawienia liczą się po `event`, `section` i `utm_campaign`.
 RETENTION_SITE_EVENT_SESSION_DAYS = 90
 RETENTION_SITE_EVENT_DAYS = 180
+# Dane pozyskania na koncie (audyt 11.10.2026, E8). `acq_session_id` łączy konto z wierszami
+# `site_events`, więc żyje tak samo długo jak one. Kampania, strona wejścia i data pierwszej
+# wizyty mają przeżyć log (po to je zdenormalizowano — raport kampanii patrzy miesiące wstecz),
+# ale nie wiecznie: art. 5 ust. 1 lit. e RODO. Do 13.10.2026 nie wygasały wcale.
+RETENTION_ACQ_SESSION_DAYS = 90
+RETENTION_ACQ_DAYS = 730
+
+
+async def purge_acquisition(session, now: datetime) -> dict:
+    """Wygasza dane pozyskania. Wiek konta liczony od pierwszej wizyty, a gdy jej brak
+    (klient bez `acq.first_seen`) — od założenia konta. Zwraca liczniki do logu i testu."""
+    born = func.coalesce(User.acq_first_seen, User.created_at)
+
+    sessions = await session.execute(
+        update(User)
+        .where(born < now - timedelta(days=RETENTION_ACQ_SESSION_DAYS), User.acq_session_id != None)  # noqa: E711
+        .values(acq_session_id=None)
+    )
+    attribution = await session.execute(
+        update(User)
+        .where(
+            born < now - timedelta(days=RETENTION_ACQ_DAYS),
+            or_(
+                User.acq_utm_campaign != None,  # noqa: E711
+                User.acq_landing != None,       # noqa: E711
+                User.acq_first_seen != None,    # noqa: E711
+            ),
+        )
+        .values(acq_utm_campaign=None, acq_landing=None, acq_first_seen=None)
+    )
+    pushes = await session.execute(
+        update(PushSubscription)
+        .where(
+            PushSubscription.created_at < now - timedelta(days=RETENTION_ACQ_SESSION_DAYS),
+            PushSubscription.acq_session_id != None,  # noqa: E711
+        )
+        .values(acq_session_id=None)
+    )
+    return {"sessions": sessions.rowcount, "attribution": attribution.rowcount, "push": pushes.rowcount}
 
 
 async def run_retention_async():
@@ -153,6 +196,13 @@ async def run_retention_async():
             delete(SiteEvent).where(SiteEvent.occurred_at < cutoff_se)
         )
         logger.info(f"site_events: usunięto {res.rowcount} wpisów")
+
+        # 7b. Dane pozyskania na koncie i subskrypcji push
+        acq = await purge_acquisition(session, now)
+        logger.info(
+            f"acq_*: odpięto identyfikator wizyty z {acq['sessions']} kont i {acq['push']} subskrypcji, "
+            f"skasowano kampanię/stronę wejścia z {acq['attribution']} kont"
+        )
 
         # 8. Zdjęcia pism od sołtysów — oryginał jest materiałem roboczym
         # redakcji, publikacją jest przedruk. Znika IMAGE_RETENTION_DAYS po
