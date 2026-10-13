@@ -37,13 +37,18 @@ const AGENT_LABELS: Record<string, string> = {
 /**
  * Wyróżniki odpowiedzi w żółci (decyzja Łukasza 11.10.2026). Żółć w tym świecie
  * znaczy kontekst i zapowiedź — w odpowiedzi to FAKT-KOTWICA: termin, godzina,
- * wieś, kwota. Działa, dopóki jest rzadka: najwyżej trzy na odpowiedź, dalsze
- * pogrubienia zostają białe (model potrafi pogrubić pół akapitu). Waga 700
- * zostaje drugim nośnikiem — sam odcień nie wystarczy przy deuteranopii.
+ * wieś, kwota. Waga 700 zostaje drugim nośnikiem — sam odcień nie wystarczy
+ * przy deuteranopii.
+ *
+ * Do 13.10 żółte były tylko TRZY pierwsze pogrubienia na odpowiedź. W liście
+ * pięciu wydarzeń dawało to dwie pozycje żółte i trzy białe — czytelnik brał
+ * to za różnicę ważności (uwaga Łukasza). Teraz żółte jest każde pogrubienie,
+ * a bezpiecznikiem przeciw „pół akapitu na żółto” jest DŁUGOŚĆ: kotwica to
+ * termin, nazwa, kwota — dłuższe pogrubienie zostaje białe.
  */
-const MAX_HIGHLIGHTS = 3;
-
-interface RenderCtx { highlights: number }
+const MAX_ANCHOR_CHARS = 60;
+/** Ile terminów wyróżnia `autoAnchors`, gdy model sam nic nie pogrubił */
+const MAX_AUTO_ANCHORS = 3;
 
 // Termin w odpowiedzi: „14 października 2026 roku”, „14.10”, „9:00–13:00”, „dziś”, „jutro”
 const MONTHS_GEN = 'stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia|września|października|listopada|grudnia';
@@ -62,13 +67,16 @@ const ANCHOR_RE = new RegExp(
 function autoAnchors(text: string): string {
   if (text.includes('**')) return text;
   let n = 0;
-  return text.replace(ANCHOR_RE, m => (n++ < MAX_HIGHLIGHTS ? `**${m}**` : m));
+  return text.replace(ANCHOR_RE, m => (n++ < MAX_AUTO_ANCHORS ? `**${m}**` : m));
 }
 
 function renderMarkdown(raw: string): React.ReactNode {
-  const ctx: RenderCtx = { highlights: 0 };
   const text = autoAnchors(raw);
   const paragraphs = text.split(/\n\n+/);
+  // Numeracja listy biegnie PRZEZ akapity: model oddziela pozycje pustą linią,
+  // a każdy akapit stawał się osobną listą od „1.” (13.10 — pięć razy „1.”).
+  // Licznik zeruje dopiero treść, która nie jest pozycją listy numerowanej
+  let olCount = 0;
   return paragraphs.map((para, pi) => {
     const lines = para.split('\n');
     const nodes: React.ReactNode[] = [];
@@ -79,7 +87,7 @@ function renderMarkdown(raw: string): React.ReactNode {
       if (listItems.length > 0) {
         const cls = 'my-2 space-y-1.5 pl-5 marker:text-tv-muted';
         nodes.push(ordered
-          ? <ol key={`ol-${pi}-${nodes.length}`} className={`list-decimal ${cls} marker:tabular`}>{listItems}</ol>
+          ? <ol key={`ol-${pi}-${nodes.length}`} start={olCount - listItems.length + 1} className={`list-decimal ${cls} marker:tabular`}>{listItems}</ol>
           : <ul key={`ul-${pi}-${nodes.length}`} className={`list-disc ${cls}`}>{listItems}</ul>);
         listItems = [];
       }
@@ -92,9 +100,10 @@ function renderMarkdown(raw: string): React.ReactNode {
 
       if (headingMatch) {
         flushList();
+        olCount = 0;
         nodes.push(
           <h3 key={`h-${pi}-${li}`} className="font-cond mb-1 mt-3 text-[18px] font-extrabold leading-tight text-white">
-            {inlineMarkdown(headingMatch[2], ctx)}
+            {inlineMarkdown(headingMatch[2])}
           </h3>
         );
       } else if (listMatch || numberedMatch) {
@@ -102,14 +111,16 @@ function renderMarkdown(raw: string): React.ReactNode {
         // Zmiana rodzaju listy w środku akapitu zamyka poprzednią
         if (listItems.length > 0 && isNum !== ordered) flushList();
         ordered = isNum;
+        if (isNum) olCount += 1; else olCount = 0;
         listItems.push(
           <li key={`li-${pi}-${li}`}>
-            {inlineMarkdown((numberedMatch ?? listMatch)![1], ctx)}
+            {inlineMarkdown((numberedMatch ?? listMatch)![1])}
           </li>
         );
       } else if (line.trim()) {
         flushList();
-        nodes.push(<span key={`t-${pi}-${li}`}>{inlineMarkdown(line, ctx)}</span>);
+        olCount = 0;
+        nodes.push(<span key={`t-${pi}-${li}`}>{inlineMarkdown(line)}</span>);
         if (li < lines.length - 1) nodes.push(<br key={`br-${pi}-${li}`} />);
       }
     });
@@ -125,12 +136,11 @@ function renderMarkdown(raw: string): React.ReactNode {
   });
 }
 
-function inlineMarkdown(text: string, ctx: RenderCtx): React.ReactNode {
+function inlineMarkdown(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)]+\))/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      const highlight = ctx.highlights < MAX_HIGHLIGHTS;
-      ctx.highlights += 1;
+      const highlight = part.length - 4 <= MAX_ANCHOR_CHARS;
       return (
         <strong key={i} className={`font-bold ${highlight ? 'text-tv-yellow' : 'text-white'}`}>
           {part.slice(2, -2)}
