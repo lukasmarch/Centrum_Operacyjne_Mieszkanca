@@ -1146,6 +1146,32 @@ sołectwa ma zobaczyć więcej osób niż na prywatnym profilu sołtysa.
   kasuje całą domenę (wspólna `@qa.rybnolive.pl` zabierała konta z ręcznego testu)
 - Po starcie sołtysa Żabin: wyłączyć źródło „Facebook - Sołtys Żabiny” (`ANNOUNCEMENT_ONLY_SOURCES`)
 
+## Sołtysi: korekta i odwołanie po publikacji (2026-10-13)
+**Opublikowanego ogłoszenia nie dało się poprawić ani wycofać** (audyt T-06): edycja zwracała 409,
+a awaryjne `DELETE /api/articles` padało na kluczach obcych (`solectwo_posts.article_id`,
+`events.source_article_id`) — ścieżka ratunkowa nie działała dokładnie wtedy, gdy była potrzebna.
+- **Proces jest między sołtysem a redakcją, mieszkaniec nie widzi NIC** (decyzja Łukasza 13.10): poprawione
+  ogłoszenie ma po prostu nową treść; odwołane pod tym samym linkiem mówi wyłącznie „nieaktualne” — bez tytułu,
+  treści, terminu, powodu i dat. Publiczne API (`PostPublic`) nie zwraca powodów ani historii. Powód widzi
+  sołtys (mail, jego panel) i redakcja (historia wersji)
+- `solectwo_post_versions` — każda opublikowana postać (publication/correction/withdrawal) z powodem i autorem;
+  `solectwo_post_requests` — prośba sołtysa o korektę/odwołanie, **publikuje redakcja** (ta sama bramka co przy
+  pierwszej wersji). Trasy: `/posts/{id}/requests`, `/admin/posts/{id}/correct|withdraw|versions`,
+  `/admin/requests/{id}/dismiss`
+- **`withdrawn_at` na `articles` i `events`** stoi w `publishable_conditions` / `visible_event_conditions` — jedna
+  kolumna wyłącza wpis naraz w feedzie, briefingu, newsletterze, pushu, u agentów i w kalendarzu. Wiersz zostaje
+  (historia). Odwołanie kasuje chunki RAG; powtórka z innego źródła przejmuje kalendarz (`_withdraw_event`)
+- **Korekta terminu** przesuwa wydarzenie w kalendarzu i wraca do briefingu (`term_corrected_at`, 30 h) z etykietą
+  „TERMIN ZAKTUALIZOWANY — nie pisz o zmianie”. Osadzenie liczone od razu (`embedding_job.embed_article`), bo job
+  chodzi 6:50/13:45
+- ⚠️ **Przedruk po zmianie terminu trzeba poprawić RĘCZNIE i po cichu** — inaczej strona pokazuje dwie godziny
+  (podsumowanie 18:00, przedruk 17:00). Bez adnotacji „[Korekta…]”: to byłby widoczny ślad procesu
+- ⚠️ **Brak „Przywróć”** — odwołania nie da się cofnąć w produkcie (świadomie, decyzja 13.10); lokalnie wystarczy nowe ogłoszenie
+- Takedown wpisu sołectwa zostawia ogłoszenie jako `withdrawn` (bez artykułu), wydarzenia z artykułu znikają
+- Migracja `add_solectwo_post_history` (✅ prod 13.10, przed kodem). Test: `python -m scripts.test_solectwa` (117 sprawdzeń,
+  lokalna baza — nie w CI)
+- ⚠️ Lokalnie `APP_URL` ma domyślnie `http://localhost:3000`, więc linki „Zobacz na stronie” prowadzą donikąd; na prodzie jest `rybnolive.pl`
+
 ## Kontrola dostępu po audycie (2026-10-11)
 **Audyt (`~/Desktop/moj-projekt-audyt/audit-output/40-final-report.md`) znalazł klasę, nie błąd:**
 każda trasa pilnowała dostępu sama albo wcale. Anonim czytał historię czatu WSZYSTKICH
@@ -1310,4 +1336,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-10-11*
+*Ostatnia aktualizacja: 2026-10-13*
