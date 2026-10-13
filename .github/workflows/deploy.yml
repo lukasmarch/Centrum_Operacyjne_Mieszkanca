@@ -154,6 +154,19 @@ jobs:
 
             docker compose -f docker-compose.prod.yml build backend
 
+            # Bramka migracji (audyt 11.10.2026, E5). „Migracja idzie na produkcję PRZED kodem" była
+            # pilnowana pamięcią; kod bez kolumny to 500 na każdym zapytaniu, a job świecił na zielono.
+            # Nowy obraz (jeszcze nie uruchomiony) sprawdza, czy baza ma wszystkie migracje schematu
+            # z jego manifestu. Czeka niewykonana → deploy staje, STARY kontener działa dalej.
+            # -T: ssh-action nie ma TTY; --no-deps: baza już stoi. Wynik nie zmienia niczego w bazie.
+            if ! docker compose -f docker-compose.prod.yml run --rm -T --no-deps backend python -m scripts.migrate --check; then
+              echo "::error::Baza produkcyjna nie ma migracji, których wymaga ten kod — deploy wstrzymany, działa poprzednia wersja."
+              echo "Wykonaj je NOWYM obrazem (już zbudowany), potem ponów job (Re-run):"
+              echo "  cd /opt/centrum && docker compose -f docker-compose.prod.yml run --rm -T --no-deps backend python -m scripts.migrate --apply --yes"
+              echo "  bash scripts/db_schema_refresh.sh   # zrzut schematu do repo, commit"
+              exit 1
+            fi
+
             # Osierocony kontener po nieudanym `up` blokuje nazwę (3.09.2026,
             # dwa razy): sprzątamy zatrzymane, zanim postawimy nowy.
             docker ps -aq -f name=centrum-backend -f status=exited | xargs -r docker rm -f

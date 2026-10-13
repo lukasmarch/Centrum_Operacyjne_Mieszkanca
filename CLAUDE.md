@@ -101,6 +101,8 @@ więc `create_all` buduje INNĄ bazę niż produkcja: bez wektorów, triggera ts
 - **CI**: `test_schema_contract` — modele nie mogą znać tabeli ani kolumny, której nie ma w zrzucie
   (czyli „kod bez kolumny” nie przejdzie bramki), oraz `test_migration_registry` (plik ↔ manifest).
   ⚠️ Nie widzą SQL-a pisanego ręcznie w `text("…")`
+- **Bramka w deployu** (od 13.10): po `build`, przed `up -d`: `run --rm -T --no-deps backend python -m scripts.migrate
+  --check`. Czerwono = brakuje migracji → wykonaj ją poleceniem niżej (obraz już zbudowany) i ponów job
 - **Nowa migracja**: plik `add_*.py` (idempotentny, addytywny) + linia w manifeście → commit →
   na serwerze NOWYM obrazem, bez podmiany działającego kontenera:
   `docker compose -f docker-compose.prod.yml build backend` →
@@ -148,8 +150,8 @@ schemacie: `clean_database.py`, `remove_duplicate_events.py`,
 
 **Reguła wdrożeniowa: migracja idzie na produkcję PRZED kodem, nigdy odwrotnie.**
 Kolumna, której stary kod nie używa, nie szkodzi nikomu — kod bez kolumny to 500
-na każdym zapytaniu. GitHub Actions **nie uruchamia migracji**: robi tylko
-`git pull && build && up -d`.
+na każdym zapytaniu. GitHub Actions **nie uruchamia migracji** (robi `git pull && build && up -d`), ale od 13.10 **deploy STAJE**,
+gdy `migrate --check` na nowym obrazie widzi niewykonaną migrację schematu — stary kontener działa dalej.
 
 ## Scheduler Timeline (14 jobów)
 ```
