@@ -16,7 +16,7 @@ interface PrivacyPageProps {
 export const PRIVACY_VERSION = '2026-09-29';
 
 const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
-  <LegalLayout title="Polityka prywatności" updated="29 września 2026">
+  <LegalLayout title="Polityka prywatności" updated="13 października 2026">
 
     <h2>1. Administrator danych</h2>
     <p>Administratorem danych osobowych jest <strong>Studio Kamienia Naturalnego Lu-Mar-Go Łukasz Marchlewicz</strong>, NIP: 571-156-78-15, adres: Żabiny 96, 13-220 Rybno (dalej: „Administrator"). Kontakt we wszystkich sprawach dotyczących danych osobowych: <strong>biuro@lumargo.pl</strong>, tel. <strong>+48 501 081 723</strong>.</p>
@@ -56,6 +56,16 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
           <td>Materiały przekazane przez sołtysa: zdjęcia pism i ogłoszeń, dopisek, przedruk i podsumowanie</td>
           <td>odczyt, moderacja i publikacja ogłoszeń sołectwa</td>
           <td>art. 6 ust. 1 lit. b — wobec sołtysa; lit. f — wobec osób, których dane znajdują się w piśmie (informowanie społeczności lokalnej o sprawach sołectwa)</td>
+        </tr>
+        <tr>
+          <td>Pomiar odwiedzin Serwisu: wejście do sekcji i kliknięcia w wybrane elementy, losowy identyfikator wizyty (znika z zamknięciem karty przeglądarki, nie jest ciasteczkiem), rodzaj urządzenia (telefon / komputer), źródło wejścia (np. kampania). Nie zapisujemy adresu IP ani nazwy przeglądarki</td>
+          <td>statystyka korzystania z Serwisu i ocena, które komunikaty trafiają do mieszkańców</td>
+          <td>art. 6 ust. 1 lit. f — prawnie uzasadniony interes (rozwój Serwisu); przysługuje prawo sprzeciwu (art. 21)</td>
+        </tr>
+        <tr>
+          <td>Źródło pozyskania konta i zgody na powiadomienia: kampania, strona pierwszego wejścia, data pierwszej wizyty, identyfikator wizyty, w której założono konto lub wyrażono zgodę</td>
+          <td>ocena, które działania informacyjne przyciągają mieszkańców do Serwisu</td>
+          <td>art. 6 ust. 1 lit. f — prawnie uzasadniony interes; przysługuje prawo sprzeciwu (art. 21)</td>
         </tr>
         <tr>
           <td>E-mail (newsletter), subskrypcje push</td>
@@ -112,12 +122,15 @@ const PrivacyPage: React.FC<PrivacyPageProps> = ({ onNavigate }) => (
         <tr><td>Zdjęcia pism przekazanych przez sołtysów (niepublikowane)</td><td>30 dni od decyzji redakcji o publikacji lub odmowie</td></tr>
         <tr><td>Opublikowane ogłoszenia sołectw (przedruk i podsumowanie)</td><td>bezterminowo — archiwum komunikatów sołectwa; usuwane na uzasadniony sprzeciw. Po usunięciu konta sołtysa ogłoszenie traci powiązanie z kontem</td></tr>
         <tr><td>Nieopublikowane ogłoszenia sołectw i dane roli</td><td>do usunięcia konta</td></tr>
+        <tr><td>Pomiar odwiedzin Serwisu</td><td>powiązanie zdarzeń z identyfikatorem wizyty i z kontem — do 90 dni; zdarzenia po odłączeniu identyfikatorów (same liczniki) — do 180 dni</td></tr>
+        <tr><td>Źródło pozyskania konta i zgody na powiadomienia</td><td>identyfikator wizyty — do 90 dni; kampania, strona wejścia i data pierwszej wizyty — do 24 miesięcy od pierwszej wizyty lub do usunięcia konta (w zależności od tego, co nastąpi wcześniej)</td></tr>
         <tr><td>Logi techniczne</td><td>do 90 dni</td></tr>
       </tbody>
     </table>
 
     <h2>7. Prawa osób, których dane dotyczą</h2>
     <p>Każdej osobie przysługuje prawo: dostępu do danych (art. 15), sprostowania (art. 16), usunięcia (art. 17), ograniczenia przetwarzania (art. 18), przenoszenia danych (art. 20), sprzeciwu wobec przetwarzania opartego na prawnie uzasadnionym interesie (art. 21) oraz cofnięcia zgody w dowolnym momencie (bez wpływu na zgodność z prawem przetwarzania przed cofnięciem).</p>
+    <p>Wniosek o dostęp do danych i o ich usunięcie obejmuje także dane o źródle pozyskania konta oraz zdarzenia z pomiaru odwiedzin powiązane z kontem lub z identyfikatorem wizyty, w której konto założono.</p>
     <p>Żądania można kierować na <strong>biuro@lumargo.pl</strong>. Odpowiadamy w terminie do 30 dni.</p>
     <p>Każdemu przysługuje również prawo wniesienia skargi do <strong>Prezesa Urzędu Ochrony Danych Osobowych</strong> (ul. Stawki 2, 00-193 Warszawa, uodo.gov.pl).</p>
 
