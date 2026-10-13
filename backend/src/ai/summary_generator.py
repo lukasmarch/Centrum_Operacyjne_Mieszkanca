@@ -144,11 +144,12 @@ def _time_label(article, now: datetime) -> str:
         when = when_label(event_at, end, now)
         # Ta sama faza i te same dopiski co etykieta feedu (`feed_policy.phase_suffix`)
         label = f"ZDARZENIE {when}{phase_suffix(event_at, end, now, ended='JUŻ PO')}"
-        # Redakcja zmieniła termin opublikowanego ogłoszenia (E7). Kto czytał
-        # pierwszą wersję, ma się dowiedzieć, że stara data nie obowiązuje —
-        # model sam z siebie nie odróżni korekty od zwykłej zapowiedzi.
+        # Redakcja zmieniła termin opublikowanego ogłoszenia (E7). Wpis wraca do
+        # materiału, żeby w briefingu stanął AKTUALNY termin — ale proces
+        # korekty nie jest sprawą mieszkańców, więc model ma podać sam termin,
+        # nie wspominając o zmianie ani przeniesieniu.
         if _term_recently_corrected(article, now):
-            label += " — KOREKTA: TERMIN ZMIENIONY, NAPISZ, ŻE TO NOWY TERMIN"
+            label += " — TERMIN ZAKTUALIZOWANY: PODAJ WYŁĄCZNIE AKTUALNY TERMIN, NIE PISZ O ZMIANIE ANI PRZENIESIENIU"
         return f"[{label}]"
 
     if not article.published_at:
@@ -177,8 +178,9 @@ def _time_label(article, now: datetime) -> str:
     return f"[opublikowano {stamp} — TERMIN ZDARZENIA NIEZNANY]"
 
 
-# Jak długo po korekcie terminu wpis niesie etykietę „KOREKTA”: najbliższy
-# briefing poranny i popołudniowy refresh, nie dłużej — potem to już zwykły termin.
+# Jak długo po korekcie terminu wpis wraca do materiału z etykietą „TERMIN
+# ZAKTUALIZOWANY”: najbliższy briefing poranny i popołudniowy refresh, nie
+# dłużej — potem to już zwykły termin.
 TERM_CORRECTION_LABEL_H = 30
 
 

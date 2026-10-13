@@ -105,7 +105,7 @@ const ChangeRequestForm: React.FC<{ post: MyPost; onSent: () => void }> = ({ pos
                 onChange={(e) => setMessage(e.target.value)}
             />
             <p className="text-xs text-neutral-500">
-                Zmianę wprowadza redakcja. Na stronie ogłoszenia mieszkańcy zobaczą, kiedy i dlaczego je zmieniono.
+                Zmianę wprowadza redakcja. Mieszkańcy nie zobaczą ani prośby, ani powodu — to zostaje między Tobą a redakcją.
             </p>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <div className="flex gap-2">

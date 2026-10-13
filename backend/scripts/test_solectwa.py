@@ -525,9 +525,11 @@ async def after_publication(client, admin, soltys, files) -> None:
         for m in sent_emails), [m["subject"] for m in sent_emails])
     from src.ai.summary_generator import _time_label
     label = _time_label(article, datetime.utcnow())
-    check("briefing: etykieta KOREKTA przy nowym terminie", "KOREKTA" in label, label)
+    check("briefing: etykieta „termin zaktualizowany” bez słowa o korekcie",
+          "TERMIN ZAKTUALIZOWANY" in label and "KOREKTA" not in label, label)
+    check("briefing: model ma nie pisać o zmianie", "NIE PISZ O ZMIANIE" in label, label)
     later = _time_label(article, datetime.utcnow() + timedelta(days=3))
-    check("briefing: po dobie etykieta znika", "KOREKTA" not in later, later)
+    check("briefing: po dobie etykieta znika", "ZAKTUALIZOWANY" not in later, later)
     from src.ai.summary_generator import SummaryGenerator
     now = datetime.utcnow()
     gen = SummaryGenerator.__new__(SummaryGenerator)
@@ -543,9 +545,11 @@ async def after_publication(client, admin, soltys, files) -> None:
     check("sołtys nie poprawi sam (403)", r.status_code == 403, r.status_code)
 
     pub = (await client.get(f"/api/solectwa/posts/{pid}")).json()
-    check("strona: znacznik korekty z powodem, bez starej treści",
-          pub["corrected_at"] and pub["changes"][0]["reason"] == "Zmiana terminu zebrania"
-          and "title" not in pub["changes"][0], pub["changes"])
+    check("strona: nowa treść, BEZ jakiegokolwiek śladu korekty",
+          "22 października" in pub["summary"]
+          and not any(k in pub for k in ("changes", "corrected_at", "withdrawn_at", "withdraw_reason", "version")),
+          sorted(pub))
+    check("strona: powód korekty nie wycieka", "Zmiana terminu" not in str(pub), str(pub)[:120])
 
     # Odwołanie — z powtórką z innego źródła wskazującą nasz wpis
     duplicate_id = await add_event(aid, "Zebranie wiejskie Żabiny (FB)", canonical_id=event_id, source_article_id=None)
@@ -570,9 +574,10 @@ async def after_publication(client, admin, soltys, files) -> None:
     check("artykuł NIE skasowany (historia)", await reload(Article, aid) is not None)
     check("mail do sołtysa o odwołaniu", any("Odwołaliśmy" in m["subject"] for m in sent_emails))
     pub = (await client.get(f"/api/solectwa/posts/{pid}")).json()
-    check("strona: odwołane, powód, bez treści i terminu",
-          pub["status"] == "withdrawn" and pub["withdraw_reason"] == "Zebranie odwołane"
-          and pub["transcript"] is None and pub["event_at"] is None, pub)
+    check("strona: odwołane = samo „nieaktualne”, bez powodu, treści, terminu i tytułu",
+          pub["status"] == "withdrawn" and pub["transcript"] is None and pub["summary"] is None
+          and pub["event_at"] is None and "Zebranie" not in pub["title"]
+          and "withdraw_reason" not in pub and "Zebranie odwołane" not in str(pub), pub)
     r = await client.post(f"/api/solectwa/admin/posts/{pid}/correct", headers=auth(admin),
                           json={"reason": "Po odwołaniu", "title": "Nowy"})
     check("korekta odwołanego → 409", r.status_code == 409, r.status_code)

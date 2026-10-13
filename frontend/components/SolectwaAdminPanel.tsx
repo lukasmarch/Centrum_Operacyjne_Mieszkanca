@@ -7,8 +7,9 @@
  * mieć przed oczami jedno i drugie. Wykryte dane osobowe stoją nad tekstem,
  * nie pod nim.
  *
- * Opublikowane (E7): korekta i odwołanie zawsze z powodem — powód widzą
- * mieszkańcy na stronie ogłoszenia i sołtys w mailu. Prośby sołtysa stoją
+ * Opublikowane (E7): korekta i odwołanie zawsze z powodem — powód widzi
+ * wyłącznie sołtys (mail, jego panel) i redakcja (historia); mieszkańcy
+ * nie widzą procesu decyzyjnego wcale. Prośby sołtysa stoją
  * nad formularzem; ogłoszenie z otwartą prośbą wraca do kolejki „Do decyzji”.
  */
 import React, { useCallback, useEffect, useState } from 'react';
@@ -225,8 +226,8 @@ const PublishedActions: React.FC<{ post: AdminPost; draft: Draft; onChanged: () 
                         )}
                         {termAction === 'set' && transcript === (post.transcript ?? '') && (
                             <p className="text-xs text-amber-300 mt-2">
-                                Przedruk powyżej wciąż podaje stary termin — mieszkaniec zobaczy obie daty.
-                                Dopisz w przedruku adnotację (np. „[Korekta: zebranie przeniesione na 22.10]”).
+                                Przedruk powyżej może wciąż zawierać starą datę lub godzinę — mieszkaniec zobaczyłby dwa różne
+                                terminy. Popraw je w przedruku po cichu, bez adnotacji o korekcie (proces zostaje między redakcją a sołtysem).
                             </p>
                         )}
                         {termAction === 'clear' && (
@@ -234,10 +235,10 @@ const PublishedActions: React.FC<{ post: AdminPost; draft: Draft; onChanged: () 
                         )}
                         <p className="text-xs text-neutral-500 mt-1">
                             Teraz: {start ? (allDay ? `${start.toLocaleDateString('pl-PL')} (cały dzień)` : dateLabel(post.event_at)) : 'brak'}.
-                            Zmiana terminu wróci do najbliższego briefingu z dopiskiem „korekta”.
+                            Zaktualizowany termin wróci do najbliższego briefingu — bez wzmianki o zmianie.
                         </p>
                     </div>
-                    <input className={input} placeholder="Powód korekty (zobaczą go mieszkańcy i sołtys)"
+                    <input className={input} placeholder="Powód korekty (zobaczy go tylko sołtys)"
                         value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
                     <button onClick={submitCorrection} disabled={busy}
                         className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
@@ -250,9 +251,9 @@ const PublishedActions: React.FC<{ post: AdminPost; draft: Draft; onChanged: () 
                 <div className="space-y-3 rounded-xl border border-red-500/30 p-4">
                     <p className="text-sm text-neutral-300">
                         Ogłoszenie zniknie z wiadomości, kalendarza, briefingu i odpowiedzi asystenta.
-                        Pod jego adresem zostanie informacja o odwołaniu z powodem.
+                        Pod jego adresem mieszkaniec zobaczy tylko „nieaktualne” — bez powodu.
                     </p>
-                    <input className={input} placeholder="Powód odwołania (zobaczą go mieszkańcy i sołtys)"
+                    <input className={input} placeholder="Powód odwołania (zobaczy go tylko sołtys)"
                         value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
                     <button onClick={submitWithdraw} disabled={busy}
                         className="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">

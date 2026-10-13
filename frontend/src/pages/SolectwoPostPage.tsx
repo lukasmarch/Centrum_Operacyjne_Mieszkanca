@@ -6,12 +6,13 @@
  * i sprawdzone przez redakcję — AI Act art. 50), pełny przedruk pisma, podpis
  * funkcją. Zdjęcia oryginału tu nie ma i nie będzie: widzi je tylko redakcja.
  *
- * Po publikacji (E7): odwołane ogłoszenie zostaje pod tym samym adresem — link
- * krąży po Facebooku — ale pokazuje tylko tytuł i informację o odwołaniu.
- * Poprawione mówi, kiedy i dlaczego je poprawiono; starej treści nie pokazujemy.
+ * Po publikacji (E7): proces decyzyjny to sprawa sołtysa i redakcji — mieszkaniec
+ * nie widzi powodów ani śladu korekty. Poprawione ogłoszenie po prostu ma nową
+ * treść. Odwołane zostaje pod tym samym adresem (link krąży po Facebooku), ale
+ * mówi wyłącznie, że nie jest już aktualne: bez tytułu, treści, terminu i powodu.
  */
 import React, { useEffect, useState } from 'react';
-import { Ban, CalendarDays, FileText, History, Loader2, Sparkles } from 'lucide-react';
+import { CalendarDays, FileText, Loader2, Sparkles } from 'lucide-react';
 import { PublicPost, fetchPublicPost, parseUtc } from '../services/solectwaApi';
 
 const idFromUrl = () => Number(new URLSearchParams(window.location.search).get('id')) || 0;
@@ -25,11 +26,6 @@ const termLabel = (post: PublicPost): string | null => {
     if (!end && start.getHours() === 0 && start.getMinutes() === 0) return day;
     const hour = (d: Date) => d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
     return `${day}, ${hour(start)}${end ? `–${hour(end)}` : ''}`;
-};
-
-const shortDate = (value: string | null) => {
-    const d = parseUtc(value);
-    return d ? d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 };
 
 const SolectwoPostPage: React.FC = () => {
@@ -46,7 +42,9 @@ const SolectwoPostPage: React.FC = () => {
         fetchPublicPost(id)
             .then((p) => {
                 setPost(p);
-                document.title = `${p.title} — ${p.signed_as} | RybnoLive`;
+                document.title = p.status === 'withdrawn'
+                    ? 'Ogłoszenie nieaktualne | RybnoLive'
+                    : `${p.title} — ${p.signed_as} | RybnoLive`;
             })
             .catch(() => setError('Nie znaleziono ogłoszenia.'));
     }, []);
@@ -60,46 +58,26 @@ const SolectwoPostPage: React.FC = () => {
 
     const term = termLabel(post);
     const published = parseUtc(post.published_at);
-    const withdrawn = post.status === 'withdrawn';
-    const corrections = post.changes.filter((c) => c.kind === 'correction');
+    if (post.status === 'withdrawn') {
+        return (
+            <article className="max-w-2xl mx-auto px-4 py-16 text-center space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-neutral-500">Ogłoszenie sołectwa {post.solectwo}</p>
+                <h1 className="text-2xl font-black text-neutral-200">To ogłoszenie nie jest już aktualne</h1>
+                <p className="text-sm text-neutral-400">Aktualne ogłoszenia znajdziesz w zakładce Wiadomości.</p>
+            </article>
+        );
+    }
 
     return (
         <article className="max-w-2xl mx-auto px-4 py-8 space-y-5">
             <header>
                 <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Ogłoszenie sołectwa {post.solectwo}</p>
-                <h1 className={`text-2xl sm:text-3xl font-black mt-2 leading-tight ${withdrawn ? 'text-neutral-400 line-through decoration-2' : ''}`}>{post.title}</h1>
+                <h1 className="text-2xl sm:text-3xl font-black mt-2 leading-tight">{post.title}</h1>
                 <p className="text-sm text-neutral-400 mt-2">
                     {post.signed_as}
                     {published && ` · ${published.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}`}
                 </p>
             </header>
-
-            {withdrawn && (
-                <div className="flex items-start gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3">
-                    <Ban className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                    <div>
-                        <p className="font-semibold text-red-200">Ogłoszenie odwołane {shortDate(post.withdrawn_at)}</p>
-                        {post.withdraw_reason && <p className="text-sm text-red-100/80 mt-0.5">{post.withdraw_reason}</p>}
-                        <p className="text-xs text-neutral-400 mt-1">Treść i termin z odwołanego ogłoszenia nie obowiązują.</p>
-                    </div>
-                </div>
-            )}
-
-            {!withdrawn && corrections.length > 0 && (
-                <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-                    <History className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                        <p className="font-semibold text-amber-200">
-                            Ogłoszenie poprawione{corrections.length > 1 ? ` (${corrections.length}×)` : ''}
-                        </p>
-                        <ul className="mt-0.5 space-y-0.5 text-amber-100/80">
-                            {corrections.map((c) => (
-                                <li key={c.at}>{shortDate(c.at)}{c.reason ? `: ${c.reason}` : ''}</li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-            )}
 
             {term && (
                 <div className="flex items-center gap-3 rounded-2xl border border-blue-500/30 bg-blue-500/5 px-4 py-3">

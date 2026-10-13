@@ -997,7 +997,8 @@ class EmailService:
             <h2>Ogłoszenie zostało poprawione</h2>
             <p><strong>{e_title}</strong></p>
             {reason_html}
-            <p>Na stronie ogłoszenia mieszkańcy widzą, kiedy i dlaczego je poprawiono.</p>
+            <p>Mieszkańcy widzą już poprawioną wersję — bez informacji o tym, że coś zmieniono.
+            Jeśli wcześniejszą wersję udostępniłeś na Facebooku, możesz dopisać tam poprawkę od siebie.</p>
             <a href="{post_url}" class="btn">Zobacz ogłoszenie</a>
             """
         elif kind == "withdrawal":
@@ -1007,8 +1008,8 @@ class EmailService:
             <p><strong>{e_title}</strong></p>
             {reason_html}
             <p>Zniknęło z wiadomości, kalendarza i briefingu. Pod dawnym linkiem
-            mieszkańcy zobaczą informację o odwołaniu — jeśli udostępniłeś je na
-            Facebooku, warto dopisać tam to samo.</p>
+            mieszkańcy zobaczą tylko, że ogłoszenie nie jest już aktualne — bez powodu.
+            Jeśli udostępniłeś je na Facebooku, warto dopisać tam odwołanie od siebie.</p>
             <a href="{post_url}" class="btn">Zobacz stronę ogłoszenia</a>
             """
         else:

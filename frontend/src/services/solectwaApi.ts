@@ -107,12 +107,9 @@ export interface PublicPost {
     event_at: string | null;
     event_until: string | null;
     published_at: string | null;
+    /** Jedyny ślad procesu dla mieszkańca; powody i historia są wyłącznie
+     *  między sołtysem a redakcją (panel sołtysa i redakcji). */
     status: 'published' | 'withdrawn';
-    corrected_at: string | null;
-    withdrawn_at: string | null;
-    withdraw_reason: string | null;
-    /** Kiedy i dlaczego zmieniono — bez starej treści (ta zostaje u redakcji). */
-    changes: { kind: 'correction' | 'withdrawal'; at: string; reason: string | null }[];
 }
 
 /** Pełna wersja z historii — tylko dla redakcji. */

@@ -20,7 +20,9 @@ Przebieg:
      prosi o to ze swojego panelu (`solectwo_post_requests`), publikuje redakcja.
      Odwołanie nie kasuje wiersza — `withdrawn_at` na artykule i wydarzeniu
      wyłącza go w bramkach `feed_policy` (feed, briefing, newsletter, push,
-     agenci, kalendarz), a stronę ogłoszenia zamienia w informację o odwołaniu.
+     agenci, kalendarz). Proces decyzyjny (prośba, powód, historia wersji) jest
+     sprawą sołtysa i redakcji: mieszkaniec widzi poprawioną treść bez śladu
+     zmiany, a pod linkiem odwołanego ogłoszenia — wyłącznie „nieaktualne”.
 
 AI Act art. 50: podsumowanie jest oznaczone na stronie jako przygotowane
 automatycznie i sprawdzone przez redakcję (front, `SolectwoPostPage`).
@@ -392,22 +394,9 @@ class PostPublic(BaseModel):
     event_at: Optional[datetime]
     event_until: Optional[datetime]
     published_at: Optional[datetime]
+    # `published` albo `withdrawn`. Nic więcej o procesie: ani powodu, ani dat
+    # korekt, ani historii — to rozmowa sołtysa z redakcją, nie mieszkańców.
     status: str = PUBLISHED
-    corrected_at: Optional[datetime] = None
-    withdrawn_at: Optional[datetime] = None
-    withdraw_reason: Optional[str] = None
-    changes: List["PublicChange"] = []
-
-
-class PublicChange(BaseModel):
-    """Ślad zmiany dla mieszkańca: KIEDY i DLACZEGO — bez starej treści,
-    bo poprzednia wersja mogła zawierać właśnie ten błąd albo czyjeś dane."""
-    kind: str
-    at: datetime
-    reason: Optional[str]
-
-
-PostPublic.model_rebuild()
 
 
 def _utc(value: Optional[datetime]) -> Optional[datetime]:
@@ -423,17 +412,12 @@ async def public_post(post_id: int):
         post = await session.get(SolectwoPost, post_id)
         if not post or post.status not in (PUBLISHED, WITHDRAWN):
             raise HTTPException(status_code=404, detail="Nie znaleziono ogłoszenia")
-        versions = (await session.execute(
-            select(SolectwoPostVersion)
-            .where(SolectwoPostVersion.post_id == post.id, SolectwoPostVersion.kind != V_PUBLICATION)
-            .order_by(SolectwoPostVersion.version)
-        )).scalars().all()
     withdrawn = post.status == WITHDRAWN
     return PostPublic(
         id=post.id, solectwo=post.solectwo, signed_as=post.signed_as,
-        title=post.title or post.signed_as,
-        # Odwołane: zostaje tytuł i informacja o odwołaniu, treść znika —
-        # inaczej termin z odwołanego ogłoszenia dalej by „obowiązywał”
+        # Odwołane: bez tytułu, treści i terminu — inaczej termin z odwołanego
+        # ogłoszenia dalej by „obowiązywał”, a tytuł zdradzałby, co odwołano
+        title=f"Ogłoszenie sołectwa {post.solectwo}" if withdrawn else (post.title or post.signed_as),
         summary=None if withdrawn else post.summary,
         transcript=None if withdrawn else post.transcript,
         doc_type=post.doc_type,
@@ -441,10 +425,6 @@ async def public_post(post_id: int):
         event_until=None if withdrawn else _utc(post.event_until),
         published_at=_utc(post.published_at),
         status=post.status,
-        corrected_at=_utc(post.corrected_at),
-        withdrawn_at=_utc(post.withdrawn_at),
-        withdraw_reason=post.withdraw_reason,
-        changes=[PublicChange(kind=v.kind, at=_utc(v.created_at), reason=v.reason) for v in versions],
     )
 
 
@@ -977,7 +957,8 @@ class VersionOut(BaseModel):
 
 @router.get("/admin/posts/{post_id}/versions", response_model=List[VersionOut])
 async def post_versions(post_id: int, admin=Depends(get_admin_user)):
-    """Pełna historia — tylko dla redakcji (stare wersje mogą nieść błąd)."""
+    """Pełna historia — tylko dla redakcji (stare wersje mogą nieść błąd,
+    a proces decyzyjny nie jest widoczny dla mieszkańców)."""
     async with async_session() as session:
         rows = (await session.execute(
             select(SolectwoPostVersion).where(SolectwoPostVersion.post_id == post_id)
