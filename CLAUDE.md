@@ -22,9 +22,14 @@
 - Odtworzenie: `docker exec -i centrum-db-1 pg_restore -U $POSTGRES_USER -d <baza> --no-owner < plik.pgc`
   (najpierw do bazy TYMCZASOWEJ). Prawdziwe dane osobowe — nie kopiować na dysk bez potrzeby
 - ⚠️ **Kopia leży na TYM SAMYM serwerze co baza** — chroni przed błędem migracji i kasowaniem, NIE przed
-  utratą serwera. Poza serwerem: włączyć Backups w panelu Hetznera albo okresowo ściągać plik (otwarte)
-- ⚠️ Staroć w `/root`: `backup_przed_snippetami_20260708_1902.dump`, `backup-przed-wydaniem-20260820-1755.sql.gz`
-  (dane osobowe sprzed miesięcy) — do skasowania po decyzji
+  utratą serwera. **Decyzja Łukasza (13.10): NIE pobieramy żadnych kopii z serwera** (to prawdziwe dane osobowe,
+  nie trafiają na MacBooka ani na inny dysk). Ochrona przed utratą serwera = wyłącznie Backups w panelu Hetznera
+  (do włączenia po stronie panelu) — nie ściągać plików `.pgc` przez scp/rsync
+- Porządek w `/root` (13.10): stare zrzuty z danymi osobowymi (`backup_przed_snippetami_*.dump`,
+  `backup-przed-wydaniem-*.sql.gz`, `backup_reports_testowe_*.sql`) i `frontend-backup/` do skasowania;
+  zostaje `backups/` (nocne kopie) i `env-kopie/`
+- Front na serwerze: `deploy-frontend.sh` dokłada pliki, nie usuwa — w `assets/` leżą dziesiątki starych paczek
+  `index-*.js`. Klatki `videos/kula6/` (121 szt.) są UŻYWANE przez `HeroSection` — to nie śmieci
 
 ## Git Workflow (PRODUKCJA)
 ```
