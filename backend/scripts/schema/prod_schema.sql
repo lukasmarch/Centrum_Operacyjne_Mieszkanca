@@ -914,6 +914,42 @@ ALTER SEQUENCE public.council_sessions_id_seq OWNED BY public.council_sessions.i
 
 
 --
+-- Name: csp_violations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.csp_violations (
+    id integer NOT NULL,
+    directive character varying(40) NOT NULL,
+    blocked character varying(120) NOT NULL,
+    page character varying(200) NOT NULL,
+    disposition character varying(10) DEFAULT 'report'::character varying NOT NULL,
+    hits integer DEFAULT 1 NOT NULL,
+    first_seen timestamp without time zone DEFAULT (now() AT TIME ZONE 'utc'::text) NOT NULL,
+    last_seen timestamp without time zone DEFAULT (now() AT TIME ZONE 'utc'::text) NOT NULL
+);
+
+
+--
+-- Name: csp_violations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.csp_violations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: csp_violations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.csp_violations_id_seq OWNED BY public.csp_violations.id;
+
+
+--
 -- Name: daily_summaries; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2312,6 +2348,13 @@ ALTER TABLE ONLY public.council_sessions ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: csp_violations id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.csp_violations ALTER COLUMN id SET DEFAULT nextval('public.csp_violations_id_seq'::regclass);
+
+
+--
 -- Name: daily_summaries id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -2750,6 +2793,22 @@ ALTER TABLE ONLY public.council_sessions
 
 ALTER TABLE ONLY public.council_sessions
     ADD CONSTRAINT council_sessions_review_token_key UNIQUE (review_token);
+
+
+--
+-- Name: csp_violations csp_violations_directive_blocked_page_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.csp_violations
+    ADD CONSTRAINT csp_violations_directive_blocked_page_key UNIQUE (directive, blocked, page);
+
+
+--
+-- Name: csp_violations csp_violations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.csp_violations
+    ADD CONSTRAINT csp_violations_pkey PRIMARY KEY (id);
 
 
 --
@@ -3228,6 +3287,13 @@ CREATE INDEX idx_conversations_user ON public.conversations USING btree (user_id
 --
 
 CREATE INDEX idx_cost_log_service_date ON public.api_cost_log USING btree (service, created_at DESC);
+
+
+--
+-- Name: idx_csp_violations_last_seen; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_csp_violations_last_seen ON public.csp_violations USING btree (last_seen);
 
 
 --

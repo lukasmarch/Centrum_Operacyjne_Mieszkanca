@@ -139,6 +139,10 @@ app.include_router(social_router)  # /api/social/* — propozycje postów dla n8
 from src.api.endpoints.analytics import router as analytics_router
 app.include_router(analytics_router)  # /api/events
 
+# Raporty naruszeń CSP (tryb raportowania, audyt E8) — publiczny zapis zagregowany
+from src.api.endpoints.csp import router as csp_router
+app.include_router(csp_router)  # /api/csp-report
+
 # Webhook Resend — jedyne źródło `newsletter_logs.opened_at` / `clicked_at`.
 from src.api.endpoints.newsletter_webhook import router as newsletter_webhook_router
 app.include_router(newsletter_webhook_router)  # /api/newsletter/webhook/resend

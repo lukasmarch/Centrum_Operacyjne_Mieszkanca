@@ -61,6 +61,8 @@ PUBLIC_WRITE_ROUTES = {
     ("PUT", "/api/newsletter/preferences"): "token z maila (32 B)",
     ("POST", "/api/newsletter/webhook/resend"): "podpis Svix",
     ("POST", "/api/payments/webhook"): "weryfikacja transakcji w P24",
+    ("POST", "/api/csp-report"): "raport CSP wysyłany przez przeglądarkę bez tokenu — limit IP i globalny, "
+                                 "zapis zagregowany bez IP/UA i bez parametrów adresu, zawsze 204",
     ("POST", "/api/cinema/ingest"): "Bearer z konfiguracji (n8n)",
     ("POST", "/api/social/media"): "X-Social-Token (n8n)",
     ("POST", "/api/council/review/{token}"): "jednorazowy token akceptacji",

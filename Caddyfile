@@ -41,6 +41,22 @@ rybnolive.pl {
         Referrer-Policy strict-origin-when-cross-origin
         Strict-Transport-Security "max-age=31536000"
         Permissions-Policy "microphone=(self), geolocation=(self), camera=(self), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()"
+
+        # Content-Security-Policy w trybie RAPORTOWANIA (audyt 11.10.2026, E8): przeglądarka niczego
+        # nie blokuje, tylko zgłasza do /api/csp-report (tabela csp_violations, odczyt:
+        # `python -m scripts.csp_report`). Polityka sprawdzona 13.10 headless Chrome na 19 trasach
+        # produkcyjnych — 0 naruszeń. Przełączenie na blokowanie (`Content-Security-Policy`) dopiero po
+        # ~2 tygodniach raportów. Źródła:
+        #   style-src 'unsafe-inline' — inline <style> w index.html i atrybuty style= z Reacta
+        #   fonts.googleapis.com / fonts.gstatic.com — Outfit
+        #   img-src https: — obrazy artykułów z wielu portali (gazetaolsztynska.pl, gminarybno.pl,
+        #     radioolsztyn.pl, fbcdn.net) i kafelki map (Carto, OpenStreetMap), ikony pogody
+        #   connect-src api.rybnolive.pl + nominatim.openstreetmap.org (wyszukiwanie adresu w Zgłoszeniach)
+        #   blob: — podgląd zdjęć przed wysłaniem i zdjęcia pism w panelu redakcji
+        # Dwa mechanizmy raportowania, bo przeglądarki różnią się: report-uri (starszy, Firefox/Safari)
+        # i report-to + Reporting-Endpoints (Chrome). Backtick: wartość zawiera cudzysłowy.
+        Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.rybnolive.pl https://nominatim.openstreetmap.org; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; report-uri https://api.rybnolive.pl/api/csp-report; report-to csp"
+        Reporting-Endpoints `csp="https://api.rybnolive.pl/api/csp-report"`
     }
 
     # Cache-Control celuje w konkretne ścieżki, a NIE globalnie. Dwie pułapki,

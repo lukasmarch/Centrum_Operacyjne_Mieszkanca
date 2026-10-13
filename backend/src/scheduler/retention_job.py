@@ -13,6 +13,7 @@ retencji w Polityce prywatności):
     cały wiersz po 180 (liczniki narzędzi zostają do analityki)
   - site_events: session_id i user_id znikają po 90 dniach, cały wiersz po 180
     (liczniki zdarzeń i kampanii zostają do analityki)
+  - csp_violations: wiersze nieaktywne od 30 dni (raporty CSP, agregat bez danych osobowych)
   - users.acq_* / push_subscriptions.acq_session_id: identyfikator wizyty znika po 90 dniach
     (jak w site_events), kampania, strona wejścia i data pierwszej wizyty po 24 miesiącach
 """
@@ -54,6 +55,18 @@ RETENTION_SITE_EVENT_DAYS = 180
 # ale nie wiecznie: art. 5 ust. 1 lit. e RODO. Do 13.10.2026 nie wygasały wcale.
 RETENTION_ACQ_SESSION_DAYS = 90
 RETENTION_ACQ_DAYS = 730
+# Raporty CSP to agregat bez danych osobowych; 30 dni od ostatniego wystąpienia wystarcza,
+# żeby po wdrożeniu poprawki zobaczyć, że naruszenie przestało się powtarzać.
+RETENTION_CSP_DAYS = 30
+
+
+async def purge_csp_violations(session, now: datetime) -> int:
+    from sqlalchemy import text
+    res = await session.execute(
+        text("DELETE FROM csp_violations WHERE last_seen < :cutoff"),
+        {"cutoff": now - timedelta(days=RETENTION_CSP_DAYS)},
+    )
+    return res.rowcount
 
 
 async def purge_acquisition(session, now: datetime) -> dict:
@@ -203,6 +216,10 @@ async def run_retention_async():
             f"acq_*: odpięto identyfikator wizyty z {acq['sessions']} kont i {acq['push']} subskrypcji, "
             f"skasowano kampanię/stronę wejścia z {acq['attribution']} kont"
         )
+
+        # 7c. Raporty CSP
+        csp_removed = await purge_csp_violations(session, now)
+        logger.info(f"csp_violations: usunięto {csp_removed} nieaktywnych wpisów (> {RETENTION_CSP_DAYS} dni)")
 
         # 8. Zdjęcia pism od sołtysów — oryginał jest materiałem roboczym
         # redakcji, publikacją jest przedruk. Znika IMAGE_RETENTION_DAYS po
