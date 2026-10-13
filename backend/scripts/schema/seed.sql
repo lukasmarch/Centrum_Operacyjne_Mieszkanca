@@ -6,6 +6,10 @@
 --
 -- Źródło „Sołectwa”: test_solectwa publikuje ogłoszenie jako artykuł z tego źródła; na prodzie powstaje
 -- migracją add_user_roles_and_solectwo_posts (rodzaj `data` w mieszanym skrypcie).
+-- pg_dump zaczyna zrzut od `set_config('search_path', '', false)`; gdy psql ładuje oba pliki w jednej
+-- sesji (CI), gołe `sources` przestaje być widoczne. Przywracamy ścieżkę wyszukiwania.
+SET search_path TO public;
+
 INSERT INTO sources (id, name, type, url, scraping_config, status, created_at)
 VALUES (26, 'RybnoLive - Sołectwa', 'community', NULL, NULL, 'disabled', now());
 
