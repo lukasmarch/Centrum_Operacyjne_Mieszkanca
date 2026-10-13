@@ -2,7 +2,6 @@ import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-import { videoFFmpegPlugin } from './vite-plugin-video-ffmpeg';
 
 export default defineConfig(({ mode }) => {
   // Load .env from backend directory
@@ -16,24 +15,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      videoFFmpegPlugin({
-        outputDir: 'public/videos',
-        videos: [
-          {
-            // kula_2.mp4: sampled bg = #091223 (rgb 9,18,35), page bg = #05080f (rgb 5,8,15)
-            input: '../assets/kula_2.mp4',
-            name: 'kula',
-            crfMp4: 20,
-            crfWebm: 32,
-            colorMatch: {
-              sourceBg: { r: 9, g: 18, b: 35 },
-              targetBg: { r: 5, g: 8,  b: 15 },
-              midtoneAnchor: 0.22,
-            },
-            vignette: Math.PI / 4.5,
-          },
-        ],
-      }),
       VitePWA({
         registerType: 'autoUpdate',
         strategies: 'injectManifest',
