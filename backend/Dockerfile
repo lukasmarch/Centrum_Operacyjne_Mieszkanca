@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# Wersja interpretera przypięta (jak prod 13.10.2026: 3.11.16) — ruchomy tag 3.11 zmieniałby się przy każdej przebudowie
+FROM python:3.11.16-slim
 WORKDIR /app
 
 # ffmpeg/ffprobe: transkrypcja sesji Rady (services/council_transcript.py) —
@@ -8,8 +9,10 @@ RUN apt-get update && apt-get install -y \
     gcc libpq-dev libxml2-dev libxslt1-dev ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# constraints.txt = pip freeze produkcji (203 pakiety). Przebudowa daje TE SAME wersje;
+# odświeżanie świadome: scripts/refresh_constraints.sh
+COPY requirements.txt constraints.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
 COPY src/ src/
 COPY data/ data/
