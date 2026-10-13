@@ -13,6 +13,19 @@
 - **Env sekrety**: `/opt/centrum/backend/.env.production` (nie w repo)
 - **Docker env**: `/opt/centrum/.env` (DB_USER, DB_PASSWORD)
 
+## Kopie zapasowe produkcji (2026-10-13)
+**Do 13.10.2026 nie było ŻADNEJ automatycznej kopii bazy** (6 miesięcy; ostatnia ręczna: 20.08, 54 dni).
+- `/usr/local/bin/centrum-backup.sh` + `/etc/cron.d/centrum-backup`: codziennie **00:10 UTC** (02:10 lokalnie),
+  `pg_dump -Fc` do `/root/backups/centrum-RRRRMMDD-GGMM.pgc` (~100 MB, chmod 600), **14 ostatnich**,
+  odmowa przy < 3 GB wolnego miejsca, odrzuca archiwum z < 40 tabelami. Log: `/var/log/centrum-backup.log`
+- Sprawdzenie: `ssh root@91.99.142.30 'tail -3 /var/log/centrum-backup.log; ls -lh /root/backups'`
+- Odtworzenie: `docker exec -i centrum-db-1 pg_restore -U $POSTGRES_USER -d <baza> --no-owner < plik.pgc`
+  (najpierw do bazy TYMCZASOWEJ). Prawdziwe dane osobowe — nie kopiować na dysk bez potrzeby
+- ⚠️ **Kopia leży na TYM SAMYM serwerze co baza** — chroni przed błędem migracji i kasowaniem, NIE przed
+  utratą serwera. Poza serwerem: włączyć Backups w panelu Hetznera albo okresowo ściągać plik (otwarte)
+- ⚠️ Staroć w `/root`: `backup_przed_snippetami_20260708_1902.dump`, `backup-przed-wydaniem-20260820-1755.sql.gz`
+  (dane osobowe sprzed miesięcy) — do skasowania po decyzji
+
 ## Git Workflow (PRODUKCJA)
 ```
 main   ← aktywna gałąź, zmiany idą tu bezpośrednio
@@ -70,11 +83,28 @@ nie dogada się z API.
 lokalna baza była o **3 tabele i 7 kolumn** za produkcją — stąd odruch
 sprawdzania rzeczy „na żywym", bo lokalnie kod po prostu nie działał.
 
-**Przyczyna, którą trzeba znać:** `alembic_version` pokazuje **tę samą wersję
-`22fbd3a7c45e` w obu bazach**, a schematy się różnią. Każda zmiana schematu idzie
-ręcznym skryptem z `backend/scripts/migrations/` (**34 sztuki**) i **żaden nie
-dopisuje nic do `alembic_version`**. Nie ma więc licznika, który powie, czego
-brakuje — rozjazd narasta po cichu.
+**Przyczyna (do 13.10.2026) i jej leczenie (audyt, E5):** `alembic_version` stoi od lutego na
+`22fbd3a7c45e` w obu bazach, a każda zmiana schematu szła ręcznym skryptem z `backend/scripts/migrations/`
+(**54 sztuki**: 45 schematu + 9 operacji na danych) — żaden nie zapisywał, że poszedł, więc rozjazd narastał
+po cichu. Modele znają 42 z 53 tabel (10 tabel i 68 kolumn istnieje tylko dzięki skryptom i `text()`),
+więc `create_all` buduje INNĄ bazę niż produkcja: bez wektorów, triggera tsvector i indeksu HNSW. Dziś:
+- **`scripts/migrations/manifest.py`** — jedna lista wszystkich skryptów. `schema` uruchamia runner,
+  `data` (clean_database, źródła, RODO) **NIGDY** — wcześniej jedno `for f in *.py` czyściło bazę
+- **`schema_migrations`** w bazie (licznik) + `python -m scripts.migrate --status | --check | --apply --yes |
+  --baseline --yes`. `--check`: 0 czysto, 1 czeka migracja, 2 brak rejestru. ✅ baseline wykonany na prod
+  i lokalnie 13.10 (45 wpisów)
+- **`backend/scripts/schema/prod_schema.sql`** — struktura produkcji (bez danych), generowana:
+  `bash scripts/db_schema_refresh.sh` (zapis) / `--check` (czy repo nadąża). **Odśwież PO każdej migracji
+  na produkcji, przed commitem kodu, który jej używa**
+- **CI**: `test_schema_contract` — modele nie mogą znać tabeli ani kolumny, której nie ma w zrzucie
+  (czyli „kod bez kolumny” nie przejdzie bramki), oraz `test_migration_registry` (plik ↔ manifest).
+  ⚠️ Nie widzą SQL-a pisanego ręcznie w `text("…")`
+- **Nowa migracja**: plik `add_*.py` (idempotentny, addytywny) + linia w manifeście → commit →
+  na serwerze NOWYM obrazem, bez podmiany działającego kontenera:
+  `docker compose -f docker-compose.prod.yml build backend` →
+  `docker compose -f docker-compose.prod.yml run --rm --no-deps backend python -m scripts.migrate --apply --yes`
+  → `bash scripts/db_schema_refresh.sh` → push kodu
+- Lokalnie Python 3.9, na produkcji i w CI 3.11 — skrypty muszą działać w obu (`from __future__ import annotations`)
 
 **Sprawdzenie rozjazdu (rób to przed każdą dłuższą pracą na bazie):**
 ```bash
@@ -95,7 +125,7 @@ cd backend && python -m scripts.migrations.<nazwa>
 dane osobowe anonimizowane (lokalny `.env` ma klucze Resend/VAPID). Zrzuty: `~/rybnolive-zrzuty`.
 Ten sam plik zasila bazę audytową (`moj-projekt-audyt`, `ZRZUT=… przygotuj_srodowisko.sh --force`).
 
-⚠️ **NIE odpalać wszystkich 34 hurtem** — część to operacje na DANYCH, nie na
+⚠️ **NIE odpalać wszystkich 54 hurtem** (runner ich i tak nie uruchomi) — 9 to operacje na DANYCH, nie na
 schemacie: `clean_database.py`, `remove_duplicate_events.py`,
 `disable_risky_sources.py`, `normalize_ceidg_casing.py`, `ceidg_minimalizacja_rodo.py`.
 
