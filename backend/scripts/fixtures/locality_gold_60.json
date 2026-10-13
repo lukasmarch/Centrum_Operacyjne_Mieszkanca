@@ -1,0 +1,602 @@
+[
+ {
+  "id": 1502,
+  "source": "Gazeta Olsztyńska (RSS)",
+  "locality": null,
+  "title": "Pijany przyjechał szukać pracy",
+  "content": "",
+  "expected": "poza regionem",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 2960,
+  "source": "Gazeta Olsztyńska (RSS)",
+  "locality": null,
+  "title": "Miasto nagrodziło najlepszych sportowców",
+  "content": "",
+  "expected": "poza regionem",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 2402,
+  "source": "Facebook - Syla",
+  "locality": null,
+  "title": "🏆 Wielki sukces naszego mieszkańca! ⚽👏 20 marca, podczas XVIII Lubawskiej Gali Sportu, mieszkaniec ...",
+  "content": "🏆 Wielki sukces naszego mieszkańca! ⚽👏 20 marca, podczas XVIII Lubawskiej Gali Sportu, mieszkaniec gminy Rybno, pochodzący z Truszczyn – Bartosz Kuczyński – otrzymał z rąk Burmistrza Lubawy Macieja Radtke wyróżnienie w kategorii Z",
+  "expected": "gmina Rybno",
+  "note": "kogo dotyczy: mieszkaniec gminy z Truszczyn",
+  "flag": ""
+ },
+ {
+  "id": 3133,
+  "source": "Gmina Rybno",
+  "locality": null,
+  "title": "I PRZETARG USTNY NIEOGRANICZO...",
+  "content": "",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 1895,
+  "source": "Facebook - Syla",
+  "locality": null,
+  "title": "🌾 11 marca – Dzień Sołtysa 🌾 Z okazji Dnia Sołtysa składam wszystkim Sołtysom z terenu Gminy Rybno ...",
+  "content": "🌾 11 marca – Dzień Sołtysa 🌾 Z okazji Dnia Sołtysa składam wszystkim Sołtysom z terenu Gminy Rybno i nie tylko, najserdeczniejsze życzenia zdrowia, pomyślności oraz satysfakcji z pełnienia tej niezwykle ważnej funkcji.",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 3107,
+  "source": "Facebook - Syla",
+  "locality": null,
+  "title": "🚴‍♀️ Sezon rowerowy w pełni – czas na holenderską jakość! 🚴‍♂️ Szukasz niezawodnego roweru, który p...",
+  "content": "🚴‍♀️ Sezon rowerowy w pełni – czas na holenderską jakość! 🚴‍♂️ Szukasz niezawodnego roweru, który posłuży Ci przez wiele sezonów? Mamy dla Ciebie sprawdzone miejsce! 🔧💚 Holand Rowery z miejscowości Dębień (Gmina Rybno) to firma z pasją, która działa nieprzerwanie od 2015 roku. Specjalizują się w… Pełna treść u źródła: https://www.faceb",
+  "expected": "gmina Rybno",
+  "note": "firma w Dębieniu (Gmina Rybno)",
+  "flag": ""
+ },
+ {
+  "id": 2058,
+  "source": "Facebook - Gmina Działdowo",
+  "locality": null,
+  "title": "Wielkie gratulacje👍👏🤩 Karolina Więckowska sołtys sołectwa Krasnołąka👏👏👏 Jesteśmy dumni👍 i życzymy wi...",
+  "content": "Wielkie gratulacje👍👏🤩 Karolina Więckowska sołtys sołectwa Krasnołąka👏👏👏 Jesteśmy dumni👍 i życzymy wielu sukcesów w życiu prywatnym i zawodowym🤗 [19 polubień, 4 komentarzy, 0 udostępnień] Pełna treść u źródła: https://www.facebook.com/gminadzialdowo/posts/pfbid0PSD2wm8eTf8v5V3FTU7Nffcnx2gTxufa34pSL2PViBFCcG5hRWLfYAPQFdcz3QRSl",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 881,
+  "source": "Facebook - Gmina Działdowo",
+  "locality": null,
+  "title": "Diagnoza potrzeb i potencjału wspólnoty samorządowej w zakresie usług społecznych na lata 2026-2030",
+  "content": "Diagnoza potrzeb i potencjału wspólnoty samorządowej w zakresie usług społecznych na lata 2026-2030 Pełna treść u źródła: https://www.facebook.com/gminadzialdowo/posts/pfbid0NkmFjnFNhKmgadxrufvXcjU7k2mataqajCA7UtcdtybJ2Gx3E9tCnryqHbsbfMhsl",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5238,
+  "source": "Facebook - Syla",
+  "locality": null,
+  "title": "Dni Działdowa 😍 zbliżają się wielkimi krokami....",
+  "content": "Dni Działdowa 😍 zbliżają się wielkimi krokami. W dniach 14–16 sierpnia mieszkańcy oraz goście będą mogli wziąć udział w jednym z najbardziej wyczekiwanych wydarzeń roku. Na terenie przyległym do zespo",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 4899,
+  "source": "Radio 7 Działdowo (RSS)",
+  "locality": null,
+  "title": "Ciechanów stawia na elektryki. Do miejskiej floty dołączą kolejne autobusy",
+  "content": "",
+  "expected": "poza regionem",
+  "note": "Ciechanów — źródło lokalne bez nazwy z gminy",
+  "flag": "bug:okolice"
+ },
+ {
+  "id": 2225,
+  "source": "Radio 7 Działdowo (RSS)",
+  "locality": null,
+  "title": "Zmarł historyk. Ostatnie pożegnanie w Działdowie",
+  "content": "",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 4652,
+  "source": "Radio 7 Działdowo (RSS)",
+  "locality": null,
+  "title": "Nowe dachy na stacjach uzdatniania wody. Gmina Zawidz inwestuje w infrastrukturę wodociągową",
+  "content": "",
+  "expected": "poza regionem",
+  "note": "gmina Zawidz (powiat żuromiński)",
+  "flag": "bug:okolice"
+ },
+ {
+  "id": 3064,
+  "source": "Radio 7 Działdowo (RSS)",
+  "locality": null,
+  "title": "Nowe miejsca zabaw. Inwestycje dla dzieci w gminie Lidzbark",
+  "content": "",
+  "expected": "okolice",
+  "note": "gmina Lidzbark, powiat działdowski",
+  "flag": ""
+ },
+ {
+  "id": 5310,
+  "source": "Gmina Rybno",
+  "locality": 3,
+  "title": "Ogłoszenie o naborze wniosków związanych z usuwaniem azbestu w 2026r. dla osób fizycznych",
+  "content": "Drukuj Ogłoszenie o naborze wniosków związanych z usuwaniem azbestu w 2026r. dla osób fizycznych Opublikowano 2026-08-11 13:53:47. Artykuł wyświetlono: 68 razy. Wójt Gminy Rybno ogłasza nabór wniosków o udzielenie pomocy w usuwaniu wyrobów zawierających azbest w 2026 r. O pomoc ubiegać się mogą właściciele lub posiadacze obiektów budowlanych położonych na terenie Gminy Rybno. Pomoc będzie udzielana w formie bezgotówkowej, tj. poprzez dofinansowanie prac związanych z usunięciem z nieruchomości … e usługi nastąpi w terminie do dnia 15 listopada 2026r. Druki wniosków o udzielenie pomocy dostępne są w Urzędzie Gminy Rybno, pokój nr 16 piętro II i na stronie internetowej www.bip.gminarybno.pl. Wnioski należy składać w terminie do dnia 19 sierpnia 2026r. do godziny 15.00 w Urzędzie Gminy Rybno, ul. Lubawska 15, 13 – 220 Rybno, pokój nr 13 (sekretariat). Gmina zastrzega sobie prawo do wcześniejszego zakończenia naboru lub unieważnienia naboru z",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6220,
+  "source": "Facebook - Syla",
+  "locality": 3,
+  "title": "✝️ Zabytek w Rybnie odzyskuje dawny blask....",
+  "content": "✝️ Zabytek w Rybnie odzyskuje dawny blask. Zakończono prace za blisko 400 tys. zł 🙏 Zakończył się kolejny ważny etap ratowania zabytkowego budynku dawnego kościoła i plebanii w Rybnie. We wtorek, 22 września, pracownicy Urzędu Ochrony Zabytków w Olsztynie przeprowadzili odbiór konserwatorski… Pełna tre",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5596,
+  "source": "Facebook - Syla",
+  "locality": 3,
+  "title": "⚽ DELFIN POWALCZY O PIERWSZE PUNKTY! Przed nami 5....",
+  "content": "⚽ DELFIN POWALCZY O PIERWSZE PUNKTY! Przed nami 5. kolejka klasy okręgowej, w której GSZS Delfin Rybno czeka wyjazdowe spotkanie z KS Wałsza Pieniężno. Podopieczni Jarosława Płoskiego po czterech kolejkach wciąż czekają na",
+  "expected": "gmina Rybno",
+  "note": "Delfin Rybno gra wyjazd",
+  "flag": ""
+ },
+ {
+  "id": 5164,
+  "source": "Facebook - Syla",
+  "locality": 3,
+  "title": "🐶 Uwaga, Hartowiec! 🐶 Czy komuś nie uciekł piesek? Zauważono czworonoga z brązową obrożą. Jeśli ro...",
+  "content": "🐶 Uwaga, Hartowiec! 🐶 Czy komuś nie uciekł piesek? Zauważono czworonoga z brązową obrożą. Jeśli rozpoznajecie swojego pupila lub wiecie, do kogo należy, prosimy o pilny kontakt z właścicielem i udostę",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5711,
+  "source": "KPP Działdowo (RSS)",
+  "locality": 2,
+  "title": "Podsumowanie działań prędkość na drogach powiatu działdowskiego",
+  "content": "",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6553,
+  "source": "Radio 7 Działdowo (RSS)",
+  "locality": 2,
+  "title": "Zofia Goljasz z Lidzbarka nagrodzona. Od lat pomaga bezdomnym zwierzętom",
+  "content": "",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5516,
+  "source": "Energa - wyłączenia bieżące (RSS)",
+  "locality": 2,
+  "title": "Wyłączenie awaryjne - Region Mława - Płośnica gmina wiejska",
+  "content": "ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej (wyłączenie prądu), 22.08.2026 08:59–11:30. Płośnica gmina wiejska 22.08.2026 08:59-11:30 - Rutkowice, Skurpie ulica Hieronima Skurpskiego.",
+  "expected": "okolice",
+  "note": "Płośnica, rejon Mława",
+  "flag": ""
+ },
+ {
+  "id": 6147,
+  "source": "Radio 7 Działdowo (RSS)",
+  "locality": 0,
+  "title": "Przełamanie nadeszło. Mławianka wygrywa z Troszynem",
+  "content": "",
+  "expected": "poza regionem",
+  "note": "Mławianka — Mława",
+  "flag": "bug:okolice"
+ },
+ {
+  "id": 6477,
+  "source": "Radio 7 Działdowo (RSS)",
+  "locality": 1,
+  "title": "Lider na deskach. Jurand z pierwszym zwycięstwem",
+  "content": "",
+  "expected": "poza regionem",
+  "note": "Jurand Ciechanów",
+  "flag": "bug:okolice"
+ },
+ {
+  "id": 6169,
+  "source": "Facebook - Syla",
+  "locality": 2,
+  "title": "📢 KURSY OPERATORÓW UDT I MASZYN BUDOWLANYCH – DZIAŁDOWO Chcesz zdobyć nowe kwalifikacje i uprawnien...",
+  "content": "📢 KURSY OPERATORÓW UDT I MASZYN BUDOWLANYCH – DZIAŁDOWO Chcesz zdobyć nowe kwalifikacje i uprawnienia przydatne na rynku pracy? W Działdowie organizowane są kursy dla operatorów urządzeń UDT oraz masz",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5610,
+  "source": "Facebook - Gmina Działdowo",
+  "locality": 2,
+  "title": "🌾 DOŻYNKI GMINNE 2026 – KSIĘŻY DWÓR 🌾 W niedzielę, 23 sierpnia 2026 r., w Księżym Dworze odbyły się...",
+  "content": "🌾 DOŻYNKI GMINNE 2026 – KSIĘŻY DWÓR 🌾 W niedzielę, 23 sierpnia 2026 r., w Księżym Dworze odbyły się Dożynki Gminne – wyjątkowe święto będące pięknym podsumowaniem całorocznej pracy rolników oraz okazj",
+  "expected": "okolice",
+  "note": "Księży Dwór, gm. Działdowo",
+  "flag": ""
+ },
+ {
+  "id": 6510,
+  "source": "Powiat Działdowski (RSS)",
+  "locality": 1,
+  "title": "Zaproszenie do udziału w VIII edycji Ogólnopolskiej Szkolnej Ligi Szachowej",
+  "content": "Artykuł Zaproszenie do udziału w VIII edycji Ogólnopolskiej Szkolnej Ligi Szachowej pochodzi z serwisu Powiat Działdowski .",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6142,
+  "source": "Facebook - Syla",
+  "locality": 2,
+  "title": "⚽🐬 Najmłodsi zawodnicy GSZS Delfin Rybno, podopieczni trenera Pawła Kryżby, wzięli udział w drugiej ...",
+  "content": "⚽🐬 Najmłodsi zawodnicy GSZS Delfin Rybno, podopieczni trenera Pawła Kryżby, wzięli udział w drugiej edycji turnieju piłkarskiego, który odbył się 19 września na boisku ze sztuczną nawierzchnią przy ul",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5524,
+  "source": "Energa - wyłączenia bieżące (RSS)",
+  "locality": 2,
+  "title": "Wyłączenie awaryjne - Region Mława - Płośnica gmina wiejska",
+  "content": "ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej (wyłączenie prądu), 22.08.2026 10:32–14:45. Płośnica gmina wiejska 22.08.2026 10:32-14:45 - Gralewo.",
+  "expected": "okolice",
+  "note": "Energa: Płośnica, wieś Gralewo o tej samej nazwie co nasza",
+  "flag": "bug:gmina Rybno"
+ },
+ {
+  "id": 6277,
+  "source": "Facebook - Syla",
+  "locality": 2,
+  "title": "🏃‍♂️ Reprezentowali gminę Rybno w Teście Coopera! 24 września na stadionie MOSiR Działdowo zakończy...",
+  "content": "🏃‍♂️ Reprezentowali gminę Rybno w Teście Coopera! 24 września na stadionie MOSiR Działdowo zakończyła się tegoroczna rywalizacja w ramach Testu Coopera. W całym cyklu Gmina Rybno reprezentowali Paweł Kopaczel, Piotr Chyrzyński oraz Sylwester Kasprowicz. Do klasyfikacji końcowej zaliczano trzy… Peł",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5841,
+  "source": "Facebook - Syla",
+  "locality": 2,
+  "title": "🌙🏃‍♂️ Ruszyło biuro zawodów kolejnego Nocnego Leśnego Biegu o Trofeum Nadleśniczego Nadleśnictwa Lid...",
+  "content": "🌙🏃‍♂️ Ruszyło biuro zawodów kolejnego Nocnego Leśnego Biegu o Trofeum Nadleśniczego Nadleśnictwa Lidzbark, organizowanego przez OSiR Rybno we współpracy z Gminą Rybno i Starostwem Powiatowym w Działdowie! 🌲🔥 Widzimy się na miejscu – przed nami wyjątkowy wieczór pełen sportowych emocji!",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6097,
+  "source": "Gmina Rybno",
+  "locality": 2,
+  "title": "Bezpłatne pojemniki na szkło...",
+  "content": "Drukuj Bezpłatne pojemniki na szkło Opublikowano 2026-09-17 14:49:06. Artykuł wyświetlono: 84 razy. Ekologiczny Związek Gmin „Działdowszczyzna” prowadzi akcję wyposażania nieruchomości zamieszkałych w bezpłatne pojemniki o pojemności 120 litrów",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6558,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": 2,
+  "title": "Unieważniony przetarg na przewozy kolejowe w audycji Jeden na Jednego",
+  "content": "Katarzyna Sobiech, Patryk Kozłowski Czwartkowa audycja Jeden na Jednego to spotkanie przedstawicieli dwóch głównych sił politycznych. Politycy Koalicji Obywatelskiej i Prawa i Sprawiedliwości, którzy ",
+  "expected": "poza regionem",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5557,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": 2,
+  "title": "Kilkanaście tysięcy mieszkańców regionu nadal bez prądu. To efekt gwałtownych burz",
+  "content": "Fot. Wojciech Chromy Energetycy usuwają skutki gwałtownych burz, które w sobotę przeszły nad Warmią i Mazurami. Uszkodzone linie energetyczne spowodowały przerwy w dostawach energii w wielu miejscowoś",
+  "expected": "poza regionem",
+  "note": "burze w całym regionie",
+  "flag": ""
+ },
+ {
+  "id": 5941,
+  "source": "Facebook - ZakladGospodarkiKomunalnej",
+  "locality": 0,
+  "title": "Temat stary, ale jakże aktualny cały czas. Zatory i zapchania w sieci kanalizacyjnej to powszec...",
+  "content": "Temat stary, ale jakże aktualny cały czas. Zatory i zapchania w sieci kanalizacyjnej to powszechny problem, który może prowadzić do poważnych konsekwencji zarówno dla gospodarstw domowych, jak i dla c",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6308,
+  "source": "Gmina Rybno",
+  "locality": 0,
+  "title": "Certyfikat QMP - termin uzyskania upływa 30 września 2026 r.",
+  "content": "Drukuj Certyfikat QMP - termin uzyskania upływa 30 września 2026 r. Opublikowano 2026-09-28 11:46:12. Artykuł wyświetlono: 61 razy. Informujemy, że rolnicy, którzy w tegorocznym wniosku o dopłaty bezp",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6280,
+  "source": "Gmina Rybno",
+  "locality": 1,
+  "title": "Partnerzy projektu ISMA z wizytą na Litwie",
+  "content": "Drukuj Partnerzy projektu ISMA z wizytą na Litwie Opublikowano 2026-09-25 13:01:37. Artykuł wyświetlono: 84 razy. Przedstawiciele Gminy Rybno oraz Uniwersytetu Warmińsko-Mazurskiego w Olsztynie odwiedzili partnerów projektu ISMA – Uniwersytet w Kłajpedzie (Klai",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5587,
+  "source": "Facebook - Syla",
+  "locality": 1,
+  "title": "❤️ POMAGAĆ MOŻNA W KAŻDEJ CHWILI! 🐶🐱 Charytatywne wydarzenie w Tuczkach już za nami, ale pomoc dla ...",
+  "content": "❤️ POMAGAĆ MOŻNA W KAŻDEJ CHWILI! 🐶🐱 Charytatywne wydarzenie w Tuczkach już za nami, ale pomoc dla Stowarzyszenia Straż Ochrony Przyrody i Praw Zwierząt w Dąbrównie wcale się nie kończy. Organizację i",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5669,
+  "source": "Facebook - Syla",
+  "locality": 1,
+  "title": "🏆 Sukces z Gronowa! Monika Skowrońska najlepsza w konkursie o życiu na Warmii i Mazurach 23 lipca w...",
+  "content": "🏆 Sukces z Gronowa! Monika Skowrońska najlepsza w konkursie o życiu na Warmii i Mazurach 23 lipca w Olsztynie odbyło się uroczyste zakończenie konkursu „Pozostanie nie tylko w pamięci. Życie codzienne",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5428,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": null,
+  "title": "Prawie 3 miliardy złotych na inwestycje w regionie. Powstanie prawie 300 km nowych dróg",
+  "content": "Fot. GDDKiA Olsztyn Czy Warmia i Mazury wkrótce zamienią się w wielki plac budowy? Zarząd Dróg Wojewódzkich planuje ambitne inwestycje drogowe, których łączna wartość sięgnie niemal 3 miliardów złotyc … mie kilometr i dwieście metrów drogi w miejscowości Kikity (gmina Jeziorany). To miejsca, co do których wiemy, że nie pozyskamy na nie środków zewnętrznych, dlatego staramy się realizo … ódzie w granicach administracyjnych miasta – 1,97 km, 23. DW 621 – rozbudowa drogi wojewódzkiej nr 621 na odcinku Ełk – Nowa Wieś Ełcka – 3,55 km, 24. DW 655 – rozbudowa drogi wojewódzkiej nr 655 na odcinku Olecko – Wieliczki – 3,68 km, 25. DW 656 –",
+  "expected": "poza regionem",
+  "note": "Nowa Wieś Ełcka z listy dróg wojewódzkich",
+  "flag": "bug:gmina Rybno"
+ },
+ {
+  "id": 5636,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": 1,
+  "title": "Krajowy Trening Reagowania już w najbliższą sobotę. Sprawdź, jak się przygotować",
+  "content": "Fot. A. Piedziewicz W najbliższą sobotę odbędzie się Krajowy Trening Reagowania. Podczas spotkań będzie można dowiedzieć się, jak działają syreny alarmowe i co oznaczają poszczególne sygnały. Będzie t … zapewniał senator PSL Gustaw Marek Brzezin , prezes Związku OSP w województwie warmińsko-mazurskim. Wydarzenie będzie też okazją do sprawdzenia systemów alarmowania, ponieważ we wszys …  w Gołdapi, Promenada Zdrojowa 14, 19-500 Gołdap Gmina Grodziczno – Remiza OSP, Grodziczno 16A, 13-324 Grodziczno Gmina Gronowo Elbląskie – plac dożynkowy, ul. Osiedlowa 6, 82-335 Gronowo Elbląskie Gmina Iława – teren przy świetlicy wiejskiej, Wola Kamieńska 27, 14-200 Iława Gmina Jonkowo – budynek OSP, ul",
+  "expected": "poza regionem",
+  "note": "Gronowo Elbląskie z listy gmin",
+  "flag": "bug:gmina Rybno"
+ },
+ {
+  "id": 5266,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": null,
+  "title": "Druga kolejka za nami. Olimpia wygrywa derby w III lidze, Rominta liderem IV ligi",
+  "content": "Fot. Marcin Maziński Fotografia Za nami 2. kolejka piłkarskiej III i IV ligi. W III lidze kibiców czekał derby województwa warmińsko &#8211; mazurskiego. Olimpia podejmowała w Elblągu Polonię Lidzbark … ica Błękitni Orneta 5-0 Wałsza Pieniężno KS Tyrowo 1-0 MKS Działdowo Ossa Biskupiec Pomorski 1-1 Radomniak Radomno GSZS Rybno 2-3 Dąb Kadyny Olimpia II Elbląg 3-0 Jeziorak Iława MKS Miłakowo 2-2 Drwęca Nowe Miasto Lubawskie Posłuchaj wypowiedzi ",
+  "expected": "gmina Rybno",
+  "note": "wynik meczu GSZS Rybno na liście wyników ligi",
+  "flag": "granica"
+ },
+ {
+  "id": 5214,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": null,
+  "title": "Mammobus odwiedza Warmię i Mazury. Dziś badania w Dąbrównie",
+  "content": "Fot. J. Sulecki Profilaktyka może uratować życie, dlatego mobilne pracownie mammograficzne docierają także do mniejszych miejscowości. Dziś z bezpłatnych badań mogą korzystać mieszkanki Dąbrówna, a w kolejnych dniach mammobus odwiedzi kolejne gminy regionu. Przed Urzędem Gminy w Dąbrównie w powiecie ostródzkim stanął mammobus, czyli mobilna pracownia mammograficzna … jscowości, w których dostęp do badań jest ograniczony. W najbliższych dniach mobilna pracownia odwiedzi także Miłakowo, Rybno, Łuktę, Małdyty i Morąg. Autor: P. Kisiel Redakcja: B. Świerkowka-Chromy The post Mammobus odwiedza Warmię i Mazury. Dz",
+  "expected": "gmina Rybno",
+  "note": "mammobus odwiedzi też Rybno — jedna pozycja listy",
+  "flag": "granica"
+ },
+ {
+  "id": 6298,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": 2,
+  "title": "Przymrozki, gradobicie i deszcze. Trudny rok dla rolników z regionu",
+  "content": "– To nie był łatwy sezon – podkreślają rolnicy. Wiosenne przymrozki i anomalie pogodowe spowodowały straty w uprawach. O tym, gdzie są największe, mówił na antenie Radia Olsztyn Szymon Tarasewicz , rz … im. Po gradobiciu 6 sierpnia największe straty odnotowano w gminie Lubomino, gdzie poszkodowanych zostało 114 gospodarstw. Duże szkody po deszczach nawalnych wystąpiły również w gminach Barciany, Reszel i Mrągowo, natomiast skutki złego przezimowania odczuli rolnicy w gminach Biskupiec i Rybno – powiedział. Powołane przez wojewodę komisje zakończyły szacowanie strat. Trwa weryfikacja dokumentów, od której zależ",
+  "expected": "gmina Rybno",
+  "note": "rolnicy w gminach Biskupiec i Rybno — jedna z dwóch",
+  "flag": "granica"
+ },
+ {
+  "id": 6165,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": 1,
+  "title": "Fałszywy mObywatel i strony do logowania. Policja ostrzega przed nową metodą oszustów",
+  "content": "Policja radzi, by przy logowaniu do rządowych aplikacji korzystać tylko z krajowych węzłów. Oszuści nie próżnują i coraz częściej sięgają po nowe sposoby kradzieży pieniędzy oraz danych osobowych. W o",
+  "expected": "poza regionem",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6479,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": 1,
+  "title": "Granty na sport i żłobki. Parlamentarzyści KO o wsparciu samorządów w regionie",
+  "content": "Fot. FB senator Ewa Kaliszuk Ponad 1,1 mln zł trafi na rozbudowę zaplecza socjalno-sanitarnego obiektów sportowych w regionie. Pieniądze otrzymają cztery samorządy z Warmii i Mazur. O szczegółach prog … ywatelskiej. Granty z programu „Szatnia na medal” otrzymają gmina Biskupiec, gmina Lidzbark Warmiński, gmina Stawiguda i gmina Zalewo. Rozwijamy zaplecze szatniowo-sanitarne. Pomagamy ",
+  "expected": "poza regionem",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5614,
+  "source": "Radio 7 Działdowo (RSS)",
+  "locality": 3,
+  "title": "Wyjątkowe kieliszki trafiły do Działdowa. Pamiątka po dawnej fabryce wódek i likierów",
+  "content": "",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6127,
+  "source": "KPP Działdowo (RSS)",
+  "locality": 3,
+  "title": "W trosce o bezpieczeństwo najmłodszych - Bezpieczna droga do szkoły i przedszkola",
+  "content": "",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5577,
+  "source": "KPP Działdowo (RSS)",
+  "locality": 3,
+  "title": "Bezpieczne Wakacje tematem spotkania z uczestnikami obozu sportowego",
+  "content": "",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6426,
+  "source": "Radio Olsztyn (RSS)",
+  "locality": 0,
+  "title": "Czyści Jak Łza – o radiu, nowym programie i planach na kolejny rok",
+  "content": "Czyści Jak Łza. Fot. P. Szauer Jeśli świętować urodziny to&#8230; na wesoło! Dlatego na początku października w audycji Wieczór Piosenki Innej gościliśmy dobrze znanych słuchaczom Radia Olsztyn twórcó",
+  "expected": "poza regionem",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5505,
+  "source": "Energa - wyłączenia bieżące (RSS)",
+  "locality": 3,
+  "title": "Wyłączenie awaryjne - Region Gostynin - Rybno gmina wiejska",
+  "content": "ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej (wyłączenie prądu), 22.08.2026 06:21–22:00. Rybno gmina wiejska 22.08.2026 06:21-22:00 - Antosin, Koszajec, Matyldów, Rybionek, Wężyki.",
+  "expected": "poza regionem",
+  "note": "Energa: Rybno koło Gostynina, cudzy rejon",
+  "flag": ""
+ },
+ {
+  "id": 5620,
+  "source": "Energa - wyłączenia planowane (RSS)",
+  "locality": 3,
+  "title": "Wyłączenie planowe - Region Mława - Rybno gmina wiejska",
+  "content": "ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej (wyłączenie prądu), 01.09.2026 09:00–14:00. Rybno gmina wiejska 01.09.2026 09:00-14:00 - Kopaniarze od 1 do 13, 15, 18, 601/s, 62.",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6254,
+  "source": "Energa - wyłączenia planowane (RSS)",
+  "locality": 2,
+  "title": "Wyłączenie planowe - Region Mława - Działdowo gmina wiejska",
+  "content": "ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej (wyłączenie prądu), 28.09.2026 08:00–17:00. Działdowo gmina wiejska 28.09.2026 08:00-17:00 - Kramarzewo 4, 24, 26, 27, 29, 29A, 30, 31, od 35 do 40, 67, 758/s, Uzdowo 86, 88, 89,",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 2278,
+  "source": "BIP Gminy Rybno",
+  "locality": null,
+  "title": "Ogłoszenie o posiedzeniu Komisji Rozwoju Gospodarczego, Rolnictwa i Ochrony Środowiska Rady Gminy Rybno",
+  "content": "Ogłoszenie o posiedzeniu Komisji Rozwoju Gospodarczego, Rolnictwa i Ochrony Środowiska Rady Gminy Rybno Informacja ogłoszona dnia 2026-03-20 13:36:59 przez Administrator Załączniki Ogłoszenie o posiedzeniu Komisji Rozwoju Gospodarczego, Rolnictwa i Ochrony Środowiska Rady Gminy Rybno (PDF, 115.7 KiB) Data wprowadzenia do BIP: 2026-03-20 13:37:14 | Data wytworzenia informacji: 2026-03-20 Pobierz dane XML Ogłoszenie o posiedzeniu Komisji Rozwoju Gospodarczego, Rolnictwa i Ochrony Środowiska Rady Gminy Rybno Drukuj informację Ogłoszenie o posiedzeniu Komisji Rozwoju Gospodarczego, Rolnictwa i Ochrony Środowiska Rady Gminy Rybno Rejestr zmian Zobacz rejestr zmian dla informacji: \" Podmiot udostępniający informację: Podmiot udostępniający informację: Urząd Gminy Rybno Osoba, która wytworzyła informację: Osoba, która wytworzyla informację: Data wytworzenia informacji: Data wytworzenia i",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5406,
+  "source": "BIP Gminy Rybno",
+  "locality": 3,
+  "title": "Obwieszczenie Wójta Gminy Rybno - wszczęcie postępowania administracyjnego i wystąpienie do organów współdziałających dot inwestycji \"Rozbudowa sieci kanalizacyjnej w miejscowościach Rumian, Naguszewo i Groszki Etap I i II planowanego do realizacji w obszarze nieruchomości Rumian obręb 0014, Naguszewo obręb 0012 i Groszki obręb 0003 oraz włączona będzie w miejscowości Rybno obręb 0015 gmina Rybno\"",
+  "content": "Rybno, dnia 17.08.2026r. WÓJT GMINY RYBNO woj. warmińsko – mazurskie PIK.6220.10.2026 OBWIESZCZENIE Wójta Gminy Rybno o wszczęciu postępowania administracyjnego i wystąpieniu do organów współdziałających Zgodnie z art. 61 § 4 i art. 10 § … o (Dz. U. z 2026r., poz. 670, dalej „Uooś”) zawiadamia się strony, że na wniosek Pana Kamila Gąski – Pełnomocnika Gminy Rybno z siedzibą w Rybnie ul. Lubawska 15 z dnia 08.08.2026r. (data wpływu: 08.08.2026r.), zostało wszczęte postępowanie w sprawie uzyskania decyzji o środowiskowych uwarunkowaniach dla planowanej inwestycji pn.: „Rozbudowie sieci kanalizacyjnej w miejscowościach Rumian, Naguszewo i Groszki Etap I i II planowanego do realizacji w obszarze nieruchomości w miejscowości Rumian obręb 0014, Naguszewo obręb 0012 i Groszki obręb 0003 oraz włączona będzie w miejscowości Rybno obręb 0015 gmina Rybno”, powiat działdowski, woj. warmińsko – mazurskie. Zgodnie z art. 75 ust. 1 pkt. 4 ustawy z dnia 3 października 2008r. u … rganem właściwym do wydania decyzji o środowiskowych uwarunkowaniach dla przedmiotowego przedsięwzięcia jest Wójt Gminy Rybno. Organem właściwym do wydania opinii w sprawie obowiązku przeprowadzenia oceny oddziaływania na środowisko oraz ewentua … dym etapie postępowania, mogą zapoznać się z materiałami zgromadzonymi w przedmiotowej sprawie w siedzibie Urzędu Gminy Rybno ul. Lubawska 15, 13-220 Rybno - Referat Inwestycji i Ochrony Środowiska piętro II, pokój nr 16 w godzinach od 7.00 do 15.00 oraz składać uwagi i wni",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 1178,
+  "source": "Moje Działdowo",
+  "locality": null,
+  "title": "Zapusty w Dłutowie już po raz szósty!",
+  "content": "W zapustach wystąpiły koła gospodyń z całego regionu. W ich organizacji jak zawsze pomaga lidzbarski urząd miasta oraz miejscowa Ochotnicza Straż Pożarna. MO",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5923,
+  "source": "Moje Działdowo",
+  "locality": 1,
+  "title": "Rolnicy z gminy Ostróda na dożynkach w Szyldaku",
+  "content": "Gmina Ostróda ma typowo rolniczy charakter – ponad połowę jej powierzchni stanowią użytki rolne, a na jej terenie działa około 550 gospodarstw różnej wielkości. To ważna część lokalnej gospodarki, któ",
+  "expected": "poza regionem",
+  "note": "gmina Ostróda",
+  "flag": "bug:okolice"
+ },
+ {
+  "id": 6594,
+  "source": "RybnoLive - Sołectwa",
+  "locality": null,
+  "title": "Zebranie wiejskie w Żabinach",
+  "content": "ZAWIADOMIENIE Zebranie wiejskie odbędzie się 25 października 2026 r. o godz. 17:00 w świetlicy.",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 6590,
+  "source": "RybnoLive - Sołectwa",
+  "locality": null,
+  "title": "Wyłączenie wody w Żabinach",
+  "content": "KOMUNIKAT W dniu 20 października 2026 r. w godz. 8:00–14:00 nastąpi przerwa w dostawie wody w Żabinach.",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 4961,
+  "source": "Powiat Działdowski (RSS)",
+  "locality": null,
+  "title": "Zaproszenie do udziału w VIII Półmaratonie Rolkarskim",
+  "content": "Artykuł Zaproszenie do udziału w VIII Półmaratonie Rolkarskim pochodzi z serwisu Powiat Działdowski .",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 340,
+  "source": "Moje Działdowo",
+  "locality": null,
+  "title": "Komendant Hufca ZHP o WOŚP i planach na najbliższy rok",
+  "content": "\"Celami Hufca z ZHP w Działdowie, tak jak i celami całego ZHP jest wychowanie młodzieży w duchu patriotyzmu, promowanie tych wartości jak wolność, patriotyzm\" - podkreśla Komendant Król. Wyzwania wspó",
+  "expected": "okolice",
+  "note": "",
+  "flag": ""
+ },
+ {
+  "id": 5619,
+  "source": "Facebook - Rybno",
+  "locality": 0,
+  "title": "🌸 Popołudnia z Pasją – wracamy we wrześniu! 🌸 Wakacje były dla nas czasem odpoczynku, ale już niedłu...",
+  "content": "🌸 Popołudnia z Pasją – wracamy we wrześniu! 🌸 Wakacje były dla nas czasem odpoczynku, ale już niedługo znów spotkamy się na naszych wspólnych zajęciach! ❤️ Przez ostatnie miesiące było u nas twórczo, ",
+  "expected": "gmina Rybno",
+  "note": "",
+  "flag": ""
+ }
+]

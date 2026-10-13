@@ -1290,6 +1290,22 @@ pięć deployów: pogoda >2 h bez odświeżenia, ruch z 10:00 przepadł (audyt F
 - `/health` robi `SELECT 1` (503 przy martwej bazie) i podaje stan schedulera
 - Test: `python -m scripts.test_job_runs [--db]` (16 w CI, 24 z bazą — sekcja 6 na atrapach jobów)
 
+## Zależności przypięte, lokalność mierzalna (2026-10-13, audyt E6 + E1 etap A)
+**E6 ✅ prod:** `backend/constraints.txt` = `pip freeze` produkcji (203 × `==`), Dockerfile `-c constraints.txt` na
+`python:3.11.16-slim`, CI instaluje te same wersje (+ krok „pip check + freeze == constraints"). Deploy taguje
+`centrum-backend:rollback` przed budową i po sukcesie czyści cache (`--keep-storage 5GB`; dysk 8,6 → 18 GB wolnych).
+Cofnięcie: `docker tag centrum-backend:rollback centrum-backend:latest && docker compose -f docker-compose.prod.yml up -d backend`.
+Odświeżenie wersji = świadomy commit: `bash scripts/refresh_constraints.sh` → CI → deploy. Dowód: freeze nowego obrazu = prod (0 różnic).
+- ⚠️ `sort` na serwerze i lokalnie różnią się lokalizacją — porównuj `LC_ALL=C`
+**E1 etap A ✅ (lokalnie):** dwa strażniki funkcji lokalności (`places_in`, `article_scope`, `is_local_article`,
+`locality_factor`, `gmina_subject`, `is_foreign_region`, reguła briefingu):
+- `python -m scripts.locality_gold --check` — golden master 6120 wpisów lokalnej bazy (`scripts/golden/locality_gold.json`,
+  tylko id + wyniki, bez tekstów). Warunek zaliczenia etapu B: **0 różnic**. `--record` tylko przy celowej zmianie zachowania
+- `python -m scripts.test_locality_gold` (w CI) — 60 wpisów oznaczonych ręcznie (`scripts/fixtures/locality_gold_60.json`):
+  52/60 zgodnych, **8 znanych błędów** z flagą `bug:` (test psuje się też, gdy błąd zostanie naprawiony — flagę trzeba zdjąć), 3 sporne
+- ⚠️ Znane błędy: listy w Radiu Olsztyn (Nowa Wieś Ełcka, Gronowo Elbląskie) liczone jako gmina Rybno; Gralewo w Energa/Płośnica;
+  źródła lokalne (Radio 7) o Ciechanowie, Mławie, Zawidzu, gminie Ostróda dostają „okolice" zamiast „poza regionem"
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
