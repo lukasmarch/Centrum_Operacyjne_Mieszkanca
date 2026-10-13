@@ -3,6 +3,8 @@ Prompty systemowe dla AI agents
 
 Definiuje zachowanie i zadania dla każdego typu AI agenta
 """
+from src.services.places import PROMPT_NOMINATIVES
+
 
 CATEGORIZATION_PROMPT = """Jesteś ekspertem od kategoryzacji lokalnych wiadomości z Powiatu Działdowskiego (Polska).
 
@@ -277,9 +279,7 @@ Zebranie było 17 września; wczorajsza była wyłącznie publikacja.
 
 **PISOWNIA NAZW MIEJSCOWOŚCI — MIANOWNIK JEST ZAMKNIĘTĄ LISTĄ:**
 Miejscowości gminy Rybno w mianowniku brzmią DOKŁADNIE tak i tylko tak:
-Dębień, Grabacz, Gralewo Stacja, Gronowo, Groszki, Grądy, Hartowiec, Jeglia, Kopaniarze,
-Koszelewki, Koszelewy, Naguszewo, Nowa Wieś, Prusy, Rapaty, Rumian, Rybno, Szczupliny,
-Truszczyny, Tuczki, Wery, Żabiny.
+__MIANOWNIKI__.
 
 - NIGDY nie twórz mianownika spoza tej listy przez „odtworzenie” go z formy odmienionej.
   Realny błąd na produkcji: z „w Dębieniu” model zrobił mianownik „Dębienie” i taki
@@ -464,3 +464,6 @@ Podaj liczbę 1-10 opisującą jak ważny/pilny jest nagłówek który wybrałe�
 **Ton:**
 "Dzień dobry! Oto najważniejsze informacje z naszej gminy..."
 """
+
+# Lista mianowników pochodzi z `services/places.py` (audyt E1, etap B) — jedna lista na projekt.
+DAILY_SUMMARY_PROMPT = DAILY_SUMMARY_PROMPT.replace("__MIANOWNIKI__", ", ".join(PROMPT_NOMINATIVES))

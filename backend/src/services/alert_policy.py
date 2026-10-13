@@ -156,48 +156,12 @@ def incident_of(title: Optional[str], content: Optional[str] = None) -> Optional
 
 # --- bramka 2: miejsce -------------------------------------------------------
 
-# Sołectwa gminy Rybno (za `auth/schemas.py: AVAILABLE_LOCATIONS`), bez „Domki
-# letniskowe" i sufiksów stref śmieciowych R1/R2 — to nazwy z harmonogramu
-# odbioru odpadów, w tekście prasowym nigdy nie padają.
-#
-# Formy odmienione wypisane wprost, zamiast doklejać dowolną końcówkę do rdzenia.
-# Automat brzmi kusząco, ale na tej liście są nazwy, które w dopełniaczu zlewają
-# się ze słowami pospolitymi: „Grądy" z gradem, „Wery" z wersją, „Rumian"
-# z rumiankiem, „Prusy" z pruskim. Alert ma budzić ludzi w nocy — wolimy przegapić
-# egzotyczną odmianę niż wysłać powiadomienie z powodu opadów gradu.
-# Wzorce działają na tekście bez ogonków (`_flat`).
-_PLACES: tuple[tuple[str, str], ...] = (
-    ("Rybno", r"rybn(o|a|ie|em)"),
-    # „debienie" to BŁĘDNY mianownik, który model tworzy z „w Dębieniu" (znany
-    # błąd, opisany w prompcie). Wzorzec ma łapać formy, które realnie padają
-    # w tekście i w polu `event_places` — także te utworzone przez model.
-    ("Dębień", r"debien(ia|iu|ie)?"),
-    ("Grabacz", r"grabacz(a|u|em)?"),
-    ("Gralewo", r"gralew(o|a|ie|em)"),
-    ("Gronowo", r"gronow(o|a|ie|em)"),
-    ("Groszki", r"groszk(i|ach|ow|om|ami)"),
-    ("Grądy", r"grad(y|ach|om|ami)"),
-    ("Hartowiec", r"hartow(iec|cu|ca|cem)"),
-    ("Jeglia", r"jegli(a|ii|i|e)"),
-    ("Kopaniarze", r"kopaniarz(e|ach|y|om|ami)"),
-    ("Koszelewki", r"koszelewk(i|ach|om|ami)"),
-    ("Koszelewy", r"koszelew(y|ach|om|ami)"),
-    ("Naguszewo", r"naguszew(o|a|ie|em)"),
-    ("Nowa Wieś", r"now(a|ej)\s+w(ies|si)"),
-    ("Prusy", r"prus(y|ach|om|ami)"),
-    ("Rapaty", r"rapat(y|ach|om|ami)"),
-    ("Rumian", r"rumian(ie|a|em|y)?"),
-    ("Szczupliny", r"szczuplin(y|ach|om|ami)"),
-    ("Truszczyny", r"truszczyn(y|ach|om|ami)"),
-    ("Tuczki", r"tuczk(i|ach|om|ami)"),
-    ("Wery", r"wer(y|ach|om|ami)"),
-    ("Żabiny", r"zabin(y|ach|om|ami)"),
-)
-
-GMINA_RYBNO_PLACES: tuple[str, ...] = tuple(place for place, _ in _PLACES)
-
-_PLACE_RE = tuple(
-    (place, re.compile(r"\b" + pattern + r"\b")) for place, pattern in _PLACES
+# Lista miejscowości mieszka w `services/places.py` (audyt E1, etap B). Nazwy zostają
+# dostępne tutaj, bo importują je inne moduły.
+from src.services.places import (  # noqa: E402
+    GMINA_RYBNO_PLACES,
+    MIEJSCOWOSCI_PATTERNS as _PLACES,
+    PLACE_RE as _PLACE_RE,
 )
 
 

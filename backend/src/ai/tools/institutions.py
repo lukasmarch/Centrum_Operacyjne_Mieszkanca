@@ -150,6 +150,7 @@ register(Tool(
     name="institution_info",
     provenance=prov.URZEDOWE,
     description=(
+        # places-ok: lokalizacje SZKÓŁ (5 z 20 sołectw), nie lista miejscowości gminy
         "Adres, telefon, kierownik i godziny pracy jednostek gminy Rybno: "
         "Urząd Gminy, GOPS (pomoc społeczna), ośrodek zdrowia, biblioteka, "
         "Ośrodek Sportu i Rekreacji, szkoły podstawowe (Rybno, Hartowiec, "

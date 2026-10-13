@@ -35,18 +35,14 @@ from typing import Optional
 from sqlalchemy import text
 
 from src.services import provenance as prov
+from src.services.places import HARMONOGRAM
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.utils.logger import setup_logger
 
 logger = setup_logger("DailyTools")
 
 # Miejscowości w harmonogramie wywozu — kanoniczne nazwy z `waste_schedule`.
-KNOWN_TOWNS = (
-    "Rybno R1", "Rybno R2", "Jeglia", "Gralewo Stacja", "Gronowo", "Grądy",
-    "Wery", "Kopaniarze", "Grabacz", "Koszelewki", "Koszelewy", "Żabiny",
-    "Rapaty", "Prusy", "Szczupliny", "Nowa Wieś", "Groszki", "Naguszewo",
-    "Rumian", "Truszczyny", "Dębień", "Hartowiec", "Tuczki", "Domki letniskowe",
-)
+KNOWN_TOWNS = HARMONOGRAM
 
 _PL_TRANSLATE = str.maketrans("ąćęłńóśźż", "acelnoszz")
 

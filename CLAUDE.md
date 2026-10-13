@@ -1306,6 +1306,15 @@ Odświeżenie wersji = świadomy commit: `bash scripts/refresh_constraints.sh` �
 - ⚠️ Znane błędy: listy w Radiu Olsztyn (Nowa Wieś Ełcka, Gronowo Elbląskie) liczone jako gmina Rybno; Gralewo w Energa/Płośnica;
   źródła lokalne (Radio 7) o Ciechanowie, Mławie, Zawidzu, gminie Ostróda dostają „okolice" zamiast „poza regionem"
 
+**E1 etap B ✅ (lokalnie, do wdrożenia):** `services/places.py` = JEDYNE miejsce z nazwami wsi. Trzy listy to trzy RÓŻNE pojęcia,
+nie duplikaty: `MIEJSCOWOSCI` 22 (nazwy w tekście, z odmianą), `SOLECTWA` 20 (BIP), `HARMONOGRAM` 24 (odpady/profil, kolejność = UI).
+`alert_policy`, `gmina_facts`, `auth/schemas`, `ai/tools/daily` i prompt briefingu (`PROMPT_NOMINATIVES`) czytają z niego.
+- Strażnik `python -m scripts.test_places_guard` (w CI): czerwieni literał z ≥4 nazwami poza `places.py` (wyjątek `# places-ok: powód`),
+  pilnuje zgodności z `frontend/types.ts` i promptem. Znalazł 4 miejsca, o których nie wiedziałem (3 to lokalizacje SZKÓŁ i podpowiedź
+  w `report_analyzer` — oznaczone `places-ok`)
+- Zaliczenie: golden master **0 różnic** na 6120 wpisach, 35 testów CI zielonych, prompt ma te same nazwy w tej samej kolejności
+- Nowa miejscowość = wpis w `places.py` (+ `frontend/types.ts`, `wasteSchedule.ts`, współrzędne w `ReportsPage.tsx` — front nadal ma 3 kopie)
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek

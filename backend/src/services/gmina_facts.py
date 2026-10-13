@@ -27,21 +27,17 @@ a sołectwo to jednostka pomocnicza gminy. Karta idzie prosto do odpowiedzi
 dla mieszkańca, więc trzyma się nazewnictwa z BIP.
 """
 
+# Sołectwa mieszkają w `services/places.py` (audyt E1, etap B); stąd je importują inne moduły.
+from src.services.places import SOLECTWA  # noqa: E402
+
 # Limit rozmiaru — patrz docstring. Podniesienie go to decyzja projektowa,
 # nie sposób na zmieszczenie kolejnego faktu.
 MAX_FACTS_BYTES = 2048
 
-# Jednostki pomocnicze gminy — BIP /147/, stan na 3.08.2026.
-SOLECTWA: tuple[str, ...] = (
-    "Dębień", "Grabacz", "Grądy", "Gralewo Stacja", "Gronowo",
-    "Hartowiec", "Jeglia", "Kopaniarze", "Koszelewki", "Koszelewy",
-    "Naguszewo", "Nowa Wieś", "Prusy", "Rapaty", "Rumian",
-    "Rybno", "Szczupliny", "Truszczyny", "Tuczki", "Żabiny",
-)
-
 # Jednostki organizacyjne gminy — BIP /2/, stan na 3.08.2026.
 JEDNOSTKI: tuple[str, ...] = (
     "Zespół Szkół w Rybnie",
+    # places-ok: lokalizacje SZKÓŁ (5 z 20 sołectw), nie lista miejscowości gminy
     "Szkoły Podstawowe: Rybno, Hartowiec, Koszelewy, Rumian, Żabiny",
     "Przedszkole w Rybnie", "Żłobek w Rybnie",
     "Gminny Ośrodek Pomocy Społecznej",

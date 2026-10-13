@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from src.database import UserTier
+from src.services.places import HARMONOGRAM
 
 
 # ======================
@@ -181,29 +182,6 @@ class MessageResponse(BaseModel):
 # Location Options
 # ======================
 
-AVAILABLE_LOCATIONS = [
-    "Rybno R1",
-    "Rybno R2",
-    "Dębień",
-    "Domki letniskowe",
-    "Grabacz",
-    "Gralewo Stacja",
-    "Gronowo",
-    "Groszki",
-    "Grądy",
-    "Hartowiec",
-    "Jeglia",
-    "Kopaniarze",
-    "Koszelewki",
-    "Koszelewy",
-    "Naguszewo",
-    "Nowa Wieś",
-    "Prusy",
-    "Rapaty",
-    "Rumian",
-    "Szczupliny",
-    "Truszczyny",
-    "Tuczki",
-    "Wery",
-    "Żabiny",
-]
+# Lista pozycji harmonogramu odpadów — jedno źródło w `services/places.py` (audyt E1, etap B).
+# Front trzyma kopię (`frontend/types.ts`); zgodność pilnuje `test_places_guard`.
+AVAILABLE_LOCATIONS = list(HARMONOGRAM)
