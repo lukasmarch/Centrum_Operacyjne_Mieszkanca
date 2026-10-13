@@ -29,8 +29,10 @@
 ## Git Workflow (PRODUKCJA)
 ```
 main   ← aktywna gałąź, zmiany idą tu bezpośrednio
-        push → GitHub Actions: job `tests` (24 testy bez bazy i modelu) → `deploy` (needs: tests)
-        (od 11.10: czerwony test = brak deployu; nowy test bez bazy/modelu dopisz do listy w deploy.yml)
+        push → GitHub Actions: `tests` (33 testy bez bazy i modelu) + `db-tests` (6 testów na bazie ze zrzutu
+        PRODUKCJI, `pgvector/pgvector:pg16`) → `deploy` (needs: tests, db-tests)
+        (od 11.10: czerwony test = brak deployu; nowy test bez bazy/modelu dopisz do listy `tests`, test z bazą
+         do `db-tests` w deploy.yml, a potrzebny mu wiersz startowy do `backend/scripts/schema/seed.sql`)
         (od 3.09: klucz deploy na serwerze, `set -e`, HEAD musi równać się github.sha,
          zdrowie = API przez Caddy; zielony job ZNACZY wdrożone)
         
@@ -104,6 +106,15 @@ więc `create_all` buduje INNĄ bazę niż produkcja: bez wektorów, triggera ts
   `docker compose -f docker-compose.prod.yml build backend` →
   `docker compose -f docker-compose.prod.yml run --rm --no-deps backend python -m scripts.migrate --apply --yes`
   → `bash scripts/db_schema_refresh.sh` → push kodu
+- **Testy z bazą w CI** (`db-tests`, od 13.10): schemat z `prod_schema.sql`, dane z `seed.sql` (minimum: źródło
+  „Sołectwa”), baza tylko w jobie, klucze to atrapy. Wchodzą testy, które SAME zakładają dane i sprzątają:
+  `test_job_runs --db`, `test_p24_ipn`, `test_auth`, `test_trial_lifecycle`, `test_batch_resilience`,
+  `test_solectwa` (~200 sprawdzeń). **Poza CI zostają**: sekcje `--db` mierzące stan prawdziwej bazy
+  (`feed_dedup`, `summary_context`, `agent_tools`, `legal_acts`… — na pustej bazie nie mają czego sprawdzić),
+  `test_waste_reminder` (harmonogram kończy się 31.12.2026 — pułapka czasowa), `test_manual_business`
+  (potrzebuje rejestru CEIDG = dane osobowe), `test_newsletter_weekly` (żywy materiał), `test_enhanced_gus`
+  (martwy: importuje nieistniejące `FREE_VARIABLES`). Przebieg lokalny w izolacji: kopia `backend/` BEZ `.env`
+  i `DATABASE_URL` na bazę tymczasową — inaczej test zobaczy prawdziwe klucze Resend/OpenAI
 - Lokalnie Python 3.9, na produkcji i w CI 3.11 — skrypty muszą działać w obu (`from __future__ import annotations`)
 
 **Sprawdzenie rozjazdu (rób to przed każdą dłuższą pracą na bazie):**

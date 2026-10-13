@@ -19,8 +19,8 @@ jobs:
   # Bramka przed deployem (audyt 11.10.2026, F-031). Do tej pory push szedł na
   # produkcję bez uruchomienia ANI JEDNEGO testu — strażnik nagłówka briefingu
   # był zepsuty od 9.10 i nikt się o tym nie dowiedział.
-  # Tylko testy bez bazy i bez modelu: schematu produkcji nie da się zbudować
-  # z modeli (ręczne migracje, F-034), a model kosztuje. Sekrety poniżej to
+  # Tylko testy bez bazy i bez modelu (te z bazą: job `db-tests` niżej — schemat budowany
+  # NIE z modeli, tylko ze zrzutu produkcji, audyt E5). Sekrety poniżej to
   # atrapy wymaganych pól konfiguracji — żaden test nie może dzięki nim wyjść
   # do sieci (OpenAI odpowie 401, baza na porcie 1 odmówi połączenia).
   # Nowy test bez bazy i modelu → dopisz go do listy.
@@ -63,8 +63,73 @@ jobs:
           done
           if [ -n "$failed" ]; then echo "::error::Czerwone:$failed"; exit 1; fi
 
+  # Testy z bazą (audyt 11.10.2026, E5). Do tej pory CI nie uruchamiał ANI JEDNEGO testu z bazą:
+  # `create_all` buduje inną bazę niż produkcja (modele znają 42 z 53 tabel; brak wektorów, triggera
+  # tsvector, indeksu HNSW), więc regresje w SQL-u wychodziły dopiero na produkcji.
+  # Schemat pochodzi ze zrzutu PRODUKCJI (`backend/scripts/schema/prod_schema.sql`, generowany
+  # `scripts/db_schema_refresh.sh`), dane startowe z `seed.sql` (minimum, bez danych osobowych).
+  # Baza żyje tylko w tym jobie (usługa na 127.0.0.1) — produkcji nie widzi, a klucze są atrapami.
+  # Lista = testy, które SAME zakładają swoje dane i je sprzątają. Poza nią zostają testy mierzące
+  # stan prawdziwej bazy (--db w feed_dedup, summary_context…), zależne od roku (test_waste_reminder)
+  # i od rejestru CEIDG (dane osobowe). Nowy test z bazą → dopisz tu; nowy wiersz startowy → seed.sql.
+  db-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: centrum_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d centrum_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:5432/centrum_ci
+      OPENAI_API_KEY: sk-ci-atrapa
+      OPENWEATHER_API_KEY: ci-atrapa
+      JWT_SECRET: ci-atrapa-ci-atrapa-ci-atrapa-ci-atrapa
+      TZ: Europe/Warsaw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Schemat produkcji i dane startowe
+        run: |
+          psql "postgresql://ci:ci@127.0.0.1:5432/centrum_ci" -v ON_ERROR_STOP=1 -q \
+            -f scripts/schema/prod_schema.sql -f scripts/schema/seed.sql
+      - name: Rejestr migracji (baseline, potem check — baza ze zrzutu ma być kompletna)
+        run: |
+          python -m scripts.migrate --baseline --yes
+          python -m scripts.migrate --check
+      - name: Testy z bazą
+        run: |
+          set -u
+          failed=""
+          for t in \
+            test_job_runs:--db test_p24_ipn test_auth test_trial_lifecycle \
+            test_batch_resilience test_solectwa
+          do
+            name="${t%%:*}"; args=""; [ "$name" != "$t" ] && args="${t#*:}"
+            echo "::group::$name $args"
+            if python -u -m "scripts.$name" $args </dev/null; then echo "OK $name"; else failed="$failed $name"; fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then echo "::error::Czerwone:$failed"; exit 1; fi
+
   deploy:
-    needs: tests
+    needs: [tests, db-tests]
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
