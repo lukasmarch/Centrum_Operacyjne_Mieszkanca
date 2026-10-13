@@ -1189,6 +1189,32 @@ sołectwa ma zobaczyć więcej osób niż na prywatnym profilu sołtysa.
   kasuje całą domenę (wspólna `@qa.rybnolive.pl` zabierała konta z ręcznego testu)
 - Po starcie sołtysa Żabin: wyłączyć źródło „Facebook - Sołtys Żabiny” (`ANNOUNCEMENT_ONLY_SOURCES`)
 
+## Dane pozyskania, pomiar strony i CSP (2026-10-13, audyt E8)
+**Retencja `acq_*` nie istniała, a usunięcie konta zostawiało `acq_session_id` na zanonimizowanym rekordzie** —
+„usunięte" konto dalej wskazywało swoje wiersze w `site_events`. Eksport (art. 15/20) nie miał ani `acq_*`, ani zdarzeń.
+- **Retencja** (`retention_job.purge_acquisition`): `acq_session_id` (konta i `push_subscriptions`) znika po **90 dniach**,
+  jak w `site_events`; kampania, strona wejścia i data pierwszej wizyty po **24 miesiącach**. Wiek = `coalesce(acq_first_seen,
+  created_at)`. Pierwsze realne wygaszenie na prod: ok. 29.11.2026 (najstarsze dane z 31.08)
+- **DSAR**: usunięcie konta kasuje `site_events` osoby po `user_id` ORAZ po identyfikatorach wizyt z konta i subskrypcji
+  push (także te sprzed rejestracji) i czyści `acq_*`; eksport dostaje bloki `acquisition` i `site_events` (limit 1000)
+- ⚠️ Pułapka: `acq_session_id` to jedyny klucz łączący zdarzenia z osobą sprzed rejestracji — nowa tabela z identyfikatorem
+  wizyty musi wejść do `_acquisition_session_ids` w `users/dsar.py`, inaczej DSAR jej nie zobaczy
+- **CSP w trybie raportowania** (Caddy `Content-Security-Policy-Report-Only` + `Reporting-Endpoints`, tylko `rybnolive.pl`).
+  Polityka sprawdzona headless Chrome na 19 trasach prod — 0 naruszeń; harness zweryfikowany na celowo zaostrzonej polityce.
+  `img-src https:` szerokie, bo obrazy artykułów z wielu portali; `style-src 'unsafe-inline'` (inline `<style>` + `style=` Reacta)
+- **`POST /api/csp-report`** (publiczny, wpis w `PUBLIC_WRITE_ROUTES`): zawsze 204, limit 30/min/IP i 300/min globalnie,
+  ciało ≤ 16 kB, zapis ZAGREGOWANY w `csp_violations` (dyrektywa × źródło jako sam `schemat://host` × ścieżka, licznik), bez IP/UA.
+  ⚠️ **Adres strony traci parametry zapytania** — w linkach są tokeny resetu hasła i zaproszeń (`?kod=`); sufit 500 różnych
+  wpisów; retencja 30 dni od ostatniego wystąpienia. Odczyt: `python -u -m scripts.csp_report [--days 14]`
+- ⚠️ **Zmiana Caddyfile = `up -d --force-recreate caddy`** (bind mount pojedynczego pliku; `reload` widzi stary inode).
+  13.10 przerwa ok. 1–2 s (pomiar), certyfikaty w `caddy_data` przeżyły
+- **Blokowanie CSP NIE jest włączone** — po ~2 tygodniach raportów (od 27.10) `scripts.csp_report`, potem decyzja
+  (zmiana nagłówka na `Content-Security-Policy`). Raporty `chrome-extension://…` to szum rozszerzeń użytkowników
+- Polityka prywatności: dopisane wiersze o pomiarze odwiedzin i danych pozyskania (sekcje 2, 6, 7), **wersja `PRIVACY_VERSION`
+  celowo bez zmian** (to znacznik zapisywany przy rejestracji, nie ma przepływu ponownej zgody; opisujemy praktykę, nie nową zgodę —
+  do oceny prawnika). Raporty CSP nie są w polityce: to agregat bez danych osobowych
+- Testy: `test_privacy_retention` (17), `test_csp_report` (27) — oba w `db-tests`
+
 ## Sołtysi: korekta i odwołanie po publikacji (2026-10-13)
 **Opublikowanego ogłoszenia nie dało się poprawić ani wycofać** (audyt T-06): edycja zwracała 409,
 a awaryjne `DELETE /api/articles` padało na kluczach obcych (`solectwo_posts.article_id`,
@@ -1303,6 +1329,8 @@ pięć deployów: pogoda >2 h bez odświeżenia, ruch z 10:00 przepadł (audyt F
 - [x] ~~Front na produkcji~~ ✅ 30.08, `5831478` — beacon łapie realny ruch
 - [x] ~~Webhook Resend~~ ✅ 30.08 — podpis zweryfikowany NA PRODUKCJI wierszem
       kontrolnym: podrobiony odrzucony, prawidłowy zapisał `opened_at` i `clicked_at`
+- [ ] **Raporty CSP po ~2 tygodniach (od 27.10)**: `docker exec -w /app centrum-backend-1 python -u -m scripts.csp_report --days 14`,
+      dopuścić zamierzone źródła, potem przełączyć `Content-Security-Policy-Report-Only` → `Content-Security-Policy`
 - [ ] **Pierwszy odczyt `site_events` po tygodniu** (`python -u -m scripts.site_report
       --days 7`), potem dopiero decyzja o GA4
 - [ ] Cztery sierpniowe konta (id 8–11) zadały łącznie **1 pytanie** agentowi i żadne
