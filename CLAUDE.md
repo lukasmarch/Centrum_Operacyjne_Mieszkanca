@@ -1297,7 +1297,7 @@ pięć deployów: pogoda >2 h bez odświeżenia, ruch z 10:00 przepadł (audyt F
 Cofnięcie: `docker tag centrum-backend:rollback centrum-backend:latest && docker compose -f docker-compose.prod.yml up -d backend`.
 Odświeżenie wersji = świadomy commit: `bash scripts/refresh_constraints.sh` → CI → deploy. Dowód: freeze nowego obrazu = prod (0 różnic).
 - ⚠️ `sort` na serwerze i lokalnie różnią się lokalizacją — porównuj `LC_ALL=C`
-**E1 etap A ✅ (lokalnie):** dwa strażniki funkcji lokalności (`places_in`, `article_scope`, `is_local_article`,
+**E1 etap A ✅ (prod 13.10; strażniki w CI):** dwa strażniki funkcji lokalności (`places_in`, `article_scope`, `is_local_article`,
 `locality_factor`, `gmina_subject`, `is_foreign_region`, reguła briefingu):
 - `python -m scripts.locality_gold --check` — golden master 6120 wpisów lokalnej bazy (`scripts/golden/locality_gold.json`,
   tylko id + wyniki, bez tekstów). Warunek zaliczenia etapu B: **0 różnic**. `--record` tylko przy celowej zmianie zachowania
@@ -1311,7 +1311,7 @@ Odświeżenie wersji = świadomy commit: `bash scripts/refresh_constraints.sh` �
   bramka pusha dalej czyta treść (Gralewo z wpisu o Płośnicy = push, decyzja z `test_alert_policy`; pominięty alert kosztuje więcej niż fałszywy)
 - ⚠️ Pozostałe 2 znane błędy: Radio 7 o Ciechanowie i Zawidzu — wpisy BEZ oceny lokalności (sprzed 21.08); kod bez oceny nie ma jak wiedzieć
 
-**E1 etap B ✅ (lokalnie, do wdrożenia):** `services/places.py` = JEDYNE miejsce z nazwami wsi. Trzy listy to trzy RÓŻNE pojęcia,
+**E1 etap B ✅ (prod 13.10, `90276ef`; poprawki lokalności `02ae974` też):** `services/places.py` = JEDYNE miejsce z nazwami wsi. Trzy listy to trzy RÓŻNE pojęcia,
 nie duplikaty: `MIEJSCOWOSCI` 22 (nazwy w tekście, z odmianą), `SOLECTWA` 20 (BIP), `HARMONOGRAM` 24 (odpady/profil, kolejność = UI).
 `alert_policy`, `gmina_facts`, `auth/schemas`, `ai/tools/daily` i prompt briefingu (`PROMPT_NOMINATIVES`) czytają z niego.
 - Strażnik `python -m scripts.test_places_guard` (w CI): czerwieni literał z ≥4 nazwami poza `places.py` (wyjątek `# places-ok: powód`),
