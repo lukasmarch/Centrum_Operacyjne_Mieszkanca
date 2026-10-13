@@ -165,10 +165,50 @@ from src.services.places import (  # noqa: E402
 )
 
 
+# Dwa konteksty, w których nazwa wsi z naszej listy NIE oznacza naszej wsi (audyt E1,
+# 13.10.2026; trzy z ośmiu znanych błędów lokalności z `test_locality_gold`):
+#
+#  • NAZWA Z PRZYDOMKIEM — „Nowa Wieś Ełcka", „Gronowo Elbląskie": polska toponimia
+#    rozróżnia tak tysiące wsi o tej samej nazwie. Przydomek to wielka litera + końcówka
+#    -sk-/-ck-, stojąca BEZPOŚREDNIO po nazwie. Liczy się, gdy WSZYSTKIE wystąpienia
+#    nazwy w tekście mają przydomek — jedno gołe „Nowa Wieś" zostaje trafieniem.
+#  • NAGŁÓWEK ENERGI Z INNĄ GMINĄ — „… Region Mława - Płośnica gmina wiejska" wymienia
+#    wsie TEJ gminy (`energa_other_gmina`). ⚠️ Używa tego WYŁĄCZNIE etykieta zasięgu
+#    (`feed_policy.article_scope`), NIE `places_in`: bramka pusha świadomie czyta treść,
+#    bo lista ulic Energi przekracza granice gmin (Gralewo — `test_alert_policy`), a pominięty
+#    alert kosztuje więcej niż fałszywy.
+_QUALIFIER_RE = re.compile(r"\s+[A-Z][a-z]+(?:sk|ck)(?:a|ie|i|iej|iego|im|ich)\b")
+_ENERGA_GMINA_RE = re.compile(r"-\s*([a-z][a-z ]*?)\s+gmina\s+(?:wiejska|miejska|miejsko-wiejska)\b")
+
+
+def energa_other_gmina(title: Optional[str]) -> bool:
+    """Tytuł Energi opisuje gminę INNĄ niż Rybno („… - Płośnica gmina wiejska")."""
+    header = _ENERGA_GMINA_RE.search(_flat(title))
+    return bool(header) and header.group(1).strip() != "rybno"
+
+
+def _deaccent_keep_case(text: str) -> str:
+    stripped = unicodedata.normalize("NFKD", text.replace("ł", "l").replace("Ł", "L"))
+    return "".join(c for c in stripped if not unicodedata.combining(c))
+
+
 def places_in(title: Optional[str], content: Optional[str] = None) -> tuple[str, ...]:
     """Nazwy miejscowości z gminy Rybno, które padły w tekście."""
     text = _flat(f"{title or ''} {content or ''}")
-    return tuple(place for place, pattern in _PLACE_RE if pattern.search(text))
+    found = tuple(place for place, pattern in _PLACE_RE if pattern.search(text))
+    if not found:
+        return found
+    raw = _deaccent_keep_case(f"{title or ''} {content or ''}")
+    return tuple(place for place in found if not _only_qualified(place, raw))
+
+
+def _only_qualified(place: str, raw: str) -> bool:
+    """Wszystkie wystąpienia nazwy mają przydomek („Nowa Wieś Ełcka")."""
+    if place == "Rybno":
+        return False  # „Rybno Pomorskie koło Działdowa" (art. 3073) to prawdopodobnie NASZE Rybno
+    pattern = dict(_PLACES)[place]
+    hits = list(re.finditer(r"\b" + pattern + r"\b", raw, re.IGNORECASE))
+    return bool(hits) and all(_QUALIFIER_RE.match(raw, m.end()) for m in hits)
 
 
 # Instytucja albo drużyna, która nosi nazwę wsi z gminy — „KOGO dotyczy” wpis

@@ -146,7 +146,9 @@ async def active_alerts(ctx: ToolContext) -> ToolResult:
             # `article_scope`, nie `is_local_article` — patrz `feed_policy`.
             # Ta druga przepuszcza cały „Powiat Działdowski (RSS)" jako nasz,
             # więc awaria w Działdowie szła do mieszkańca Rybna jako jego.
-            "zasieg": article_scope(source_name, article.title, article.content),
+            "zasieg": article_scope(
+                source_name, article.title, article.content, getattr(article, "locality", None)
+            ),
             "ogloszono": (
                 f"{_local(article.published_at):%d.%m.%Y}"
                 if article.event_at and article.published_at else None

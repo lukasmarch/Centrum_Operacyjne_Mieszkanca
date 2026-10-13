@@ -233,7 +233,7 @@ def _scope_of(article, source_name: Optional[str]) -> str:
         if locality >= MIN_ARTICLE_LOCALITY:
             return "gmina"
         return "okolice" if locality == 2 else "region"
-    label = article_scope(source_name, article.title, article.content)
+    label = article_scope(source_name, article.title, article.content)  # brak oceny — patrz wyżej
     return {"gmina Rybno": "gmina", "okolice": "okolice"}.get(label, "region")
 
 

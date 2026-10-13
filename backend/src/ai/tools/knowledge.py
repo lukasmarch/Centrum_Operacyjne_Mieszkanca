@@ -397,7 +397,9 @@ async def latest_local_news(ctx: ToolContext, hours: int = FEED_WINDOW_H) -> Too
         # `article_scope`, nie `is_local_article`: ta druga mówi „nasz region"
         # i jest celowo szeroka (steruje rankingiem). Jako ETYKIETA kłamie —
         # blok komunalny w Działdowie szedł do mieszkańca jako „gmina Rybno".
-        zasieg = article_scope(source_name, article.title, article.content)
+        zasieg = article_scope(
+            source_name, article.title, article.content, getattr(article, "locality", None)
+        )
         lokalne += zasieg == "gmina Rybno"
         wpisy.append({
             "kiedy": time_label(

@@ -96,7 +96,7 @@
   "title": "Ciechanów stawia na elektryki. Do miejskiej floty dołączą kolejne autobusy",
   "content": "",
   "expected": "poza regionem",
-  "note": "Ciechanów — źródło lokalne bez nazwy z gminy",
+  "note": "Ciechanów — źródło lokalne bez nazwy z gminy — wpis BEZ oceny lokalności (sprzed 21.08): kod nie ma jak wiedzieć; nowe wpisy dostają ocenę",
   "flag": "bug:okolice"
  },
  {
@@ -116,7 +116,7 @@
   "title": "Nowe dachy na stacjach uzdatniania wody. Gmina Zawidz inwestuje w infrastrukturę wodociągową",
   "content": "",
   "expected": "poza regionem",
-  "note": "gmina Zawidz (powiat żuromiński)",
+  "note": "gmina Zawidz (powiat żuromiński) — wpis BEZ oceny lokalności (sprzed 21.08): kod nie ma jak wiedzieć; nowe wpisy dostają ocenę",
   "flag": "bug:okolice"
  },
  {
@@ -207,7 +207,7 @@
   "content": "",
   "expected": "poza regionem",
   "note": "Mławianka — Mława",
-  "flag": "bug:okolice"
+  "flag": ""
  },
  {
   "id": 6477,
@@ -217,7 +217,7 @@
   "content": "",
   "expected": "poza regionem",
   "note": "Jurand Ciechanów",
-  "flag": "bug:okolice"
+  "flag": ""
  },
  {
   "id": 6169,
@@ -267,7 +267,7 @@
   "content": "ENERGA-OPERATOR — TRWA przerwa w dostawie energii elektrycznej (wyłączenie prądu), 22.08.2026 10:32–14:45. Płośnica gmina wiejska 22.08.2026 10:32-14:45 - Gralewo.",
   "expected": "okolice",
   "note": "Energa: Płośnica, wieś Gralewo o tej samej nazwie co nasza",
-  "flag": "bug:gmina Rybno"
+  "flag": ""
  },
  {
   "id": 6277,
@@ -377,7 +377,7 @@
   "content": "Fot. GDDKiA Olsztyn Czy Warmia i Mazury wkrótce zamienią się w wielki plac budowy? Zarząd Dróg Wojewódzkich planuje ambitne inwestycje drogowe, których łączna wartość sięgnie niemal 3 miliardów złotyc … mie kilometr i dwieście metrów drogi w miejscowości Kikity (gmina Jeziorany). To miejsca, co do których wiemy, że nie pozyskamy na nie środków zewnętrznych, dlatego staramy się realizo … ódzie w granicach administracyjnych miasta – 1,97 km, 23. DW 621 – rozbudowa drogi wojewódzkiej nr 621 na odcinku Ełk – Nowa Wieś Ełcka – 3,55 km, 24. DW 655 – rozbudowa drogi wojewódzkiej nr 655 na odcinku Olecko – Wieliczki – 3,68 km, 25. DW 656 –",
   "expected": "poza regionem",
   "note": "Nowa Wieś Ełcka z listy dróg wojewódzkich",
-  "flag": "bug:gmina Rybno"
+  "flag": ""
  },
  {
   "id": 5636,
@@ -387,7 +387,7 @@
   "content": "Fot. A. Piedziewicz W najbliższą sobotę odbędzie się Krajowy Trening Reagowania. Podczas spotkań będzie można dowiedzieć się, jak działają syreny alarmowe i co oznaczają poszczególne sygnały. Będzie t … zapewniał senator PSL Gustaw Marek Brzezin , prezes Związku OSP w województwie warmińsko-mazurskim. Wydarzenie będzie też okazją do sprawdzenia systemów alarmowania, ponieważ we wszys …  w Gołdapi, Promenada Zdrojowa 14, 19-500 Gołdap Gmina Grodziczno – Remiza OSP, Grodziczno 16A, 13-324 Grodziczno Gmina Gronowo Elbląskie – plac dożynkowy, ul. Osiedlowa 6, 82-335 Gronowo Elbląskie Gmina Iława – teren przy świetlicy wiejskiej, Wola Kamieńska 27, 14-200 Iława Gmina Jonkowo – budynek OSP, ul",
   "expected": "poza regionem",
   "note": "Gronowo Elbląskie z listy gmin",
-  "flag": "bug:gmina Rybno"
+  "flag": ""
  },
  {
   "id": 5266,
@@ -547,7 +547,7 @@
   "content": "Gmina Ostróda ma typowo rolniczy charakter – ponad połowę jej powierzchni stanowią użytki rolne, a na jej terenie działa około 550 gospodarstw różnej wielkości. To ważna część lokalnej gospodarki, któ",
   "expected": "poza regionem",
   "note": "gmina Ostróda",
-  "flag": "bug:okolice"
+  "flag": ""
  },
  {
   "id": 6594,

@@ -1302,9 +1302,14 @@ Odświeżenie wersji = świadomy commit: `bash scripts/refresh_constraints.sh` �
 - `python -m scripts.locality_gold --check` — golden master 6120 wpisów lokalnej bazy (`scripts/golden/locality_gold.json`,
   tylko id + wyniki, bez tekstów). Warunek zaliczenia etapu B: **0 różnic**. `--record` tylko przy celowej zmianie zachowania
 - `python -m scripts.test_locality_gold` (w CI) — 60 wpisów oznaczonych ręcznie (`scripts/fixtures/locality_gold_60.json`):
-  52/60 zgodnych, **8 znanych błędów** z flagą `bug:` (test psuje się też, gdy błąd zostanie naprawiony — flagę trzeba zdjąć), 3 sporne
-- ⚠️ Znane błędy: listy w Radiu Olsztyn (Nowa Wieś Ełcka, Gronowo Elbląskie) liczone jako gmina Rybno; Gralewo w Energa/Płośnica;
-  źródła lokalne (Radio 7) o Ciechanowie, Mławie, Zawidzu, gminie Ostróda dostają „okolice" zamiast „poza regionem"
+  58/60 zgodnych (po naprawach 13.10), **2 znane błędy** z flagą `bug:` (test psuje się też, gdy błąd zostanie naprawiony — flagę trzeba zdjąć), 3 sporne
+- **Naprawy lokalności 13.10 (decyzja Łukasza: obce tematy = „poza regionem", Płośnica = „okolice")**:
+  `article_scope(…, locality)` — media regionalne (`REGIONAL_MEDIA_SOURCES`: Radio 7, Moje Działdowo, Panorama) z oceną 0–1 → „poza regionem"
+  (238 zmian etykiety, w większości Żuromin/Mława/Płock). ⚠️ NIE dla innych źródeł lokalnych: ocena 1 znaczy też „wpis bez nazwy
+  miejscowości" (pozdrowienie Syli). `places_in` ignoruje nazwę z PRZYDOMKIEM („Nowa Wieś Ełcka", „Gronowo Elbląskie"; wyjątek: samo Rybno —
+  „Rybno Pomorskie koło Działdowa" to prawdopodobnie nasze). Tytuł Energi z inną gminą (`energa_other_gmina`) → „okolice" — **tylko w etykiecie**:
+  bramka pusha dalej czyta treść (Gralewo z wpisu o Płośnicy = push, decyzja z `test_alert_policy`; pominięty alert kosztuje więcej niż fałszywy)
+- ⚠️ Pozostałe 2 znane błędy: Radio 7 o Ciechanowie i Zawidzu — wpisy BEZ oceny lokalności (sprzed 21.08); kod bez oceny nie ma jak wiedzieć
 
 **E1 etap B ✅ (lokalnie, do wdrożenia):** `services/places.py` = JEDYNE miejsce z nazwami wsi. Trzy listy to trzy RÓŻNE pojęcia,
 nie duplikaty: `MIEJSCOWOSCI` 22 (nazwy w tekście, z odmianą), `SOLECTWA` 20 (BIP), `HARMONOGRAM` 24 (odpady/profil, kolejność = UI).

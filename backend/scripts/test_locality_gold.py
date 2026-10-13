@@ -37,7 +37,7 @@ def main() -> int:
     failures: list[str] = []
     correct = known = 0
     for case in cases:
-        got = article_scope(case["source"], case["title"], case["content"])
+        got = article_scope(case["source"], case["title"], case["content"], case["locality"])
         flag = case["flag"]
         label = f"#{case['id']} [{case['source']}] {case['title'][:60]}"
         if flag.startswith("bug:"):

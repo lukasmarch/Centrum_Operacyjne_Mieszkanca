@@ -67,7 +67,7 @@ def evaluate(source: Optional[str], title: Optional[str], content: Optional[str]
         is_foreign_region(title, content),
         gmina_subject(title, content),
         is_local_article(source, title, content),
-        article_scope(source, title, content),
+        article_scope(source, title, content, locality),
         locality_factor(locality, source, title, content),
         locality_factor(None, source, title, content),
         briefing_local,

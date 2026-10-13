@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import and_, case, func, or_
 
 from src.services.alert_policy import (
+    energa_other_gmina,
     incident_of,
     is_foreign_region,
     places_in,
@@ -174,6 +175,15 @@ LOCAL_SOURCES: frozenset[str] = COUNTY_WIDE_SOURCES | {
     "Łaciate Mazury MTB",
 }
 
+# Media piszące o całym regionie (Ciechanów, Mława, gmina Ostróda): dla nich ocena lokalności
+# 0–1 znaczy „to nie nasze". Dla pozostałych źródeł lokalnych NIE — tam 1 znaczy często
+# „wpis bez nazwy miejscowości" (poranne pozdrowienie Syli), a nie „obcy". Audyt E1, 13.10.2026.
+REGIONAL_MEDIA_SOURCES: frozenset[str] = frozenset({
+    "Radio 7 Działdowo (RSS)",
+    "Moje Działdowo",
+    "Facebook - Panorama Regionu",
+})
+
 # Źródła, których nazw NIE eksponujemy w interfejsie.
 # Prywatne profile FB pokazujemy jako neutralne „źródło ↗" z linkiem do oryginału:
 # atrybucja zostaje (link), ale nie reklamujemy cudzej marki nagłówkiem
@@ -235,6 +245,7 @@ def article_scope(
     source_name: Optional[str],
     title: Optional[str] = None,
     content: Optional[str] = None,
+    locality: Optional[int] = None,
 ) -> str:
     """Etykieta miejsca DLA CZŁOWIEKA: „gmina Rybno" / „okolice" / „poza regionem".
 
@@ -258,12 +269,23 @@ def article_scope(
         return "poza regionem"  # cudze Rybno spod Sochaczewa
     if source_name in GMINA_SOURCES:
         return "gmina Rybno"
+    # Energa opisuje wyłączenie gminą z tytułu („Płośnica gmina wiejska"); nazwa wsi z naszej
+    # listy w treści (Gralewo) nie czyni z niego sprawy Rybna. Tylko etykieta — push czyta treść.
+    if source_name in COUNTY_WIDE_SOURCES and energa_other_gmina(title):
+        return "okolice"
     # Treść przed źródłem: Radio Olsztyn nie jest źródłem lokalnym, ale gdy pisze
     # O RYBNIE, to jest wiadomość z gminy. Bramka źródła postawiona wyżej
     # odcinałaby takie wpisy, zanim ktokolwiek spojrzy, o czym są.
     if places_in(title, content):
         return "gmina Rybno"
-    return "okolice" if is_local_source(source_name) else "poza regionem"
+    if not is_local_source(source_name):
+        return "poza regionem"
+    # Media regionalne (Radio 7, Moje Działdowo) piszą też o Ciechanowie, Mławie i gminie
+    # Ostróda — do 13.10.2026 szło to z etykietą „okolice" (audyt E1). Ocena 0–1 = „to nie
+    # nasze". Brak oceny (wpis sprzed 21.08 albo przed kategoryzacją) = dawne zachowanie.
+    if locality is not None and locality <= 1 and source_name in REGIONAL_MEDIA_SOURCES:
+        return "poza regionem"
+    return "okolice"
 
 
 def is_local_article(
