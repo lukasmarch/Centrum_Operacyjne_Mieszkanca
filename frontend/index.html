@@ -115,7 +115,28 @@
         @keyframes tv-tag-in { from { transform: translateX(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
         .tv-wipe { animation: tv-wipe 220ms cubic-bezier(0.16, 1, 0.3, 1) both; }
         .tv-tag-in { animation: tv-tag-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-        @media (prefers-reduced-motion: reduce) { .tv-wipe, .tv-tag-in { animation: none; } }
+        /* Pasek „Na żywo” (13.10.2026, klatki z TVN24): wjazd pasa od lewej przy
+           wczytaniu, przy zmianie migawki tekst odsłania krawędź w kolorze plakietki */
+        @keyframes tv-belt-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+        .tv-belt-in { animation: tv-belt-in 700ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+        .tv-belt-in .tv-tag-in { animation-delay: 520ms; }
+        @keyframes tv-swap-text { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+        @keyframes tv-swap-edge {
+            0% { left: 0; width: 0; opacity: 1; }
+            15% { width: 18px; }
+            85% { left: calc(100% - 18px); width: 18px; opacity: 1; }
+            100% { left: 100%; width: 0; opacity: 0; }
+        }
+        .tv-swap-text { animation: tv-swap-text 520ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+        .tv-swap-edge { position: absolute; top: 0; bottom: 0; left: 0; width: 0; pointer-events: none;
+            animation: tv-swap-edge 520ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+        .tv-belt-in .tv-swap-text, .tv-belt-in .tv-swap-edge { animation-delay: 380ms; }
+        @keyframes tv-progress { from { width: 0; } to { width: 100%; } }
+        .tv-progress { animation: tv-progress linear both; }
+        @media (prefers-reduced-motion: reduce) {
+            .tv-wipe, .tv-tag-in, .tv-belt-in, .tv-swap-text, .tv-swap-edge, .tv-progress { animation: none; }
+            .tv-swap-edge { display: none; }
+        }
 
         /* ── GlowingTile logic from assets/borders.txt ── */
         @property --glow-angle {

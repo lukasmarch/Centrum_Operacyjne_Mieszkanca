@@ -1,6 +1,7 @@
 import React from 'react';
-import { Stethoscope, Pill, AlertTriangle, Phone } from 'lucide-react';
-import { useHealthToday } from '../../src/hooks/useHealthToday';
+import { Stethoscope, Pill, AlertTriangle, Phone, ChevronDown } from 'lucide-react';
+import type { HealthTodayResponse } from '../../types';
+import { Tag } from './tv';
 
 /**
  * „Zdrowie dziś" — kto przyjmuje w ośrodku i która apteka ma dyżur.
@@ -20,7 +21,44 @@ import { useHealthToday } from '../../src/hooks/useHealthToday';
  * Kolor niesie znaczenie, tak samo jak w pasku dróg: spokojny grafik jest
  * neutralny, odstępstwo bursztynowe. Gdyby wyróżnić wszystko, wyróżnienie
  * przestaje cokolwiek znaczyć.
+ *
+ * Zwinięty (13.10.2026, uwaga Łukasza): cały żółty blok z sześcioma wierszami
+ * grafiku był najgłośniejszą rzeczą pulpitu, a zmienia się w nim jedno zdanie.
+ * Na wierzchu stoi tylko to zdanie (kto dziś nie przyjmuje); grafik i apteka
+ * są pod „Rozwiń”. Zmianę ogłasza też pasek „Na żywo” — jego migawka rozwija
+ * ten kafel.
  */
+
+export interface HealthChange {
+    clinic: string;
+    name: string;
+    /** Notatka bez daty z przodu, zdaniem zamiast wersalików */
+    note: string;
+    absent: boolean;
+}
+
+/** „13.10.2026 LEKARZ NIE PRZYJMUJE” → „Lekarz nie przyjmuje”. */
+const cleanNote = (raw: string): string => {
+    const text = raw.replace(/^\s*\d{1,2}\.\d{1,2}\.\d{2,4}\s*[:–-]?\s*/, '').trim();
+    if (text && text === text.toUpperCase()) {
+        const lower = text.toLowerCase();
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+    }
+    return text;
+};
+
+/** Dzisiejsze odstępstwa od grafiku — wspólne dla kafla i paska „Na żywo”. */
+export const healthChanges = (data: HealthTodayResponse | null): HealthChange[] =>
+    (data?.clinics ?? []).flatMap(c =>
+        c.doctors
+            .filter(d => d.notes)
+            .map(d => ({
+                clinic: c.clinic_name,
+                name: cleanName(d.name),
+                note: cleanNote(d.notes as string),
+                absent: /nie\s+przyjmuje/i.test(d.notes as string),
+            })),
+    );
 
 /** Skrót roli — „Specjalista chorób wewnętrznych, Specjalista medycyny rodzinnej"
  *  zajmuje w kaflu tyle co reszta wiersza i nie mówi mieszkańcowi nic ponad to,
@@ -92,90 +130,107 @@ const buildRows = (
  *  a backend skleja godziny zwykłym minusem. */
 const prettyHours = (hours: string): string => hours.replace(/\s*-\s*/, '–');
 
-const HealthTodayCard: React.FC<{ onOpenAssistant?: () => void }> = () => {
-    const { data, loading, error } = useHealthToday();
+interface HealthTodayCardProps {
+    data: HealthTodayResponse | null;
+    open: boolean;
+    onToggle: () => void;
+}
 
+const HealthTodayCard: React.FC<HealthTodayCardProps> = ({ data, open, onToggle }) => {
     // Cisza zamiast szkieletu: kafel wchodzi między gotowe karty „Na dziś",
     // a migający placeholder przy każdym wejściu jest gorszy niż treść
     // pojawiająca się o sekundę później (ta sama zasada co w pasku dróg)
-    if (loading || error || !data) return null;
+    if (!data) return null;
 
     const clinics = data.clinics ?? [];
     const pharmacy = (data.pharmacies ?? [])[0];
     if (!clinics.length && !pharmacy) return null;
 
     const rows = buildRows(clinics);
-    const changes = clinics.flatMap(c =>
-        c.doctors.filter(d => d.notes).map(d => ({ clinic: c.clinic_name, doctor: d })),
-    );
+    const changes = healthChanges(data);
+    const absentNames = new Set(changes.filter(c => c.absent).map(c => c.name));
     const hasChange = changes.length > 0;
 
+    // Zdanie na wierzchu: zmiana, a bez niej — kiedy ośrodek dziś pracuje
+    const first = rows[0]?.hours.split('-')[0]?.trim();
+    const last = rows.map(r => r.hours.split('-')[1]?.trim()).filter(Boolean).sort().pop();
+    const summary = rows.length
+        ? `przyjmuje dziś${first && last ? ` ${first}–${last}` : ''}`
+        : 'dziś nie przyjmuje';
+
     return (
-        <div
-            className={`px-4 py-3 ${hasChange ? 'bg-tv-yellow text-tv-ink' : 'bg-tv-panel'}`}
-        >
-            <div className="flex items-start gap-3">
-                <Stethoscope
-                    size={20}
-                    className={`mt-0.5 shrink-0 ${hasChange ? 'text-tv-ink' : 'text-tv-muted'}`}
-                    aria-hidden
-                />
+        <section id="osrodek-zdrowia" aria-label="Ośrodek zdrowia" className="scroll-mt-24">
+            <Tag as="h2">Ośrodek zdrowia</Tag>
+            <div className="bg-tv-panel">
+            <button
+                onClick={onToggle}
+                aria-expanded={open}
+                aria-controls="osrodek-zdrowia-grafik"
+                className="flex min-h-[52px] w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-tv-panel2"
+            >
+                <Stethoscope size={20} className="shrink-0 text-tv-muted" aria-hidden />
+                <span className="min-w-0 flex-1 text-[15px] leading-snug">
+                    {hasChange ? (
+                        changes.map((c, i) => (
+                            <span key={i} className="flex flex-wrap items-baseline gap-x-2">
+                                <span className="font-cond bg-tv-yellow px-1.5 py-0.5 text-[13px] font-extrabold uppercase leading-none tracking-wide text-tv-ink">
+                                    {c.absent ? 'Dziś nie przyjmuje' : 'Zmiana dziś'}
+                                </span>
+                                <span className="font-semibold text-white">
+                                    {c.name || c.clinic}
+                                    <span className="font-normal text-tv-muted"> · {c.clinic}{!c.absent && ` — ${c.note}`}</span>
+                                </span>
+                            </span>
+                        ))
+                    ) : (
+                        <span className="text-tv-paper">{summary.charAt(0).toUpperCase() + summary.slice(1)}</span>
+                    )}
+                </span>
+                <span className="flex shrink-0 items-center gap-1 text-[14px] font-bold text-tv-bluesoft">
+                    <span>{open ? 'Zwiń' : 'Rozwiń'}</span>
+                    <ChevronDown size={18} aria-hidden className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+                </span>
+            </button>
 
-                <div className="min-w-0 flex-1">
-                    <p className={`text-[15px] font-bold leading-snug ${hasChange ? "text-tv-ink" : "text-tv-paper"}`}>
-                        Ośrodek zdrowia dziś
-                    </p>
-
+            {open && (
+                <div id="osrodek-zdrowia-grafik" className="border-t border-tv-seam px-4 pb-3 pt-2.5 sm:pl-[52px]">
                     {rows.length > 0 ? (
-                        <ul className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-                            {rows.map((row, i) => (
-                                <React.Fragment key={i}>
-                                    <li className={`whitespace-nowrap text-[15px] font-semibold tabular-nums ${hasChange ? "text-tv-ink" : "text-white"}`}>
-                                        {prettyHours(row.hours)}
-                                    </li>
-                                    <li className={`min-w-0 text-[15px] leading-snug ${hasChange ? "text-tv-ink" : "text-tv-muted"}`}>
-                                        <span className={`font-semibold ${hasChange ? "text-tv-ink" : "text-tv-paper"}`}>{row.clinic}</span>
-                                        {row.who && <> · {row.who}</>}
-                                    </li>
-                                </React.Fragment>
-                            ))}
+                        <ul className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                            {rows.map((row, i) => {
+                                const off = row.who.split(', ').some(n => absentNames.has(n));
+                                return (
+                                    <React.Fragment key={i}>
+                                        <li className={`whitespace-nowrap text-[15px] font-semibold tabular-nums ${off ? 'text-tv-muted line-through' : 'text-white'}`}>
+                                            {prettyHours(row.hours)}
+                                        </li>
+                                        <li className="min-w-0 text-[15px] leading-snug text-tv-muted">
+                                            <span className="font-semibold text-tv-paper">{row.clinic}</span>
+                                            {row.who && <> · <span className={off ? 'line-through' : ''}>{row.who}</span></>}
+                                            {off && (
+                                                <span className="ml-2 inline-flex items-center gap-1 font-semibold text-tv-yellow">
+                                                    <AlertTriangle size={14} aria-hidden />
+                                                    nie przyjmuje
+                                                </span>
+                                            )}
+                                        </li>
+                                    </React.Fragment>
+                                );
+                            })}
                         </ul>
                     ) : (
-                        <p className={`mt-1 text-[15px] ${hasChange ? "text-tv-ink" : "text-tv-muted"}`}>
-                            Dziś ośrodek nie przyjmuje.
-                        </p>
-                    )}
-
-                    {/* Zmiana jest jedynym powodem, dla którego ktoś ma przeczytać
-                        ten kafel uważnie — dostaje własny wiersz, nie przypis */}
-                    {hasChange && (
-                        <div className="mt-2 space-y-1 border-t border-black/25 pt-2">
-                            {changes.map(({ clinic, doctor }, i) => (
-                                <p key={i} className="flex items-start gap-2 text-[15px] font-semibold leading-snug text-tv-ink">
-                                    <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden />
-                                    <span>
-                                        <span className="font-semibold">
-                                            {clinic}
-                                            {cleanName(doctor.name) && ` · ${cleanName(doctor.name)}`}
-                                        </span>
-                                        {' — '}
-                                        {doctor.notes}
-                                    </span>
-                                </p>
-                            ))}
-                        </div>
+                        <p className="text-[15px] text-tv-muted">Dziś ośrodek nie przyjmuje.</p>
                     )}
 
                     {pharmacy && (
-                        <p className={`mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t pt-2 text-[15px] ${hasChange ? 'border-black/25 text-tv-ink' : 'border-tv-seam text-tv-muted'}`}>
+                        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-tv-seam pt-2 text-[15px] text-tv-muted">
                             <Pill size={15} className="shrink-0" aria-hidden />
                             <span>Apteka dyżurna:</span>
-                            <span className={`font-semibold ${hasChange ? 'text-tv-ink' : 'text-white'}`}>{pharmacy.name}</span>
+                            <span className="font-semibold text-white">{pharmacy.name}</span>
                             <span className="whitespace-nowrap tabular-nums">{prettyHours(pharmacy.hours)}</span>
                             {pharmacy.phone && (
                                 <a
                                     href={`tel:${pharmacy.phone.replace(/[^\d+]/g, '')}`}
-                                    className={`inline-flex min-h-[44px] items-center gap-1 font-semibold underline underline-offset-2 ${hasChange ? "text-tv-ink" : "text-tv-bluesoft hover:text-white"}`}
+                                    className="inline-flex min-h-[44px] items-center gap-1 font-semibold text-tv-bluesoft underline underline-offset-2 hover:text-white"
                                 >
                                     <Phone size={12} aria-hidden />
                                     {pharmacy.phone}
@@ -184,8 +239,9 @@ const HealthTodayCard: React.FC<{ onOpenAssistant?: () => void }> = () => {
                         </p>
                     )}
                 </div>
+            )}
             </div>
-        </div>
+        </section>
     );
 };
 

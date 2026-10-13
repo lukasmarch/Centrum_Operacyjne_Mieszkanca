@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ClipboardList, MapPin, ArrowRight, Camera } from 'lucide-react';
 import { fetchReports, getImageUrl, STATUS_CONFIG } from '../../src/services/reportsApi';
 import { Report } from '../../types';
-import { RowLink } from './tv';
+import { RowLink, Tag } from './tv';
 
 interface ReportsMiniProps {
     onOpenReports: () => void;
@@ -79,7 +79,7 @@ const ReportsMini: React.FC<ReportsMiniProps> = ({ onOpenReports }) => {
 
     return (
         <section aria-label="Zgłoszenia 24">
-            <h2 className="sr-only">Zgłoszenia 24</h2>
+            <Tag as="h2">Zgłoszenia 24</Tag>
 
             {/*
               Pusto znaczy „bądź pierwszy", nie „tu nic nie ma". To jedyna sekcja,

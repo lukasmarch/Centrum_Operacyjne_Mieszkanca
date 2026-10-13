@@ -84,11 +84,14 @@ const BriefingCard: React.FC<BriefingCardProps> = ({ onShowAll }) => {
     // się wyłącznie w dniu, którego dotyczy.
     if (day?.stale) {
         return (
-            <section aria-label="Briefing dnia" className="flex flex-wrap items-center justify-between gap-x-4 border-y border-tv-seam py-2">
-                <p className="text-[15px] text-tv-muted">
-                    Dzisiejszy briefing jeszcze nie powstał. Ostatni: <span className="font-semibold text-tv-paper">{day.label}, {updated}</span>
-                </p>
-                <RowLink onClick={onShowAll}>Wiadomości z gminy</RowLink>
+            <section aria-label="Briefing dnia">
+                <Tag as="h2">Briefing dnia</Tag>
+                <div className="flex flex-wrap items-center justify-between gap-x-4 bg-tv-panel px-4 py-1 lg:px-5">
+                    <p className="py-2 text-[15px] text-tv-muted">
+                        Dzisiejszy briefing jeszcze nie powstał. Ostatni: <span className="font-semibold text-tv-paper">{day.label}, {updated}</span>
+                    </p>
+                    <RowLink onClick={onShowAll}>Wiadomości z gminy</RowLink>
+                </div>
             </section>
         );
     }

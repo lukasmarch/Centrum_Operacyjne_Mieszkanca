@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MAP_ATTRIBUTION, MAP_TILE_URL } from '../utils/mapTiles';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { createPortal } from 'react-dom';
@@ -930,7 +931,8 @@ const AlertMap: React.FC<{
     const FitBounds: React.FC<{ bounds: L.LatLngBounds }> = ({ bounds: b }) => {
         const map = useMap();
         useEffect(() => {
-            map.fitBounds(b, { padding: [40, 40], maxZoom: 15 });
+            // 13 = widać wieś i sąsiednie — przy kilku zgłoszeniach z jednej wsi 15 pokazywało same ulice
+            map.fitBounds(b, { padding: [40, 40], maxZoom: 13 });
         }, [b, map]);
         return null;
     };
@@ -942,8 +944,9 @@ const AlertMap: React.FC<{
                 <div style={{ height: 350 }}>
                     <MapContainer center={RYBNO_CENTER} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={false}>
                         <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
-                            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                            attribution={MAP_ATTRIBUTION}
+                            url={MAP_TILE_URL}
+                            maxZoom={19}
                         />
                     </MapContainer>
                 </div>
@@ -981,8 +984,9 @@ const AlertMap: React.FC<{
                 <MapContainer center={RYBNO_CENTER} zoom={12} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
                     {bounds && <FitBounds bounds={bounds} />}
                     <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
-                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                        attribution={MAP_ATTRIBUTION}
+                        url={MAP_TILE_URL}
+                            maxZoom={19}
                     />
                     {reports.map((r) => {
                         const cat = CATEGORY_CONFIG[r.category] || CATEGORY_CONFIG.other;

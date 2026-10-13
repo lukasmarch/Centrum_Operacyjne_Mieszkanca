@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Construction, Route, CircleHelp } from 'lucide-react';
 import { clockLabel, parseUtc } from '../../src/utils/articleTime';
+import { Tag } from './tv';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -70,15 +71,24 @@ const RoadStatusStrip: React.FC = () => {
     // przy każdym wejściu jest gorsze niż pasek pojawiający się o sekundę później
     if (!roads?.length) return null;
 
+    // Własna plakietka, jak kafle „Na dziś” — bez niej pasek dróg zlewał się
+    // z ośrodkiem zdrowia w jeden blok (uwaga Łukasza 13.10)
+    const wrap = (node: React.ReactNode) => (
+        <section aria-label="Drogi">
+            <Tag as="h2">Drogi</Tag>
+            {node}
+        </section>
+    );
+
     /* Ikona w kaflu, tak jak w kartach „Na dziś" — sama ikona 16 px na tle
        paska ginęła na desktopie i była praktycznie niewidoczna na telefonie.
        Kolorowe tło daje jej powierzchnię i od razu niesie stan: zielony/bursztyn */
     if (stale && !trouble.length) {
-        return (
+        return wrap(
             <p className="flex items-center gap-3 bg-tv-panel px-4 py-3">
                 <CircleHelp size={20} className="shrink-0 text-tv-muted" aria-hidden />
                 <span className="text-[15px] leading-snug text-tv-paper">
-                    Drogi: brak aktualnego odczytu
+                    Brak aktualnego odczytu
                     {readTime && <span className="text-tv-muted"> — ostatni z {readTime}</span>}
                 </span>
             </p>
@@ -86,18 +96,18 @@ const RoadStatusStrip: React.FC = () => {
     }
 
     if (!trouble.length) {
-        return (
+        return wrap(
             <p className="flex items-center gap-3 bg-tv-panel px-4 py-3">
                 <Route size={20} className="shrink-0 text-tv-green" aria-hidden />
                 <span className="text-[15px] leading-snug text-tv-paper">
-                    Drogi w okolicy <span className="font-bold text-white">przejezdne</span>
+                    W okolicy <span className="font-bold text-white">przejezdne</span>
                     <span className="text-tv-muted"> — bez zgłoszonych utrudnień</span>
                 </span>
             </p>
         );
     }
 
-    return (
+    return wrap(
         <div className="space-y-2 bg-tv-yellow px-4 py-3 text-tv-ink">
             {trouble.map(road => (
                 <p key={road.id} className="flex items-start gap-3">

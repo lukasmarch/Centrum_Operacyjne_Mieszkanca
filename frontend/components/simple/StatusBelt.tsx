@@ -1,26 +1,44 @@
-import React, { useEffect, useState } from 'react';
-import { Article } from '../../types';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronRight, Pause, Play } from 'lucide-react';
+import { Article, HealthTodayResponse } from '../../types';
 import type { OutageItem, OutageOutlook } from '../../src/hooks/useOutageOutlook';
+import { parseUtc } from '../../src/utils/articleTime';
 import { Tag, TagTone, dayWord, hourSpan, hm } from './tv';
+import { healthChanges } from './HealthTodayCard';
 
 /**
- * Belka — stan prądu i wody w Twojej wsi, w języku paska informacyjnego.
+ * Pasek „Na żywo” — pierwsza linia pulpitu i miejsce na NAJŚWIEŻSZĄ sprawę gminy.
  *
- * Plakietka (kto + kiedy) nad białym pasem (co) i żółty pasek kontekstu
- * (co jeszcze w gminie). Zastępuje dwie rzeczy naraz: czerwoną kartę
- * `AlertOfTheDay`, która istniała tylko w oknie 30 h, i brak jakiejkolwiek
- * odpowiedzi w spokojny dzień. Krytyka 11.10.2026: zapowiedziane wyłączenie
- * w Grądach stało czwarte na liście wiadomości, a strona nigdy nie mówiła
- * „u Ciebie nic nie zapowiedziano”.
+ * Do 13.10.2026 cały biały pas należał do prądu i wody. Uwaga Łukasza: to pierwsza
+ * linia, którą czytelnik ogląda — albo go zaciekawi, albo wyjdzie — a zapowiedź
+ * wyłączenia za tydzień nie zaciekawia nikogo poza jedną wsią. Teraz pas to
+ * MIGAWKI, które się podmieniają jak na pasku telewizji informacyjnej:
  *
- * Kolor = znaczenie. Czerwień tylko dla sprawy TERAZ albo w ciągu doby i tylko
- * w Twojej wsi (albo w gminie, gdy wsi nie wybrano). Zapowiedź dalej niż doba
- * — żółć. Spokój — chaber. Brak odpowiedzi z serwera — szew, i zdanie, że nie
- * sprawdziliśmy: „bez awarii” wolno powiedzieć wyłącznie po udanym sprawdzeniu.
+ *   1. awaria w Twojej wsi TERAZ albo w ciągu doby (czerwień, zawsze pierwsza),
+ *   2. zmiana w ośrodku zdrowia dziś („nie przyjmuje”) — dla wszystkich wsi,
+ *   3. ogłoszenia sołtysów — dla wszystkich wsi, bo bal w Żabinach zainteresuje
+ *      też kogoś z Rumiana; migawka mówi tylko „sołtys z X podał”, treść jest dalej,
+ *   4. najświeższe wiadomości z gminy (np. OSiR).
+ *
+ * Prąd i woda nie znikają: żółty pasek pod spodem trzyma ich stan NA STAŁE,
+ * także „bez zapowiedzianych wyłączeń” — to odpowiedź, której ktoś szuka
+ * celowo, a nie migawka, która ma przyciągnąć.
+ *
+ * Ruch: przy wczytaniu pas rozwija się od lewej (klatki z TVN24, 13.10),
+ * przy zmianie migawki tekst odsłania krawędź w kolorze plakietki. Bez ruchu
+ * przy `prefers-reduced-motion`; rotację zatrzymuje najechanie, fokus,
+ * schowana karta i przycisk pauzy (WCAG 2.2.2 — treść ruszająca się > 5 s).
  */
 
-/** Ile godzin naprzód sprawa jest „pilna” — ta sama skala co przypięcie feedu (30 h) z zapasem na całą jutrzejszą dobę. */
+/** Ile godzin naprzód awaria jest „pilna” — ta sama skala co przypięcie feedu (30 h) z zapasem. */
 const URGENT_H = 36;
+/** Ile trwa jedna migawka */
+const SLIDE_MS = 8000;
+/** Ogłoszenie sołtysa jest „świeże” przez 5 dni — sołtysi piszą rzadko */
+const SOLTYS_FRESH_H = 120;
+/** Wiadomość z gminy jest migawką przez 36 h */
+const NEWS_FRESH_H = 36;
+const SOLECTWA_SOURCE = 'RybnoLive - Sołectwa';
 
 const isUrgent = (item: OutageItem, now: Date) =>
     item.ongoing || (item.start !== null && item.start.getTime() - now.getTime() <= URGENT_H * 3_600_000);
@@ -34,153 +52,346 @@ const when = (item: OutageItem, now: Date): string => {
 
 const placesOf = (item: OutageItem) => (item.places.length ? item.places.join(', ') : 'gmina Rybno');
 
-interface BeltState {
+/** „Sołtys sołectwa Żabiny” → „Żabiny”; bez podpisu — pierwsza wieś z treści. */
+const villageOfPost = (a: Article): string | null => {
+    const m = (a.author ?? '').match(/so[łl]ectwa\s+(.+)$/i);
+    return m?.[1]?.trim() || a.alertPlaces?.[0] || null;
+};
+
+/** Link do ogłoszenia jako ścieżka TEJ strony — `url` w bazie niesie host z chwili publikacji. */
+const announcementPath = (url: string): string => {
+    try {
+        const u = new URL(url);
+        return `${u.pathname}${u.search}`;
+    } catch {
+        return url;
+    }
+};
+
+const ts = (iso: string): Date => parseUtc(iso) ?? new Date(0);
+const hoursAgo = (iso: string, now: Date) => (now.getTime() - ts(iso).getTime()) / 3_600_000;
+
+type SlideAction =
+    | { kind: 'outage' }
+    | { kind: 'health' }
+    | { kind: 'href'; href: string }
+    | { kind: 'news' };
+
+interface Slide {
+    key: string;
     tone: TagTone;
     tag: string;
-    bar: string;
-    context: React.ReactNode | null;
-    articleId?: number;
+    text: string;
+    /** Co mówi link na końcu pasa — czytelnik ma wiedzieć, dokąd idzie */
+    cta: string;
+    action: SlideAction;
 }
 
-function beltState(outlook: OutageOutlook, village: string | null, now: Date): BeltState {
-    const items = outlook.items;
+/** Klasa krawędzi odsłaniającej tekst — kolor plakietki migawki. */
+const EDGE: Record<TagTone, string> = {
+    red: 'bg-tv-red',
+    yellow: 'bg-tv-yellow',
+    blue: 'bg-tv-blue',
+    paper: 'bg-tv-ink',
+    seam: 'bg-tv-seam',
+};
+
+function buildSlides(
+    outlook: OutageOutlook | null | undefined,
+    village: string | null,
+    health: HealthTodayResponse | null,
+    articles: Article[],
+    now: Date,
+): Slide[] {
+    const slides: Slide[] = [];
     const where = village ?? 'Gmina Rybno';
-    const mine = village ? items.filter(i => i.concernsVillage) : items;
-    const lead = mine[0];
 
-    const contextFor = (exclude?: OutageItem) => {
-        const other = items.find(i => i !== exclude && !(village && i.concernsVillage));
-        if (other) {
-            return (
-                <>
-                    W gminie: <strong className="font-extrabold">{when(other, now)}</strong> — {other.label.toLowerCase()}, {placesOf(other)}
-                </>
-            );
-        }
-        return `${village ? 'W całej gminie' : 'W gminie'} nic więcej nie zapowiedziano na ${outlook.windowDays} dni`;
-    };
-
-    if (lead) {
-        const urgent = isUrgent(lead, now);
-        const span = when(lead, now);
-        return {
-            tone: urgent ? 'red' : 'yellow',
-            tag: urgent ? `${where} · ${lead.ongoing ? 'trwa teraz' : dayWord(lead.start ?? now, now)}` : `${where} · zapowiedź`,
-            bar: village
-                ? `${lead.label}: ${span}`
-                : `${lead.label} — ${placesOf(lead)}: ${span}`,
-            context: village && lead.places.length > 1
-                ? <>Dotyczy też: {lead.places.filter(p => p !== village).join(', ')}</>
-                : contextFor(lead),
-            articleId: lead.id,
-        };
+    // 1. Awaria TERAZ albo w ciągu doby — tylko ta, która dotyczy czytelnika
+    const mine = outlook ? (village ? outlook.items.filter(i => i.concernsVillage) : outlook.items) : [];
+    for (const item of mine.filter(i => isUrgent(i, now)).slice(0, 2)) {
+        slides.push({
+            key: `awaria-${item.id}`,
+            tone: 'red',
+            tag: `${where} · ${item.ongoing ? 'trwa teraz' : dayWord(item.start ?? now, now)}`,
+            text: village ? `${item.label}: ${when(item, now)}` : `${item.label} — ${placesOf(item)}: ${when(item, now)}`,
+            cta: 'sprawdź',
+            action: { kind: 'outage' },
+        });
     }
 
-    // Okno czasu W SAMYM zdaniu: „bez wyłączeń” bez zakresu brzmi jak
-    // gwarancja, a my wiemy tylko tyle, ile zapowiedziano na najbliższe dni
-    return {
-        tone: 'blue',
-        tag: `${where} · teraz`,
-        bar: `Najbliższe ${outlook.windowDays} dni: bez zapowiedzianych wyłączeń prądu i wody`,
-        context: contextFor(),
-    };
+    // 2. Ośrodek zdrowia — tylko ZMIANA, nigdy stały grafik
+    for (const change of healthChanges(health)) {
+        slides.push({
+            key: `zdrowie-${change.clinic}-${change.name}`,
+            tone: 'yellow',
+            tag: 'Ośrodek zdrowia · dziś',
+            text: change.absent
+                ? `Dziś nie przyjmuje: ${change.name || change.clinic}${change.name ? ` (${change.clinic})` : ''}`
+                : `${change.clinic}${change.name ? ` · ${change.name}` : ''}: ${change.note}`,
+            cta: 'sprawdź',
+            action: { kind: 'health' },
+        });
+    }
+
+    // 3. Sołtysi — dla wszystkich wsi, najświeższe pierwsze
+    const posts = articles
+        .filter(a => a.source === SOLECTWA_SOURCE && hoursAgo(a.rawTimestamp, now) <= SOLTYS_FRESH_H)
+        .sort((a, b) => ts(b.rawTimestamp).getTime() - ts(a.rawTimestamp).getTime())
+        .slice(0, 3);
+    for (const a of posts) {
+        const v = villageOfPost(a);
+        slides.push({
+            key: `soltys-${a.id}`,
+            tone: 'blue',
+            tag: v ? `Sołtys · ${v}` : 'Ogłoszenie sołectwa',
+            text: a.title,
+            cta: 'sprawdź',
+            action: { kind: 'href', href: announcementPath(a.url) },
+        });
+    }
+
+    // 4. Świeże wiadomości z gminy — bez awarii (mają pas niżej) i bez sołtysów (wyżej)
+    const news = articles
+        .filter(a =>
+            a.scope === 'gmina'
+            && a.source !== SOLECTWA_SOURCE
+            && !a.isPinnedAlert
+            && a.category !== 'Awaria'
+            && hoursAgo(a.rawTimestamp, now) <= NEWS_FRESH_H,
+        )
+        .slice(0, 2);
+    for (const a of news) {
+        slides.push({
+            key: `news-${a.id}`,
+            tone: 'blue',
+            tag: `${a.sourceLabel ?? 'Gmina Rybno'} · ${dayWord(ts(a.rawTimestamp), now)}`,
+            text: a.title,
+            cta: 'sprawdź',
+            action: { kind: 'news' },
+        });
+    }
+
+    return slides;
+}
+
+/** Żółty pasek: stan prądu i wody — zawsze, niezależnie od migawki. */
+function outageLine(outlook: OutageOutlook | null, village: string | null, now: Date): React.ReactNode {
+    if (outlook === null) {
+        return <>Prąd i woda: <strong className="font-extrabold">nie udało się sprawdzić komunikatów</strong> — odśwież stronę za chwilę</>;
+    }
+    const where = village ?? 'gminie';
+    const mine = village ? outlook.items.filter(i => i.concernsVillage) : outlook.items;
+    const lead = mine.find(i => !isUrgent(i, now)) ?? null;
+    const urgentShown = mine.some(i => isUrgent(i, now));
+
+    if (lead) {
+        return (
+            <>
+                Prąd i woda{village ? <> · {village}</> : ''}: <strong className="font-extrabold">{when(lead, now)}</strong>
+                {' — '}{lead.label.toLowerCase()}{!village || lead.places.length > 1 ? <>, {placesOf(lead)}</> : null}
+            </>
+        );
+    }
+    const other = outlook.items.find(i => !(village && i.concernsVillage));
+    if (urgentShown) {
+        return other
+            ? <>Prąd i woda, reszta gminy: <strong className="font-extrabold">{when(other, now)}</strong> — {other.label.toLowerCase()}, {placesOf(other)}</>
+            : <>Prąd i woda: poza tym w gminie nic nie zapowiedziano na {outlook.windowDays} dni</>;
+    }
+    // Okno czasu W SAMYM zdaniu: „bez wyłączeń” bez zakresu brzmi jak gwarancja
+    return (
+        <>
+            Prąd i woda {village ? <>w {where}</> : 'w gminie'}: <strong className="font-extrabold">najbliższe {outlook.windowDays} dni bez zapowiedzianych wyłączeń</strong>
+            {other && <> · w gminie: {when(other, now)} — {other.label.toLowerCase()}, {placesOf(other)}</>}
+        </>
+    );
+}
+
+/** Żółty pasek, gdy biały pas sam mówi o prądzie i wodzie — nie powtarzamy zdania. */
+function calmContext(outlook: OutageOutlook | null, village: string | null, now: Date): React.ReactNode {
+    if (outlook === null) return 'Odśwież stronę za chwilę. Do tego czasu nie wiemy, czy coś zapowiedziano.';
+    const other = outlook.items.find(i => !(village && i.concernsVillage));
+    if (other) {
+        return <>W gminie: <strong className="font-extrabold">{when(other, now)}</strong> — {other.label.toLowerCase()}, {placesOf(other)}</>;
+    }
+    return `${village ? 'W całej gminie' : 'W gminie'} nic więcej nie zapowiedziano na ${outlook.windowDays} dni`;
 }
 
 interface StatusBeltProps {
     outlook: OutageOutlook | null | undefined;
     village: string | null;
+    health: HealthTodayResponse | null;
+    articles: Article[];
     /** Obowiązujące ostrzeżenie meteo z feedu (przypięte, nie-awaria) */
     weatherWarning: Article | null;
     onOpenDetails: () => void;
+    onOpenHealth: () => void;
+    onOpenNews: () => void;
 }
 
-/**
- * Ruch belki gra WYŁĄCZNIE przy zmianie stanu (kontrakt kierunku, FORM).
- * Ostatni pokazany stan pamięta sessionStorage: wejście na pulpit z tym samym
- * stanem co poprzednio nie animuje niczego — inaczej „sygnatura” grałaby przy
- * każdym przejściu ze szkieletu do treści i przestałaby cokolwiek znaczyć.
- */
-const SEEN_KEY = 'rl_belt_seen';
-
-const readSeen = (): string | null => {
-    try {
-        return sessionStorage.getItem(SEEN_KEY);
-    } catch {
-        return null;
-    }
-};
-
-const StatusBelt: React.FC<StatusBeltProps> = ({ outlook, village, weatherWarning, onOpenDetails }) => {
+const StatusBelt: React.FC<StatusBeltProps> = ({
+    outlook, village, health, articles, weatherWarning, onOpenDetails, onOpenHealth, onOpenNews,
+}) => {
     const now = new Date();
+    const slides = useMemo(
+        () => buildSlides(outlook, village, health, articles, new Date()),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [outlook, village, health, articles],
+    );
 
-    const state: BeltState | null = outlook === undefined
-        ? null
-        : outlook === null
-            ? {
-                tone: 'seam',
-                tag: 'Prąd i woda',
-                bar: 'Nie udało się sprawdzić komunikatów o awariach',
-                context: 'Odśwież stronę za chwilę. Do tego czasu nie wiemy, czy coś zapowiedziano.',
-            }
-            : beltState(outlook, village, now);
-    const key = state ? `${state.tone}|${state.bar}` : null;
-
-    // Ostatni stan, który czytelnik już widział (z poprzedniego wejścia albo
-    // sprzed odświeżenia co 10 min). Animujemy tylko różnicę
-    const [shown, setShown] = useState<string | null>(readSeen);
-    const animate = key !== null && shown !== null && shown !== key;
+    const [index, setIndex] = useState(0);
+    const [paused, setPaused] = useState(false);
+    // Najechanie i fokus zatrzymują rotację tylko na chwilę — pauza z przycisku na stałe
+    const [hold, setHold] = useState(false);
+    const [hidden, setHidden] = useState(typeof document !== 'undefined' && document.hidden);
+    const rootRef = useRef<HTMLElement>(null);
 
     useEffect(() => {
-        if (!key) return;
-        try {
-            sessionStorage.setItem(SEEN_KEY, key);
-        } catch {
-            /* bez pamięci: brak animacji to bezpieczny wynik */
-        }
-        // Po zagraniu animacji kolejny render (np. zmiana wsi z powrotem) liczy od tego stanu
-        const timer = setTimeout(() => setShown(key), 400);
-        return () => clearTimeout(timer);
-    }, [key]);
+        const onVis = () => setHidden(document.hidden);
+        document.addEventListener('visibilitychange', onVis);
+        return () => document.removeEventListener('visibilitychange', onVis);
+    }, []);
 
-    // Zanim przyjdzie odpowiedź — miejsce zarezerwowane, żeby plakietki pod
-    // spodem nie skakały o 90 px, gdy belka się pojawi
-    if (!state || !key) {
+    // Zbiór migawek zmienia się przy odświeżeniu danych — indeks nie może wyjść poza listę
+    useEffect(() => {
+        if (index >= slides.length) setIndex(0);
+    }, [slides.length, index]);
+
+    const running = slides.length > 1 && !paused && !hold && !hidden;
+
+    useEffect(() => {
+        if (!running) return;
+        const timer = setTimeout(() => setIndex(i => (i + 1) % slides.length), SLIDE_MS);
+        return () => clearTimeout(timer);
+    }, [running, index, slides.length]);
+
+    // Pierwsza klatka gra wjazd całego pasa; kolejne — tylko odsłonięcie tekstu
+    const [entered, setEntered] = useState(false);
+    useEffect(() => {
+        const t = setTimeout(() => setEntered(true), 900);
+        return () => clearTimeout(t);
+    }, []);
+
+    // Zanim przyjdzie odpowiedź o awariach — miejsce zarezerwowane, żeby
+    // plakietki pod spodem nie skakały, gdy pas się pojawi
+    if (outlook === undefined) {
         return (
-            <section aria-label="Prąd i woda" aria-busy className="min-h-[124px]">
-                <span className="block h-[25px] w-40 bg-tv-panel2" />
-                <span className="mt-0 block h-[52px] w-full bg-tv-panel" />
+            <section aria-label="Na żywo w gminie" aria-busy className="min-h-[148px]">
+                <span className="block h-[29px] w-48 bg-tv-panel2" />
+                <span className="block h-[84px] w-full bg-tv-panel" />
             </section>
         );
     }
 
+    // Spokojny dzień bez żadnej migawki: pas mówi o prądzie i wodzie, jak dawniej
+    const calm: Slide = {
+        key: 'spokoj',
+        tone: outlook === null ? 'seam' : 'blue',
+        tag: `${village ?? 'Gmina Rybno'} · teraz`,
+        text: outlook === null
+            ? 'Nie udało się sprawdzić komunikatów o awariach'
+            : `Najbliższe ${outlook.windowDays} dni: bez zapowiedzianych wyłączeń prądu i wody`,
+        cta: '',
+        action: { kind: 'outage' },
+    };
+    const list = slides.length ? slides : [calm];
+    const slide = list[Math.min(index, list.length - 1)];
+    const multi = list.length > 1;
+
+    const act = () => {
+        switch (slide.action.kind) {
+            case 'outage': return onOpenDetails();
+            case 'health': return onOpenHealth();
+            case 'news': return onOpenNews();
+            case 'href': window.location.href = slide.action.href; return;
+        }
+    };
+
     const checked = outlook?.checkedAt ? hm(outlook.checkedAt) : null;
 
     return (
-        <section aria-label="Prąd i woda" aria-live="polite">
-            <Tag tone={state.tone} as="h2" className={`${animate ? "tv-tag-in " : ""}!text-[14px] !py-1.5`} key={`t-${key}`}>
-                {state.tag}
-            </Tag>
-            <div key={`b-${key}`} className={`${animate ? "tv-wipe " : ""}bg-tv-paper px-4 py-3 lg:px-6 lg:py-5`}>
-                <p className="font-cond text-[24px] font-extrabold leading-[1.08] text-tv-ink sm:text-[30px] lg:text-[44px]">
-                    {state.bar}
-                </p>
+        <section
+            ref={rootRef}
+            aria-label="Na żywo w gminie"
+            aria-roledescription={multi ? 'karuzela' : undefined}
+            className={entered ? '' : 'tv-belt-in'}
+            onMouseEnter={() => setHold(true)}
+            onMouseLeave={() => setHold(false)}
+            onFocus={() => setHold(true)}
+            onBlur={e => { if (!rootRef.current?.contains(e.relatedTarget as Node)) setHold(false); }}
+        >
+            <div className="flex items-end justify-between gap-2">
+                <Tag tone={slide.tone} as="h2" className="tv-tag-in !py-1.5 !text-[14px]" key={`t-${slide.key}`}>
+                    {slide.tag}
+                </Tag>
+                {multi && (
+                    <div className="flex items-center gap-px">
+                        <span className="tabular px-2 text-[14px] font-semibold text-tv-muted" aria-hidden>
+                            {list.indexOf(slide) + 1}/{list.length}
+                        </span>
+                        <button
+                            onClick={() => setPaused(p => !p)}
+                            aria-label={paused ? 'Wznów przewijanie' : 'Zatrzymaj przewijanie'}
+                            className="flex h-9 w-9 items-center justify-center bg-tv-panel text-tv-paper transition-colors hover:bg-tv-seam"
+                        >
+                            {paused ? <Play size={16} aria-hidden /> : <Pause size={16} aria-hidden />}
+                        </button>
+                        <button
+                            onClick={() => setIndex(i => (i + 1) % list.length)}
+                            aria-label="Następna wiadomość"
+                            className="flex h-9 w-9 items-center justify-center bg-tv-panel text-tv-paper transition-colors hover:bg-tv-seam"
+                        >
+                            <ChevronRight size={18} aria-hidden />
+                        </button>
+                    </div>
+                )}
             </div>
-            {state.context && (
+
+            <div className="relative overflow-hidden bg-tv-paper">
+                <button
+                    key={`b-${slide.key}`}
+                    onClick={act}
+                    aria-live={running ? 'off' : 'polite'}
+                    className="tv-swap group relative block min-h-[84px] w-full px-4 py-3 text-left lg:min-h-[96px] lg:px-6 lg:py-5"
+                >
+                    <span className={`tv-swap-edge ${EDGE[slide.tone]}`} aria-hidden />
+                    <span className="tv-swap-text font-cond line-clamp-2 block text-[24px] font-extrabold leading-[1.08] text-tv-ink sm:text-[30px] lg:line-clamp-1 lg:text-[42px]">
+                        {slide.text}
+                        {slide.cta && (
+                            <span className="ml-2 inline-flex translate-y-[-0.15em] items-center whitespace-nowrap align-middle font-sans text-[15px] font-bold text-tv-blue underline-offset-4 group-hover:underline lg:text-[17px]">
+                                {slide.cta}
+                                <ChevronRight size={16} aria-hidden />
+                            </span>
+                        )}
+                    </span>
+                </button>
+                {/* Ile zostało do następnej migawki — cienka linia, jak w telewizji */}
+                {multi && (
+                    <span
+                        key={`p-${slide.key}-${running}`}
+                        aria-hidden
+                        className={`absolute bottom-0 left-0 h-[3px] ${slide.tone === "yellow" ? "bg-tv-ink" : EDGE[slide.tone]} ${running ? 'tv-progress' : 'w-0'}`}
+                        style={running ? { animationDuration: `${SLIDE_MS}ms` } : undefined}
+                    />
+                )}
+            </div>
+
+            {outlook !== undefined && (
                 <p className="bg-tv-yellow px-4 py-2 text-[15px] font-semibold leading-snug text-tv-ink lg:px-5">
-                    {state.context}
+                    {slides.length ? outageLine(outlook, village, now) : calmContext(outlook, village, now)}
                     {outlook && (
                         <span className="font-normal">
-                            {' · '}wg komunikatów Energi i ZGK{checked && <>, sprawdzone <span className="tabular">{checked}</span></>}
+                            {' · '}wg Energi i ZGK{checked && <>, sprawdzone <span className="tabular">{checked}</span></>}
                         </span>
                     )}
-                    {state.articleId !== undefined && (
+                    {outlook && outlook.items.length > 0 && (
                         <>
                             {' · '}
                             <button
                                 onClick={onOpenDetails}
                                 className="font-extrabold underline underline-offset-2 hover:no-underline"
                             >
-                                szczegóły komunikatu
+                                komunikaty
                             </button>
                         </>
                     )}
@@ -188,7 +399,7 @@ const StatusBelt: React.FC<StatusBeltProps> = ({ outlook, village, weatherWarnin
             )}
 
             {weatherWarning && (
-                <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-l-0 bg-tv-panel px-4 py-2.5">
+                <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 bg-tv-panel px-4 py-2.5">
                     <Tag tone="yellow">Ostrzeżenie</Tag>
                     <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-white">
                         {weatherWarning.title}

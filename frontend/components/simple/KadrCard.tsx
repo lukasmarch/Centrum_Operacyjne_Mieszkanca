@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
 import { PHOTO_POSTS } from '../../src/data/photoPosts';
+import { Tag } from './tv';
 
 /* Weekend wyszedł z tej karty 11.10.2026 (przegląd końcowy): zdjęcie i kalendarz
    to dwie niezwiązane rzeczy, a stopka w karcie zdjęcia była trudna do znalezienia.
@@ -31,6 +32,7 @@ const KadrCard: React.FC<KadrCardProps> = () => {
 
     return (
         <section aria-label="Rybno w kadrze" className="flex flex-col">
+            <Tag as="h2">Rybno w kadrze</Tag>
             <div className="flex flex-1 flex-col bg-tv-panel">
                 <div className="relative h-48 w-full shrink-0 bg-tv-panel2 lg:h-60">
                     {post && imageOk ? (
@@ -50,9 +52,9 @@ const KadrCard: React.FC<KadrCardProps> = () => {
                 </div>
 
                 <div className="flex flex-1 flex-col px-4 pb-4 pt-3 lg:px-5">
-                    <h2 className="font-cond text-[21px] font-extrabold leading-snug text-white">
+                    <h3 className="font-cond text-[21px] font-extrabold leading-snug text-white">
                         {post ? post.title : 'Zdjęcia z gminy'}
-                    </h2>
+                    </h3>
                     <p className="mt-1 text-[15px] leading-relaxed text-[#d7dbe8]">
                         {post
                             ? post.description

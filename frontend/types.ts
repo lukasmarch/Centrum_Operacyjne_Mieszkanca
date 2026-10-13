@@ -8,6 +8,8 @@ export interface Article {
   source: string;
   /** Nazwa źródła do pokazania w UI. null → neutralne „źródło ↗" (prywatne profile FB) */
   sourceLabel: string | null;
+  /** Podpis autora — dla ogłoszeń sołectw „Sołtys sołectwa Żabiny” (pasek na pulpicie) */
+  author?: string | null;
   category: string;
   timestamp: string;
   rawTimestamp: string;

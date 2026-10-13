@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MAP_ATTRIBUTION, MAP_TILE_URL } from '../src/utils/mapTiles';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { ActiveBus, BusStop, BusTripTimetable } from '../types';
@@ -147,10 +148,9 @@ const BusMap: React.FC<BusMapProps> = ({ activeBuses, stops, trips }) => {
         center={center}
         zoom={11}
         scrollWheelZoom={false}
-        attributionControl={false}
         className="h-full w-full"
       >
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+        <TileLayer url={MAP_TILE_URL} attribution={MAP_ATTRIBUTION} maxZoom={19} />
 
         {/* Trasa — jedna linia, bez poświaty */}
         <Polyline positions={routeCoords} pathOptions={{ color: TV_BLUE, weight: 4, opacity: 0.9 }} />

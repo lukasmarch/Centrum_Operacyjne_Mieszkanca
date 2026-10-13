@@ -8,6 +8,7 @@ import { resolveWasteTown } from '../utils/wasteTown';
 import { useEvents } from '../hooks/useEvents';
 import { useMyVillage } from '../hooks/useMyVillage';
 import { useOutageOutlook } from '../hooks/useOutageOutlook';
+import { useHealthToday } from '../hooks/useHealthToday';
 import {
     endOf,
     isInWeekend,
@@ -80,6 +81,15 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
     // ale tylko dla wsi z konta. Podgląd cudzej wsi liczy wywóz dla niej
     const town = resolveWasteTown(isPreview ? village : (user?.location ?? village));
     const outlook = useOutageOutlook(village);
+    // Jeden odczyt grafiku ośrodka dla paska „Na żywo” i kafla zdrowia
+    const { data: health } = useHealthToday();
+    const [healthOpen, setHealthOpen] = useState(false);
+    const openHealth = () => {
+        setHealthOpen(true);
+        requestAnimationFrame(() =>
+            document.getElementById('osrodek-zdrowia')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+        );
+    };
 
     const { articles, loading: articlesLoading } = useArticles({ limit: 20, location: village ?? undefined });
     const { weather, loading: weatherLoading } = useWeather('Rybno');
@@ -309,8 +319,12 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
                 <StatusBelt
                     outlook={outlook}
                     village={village}
+                    health={health}
+                    articles={articles ?? []}
                     weatherWarning={weatherWarning}
                     onOpenDetails={() => onNavigate('news')}
+                    onOpenHealth={openHealth}
+                    onOpenNews={() => onNavigate('news')}
                 />
                 <VillagePushCta village={village} onPickVillage={openPicker} />
             </div>
@@ -349,8 +363,8 @@ const SimpleHomePage: React.FC<SimpleHomePageProps> = ({ onNavigate, onQuerySubm
                 {/* Zdrowie i drogi jako pasy pod plakietkami: przez większość dni
                     mówią „bez zmian”, więc nie dostają własnego pola — ale zmiana
                     (lekarz nie przyjmuje, droga zamknięta) zapala je na żółto */}
-                <div className="mt-3 space-y-px">
-                    <HealthTodayCard />
+                <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+                    <HealthTodayCard data={health} open={healthOpen} onToggle={() => setHealthOpen(o => !o)} />
                     <RoadStatusStrip />
                 </div>
             </section>

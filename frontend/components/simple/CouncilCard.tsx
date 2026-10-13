@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { useEvents } from '../../src/hooks/useEvents';
 import { useCouncilSessions } from '../../src/hooks/useCouncil';
 import { phaseOf, upcomingFirst } from '../../src/utils/eventTime';
+import { Tag } from './tv';
 
 interface CouncilCardProps {
     onClick: () => void;
@@ -117,13 +118,14 @@ const CouncilCard: React.FC<CouncilCardProps> = ({ onClick }) => {
 
     return (
         <section aria-label="Rada Gminy" className="flex flex-col">
+            <Tag as="h2">Rada Gminy</Tag>
             <button
                 onClick={onClick}
                 className="group flex flex-1 flex-col items-start border-t-2 border-tv-blue bg-tv-panel px-4 pb-1 pt-3 text-left transition-colors hover:bg-tv-panel2 lg:px-5"
             >
-                <h2 className="font-cond text-[21px] font-extrabold leading-snug text-white lg:text-[23px]">
+                <h3 className="font-cond text-[21px] font-extrabold leading-snug text-white lg:text-[23px]">
                     {title}
-                </h2>
+                </h3>
                 {/* Termin i stan w linii pod nagłówkiem, nie jako etykieta nad nim */}
                 <span className={`mt-1 text-[14px] font-bold ${ongoing ? 'text-[#ff8a80]' : 'text-tv-paper'}`}>
                     {kicker}

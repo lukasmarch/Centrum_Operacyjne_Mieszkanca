@@ -94,6 +94,7 @@ export function useArticles(options: UseArticlesOptions = {}) {
           // Nazwy prywatnych profili FB nie eksponujemy — backend zwraca wtedy null,
           // atrybucją zostaje sam link „źródło ↗"
           sourceLabel: item.source_label ?? null,
+          author: item.author ?? null,
           category: item.category || 'Wiadomości',
           // Zapowiedź opisuje TERMIN, nie wiek ogłoszenia (`utils/articleTime`):
           // wyłączenie prądu zapowiedziane 21.08 na dziś czytało się jako „3d temu"
