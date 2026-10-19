@@ -1,5 +1,5 @@
 /**
- * „Rybno w kadrze" — własne zdjęcia gminy z podpisem.
+ * „Gmina w kadrze" — własne zdjęcia gminy z podpisem (przewijana galeria).
  *
  * DLACZEGO TO ISTNIEJE: karta weekendowa opierała się wyłącznie na kalendarzu
  * wydarzeń, a kalendarz w gminie wiejskiej bywa pusty przez kilka tygodni.
@@ -12,7 +12,7 @@
  *     długi bok maks. 1600 px — `sips -Z 1600 plik.jpg`, jakość ~70).
  *     Zdjęcie musi być WŁASNE: kadry z portali i Facebooka są objęte prawami
  *     autorskimi i nie wolno ich tu podpinać.
- *  2. Dopisz wpis na POCZĄTEK tablicy — karta pokazuje pierwszy z brzegu.
+ *  2. Dopisz wpis na POCZĄTEK tablicy — karta pokazuje je po kolei, od pierwszego.
  *  3. `date` w formacie ISO (RRRR-MM-DD) — pod spodem wyświetla się po polsku.
  *
  * Wpis może opisywać stan rzeczy, nie tylko widok: „remont drogi
@@ -35,9 +35,75 @@ export interface PhotoPost {
 
 export const PHOTO_POSTS: PhotoPost[] = [
     {
-        image: '/simple/kadr/rybno-lot-2026-08-25.jpg',
-        title: 'Lot nad Rybnem',
-        description: 'Rybno w sierpniowy wieczór.',
-        date: '2026-08-25',
+        image: '/simple/kadr/rybno-dron-2026-10-15-01.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-02.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-03.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-04.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-05.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-06.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-07.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-08.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-09.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-dron-2026-10-15-10.jpg',
+        title: 'Gmina Rybno z lotu ptaka',
+        description: 'Zdjęcie z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-koszelewy-2026-10-15.jpg',
+        title: 'Koszelewy',
+        description: 'Koszelewy z drona.',
+        date: '2026-10-15',
+    },
+    {
+        image: '/simple/kadr/rybno-zabiny-2026-10-15.jpg',
+        title: 'Żabiny',
+        description: 'Żabiny z drona.',
+        date: '2026-10-15',
     },
 ];
