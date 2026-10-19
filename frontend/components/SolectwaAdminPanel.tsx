@@ -6,15 +6,20 @@
  * idzie jako „sprawdzone przez redakcję" (AI Act art. 50), więc człowiek musi
  * mieć przed oczami jedno i drugie. Wykryte dane osobowe stoją nad tekstem,
  * nie pod nim.
+ *
+ * Opublikowane (E7): korekta i odwołanie zawsze z powodem — powód widzi
+ * wyłącznie sołtys (mail, jego panel) i redakcja (historia); mieszkańcy
+ * nie widzą procesu decyzyjnego wcale. Prośby sołtysa stoją
+ * nad formularzem; ogłoszenie z otwartą prośbą wraca do kolejki „Do decyzji”.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Check, Copy, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Ban, Check, Copy, History, Loader2, PencilLine, RefreshCw, X } from 'lucide-react';
 import { Chip, Notice, Skeleton, Tag, TagTone } from './simple/tv';
 import {
-    AdminInvitation, AdminPost, AdminRole, RoleDefinition, STATUS_LABELS,
-    approvePost, createInvitation, editPost, fetchAdminPosts, fetchAdminRoles,
-    fetchInvitations, fetchPostImage, fetchRoleDefinitions, parseUtc, rejectPost,
-    rereadPost, revokeInvitation, revokeRole,
+    AdminInvitation, AdminPost, AdminRole, Correction, PostVersion, RoleDefinition, STATUS_LABELS,
+    approvePost, correctPost, createInvitation, dismissRequest, editPost, fetchAdminPosts, fetchAdminRoles,
+    fetchInvitations, fetchPostImage, fetchPostVersions, fetchRoleDefinitions, parseUtc, rejectPost,
+    rereadPost, revokeInvitation, revokeRole, withdrawPost,
 } from '../src/services/solectwaApi';
 
 type Section = 'posts' | 'invitations' | 'roles';
@@ -88,6 +93,198 @@ const PostImages: React.FC<{ post: AdminPost }> = ({ post }) => {
     );
 };
 
+// ── Po publikacji: korekta, odwołanie, historia (E7) ─────────────────────
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const localDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const localTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+const VERSION_KIND: Record<PostVersion['kind'], string> = {
+    publication: 'Publikacja',
+    correction: 'Korekta',
+    withdrawal: 'Odwołanie',
+};
+
+const VersionHistory: React.FC<{ postId: number }> = ({ postId }) => {
+    const [versions, setVersions] = useState<PostVersion[] | null>(null);
+    const [error, setError] = useState('');
+    useEffect(() => {
+        fetchPostVersions(postId).then(setVersions).catch((e) => setError(e.message));
+    }, [postId]);
+    if (error) return <p className="text-sm text-red-400">{error}</p>;
+    if (!versions) return <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />;
+    return (
+        <ol className="space-y-3">
+            {versions.map((v) => (
+                <li key={v.version} className="rounded-xl border border-gray-800 p-3 text-sm">
+                    <p className="text-xs text-neutral-500">
+                        v{v.version} · {VERSION_KIND[v.kind]} · {dateLabel(v.created_at)} · {v.changed_by ?? '—'}
+                    </p>
+                    {v.reason && <p className="text-amber-200 mt-1">Powód: {v.reason}</p>}
+                    <p className="font-semibold mt-1">{v.title}</p>
+                    <p className="text-neutral-400">termin: {v.event_at ? dateLabel(v.event_at) : 'brak'}</p>
+                    {v.summary && <p className="text-neutral-300 mt-1">{v.summary}</p>}
+                </li>
+            ))}
+        </ol>
+    );
+};
+
+interface Draft { title: string; summary: string; transcript: string }
+
+const PublishedActions: React.FC<{ post: AdminPost; draft: Draft; onChanged: () => void }> = ({ post, draft, onChanged }) => {
+    const { title, summary, transcript } = draft;
+    const start = parseUtc(post.event_at);
+    const end = parseUtc(post.event_until);
+    const allDay = !!start && !end && start.getHours() === 0 && start.getMinutes() === 0;
+    const correctionRequest = post.open_requests.find((r) => r.kind === 'correction');
+    const withdrawalRequest = post.open_requests.find((r) => r.kind === 'withdrawal');
+
+    const [mode, setMode] = useState<'none' | 'correct' | 'withdraw' | 'history'>('none');
+    const [termAction, setTermAction] = useState<Correction['term_action']>('keep');
+    const [day, setDay] = useState(start ? localDay(start) : '');
+    const [from, setFrom] = useState(start && !allDay ? localTime(start) : '');
+    const [to, setTo] = useState(end ? localTime(end) : '');
+    const [reason, setReason] = useState('');
+    const [dismissReason, setDismissReason] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    const run = async (action: () => Promise<unknown>) => {
+        if (mode !== 'none' && mode !== 'history' && reason.trim().length < 3) {
+            setError('Podaj powód — zobaczą go mieszkańcy i sołtys.');
+            return;
+        }
+        setBusy(true);
+        setError('');
+        try {
+            await action();
+            onChanged();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Nie udało się');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const submitCorrection = () => run(() => {
+        if (termAction === 'set' && !day) throw new Error('Wybierz dzień nowego terminu');
+        if (to && !from) throw new Error('Godzina końca wymaga godziny rozpoczęcia');
+        const data: Correction = { reason, term_action: termAction, request_id: correctionRequest?.id };
+        if (title !== (post.title ?? '')) data.title = title;
+        if (summary !== (post.summary ?? '')) data.summary = summary;
+        if (transcript !== (post.transcript ?? '')) data.transcript = transcript;
+        if (termAction === 'set') data.term = { day, start: from || null, end: to || null };
+        return correctPost(post.id, data);
+    });
+    const submitWithdraw = () => run(() => withdrawPost(post.id, reason, withdrawalRequest?.id));
+
+    const tab = (m: typeof mode, label: string, Icon: typeof PencilLine, tone = '') => (
+        <button onClick={() => { setMode(mode === m ? 'none' : m); setError(''); }}
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm ${mode === m ? 'bg-white/10 border-gray-600' : 'border-gray-700 hover:bg-white/5'} ${tone}`}>
+            <Icon className="w-4 h-4" /> {label}
+        </button>
+    );
+
+    return (
+        <div className="mt-5 space-y-3">
+            {post.open_requests.map((r) => (
+                <div key={r.id} className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+                    <p className="font-semibold text-amber-200">
+                        Sołtys prosi o {r.kind === 'correction' ? 'korektę' : 'ODWOŁANIE'} · {dateLabel(r.created_at)}
+                    </p>
+                    <p className="text-neutral-200 mt-1">„{r.message}”</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <input className={`${input} sm:max-w-xs`} placeholder="Odpowiedź dla sołtysa (opcjonalnie)"
+                            value={dismissReason} onChange={(e) => setDismissReason(e.target.value)} />
+                        <button onClick={() => run(() => dismissRequest(r.id, dismissReason))} disabled={busy}
+                            className="rounded-xl border border-gray-700 px-3 py-1.5 text-sm hover:bg-white/5">
+                            Zostaw bez zmian
+                        </button>
+                    </div>
+                </div>
+            ))}
+
+            {post.corrected_at && (
+                <p className="text-xs text-neutral-500">Ostatnia korekta: {dateLabel(post.corrected_at)} · wersja {post.version}</p>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+                {tab('correct', 'Popraw', PencilLine)}
+                {tab('withdraw', 'Odwołaj', Ban, 'text-red-300')}
+                {tab('history', 'Historia', History)}
+            </div>
+
+            {mode === 'correct' && (
+                <div className="space-y-3 rounded-xl border border-gray-800 p-4">
+                    <p className="text-sm text-neutral-400">
+                        Tytuł, podsumowanie i przedruk poprawiasz w polach powyżej
+                        {(title !== (post.title ?? '') || summary !== (post.summary ?? '') || transcript !== (post.transcript ?? ''))
+                            ? ' — są zmiany w tekście.' : '.'}
+                    </p>
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">Termin</label>
+                        <div className="flex flex-wrap gap-3 text-sm mt-1">
+                            {([['keep', 'bez zmian'], ['set', 'nowy termin'], ['clear', 'usuń termin']] as const).map(([value, label]) => (
+                                <label key={value} className="inline-flex items-center gap-1.5">
+                                    <input type="radio" checked={termAction === value} onChange={() => setTermAction(value)} /> {label}
+                                </label>
+                            ))}
+                        </div>
+                        {termAction === 'set' && (
+                            <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+                                <input type="date" className={`${input} max-w-[11rem]`} value={day} onChange={(e) => setDay(e.target.value)} />
+                                <input type="time" className={`${input} max-w-[8rem]`} value={from} onChange={(e) => setFrom(e.target.value)} />
+                                <span className="text-neutral-500">–</span>
+                                <input type="time" className={`${input} max-w-[8rem]`} value={to} onChange={(e) => setTo(e.target.value)} />
+                                <span className="text-xs text-neutral-500">bez godziny = cały dzień</span>
+                            </div>
+                        )}
+                        {termAction === 'set' && transcript === (post.transcript ?? '') && (
+                            <p className="text-xs text-amber-300 mt-2">
+                                Przedruk powyżej może wciąż zawierać starą datę lub godzinę — mieszkaniec zobaczyłby dwa różne
+                                terminy. Popraw je w przedruku po cichu, bez adnotacji o korekcie (proces zostaje między redakcją a sołtysem).
+                            </p>
+                        )}
+                        {termAction === 'clear' && (
+                            <p className="text-xs text-neutral-500 mt-1">Wydarzenie zniknie z kalendarza.</p>
+                        )}
+                        <p className="text-xs text-neutral-500 mt-1">
+                            Teraz: {start ? (allDay ? `${start.toLocaleDateString('pl-PL')} (cały dzień)` : dateLabel(post.event_at)) : 'brak'}.
+                            Zaktualizowany termin wróci do najbliższego briefingu — bez wzmianki o zmianie.
+                        </p>
+                    </div>
+                    <input className={input} placeholder="Powód korekty (zobaczy go tylko sołtys)"
+                        value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
+                    <button onClick={submitCorrection} disabled={busy}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
+                        <Check className="w-4 h-4" /> Opublikuj korektę
+                    </button>
+                </div>
+            )}
+
+            {mode === 'withdraw' && (
+                <div className="space-y-3 rounded-xl border border-red-500/30 p-4">
+                    <p className="text-sm text-neutral-300">
+                        Ogłoszenie zniknie z wiadomości, kalendarza, briefingu i odpowiedzi asystenta.
+                        Pod jego adresem mieszkaniec zobaczy tylko „nieaktualne” — bez powodu.
+                    </p>
+                    <input className={input} placeholder="Powód odwołania (zobaczy go tylko sołtys)"
+                        value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
+                    <button onClick={submitWithdraw} disabled={busy}
+                        className="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
+                        <Ban className="w-4 h-4" /> Odwołaj ogłoszenie
+                    </button>
+                </div>
+            )}
+
+            {mode === 'history' && <VersionHistory postId={post.id} />}
+
+            {error && <p className="text-sm text-red-400">{error}</p>}
+        </div>
+    );
+};
+
 const PostModeration: React.FC<{ post: AdminPost; onChanged: () => void }> = ({ post, onChanged }) => {
     const [title, setTitle] = useState(post.title ?? '');
     const [summary, setSummary] = useState(post.summary ?? '');
@@ -96,7 +293,9 @@ const PostModeration: React.FC<{ post: AdminPost; onChanged: () => void }> = ({ 
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const dirty = title !== (post.title ?? '') || summary !== (post.summary ?? '') || transcript !== (post.transcript ?? '');
-    const decided = post.status === 'published' || post.status === 'rejected';
+    const decided = post.status === 'published' || post.status === 'rejected' || post.status === 'withdrawn';
+    // Opublikowane poprawia się w tych samych polach — wysyła je „Opublikuj korektę”
+    const locked = post.status === 'rejected' || post.status === 'withdrawn';
 
     const run = async (action: () => Promise<unknown>) => {
         setBusy(true);
@@ -130,6 +329,9 @@ const PostModeration: React.FC<{ post: AdminPost; onChanged: () => void }> = ({ 
                 </span>
             </div>
 
+            {post.status === 'withdrawn' && (
+                <p className="mb-3 text-sm text-red-300">Odwołane {dateLabel(post.withdrawn_at)}: {post.withdraw_reason}</p>
+            )}
             {post.ai_error && (
                 <p className="mb-3 flex gap-2 bg-tv-yellow px-4 py-3 text-[15px] text-tv-ink"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{post.ai_error}</p>
             )}
@@ -154,15 +356,15 @@ const PostModeration: React.FC<{ post: AdminPost; onChanged: () => void }> = ({ 
                 <div className="space-y-3">
                     <div>
                         <label className={fieldLabel}>Tytuł</label>
-                        <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} disabled={decided} />
+                        <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} disabled={locked} />
                     </div>
                     <div>
                         <label className={fieldLabel}>Podsumowanie</label>
-                        <textarea className={input} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} disabled={decided} />
+                        <textarea className={input} rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} disabled={locked} />
                     </div>
                     <div>
                         <label className={fieldLabel}>Przedruk</label>
-                        <textarea className={`${input} text-[14px] leading-relaxed`} rows={14} value={transcript} onChange={(e) => setTranscript(e.target.value)} disabled={decided} />
+                        <textarea className={`${input} text-[14px] leading-relaxed`} rows={14} value={transcript} onChange={(e) => setTranscript(e.target.value)} disabled={locked} />
                     </div>
                     <p className="tabular text-[13px] text-tv-muted">
                         {post.doc_type ? `${post.doc_type} · ` : ''}
@@ -195,6 +397,13 @@ const PostModeration: React.FC<{ post: AdminPost; onChanged: () => void }> = ({ 
                     </button>
                 </div>
             )}
+            {post.status === 'published' && <PublishedActions post={post} draft={{ title, summary, transcript }} onChanged={onChanged} />}
+            {post.status === 'withdrawn' && (
+                <details className="mt-4">
+                    <summary className="text-sm text-neutral-400 cursor-pointer">Historia</summary>
+                    <div className="mt-2"><VersionHistory postId={post.id} /></div>
+                </details>
+            )}
             {post.url && (
                 <a href={post.url} className="mt-3 inline-flex min-h-[44px] items-center text-[15px] font-bold text-tv-bluesoft underline-offset-4 hover:text-white hover:underline">Zobacz na stronie →</a>
             )}
@@ -210,7 +419,7 @@ const PostsSection: React.FC = () => {
     const load = useCallback(() => {
         fetchAdminPosts()
             .then((all) => setPosts(filter === 'queue'
-                ? all.filter((p) => ['processing', 'pending', 'failed'].includes(p.status))
+                ? all.filter((p) => ['processing', 'pending', 'failed'].includes(p.status) || p.open_requests.length > 0)
                 : all))
             .catch((e) => setError(e.message));
     }, [filter]);
@@ -234,7 +443,7 @@ const PostsSection: React.FC = () => {
             {error && <Notice tone="warn" role="alert">{error}</Notice>}
             {posts === null ? <Skeleton className="h-40" /> :
                 posts.length === 0 ? <Notice>Nic nie czeka na decyzję.</Notice> :
-                    posts.map((p) => <PostModeration key={`${p.id}-${p.status}`} post={p} onChanged={load} />)}
+                    posts.map((p) => <PostModeration key={`${p.id}-${p.status}-${p.version}-${p.open_requests.length}`} post={p} onChanged={load} />)}
         </div>
     );
 };

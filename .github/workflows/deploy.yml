@@ -19,8 +19,8 @@ jobs:
   # Bramka przed deployem (audyt 11.10.2026, F-031). Do tej pory push szedł na
   # produkcję bez uruchomienia ANI JEDNEGO testu — strażnik nagłówka briefingu
   # był zepsuty od 9.10 i nikt się o tym nie dowiedział.
-  # Tylko testy bez bazy i bez modelu: schematu produkcji nie da się zbudować
-  # z modeli (ręczne migracje, F-034), a model kosztuje. Sekrety poniżej to
+  # Tylko testy bez bazy i bez modelu (te z bazą: job `db-tests` niżej — schemat budowany
+  # NIE z modeli, tylko ze zrzutu produkcji, audyt E5). Sekrety poniżej to
   # atrapy wymaganych pól konfiguracji — żaden test nie może dzięki nim wyjść
   # do sieci (OpenAI odpowie 401, baza na porcie 1 odmówi połączenia).
   # Nowy test bez bazy i modelu → dopisz go do listy.
@@ -39,10 +39,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.11.16'
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/constraints.txt
+      - run: pip install -r requirements.txt -c constraints.txt
+      - name: Zależności = constraints.txt (pip check + freeze)
+        run: |
+          pip check
+          pip freeze | sort > /tmp/freeze.txt
+          sort constraints.txt > /tmp/constraints.txt
+          diff /tmp/constraints.txt /tmp/freeze.txt
       - name: Testy bez bazy i modelu
         run: |
           set -u
@@ -52,8 +60,8 @@ jobs:
             test_agent_tools test_alert_policy test_bip_knowledge test_content_gate \
             test_content_score test_council_sessions test_council_store test_council_summary \
             test_event_dedup test_event_gate test_event_phase test_event_terms test_feed_dedup test_feed_window \
-            test_gmina_facts test_grounding test_job_runs test_legal_acts test_newsletter_tense test_outage_outlook test_password_reset \
-            test_provenance test_road_context test_source_health test_storm_policy test_story_judge test_summary_context \
+            test_gmina_facts test_grounding test_job_runs test_legal_acts test_locality_gold test_migration_registry test_newsletter_tense test_outage_outlook test_password_reset test_places_guard \
+            test_provenance test_road_context test_schema_contract test_source_health test_storm_policy test_story_judge test_summary_context \
             test_summary_headline test_text_clean test_timezone_guard
           do
             name="${t%%:*}"; args=""; [ "$name" != "$t" ] && args="${t#*:}"
@@ -63,8 +71,75 @@ jobs:
           done
           if [ -n "$failed" ]; then echo "::error::Czerwone:$failed"; exit 1; fi
 
+  # Testy z bazą (audyt 11.10.2026, E5). Do tej pory CI nie uruchamiał ANI JEDNEGO testu z bazą:
+  # `create_all` buduje inną bazę niż produkcja (modele znają 42 z 53 tabel; brak wektorów, triggera
+  # tsvector, indeksu HNSW), więc regresje w SQL-u wychodziły dopiero na produkcji.
+  # Schemat pochodzi ze zrzutu PRODUKCJI (`backend/scripts/schema/prod_schema.sql`, generowany
+  # `scripts/db_schema_refresh.sh`), dane startowe z `seed.sql` (minimum, bez danych osobowych).
+  # Baza żyje tylko w tym jobie (usługa na 127.0.0.1) — produkcji nie widzi, a klucze są atrapami.
+  # Lista = testy, które SAME zakładają swoje dane i je sprzątają. Poza nią zostają testy mierzące
+  # stan prawdziwej bazy (--db w feed_dedup, summary_context…), zależne od roku (test_waste_reminder)
+  # i od rejestru CEIDG (dane osobowe). Nowy test z bazą → dopisz tu; nowy wiersz startowy → seed.sql.
+  db-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: centrum_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d centrum_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:5432/centrum_ci
+      OPENAI_API_KEY: sk-ci-atrapa
+      OPENWEATHER_API_KEY: ci-atrapa
+      JWT_SECRET: ci-atrapa-ci-atrapa-ci-atrapa-ci-atrapa
+      TZ: Europe/Warsaw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.16'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/constraints.txt
+      - run: pip install -r requirements.txt -c constraints.txt
+      - name: Schemat produkcji i dane startowe
+        run: |
+          psql "postgresql://ci:ci@127.0.0.1:5432/centrum_ci" -v ON_ERROR_STOP=1 -q \
+            -f scripts/schema/prod_schema.sql -f scripts/schema/seed.sql
+      - name: Rejestr migracji (baseline, potem check — baza ze zrzutu ma być kompletna)
+        run: |
+          python -m scripts.migrate --baseline --yes
+          python -m scripts.migrate --check
+      - name: Testy z bazą
+        run: |
+          set -u
+          failed=""
+          for t in \
+            test_job_runs:--db test_p24_ipn test_auth test_trial_lifecycle \
+            test_batch_resilience test_csp_report test_privacy_retention test_solectwa
+          do
+            name="${t%%:*}"; args=""; [ "$name" != "$t" ] && args="${t#*:}"
+            echo "::group::$name $args"
+            if python -u -m "scripts.$name" $args </dev/null; then echo "OK $name"; else failed="$failed $name"; fi
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then echo "::error::Czerwone:$failed"; exit 1; fi
+
   deploy:
-    needs: tests
+    needs: [tests, db-tests]
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
@@ -87,7 +162,24 @@ jobs:
             fi
             echo "Kod na serwerze: $DEPLOYED"
 
+            # Obraz do powrotu (audyt E6): przed budową tag `rollback` wskazuje to, co działa.
+            # Cofnięcie: docker tag centrum-backend:rollback centrum-backend:latest && docker compose -f docker-compose.prod.yml up -d backend
+            docker tag centrum-backend:latest centrum-backend:rollback 2>/dev/null || echo "brak obrazu do oznaczenia (pierwszy deploy?)"
+
             docker compose -f docker-compose.prod.yml build backend
+
+            # Bramka migracji (audyt 11.10.2026, E5). „Migracja idzie na produkcję PRZED kodem" była
+            # pilnowana pamięcią; kod bez kolumny to 500 na każdym zapytaniu, a job świecił na zielono.
+            # Nowy obraz (jeszcze nie uruchomiony) sprawdza, czy baza ma wszystkie migracje schematu
+            # z jego manifestu. Czeka niewykonana → deploy staje, STARY kontener działa dalej.
+            # -T: ssh-action nie ma TTY; --no-deps: baza już stoi. Wynik nie zmienia niczego w bazie.
+            if ! docker compose -f docker-compose.prod.yml run --rm -T --no-deps backend python -m scripts.migrate --check; then
+              echo "::error::Baza produkcyjna nie ma migracji, których wymaga ten kod — deploy wstrzymany, działa poprzednia wersja."
+              echo "Wykonaj je NOWYM obrazem (już zbudowany), potem ponów job (Re-run):"
+              echo "  cd /opt/centrum && docker compose -f docker-compose.prod.yml run --rm -T --no-deps backend python -m scripts.migrate --apply --yes"
+              echo "  bash scripts/db_schema_refresh.sh   # zrzut schematu do repo, commit"
+              exit 1
+            fi
 
             # Osierocony kontener po nieudanym `up` blokuje nazwę (3.09.2026,
             # dwa razy): sprzątamy zatrzymane, zanim postawimy nowy.
@@ -99,6 +191,10 @@ jobs:
             for i in $(seq 1 12); do
               if curl -sf -o /dev/null "https://api.rybnolive.pl/api/articles?limit=1"; then
                 echo "API odpowiada (próba $i)"
+                # Cache budowania rósł do 18,8 GB z dysku 38 GB. Sprzątanie dopiero PO udanym wdrożeniu;
+                # błąd sprzątania nie może zepsuć zielonego deployu.
+                docker builder prune -f --keep-storage 5GB >/dev/null 2>&1 || true
+                docker image prune -f >/dev/null 2>&1 || true
                 exit 0
               fi
               sleep 5

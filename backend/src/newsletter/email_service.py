@@ -5,6 +5,7 @@ Email service using Resend for newsletter delivery
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
+from html import escape as html_escape  # zmienna lokalna `html` w metodach zasłania moduł
 from typing import Dict, Any, List, Optional
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -928,6 +929,10 @@ class EmailService:
         wygląda jak awaria serwisu. Przy publikacji link jest celem maila —
         sołtys wkleja go na swój profil i to on niesie zasięg do nas.
         """
+        # Tytuł i powód pochodzą z odczytu pisma przez model / z formularza —
+        # nie mogą stać się HTML-em w skrzynce sołtysa
+        title = html_escape(title or "")
+        reason = html_escape(reason) if reason else None
         if approved:
             subject = f"✅ Opublikowane: {title}"
             body = f"""
@@ -945,6 +950,75 @@ class EmailService:
             <p><strong>{title}</strong></p>
             {reason_html}
             <p>Odpisz na tę wiadomość, jeśli chcesz coś poprawić — pomożemy.</p>
+            """
+
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{ font-family: sans-serif; line-height: 1.6; color: #333; }}
+                .btn {{ display: inline-block; background: #1e3a5f; color: white; padding: 12px 30px;
+                        text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            {body}
+            <p style="font-size: 12px; color: #888; margin-top: 30px;">
+                RybnoLive — ogłoszenia sołectw gminy Rybno
+            </p>
+        </body>
+        </html>
+        """
+        return await self.send_email(
+            to_email=to_email,
+            subject=subject,
+            html_content=html,
+            reply_to="biuro@lumargo.pl",
+        )
+
+    async def send_solectwo_post_change(
+        self,
+        to_email: str,
+        title: str,
+        kind: str,
+        post_url: str,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Zmiana opublikowanego ogłoszenia (E7) — do sołtysa: korekta,
+        odwołanie albo odpowiedź na prośbę bez zmiany. Ogłoszenie podpisane
+        jego funkcją nie może zmienić się bez jego wiedzy."""
+        e_title = html_escape(title or "")
+        reason_html = f"<p>Powód: {html_escape(reason)}</p>" if reason else ""
+        if kind == "correction":
+            subject = f"Poprawiliśmy ogłoszenie: {title}"
+            body = f"""
+            <h2>Ogłoszenie zostało poprawione</h2>
+            <p><strong>{e_title}</strong></p>
+            {reason_html}
+            <p>Mieszkańcy widzą już poprawioną wersję — bez informacji o tym, że coś zmieniono.
+            Jeśli wcześniejszą wersję udostępniłeś na Facebooku, możesz dopisać tam poprawkę od siebie.</p>
+            <a href="{post_url}" class="btn">Zobacz ogłoszenie</a>
+            """
+        elif kind == "withdrawal":
+            subject = f"Odwołaliśmy ogłoszenie: {title}"
+            body = f"""
+            <h2>Ogłoszenie zostało odwołane</h2>
+            <p><strong>{e_title}</strong></p>
+            {reason_html}
+            <p>Zniknęło z wiadomości, kalendarza i briefingu. Pod dawnym linkiem
+            mieszkańcy zobaczą tylko, że ogłoszenie nie jest już aktualne — bez powodu.
+            Jeśli udostępniłeś je na Facebooku, warto dopisać tam odwołanie od siebie.</p>
+            <a href="{post_url}" class="btn">Zobacz stronę ogłoszenia</a>
+            """
+        else:
+            subject = f"Twoja prośba w sprawie ogłoszenia: {title}"
+            body = f"""
+            <h2>Ogłoszenie zostaje bez zmian</h2>
+            <p><strong>{e_title}</strong></p>
+            {reason_html}
+            <p>Odpisz na tę wiadomość, jeśli coś jest niejasne — odpowiada człowiek.</p>
             """
 
         html = f"""

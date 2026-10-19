@@ -36,6 +36,7 @@ def _get_client():
     return genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
+# places-ok: przykładowa podpowiedź dla modelu (zawiera też wsie spoza gminy: Jeżewo, Dłutowo, Fijewo), nie lista gminy
 ANALYSIS_PROMPT = """Jesteś dyżurnym operatorem Centrum Powiadamiania o Zdarzeniach w gminie Rybno (powiat działdowski, woj. warmińsko-mazurskie).
 
 KONTEKST TERENU:

@@ -5,6 +5,11 @@
  * Trzy warstwy: tytuł i podsumowanie (oznaczone jako przygotowane automatycznie
  * i sprawdzone przez redakcję — AI Act art. 50), pełny przedruk pisma, podpis
  * funkcją. Zdjęcia oryginału tu nie ma i nie będzie: widzi je tylko redakcja.
+ *
+ * Po publikacji (E7): proces decyzyjny to sprawa sołtysa i redakcji — mieszkaniec
+ * nie widzi powodów ani śladu korekty. Poprawione ogłoszenie po prostu ma nową
+ * treść. Odwołane zostaje pod tym samym adresem (link krąży po Facebooku), ale
+ * mówi wyłącznie, że nie jest już aktualne: bez tytułu, treści, terminu i powodu.
  */
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, ChevronDown, FileText, Sparkles } from 'lucide-react';
@@ -38,7 +43,9 @@ const SolectwoPostPage: React.FC = () => {
         fetchPublicPost(id)
             .then((p) => {
                 setPost(p);
-                document.title = `${p.title} — ${p.signed_as} | RybnoLive`;
+                document.title = p.status === 'withdrawn'
+                    ? 'Ogłoszenie nieaktualne | RybnoLive'
+                    : `${p.title} — ${p.signed_as} | RybnoLive`;
             })
             .catch(() => setError('Nie znaleziono ogłoszenia.'));
     }, []);
@@ -58,6 +65,15 @@ const SolectwoPostPage: React.FC = () => {
 
     const term = termLabel(post);
     const published = parseUtc(post.published_at);
+    if (post.status === 'withdrawn') {
+        return (
+            <article className="max-w-2xl mx-auto px-4 py-16 text-center space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-neutral-500">Ogłoszenie sołectwa {post.solectwo}</p>
+                <h1 className="text-2xl font-black text-neutral-200">To ogłoszenie nie jest już aktualne</h1>
+                <p className="text-sm text-neutral-400">Aktualne ogłoszenia znajdziesz w zakładce Wiadomości.</p>
+            </article>
+        );
+    }
 
     return (
         <article className="flex max-w-2xl flex-col">

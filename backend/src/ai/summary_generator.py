@@ -143,7 +143,14 @@ def _time_label(article, now: datetime) -> str:
         end = getattr(article, "event_until", None)
         when = when_label(event_at, end, now)
         # Ta sama faza i te same dopiski co etykieta feedu (`feed_policy.phase_suffix`)
-        return f"[ZDARZENIE {when}{phase_suffix(event_at, end, now, ended='JUŻ PO')}]"
+        label = f"ZDARZENIE {when}{phase_suffix(event_at, end, now, ended='JUŻ PO')}"
+        # Redakcja zmieniła termin opublikowanego ogłoszenia (E7). Wpis wraca do
+        # materiału, żeby w briefingu stanął AKTUALNY termin — ale proces
+        # korekty nie jest sprawą mieszkańców, więc model ma podać sam termin,
+        # nie wspominając o zmianie ani przeniesieniu.
+        if _term_recently_corrected(article, now):
+            label += " — TERMIN ZAKTUALIZOWANY: PODAJ WYŁĄCZNIE AKTUALNY TERMIN, NIE PISZ O ZMIANIE ANI PRZENIESIENIU"
+        return f"[{label}]"
 
     if not article.published_at:
         return "[bez daty]"
@@ -169,6 +176,17 @@ def _time_label(article, now: datetime) -> str:
     # wygląda dokładnie tak samo jak termin. Ta sama zasada, co przy „JUŻ PO"
     # i „AWARIA SPRZED DOBY": etykieta niesie SKUTEK, nie tylko liczbę.
     return f"[opublikowano {stamp} — TERMIN ZDARZENIA NIEZNANY]"
+
+
+# Jak długo po korekcie terminu wpis wraca do materiału z etykietą „TERMIN
+# ZAKTUALIZOWANY”: najbliższy briefing poranny i popołudniowy refresh, nie
+# dłużej — potem to już zwykły termin.
+TERM_CORRECTION_LABEL_H = 30
+
+
+def _term_recently_corrected(article, now: datetime) -> bool:
+    corrected = getattr(article, "term_corrected_at", None)
+    return bool(corrected) and now - timedelta(hours=TERM_CORRECTION_LABEL_H) <= corrected <= now
 
 
 def _alert_past_window(article, now: datetime) -> bool:
@@ -700,6 +718,10 @@ class SummaryGenerator:
                     & (Article.published_at < window_end),
                     (Article.event_at >= window_start)
                     & (Article.event_at < lookahead_end),
+                    # Korekta terminu ogłoszenia (E7) wraca do najbliższego
+                    # briefingu, choć nowy termin może być za dwa tygodnie
+                    (Article.term_corrected_at
+                     >= (now or window_end) - timedelta(hours=TERM_CORRECTION_LABEL_H)),
                 )
             )
             .order_by(func.coalesce(Article.event_at, Article.published_at).desc())

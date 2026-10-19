@@ -13,11 +13,31 @@
 - **Env sekrety**: `/opt/centrum/backend/.env.production` (nie w repo)
 - **Docker env**: `/opt/centrum/.env` (DB_USER, DB_PASSWORD)
 
+## Kopie zapasowe produkcji (2026-10-13)
+**Do 13.10.2026 nie było ŻADNEJ automatycznej kopii bazy** (6 miesięcy; ostatnia ręczna: 20.08, 54 dni).
+- `/usr/local/bin/centrum-backup.sh` + `/etc/cron.d/centrum-backup`: codziennie **00:10 UTC** (02:10 lokalnie),
+  `pg_dump -Fc` do `/root/backups/centrum-RRRRMMDD-GGMM.pgc` (~100 MB, chmod 600), **14 ostatnich**,
+  odmowa przy < 3 GB wolnego miejsca, odrzuca archiwum z < 40 tabelami. Log: `/var/log/centrum-backup.log`
+- Sprawdzenie: `ssh root@91.99.142.30 'tail -3 /var/log/centrum-backup.log; ls -lh /root/backups'`
+- Odtworzenie: `docker exec -i centrum-db-1 pg_restore -U $POSTGRES_USER -d <baza> --no-owner < plik.pgc`
+  (najpierw do bazy TYMCZASOWEJ). Prawdziwe dane osobowe — nie kopiować na dysk bez potrzeby
+- ⚠️ **Kopia leży na TYM SAMYM serwerze co baza** — chroni przed błędem migracji i kasowaniem, NIE przed
+  utratą serwera. **Decyzja Łukasza (13.10): NIE pobieramy żadnych kopii z serwera** (to prawdziwe dane osobowe,
+  nie trafiają na MacBooka ani na inny dysk). Ochrona przed utratą serwera = wyłącznie Backups w panelu Hetznera
+  (do włączenia po stronie panelu) — nie ściągać plików `.pgc` przez scp/rsync
+- Porządek w `/root` (13.10): stare zrzuty z danymi osobowymi (`backup_przed_snippetami_*.dump`,
+  `backup-przed-wydaniem-*.sql.gz`, `backup_reports_testowe_*.sql`) i `frontend-backup/` do skasowania;
+  zostaje `backups/` (nocne kopie) i `env-kopie/`
+- Front na serwerze: `deploy-frontend.sh` dokłada pliki, nie usuwa — w `assets/` leżą dziesiątki starych paczek
+  `index-*.js`. Klatki `videos/kula6/` (121 szt.) są UŻYWANE przez `HeroSection` — to nie śmieci
+
 ## Git Workflow (PRODUKCJA)
 ```
 main   ← aktywna gałąź, zmiany idą tu bezpośrednio
-        push → GitHub Actions: job `tests` (24 testy bez bazy i modelu) → `deploy` (needs: tests)
-        (od 11.10: czerwony test = brak deployu; nowy test bez bazy/modelu dopisz do listy w deploy.yml)
+        push → GitHub Actions: `tests` (33 testy bez bazy i modelu) + `db-tests` (6 testów na bazie ze zrzutu
+        PRODUKCJI, `pgvector/pgvector:pg16`) → `deploy` (needs: tests, db-tests)
+        (od 11.10: czerwony test = brak deployu; nowy test bez bazy/modelu dopisz do listy `tests`, test z bazą
+         do `db-tests` w deploy.yml, a potrzebny mu wiersz startowy do `backend/scripts/schema/seed.sql`)
         (od 3.09: klucz deploy na serwerze, `set -e`, HEAD musi równać się github.sha,
          zdrowie = API przez Caddy; zielony job ZNACZY wdrożone)
         
@@ -70,11 +90,39 @@ nie dogada się z API.
 lokalna baza była o **3 tabele i 7 kolumn** za produkcją — stąd odruch
 sprawdzania rzeczy „na żywym", bo lokalnie kod po prostu nie działał.
 
-**Przyczyna, którą trzeba znać:** `alembic_version` pokazuje **tę samą wersję
-`22fbd3a7c45e` w obu bazach**, a schematy się różnią. Każda zmiana schematu idzie
-ręcznym skryptem z `backend/scripts/migrations/` (**34 sztuki**) i **żaden nie
-dopisuje nic do `alembic_version`**. Nie ma więc licznika, który powie, czego
-brakuje — rozjazd narasta po cichu.
+**Przyczyna (do 13.10.2026) i jej leczenie (audyt, E5):** `alembic_version` stoi od lutego na
+`22fbd3a7c45e` w obu bazach, a każda zmiana schematu szła ręcznym skryptem z `backend/scripts/migrations/`
+(**54 sztuki**: 45 schematu + 9 operacji na danych) — żaden nie zapisywał, że poszedł, więc rozjazd narastał
+po cichu. Modele znają 42 z 53 tabel (10 tabel i 68 kolumn istnieje tylko dzięki skryptom i `text()`),
+więc `create_all` buduje INNĄ bazę niż produkcja: bez wektorów, triggera tsvector i indeksu HNSW. Dziś:
+- **`scripts/migrations/manifest.py`** — jedna lista wszystkich skryptów. `schema` uruchamia runner,
+  `data` (clean_database, źródła, RODO) **NIGDY** — wcześniej jedno `for f in *.py` czyściło bazę
+- **`schema_migrations`** w bazie (licznik) + `python -m scripts.migrate --status | --check | --apply --yes |
+  --baseline --yes`. `--check`: 0 czysto, 1 czeka migracja, 2 brak rejestru. ✅ baseline wykonany na prod
+  i lokalnie 13.10 (45 wpisów)
+- **`backend/scripts/schema/prod_schema.sql`** — struktura produkcji (bez danych), generowana:
+  `bash scripts/db_schema_refresh.sh` (zapis) / `--check` (czy repo nadąża). **Odśwież PO każdej migracji
+  na produkcji, przed commitem kodu, który jej używa**
+- **CI**: `test_schema_contract` — modele nie mogą znać tabeli ani kolumny, której nie ma w zrzucie
+  (czyli „kod bez kolumny” nie przejdzie bramki), oraz `test_migration_registry` (plik ↔ manifest).
+  ⚠️ Nie widzą SQL-a pisanego ręcznie w `text("…")`
+- **Bramka w deployu** (od 13.10): po `build`, przed `up -d`: `run --rm -T --no-deps backend python -m scripts.migrate
+  --check`. Czerwono = brakuje migracji → wykonaj ją poleceniem niżej (obraz już zbudowany) i ponów job
+- **Nowa migracja**: plik `add_*.py` (idempotentny, addytywny) + linia w manifeście → commit →
+  na serwerze NOWYM obrazem, bez podmiany działającego kontenera:
+  `docker compose -f docker-compose.prod.yml build backend` →
+  `docker compose -f docker-compose.prod.yml run --rm --no-deps backend python -m scripts.migrate --apply --yes`
+  → `bash scripts/db_schema_refresh.sh` → push kodu
+- **Testy z bazą w CI** (`db-tests`, od 13.10): schemat z `prod_schema.sql`, dane z `seed.sql` (minimum: źródło
+  „Sołectwa”), baza tylko w jobie, klucze to atrapy. Wchodzą testy, które SAME zakładają dane i sprzątają:
+  `test_job_runs --db`, `test_p24_ipn`, `test_auth`, `test_trial_lifecycle`, `test_batch_resilience`,
+  `test_solectwa` (~200 sprawdzeń). **Poza CI zostają**: sekcje `--db` mierzące stan prawdziwej bazy
+  (`feed_dedup`, `summary_context`, `agent_tools`, `legal_acts`… — na pustej bazie nie mają czego sprawdzić),
+  `test_waste_reminder` (harmonogram kończy się 31.12.2026 — pułapka czasowa), `test_manual_business`
+  (potrzebuje rejestru CEIDG = dane osobowe), `test_newsletter_weekly` (żywy materiał), `test_enhanced_gus`
+  (martwy: importuje nieistniejące `FREE_VARIABLES`). Przebieg lokalny w izolacji: kopia `backend/` BEZ `.env`
+  i `DATABASE_URL` na bazę tymczasową — inaczej test zobaczy prawdziwe klucze Resend/OpenAI
+- Lokalnie Python 3.9, na produkcji i w CI 3.11 — skrypty muszą działać w obu (`from __future__ import annotations`)
 
 **Sprawdzenie rozjazdu (rób to przed każdą dłuższą pracą na bazie):**
 ```bash
@@ -95,7 +143,7 @@ cd backend && python -m scripts.migrations.<nazwa>
 dane osobowe anonimizowane (lokalny `.env` ma klucze Resend/VAPID). Zrzuty: `~/rybnolive-zrzuty`.
 Ten sam plik zasila bazę audytową (`moj-projekt-audyt`, `ZRZUT=… przygotuj_srodowisko.sh --force`).
 
-⚠️ **NIE odpalać wszystkich 34 hurtem** — część to operacje na DANYCH, nie na
+⚠️ **NIE odpalać wszystkich 54 hurtem** (runner ich i tak nie uruchomi) — 9 to operacje na DANYCH, nie na
 schemacie: `clean_database.py`, `remove_duplicate_events.py`,
 `disable_risky_sources.py`, `normalize_ceidg_casing.py`, `ceidg_minimalizacja_rodo.py`.
 
@@ -107,8 +155,8 @@ schemacie: `clean_database.py`, `remove_duplicate_events.py`,
 
 **Reguła wdrożeniowa: migracja idzie na produkcję PRZED kodem, nigdy odwrotnie.**
 Kolumna, której stary kod nie używa, nie szkodzi nikomu — kod bez kolumny to 500
-na każdym zapytaniu. GitHub Actions **nie uruchamia migracji**: robi tylko
-`git pull && build && up -d`.
+na każdym zapytaniu. GitHub Actions **nie uruchamia migracji** (robi `git pull && build && up -d`), ale od 13.10 **deploy STAJE**,
+gdy `migrate --check` na nowym obrazie widzi niewykonaną migrację schematu — stary kontener działa dalej.
 
 ## Scheduler Timeline (14 jobów)
 ```
@@ -1146,6 +1194,58 @@ sołectwa ma zobaczyć więcej osób niż na prywatnym profilu sołtysa.
   kasuje całą domenę (wspólna `@qa.rybnolive.pl` zabierała konta z ręcznego testu)
 - Po starcie sołtysa Żabin: wyłączyć źródło „Facebook - Sołtys Żabiny” (`ANNOUNCEMENT_ONLY_SOURCES`)
 
+## Dane pozyskania, pomiar strony i CSP (2026-10-13, audyt E8)
+**Retencja `acq_*` nie istniała, a usunięcie konta zostawiało `acq_session_id` na zanonimizowanym rekordzie** —
+„usunięte" konto dalej wskazywało swoje wiersze w `site_events`. Eksport (art. 15/20) nie miał ani `acq_*`, ani zdarzeń.
+- **Retencja** (`retention_job.purge_acquisition`): `acq_session_id` (konta i `push_subscriptions`) znika po **90 dniach**,
+  jak w `site_events`; kampania, strona wejścia i data pierwszej wizyty po **24 miesiącach**. Wiek = `coalesce(acq_first_seen,
+  created_at)`. Pierwsze realne wygaszenie na prod: ok. 29.11.2026 (najstarsze dane z 31.08)
+- **DSAR**: usunięcie konta kasuje `site_events` osoby po `user_id` ORAZ po identyfikatorach wizyt z konta i subskrypcji
+  push (także te sprzed rejestracji) i czyści `acq_*`; eksport dostaje bloki `acquisition` i `site_events` (limit 1000)
+- ⚠️ Pułapka: `acq_session_id` to jedyny klucz łączący zdarzenia z osobą sprzed rejestracji — nowa tabela z identyfikatorem
+  wizyty musi wejść do `_acquisition_session_ids` w `users/dsar.py`, inaczej DSAR jej nie zobaczy
+- **CSP w trybie raportowania** (Caddy `Content-Security-Policy-Report-Only` + `Reporting-Endpoints`, tylko `rybnolive.pl`).
+  Polityka sprawdzona headless Chrome na 19 trasach prod — 0 naruszeń; harness zweryfikowany na celowo zaostrzonej polityce.
+  `img-src https:` szerokie, bo obrazy artykułów z wielu portali; `style-src 'unsafe-inline'` (inline `<style>` + `style=` Reacta)
+- **`POST /api/csp-report`** (publiczny, wpis w `PUBLIC_WRITE_ROUTES`): zawsze 204, limit 30/min/IP i 300/min globalnie,
+  ciało ≤ 16 kB, zapis ZAGREGOWANY w `csp_violations` (dyrektywa × źródło jako sam `schemat://host` × ścieżka, licznik), bez IP/UA.
+  ⚠️ **Adres strony traci parametry zapytania** — w linkach są tokeny resetu hasła i zaproszeń (`?kod=`); sufit 500 różnych
+  wpisów; retencja 30 dni od ostatniego wystąpienia. Odczyt: `python -u -m scripts.csp_report [--days 14]`
+- ⚠️ **Zmiana Caddyfile = `up -d --force-recreate caddy`** (bind mount pojedynczego pliku; `reload` widzi stary inode).
+  13.10 przerwa ok. 1–2 s (pomiar), certyfikaty w `caddy_data` przeżyły
+- **Blokowanie CSP NIE jest włączone** — po ~2 tygodniach raportów (od 27.10) `scripts.csp_report`, potem decyzja
+  (zmiana nagłówka na `Content-Security-Policy`). Raporty `chrome-extension://…` to szum rozszerzeń użytkowników
+- Polityka prywatności: dopisane wiersze o pomiarze odwiedzin i danych pozyskania (sekcje 2, 6, 7), **wersja `PRIVACY_VERSION`
+  celowo bez zmian** (to znacznik zapisywany przy rejestracji, nie ma przepływu ponownej zgody; opisujemy praktykę, nie nową zgodę —
+  do oceny prawnika). Raporty CSP nie są w polityce: to agregat bez danych osobowych
+- Testy: `test_privacy_retention` (17), `test_csp_report` (27) — oba w `db-tests`
+
+## Sołtysi: korekta i odwołanie po publikacji (2026-10-13)
+**Opublikowanego ogłoszenia nie dało się poprawić ani wycofać** (audyt T-06): edycja zwracała 409,
+a awaryjne `DELETE /api/articles` padało na kluczach obcych (`solectwo_posts.article_id`,
+`events.source_article_id`) — ścieżka ratunkowa nie działała dokładnie wtedy, gdy była potrzebna.
+- **Proces jest między sołtysem a redakcją, mieszkaniec nie widzi NIC** (decyzja Łukasza 13.10): poprawione
+  ogłoszenie ma po prostu nową treść; odwołane pod tym samym linkiem mówi wyłącznie „nieaktualne” — bez tytułu,
+  treści, terminu, powodu i dat. Publiczne API (`PostPublic`) nie zwraca powodów ani historii. Powód widzi
+  sołtys (mail, jego panel) i redakcja (historia wersji)
+- `solectwo_post_versions` — każda opublikowana postać (publication/correction/withdrawal) z powodem i autorem;
+  `solectwo_post_requests` — prośba sołtysa o korektę/odwołanie, **publikuje redakcja** (ta sama bramka co przy
+  pierwszej wersji). Trasy: `/posts/{id}/requests`, `/admin/posts/{id}/correct|withdraw|versions`,
+  `/admin/requests/{id}/dismiss`
+- **`withdrawn_at` na `articles` i `events`** stoi w `publishable_conditions` / `visible_event_conditions` — jedna
+  kolumna wyłącza wpis naraz w feedzie, briefingu, newsletterze, pushu, u agentów i w kalendarzu. Wiersz zostaje
+  (historia). Odwołanie kasuje chunki RAG; powtórka z innego źródła przejmuje kalendarz (`_withdraw_event`)
+- **Korekta terminu** przesuwa wydarzenie w kalendarzu i wraca do briefingu (`term_corrected_at`, 30 h) z etykietą
+  „TERMIN ZAKTUALIZOWANY — nie pisz o zmianie”. Osadzenie liczone od razu (`embedding_job.embed_article`), bo job
+  chodzi 6:50/13:45
+- ⚠️ **Przedruk po zmianie terminu trzeba poprawić RĘCZNIE i po cichu** — inaczej strona pokazuje dwie godziny
+  (podsumowanie 18:00, przedruk 17:00). Bez adnotacji „[Korekta…]”: to byłby widoczny ślad procesu
+- ⚠️ **Brak „Przywróć”** — odwołania nie da się cofnąć w produkcie (świadomie, decyzja 13.10); lokalnie wystarczy nowe ogłoszenie
+- Takedown wpisu sołectwa zostawia ogłoszenie jako `withdrawn` (bez artykułu), wydarzenia z artykułu znikają
+- Migracja `add_solectwo_post_history` (✅ prod 13.10, przed kodem). Test: `python -m scripts.test_solectwa` (117 sprawdzeń,
+  lokalna baza — nie w CI)
+- ⚠️ Lokalnie `APP_URL` ma domyślnie `http://localhost:3000`, więc linki „Zobacz na stronie” prowadzą donikąd; na prodzie jest `rybnolive.pl`
+
 ## Kontrola dostępu po audycie (2026-10-11)
 **Audyt (`~/Desktop/moj-projekt-audyt/audit-output/40-final-report.md`) znalazł klasę, nie błąd:**
 każda trasa pilnowała dostępu sama albo wcale. Anonim czytał historię czatu WSZYSTKICH
@@ -1189,6 +1289,36 @@ pięć deployów: pogoda >2 h bez odświeżenia, ruch z 10:00 przepadł (audyt F
   dopiero to czyni ponowienie bezpiecznym (F-022)
 - `/health` robi `SELECT 1` (503 przy martwej bazie) i podaje stan schedulera
 - Test: `python -m scripts.test_job_runs [--db]` (16 w CI, 24 z bazą — sekcja 6 na atrapach jobów)
+
+## Zależności przypięte, lokalność mierzalna (2026-10-13, audyt E6 + E1 etap A)
+**E6 ✅ prod:** `backend/constraints.txt` = `pip freeze` produkcji (203 × `==`), Dockerfile `-c constraints.txt` na
+`python:3.11.16-slim`, CI instaluje te same wersje (+ krok „pip check + freeze == constraints"). Deploy taguje
+`centrum-backend:rollback` przed budową i po sukcesie czyści cache (`--keep-storage 5GB`; dysk 8,6 → 18 GB wolnych).
+Cofnięcie: `docker tag centrum-backend:rollback centrum-backend:latest && docker compose -f docker-compose.prod.yml up -d backend`.
+Odświeżenie wersji = świadomy commit: `bash scripts/refresh_constraints.sh` → CI → deploy. Dowód: freeze nowego obrazu = prod (0 różnic).
+- ⚠️ `sort` na serwerze i lokalnie różnią się lokalizacją — porównuj `LC_ALL=C`
+**E1 etap A ✅ (prod 13.10; strażniki w CI):** dwa strażniki funkcji lokalności (`places_in`, `article_scope`, `is_local_article`,
+`locality_factor`, `gmina_subject`, `is_foreign_region`, reguła briefingu):
+- `python -m scripts.locality_gold --check` — golden master 6120 wpisów lokalnej bazy (`scripts/golden/locality_gold.json`,
+  tylko id + wyniki, bez tekstów). Warunek zaliczenia etapu B: **0 różnic**. `--record` tylko przy celowej zmianie zachowania
+- `python -m scripts.test_locality_gold` (w CI) — 60 wpisów oznaczonych ręcznie (`scripts/fixtures/locality_gold_60.json`):
+  58/60 zgodnych (po naprawach 13.10), **2 znane błędy** z flagą `bug:` (test psuje się też, gdy błąd zostanie naprawiony — flagę trzeba zdjąć), 3 sporne
+- **Naprawy lokalności 13.10 (decyzja Łukasza: obce tematy = „poza regionem", Płośnica = „okolice")**:
+  `article_scope(…, locality)` — media regionalne (`REGIONAL_MEDIA_SOURCES`: Radio 7, Moje Działdowo, Panorama) z oceną 0–1 → „poza regionem"
+  (238 zmian etykiety, w większości Żuromin/Mława/Płock). ⚠️ NIE dla innych źródeł lokalnych: ocena 1 znaczy też „wpis bez nazwy
+  miejscowości" (pozdrowienie Syli). `places_in` ignoruje nazwę z PRZYDOMKIEM („Nowa Wieś Ełcka", „Gronowo Elbląskie"; wyjątek: samo Rybno —
+  „Rybno Pomorskie koło Działdowa" to prawdopodobnie nasze). Tytuł Energi z inną gminą (`energa_other_gmina`) → „okolice" — **tylko w etykiecie**:
+  bramka pusha dalej czyta treść (Gralewo z wpisu o Płośnicy = push, decyzja z `test_alert_policy`; pominięty alert kosztuje więcej niż fałszywy)
+- ⚠️ Pozostałe 2 znane błędy: Radio 7 o Ciechanowie i Zawidzu — wpisy BEZ oceny lokalności (sprzed 21.08); kod bez oceny nie ma jak wiedzieć
+
+**E1 etap B ✅ (prod 13.10, `90276ef`; poprawki lokalności `02ae974` też):** `services/places.py` = JEDYNE miejsce z nazwami wsi. Trzy listy to trzy RÓŻNE pojęcia,
+nie duplikaty: `MIEJSCOWOSCI` 22 (nazwy w tekście, z odmianą), `SOLECTWA` 20 (BIP), `HARMONOGRAM` 24 (odpady/profil, kolejność = UI).
+`alert_policy`, `gmina_facts`, `auth/schemas`, `ai/tools/daily` i prompt briefingu (`PROMPT_NOMINATIVES`) czytają z niego.
+- Strażnik `python -m scripts.test_places_guard` (w CI): czerwieni literał z ≥4 nazwami poza `places.py` (wyjątek `# places-ok: powód`),
+  pilnuje zgodności z `frontend/types.ts` i promptem. Znalazł 4 miejsca, o których nie wiedziałem (3 to lokalizacje SZKÓŁ i podpowiedź
+  w `report_analyzer` — oznaczone `places-ok`)
+- Zaliczenie: golden master **0 różnic** na 6120 wpisach, 35 testów CI zielonych, prompt ma te same nazwy w tej samej kolejności
+- Nowa miejscowość = wpis w `places.py` (+ `frontend/types.ts`, `wasteSchedule.ts`, współrzędne w `ReportsPage.tsx` — front nadal ma 3 kopie)
 
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
@@ -1234,6 +1364,8 @@ pięć deployów: pogoda >2 h bez odświeżenia, ruch z 10:00 przepadł (audyt F
 - [x] ~~Front na produkcji~~ ✅ 30.08, `5831478` — beacon łapie realny ruch
 - [x] ~~Webhook Resend~~ ✅ 30.08 — podpis zweryfikowany NA PRODUKCJI wierszem
       kontrolnym: podrobiony odrzucony, prawidłowy zapisał `opened_at` i `clicked_at`
+- [ ] **Raporty CSP po ~2 tygodniach (od 27.10)**: `docker exec -w /app centrum-backend-1 python -u -m scripts.csp_report --days 14`,
+      dopuścić zamierzone źródła, potem przełączyć `Content-Security-Policy-Report-Only` → `Content-Security-Policy`
 - [ ] **Pierwszy odczyt `site_events` po tygodniu** (`python -u -m scripts.site_report
       --days 7`), potem dopiero decyzja o GA4
 - [ ] Cztery sierpniowe konta (id 8–11) zadały łącznie **1 pytanie** agentowi i żadne
@@ -1310,4 +1442,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-10-11*
+*Ostatnia aktualizacja: 2026-10-13*

@@ -156,55 +156,95 @@ def incident_of(title: Optional[str], content: Optional[str] = None) -> Optional
 
 # --- bramka 2: miejsce -------------------------------------------------------
 
-# Sołectwa gminy Rybno (za `auth/schemas.py: AVAILABLE_LOCATIONS`), bez „Domki
-# letniskowe" i sufiksów stref śmieciowych R1/R2 — to nazwy z harmonogramu
-# odbioru odpadów, w tekście prasowym nigdy nie padają.
+# Lista miejscowości mieszka w `services/places.py` (audyt E1, etap B). Nazwy zostają
+# dostępne tutaj, bo importują je inne moduły.
+from src.services.places import (  # noqa: E402
+    GMINA_RYBNO_PLACES,
+    MIEJSCOWOSCI_PATTERNS as _PLACES,
+    PLACE_RE as _PLACE_RE,
+)
+
+
+# Dwa konteksty, w których nazwa wsi z naszej listy NIE oznacza naszej wsi (audyt E1,
+# 13.10.2026; trzy z ośmiu znanych błędów lokalności z `test_locality_gold`):
 #
-# Formy odmienione wypisane wprost, zamiast doklejać dowolną końcówkę do rdzenia.
-# Automat brzmi kusząco, ale na tej liście są nazwy, które w dopełniaczu zlewają
-# się ze słowami pospolitymi: „Grądy" z gradem, „Wery" z wersją, „Rumian"
-# z rumiankiem, „Prusy" z pruskim. Alert ma budzić ludzi w nocy — wolimy przegapić
-# egzotyczną odmianę niż wysłać powiadomienie z powodu opadów gradu.
-# Wzorce działają na tekście bez ogonków (`_flat`).
-_PLACES: tuple[tuple[str, str], ...] = (
-    ("Rybno", r"rybn(o|a|ie|em)"),
-    # „debienie" to BŁĘDNY mianownik, który model tworzy z „w Dębieniu" (znany
-    # błąd, opisany w prompcie). Wzorzec ma łapać formy, które realnie padają
-    # w tekście i w polu `event_places` — także te utworzone przez model.
-    ("Dębień", r"debien(ia|iu|ie)?"),
-    ("Grabacz", r"grabacz(a|u|em)?"),
-    ("Gralewo", r"gralew(o|a|ie|em)"),
-    ("Gronowo", r"gronow(o|a|ie|em)"),
-    ("Groszki", r"groszk(i|ach|ow|om|ami)"),
-    ("Grądy", r"grad(y|ach|om|ami)"),
-    ("Hartowiec", r"hartow(iec|cu|ca|cem)"),
-    ("Jeglia", r"jegli(a|ii|i|e)"),
-    ("Kopaniarze", r"kopaniarz(e|ach|y|om|ami)"),
-    ("Koszelewki", r"koszelewk(i|ach|om|ami)"),
-    ("Koszelewy", r"koszelew(y|ach|om|ami)"),
-    ("Naguszewo", r"naguszew(o|a|ie|em)"),
-    ("Nowa Wieś", r"now(a|ej)\s+w(ies|si)"),
-    ("Prusy", r"prus(y|ach|om|ami)"),
-    ("Rapaty", r"rapat(y|ach|om|ami)"),
-    ("Rumian", r"rumian(ie|a|em|y)?"),
-    ("Szczupliny", r"szczuplin(y|ach|om|ami)"),
-    ("Truszczyny", r"truszczyn(y|ach|om|ami)"),
-    ("Tuczki", r"tuczk(i|ach|om|ami)"),
-    ("Wery", r"wer(y|ach|om|ami)"),
-    ("Żabiny", r"zabin(y|ach|om|ami)"),
-)
+#  • NAZWA Z PRZYDOMKIEM — „Nowa Wieś Ełcka", „Gronowo Elbląskie": polska toponimia
+#    rozróżnia tak tysiące wsi o tej samej nazwie. Przydomek to wielka litera + końcówka
+#    -sk-/-ck-, stojąca BEZPOŚREDNIO po nazwie. Liczy się, gdy WSZYSTKIE wystąpienia
+#    nazwy w tekście mają przydomek — jedno gołe „Nowa Wieś" zostaje trafieniem.
+#  • NAGŁÓWEK ENERGI Z INNĄ GMINĄ — „… Region Mława - Płośnica gmina wiejska" wymienia
+#    wsie TEJ gminy (`energa_other_gmina`). ⚠️ Używa tego WYŁĄCZNIE etykieta zasięgu
+#    (`feed_policy.article_scope`), NIE `places_in`: bramka pusha świadomie czyta treść,
+#    bo lista ulic Energi przekracza granice gmin (Gralewo — `test_alert_policy`), a pominięty
+#    alert kosztuje więcej niż fałszywy.
+_QUALIFIER_RE = re.compile(r"\s+[A-Z][a-z]+(?:sk|ck)(?:a|ie|i|iej|iego|im|ich)\b")
+_ENERGA_GMINA_RE = re.compile(r"-\s*([a-z][a-z ]*?)\s+gmina\s+(?:wiejska|miejska|miejsko-wiejska)\b")
 
-GMINA_RYBNO_PLACES: tuple[str, ...] = tuple(place for place, _ in _PLACES)
 
-_PLACE_RE = tuple(
-    (place, re.compile(r"\b" + pattern + r"\b")) for place, pattern in _PLACES
-)
+def energa_other_gmina(title: Optional[str]) -> bool:
+    """Tytuł Energi opisuje gminę INNĄ niż Rybno („… - Płośnica gmina wiejska")."""
+    header = _ENERGA_GMINA_RE.search(_flat(title))
+    return bool(header) and header.group(1).strip() != "rybno"
+
+
+def _deaccent_keep_case(text: str) -> str:
+    stripped = unicodedata.normalize("NFKD", text.replace("ł", "l").replace("Ł", "L"))
+    return "".join(c for c in stripped if not unicodedata.combining(c))
 
 
 def places_in(title: Optional[str], content: Optional[str] = None) -> tuple[str, ...]:
     """Nazwy miejscowości z gminy Rybno, które padły w tekście."""
     text = _flat(f"{title or ''} {content or ''}")
-    return tuple(place for place, pattern in _PLACE_RE if pattern.search(text))
+    found = tuple(place for place, pattern in _PLACE_RE if pattern.search(text))
+    if not found:
+        return found
+    raw = _deaccent_keep_case(f"{title or ''} {content or ''}")
+    return tuple(place for place in found if not _only_qualified(place, raw))
+
+
+def _only_qualified(place: str, raw: str) -> bool:
+    """Wszystkie wystąpienia nazwy mają przydomek („Nowa Wieś Ełcka")."""
+    if place == "Rybno":
+        return False  # „Rybno Pomorskie koło Działdowa" (art. 3073) to prawdopodobnie NASZE Rybno
+    pattern = dict(_PLACES)[place]
+    hits = list(re.finditer(r"\b" + pattern + r"\b", raw, re.IGNORECASE))
+    return bool(hits) and all(_QUALIFIER_RE.match(raw, m.end()) for m in hits)
+
+
+# Instytucja albo drużyna, która nosi nazwę wsi z gminy — „KOGO dotyczy” wpis
+# (decyzja 11.10.2026, audyt E1): mecz wyjazdowy Delfina Rybno, jubileusz OSP
+# Truszczyny, szkoła w Rumianie na konkursie w Lubawie są sprawą GMINY, choć
+# dzieją się gdzie indziej. Model ocenia „gdzie”, a ten wzorzec dokłada „kogo”.
+#
+# ⚠️ Celowo instytucje, NIE ludzie. „Mieszkanki gminy Rybno wspierają akcję
+# zdrowotną w Lubawie” otworzyło 3.09.2026 briefing jako lokalna sprawa — i to
+# był błąd. Stąd „Gmina/Gminy Rybno” liczy się WYŁĄCZNIE wielką literą (urząd),
+# a „mieszkańcy/seniorzy z gminy” nie są podmiotem.
+_ORG_WORDS = (
+    r"delfin\w*|gszs|osp|ochotnicz\w* straż\w*|kgw|koł\w* gospodyń\w*|"
+    r"szkoł\w*|sp|zesp\w* szk\w*|przedszkol\w*|żłob\w*|orkiestr\w*|"
+    r"parafi\w*|sołectw\w*|sołtys\w*|klub\w*|uks|gops|zgk|biblio\w*|osir"
+)
+_GMINA_OFFICE = re.compile(r"\b(?:Gmin[aeyę]|Urz[ąę]d\w* Gminy|Wójt\w*)\s+(?:Rybno|Rybna)\b")
+
+
+def gmina_subject(title: Optional[str], content: Optional[str] = None) -> bool:
+    """Czy podmiotem wpisu jest instytucja/drużyna z gminy Rybno (patrz `_ORG_WORDS`).
+
+    Okno: słowo instytucji i do czterech kolejnych słów („OSP Truszczyny”,
+    „Szkoła Podstawowa w Rumianie”, „trampkarze Delfina Rybno”) — nazwa wsi
+    musi paść W TYM OKNIE, nie gdziekolwiek w tekście.
+    """
+    text = f"{title or ''} {content or ''}"
+    if _GMINA_OFFICE.search(text):
+        return True
+    for match in re.finditer(rf"\b(?:{_ORG_WORDS})\b", text, re.IGNORECASE):
+        window = text[match.start(): match.end() + 60]
+        window = re.split(r"[.!?\n]", window, maxsplit=1)[0]  # okno nie przechodzi do następnego zdania
+        window = " ".join(window.split()[:6])
+        if places_in(window):
+            return True
+    return False
 
 
 def norm_place(value: Optional[str]) -> str:

@@ -264,6 +264,13 @@ class Article(SQLModel, table=True):
     # Migracja `add_article_story` (FK ON DELETE SET NULL).
     story_id: Optional[int] = Field(default=None)
     story_checked_at: Optional[datetime] = Field(default=None)
+    # Wycofane z publikacji (odwołane ogłoszenie sołectwa, E7 12.10.2026).
+    # Wiersz zostaje — historia ma przetrwać — a `publishable_conditions`
+    # wyłącza go naraz w feedzie, briefingu, newsletterze, pushu i u agentów.
+    withdrawn_at: Optional[datetime] = Field(default=None)
+    # Redakcja zmieniła TERMIN opublikowanego ogłoszenia: wpis wraca do
+    # najbliższego briefingu z etykietą „KOREKTA” (`summary_generator`).
+    term_corrected_at: Optional[datetime] = Field(default=None)
 
 class Event(SQLModel, table=True):
     __tablename__ = "events"
@@ -301,6 +308,8 @@ class Event(SQLModel, table=True):
     is_featured: bool = Field(default=False)
     views_count: int = Field(default=0)
     embedded: bool = Field(default=False)  # True when RAG embeddings generated
+    # Ogłoszenie źródłowe odwołane (E7) — `visible_event_conditions` chowa wpis
+    withdrawn_at: Optional[datetime] = None
 
 class Weather(SQLModel, table=True):
     __tablename__ = "weather"
@@ -1408,3 +1417,52 @@ class SolectwoPost(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     published_at: Optional[datetime] = None
     images_deleted_at: Optional[datetime] = None
+
+    # Korekta i odwołanie po publikacji (E7, 12.10.2026). `version` = numer
+    # ostatniego wiersza w `solectwo_post_versions` (0 = nieopublikowane).
+    version: int = Field(default=0)
+    corrected_at: Optional[datetime] = None
+    withdrawn_at: Optional[datetime] = None
+    withdraw_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class SolectwoPostVersion(SQLModel, table=True):
+    """Opublikowana postać ogłoszenia: publikacja, korekta albo odwołanie.
+
+    Pełne treści poprzednich wersji widzi wyłącznie redakcja — stara wersja
+    mogła zawierać właśnie ten błąd albo czyjeś dane. Strona publiczna
+    pokazuje tylko datę i powód zmiany.
+    """
+    __tablename__ = "solectwo_post_versions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    post_id: int = Field(foreign_key="solectwo_posts.id", index=True)
+    version: int
+    # publication / correction / withdrawal
+    kind: str = Field(max_length=20)
+    title: Optional[str] = Field(default=None, max_length=200)
+    summary: Optional[str] = None
+    transcript: Optional[str] = None
+    event_at: Optional[datetime] = None
+    event_until: Optional[datetime] = None
+    reason: Optional[str] = Field(default=None, max_length=500)
+    changed_by: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SolectwoPostRequest(SQLModel, table=True):
+    """Prośba sołtysa o korektę albo odwołanie opublikowanego ogłoszenia.
+    Publikuje redakcja — ta sama bramka co przy pierwszej wersji."""
+    __tablename__ = "solectwo_post_requests"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    post_id: int = Field(foreign_key="solectwo_posts.id", index=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    # correction / withdrawal
+    kind: str = Field(max_length=20)
+    message: str
+    # open → done / dismissed
+    status: str = Field(default="open", max_length=20)
+    handled_by: Optional[str] = Field(default=None, max_length=255)
+    handled_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)

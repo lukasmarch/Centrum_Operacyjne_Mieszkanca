@@ -19,6 +19,10 @@ przez prawdziwe endpointy (ASGI, lokalna baza):
  12. retencja: zdjęcia znikają po IMAGE_RETENTION_DAYS od decyzji
  13. DSAR: opublikowane zostaje bez konta, nieopublikowane znika, rola znika
  14. kontrola kodem odczytu: PESEL wycięty, termin bez śladu w tekście odrzucony
+ 15. po publikacji (E7): prośba sołtysa → korekta (artykuł, kalendarz, RAG,
+     etykieta „KOREKTA” w briefingu, historia) → odwołanie (znika z bramek,
+     powtórka z innego źródła przejmuje kalendarz, strona mówi „odwołane”)
+ 16. takedown wpisu sołectwa z wydarzeniem nie pada na kluczach obcych
 
 Model i poczta są PODMIENIONE — nic nie wychodzi na zewnątrz i nic nie kosztuje.
 `--live` dokłada prawdziwy odczyt wygenerowanego pisma przez gpt-4o (~$0,01).
@@ -44,7 +48,8 @@ from sqlmodel import select
 from src.auth.jwt import create_access_token
 from src.database.connection import async_session
 from src.database.schema import (
-    Article, RoleInvitation, SolectwoPost, User, UserRole, UserTier,
+    Article, Event, RoleInvitation, SolectwoPost, SolectwoPostRequest,
+    SolectwoPostVersion, User, UserRole, UserTier,
 )
 from src.newsletter.email_service import EmailService
 
@@ -100,6 +105,19 @@ def patch_outside_world() -> None:
         return article
     article_processor.ArticleProcessor.__init__ = lambda self: None
     article_processor.ArticleProcessor.process_article = fake_process
+
+    # Osadzenie poprawionej treści bez OpenAI — liczymy tylko, że zostało zawołane
+    from src.scheduler import embedding_job
+
+    async def fake_embed(session, article, source_name):
+        reembedded.append(article.id)
+        article.embedded = True
+        session.add(article)
+        return 1
+    embedding_job.embed_article = fake_embed
+
+
+reembedded: list[int] = []
 
 
 def jpeg_bytes() -> bytes:
@@ -298,6 +316,8 @@ async def run(client: httpx.AsyncClient, live: bool) -> None:
     check("odrzucone", r.status_code == 200 and r.json()["status"] == "rejected")
     check("mail z powodem", any("innej gminy" in m["html"] for m in sent_emails))
 
+    await after_publication(client, admin, soltys, files)
+
     print("\n1️⃣1️⃣  Odebranie roli")
     r = await client.get("/api/roles/admin/list", headers=auth(admin))
     rumian = next(x for x in r.json() if x["user_id"] == existing.id)
@@ -329,8 +349,9 @@ async def run(client: httpx.AsyncClient, live: bool) -> None:
     async with async_session() as session:
         account = await session.get(User, soltys.id)
         export = await export_user_data(session, account)
-        check("eksport zawiera role i ogłoszenia",
-              len(export["roles"]) == 1 and len(export["solectwo_posts"]) == 3)
+        check("eksport zawiera role, ogłoszenia i prośby",
+              len(export["roles"]) == 1 and len(export["solectwo_posts"]) == 5
+              and len(export["solectwo_requests"]) == 2, (len(export["solectwo_posts"]), len(export["solectwo_requests"])))
         await delete_user_account(session, account)
     published = await reload(SolectwoPost, post_id)
     check("opublikowane zostaje, bez konta", published is not None and published.user_id is None)
@@ -385,6 +406,211 @@ async def run(client: httpx.AsyncClient, live: bool) -> None:
 
     if live:
         await live_scan()
+
+
+async def publish_new(client, admin, soltys, files) -> tuple[int, int]:
+    r = await client.post("/api/solectwa/posts", headers=auth(soltys), files=files)
+    pid = r.json()["id"]
+    r = await client.post(f"/api/solectwa/admin/posts/{pid}/approve", headers=auth(admin))
+    assert r.status_code == 200, r.text
+    post = await reload(SolectwoPost, pid)
+    return pid, post.article_id
+
+
+async def add_event(article_id: int, title: str, canonical_id=None, source_article_id=-1) -> int:
+    """Wydarzenie z ogłoszenia (ekstraktora tu nie uruchamiamy) + chunk RAG."""
+    async with async_session() as session:
+        event = Event(
+            title=title, event_date=datetime(2026, 10, 15, 16, 0), event_time="18:00",
+            location="Żabiny", locality=3, canonical_id=canonical_id,
+            source_article_id=article_id if source_article_id == -1 else source_article_id,
+            description="Zebranie 15 października", embedded=True,
+        )
+        session.add(event)
+        await session.commit()
+        await session.refresh(event)
+        await session.execute(text(
+            "INSERT INTO document_embeddings (source_type, source_id, chunk_index, chunk_text) "
+            "VALUES ('event', :id, 0, 'test')"), {"id": event.id})
+        await session.commit()
+        return event.id
+
+
+async def chunks(source_type: str, source_id: int) -> int:
+    async with async_session() as session:
+        return (await session.execute(text(
+            "SELECT count(*) FROM document_embeddings WHERE source_type = :t AND source_id = :i"),
+            {"t": source_type, "i": source_id})).scalar()
+
+
+async def visible(article_id: int) -> bool:
+    from src.services.feed_policy import publishable_conditions
+    async with async_session() as session:
+        row = (await session.execute(
+            select(Article.id).where(Article.id == article_id, *publishable_conditions(Article))
+        )).first()
+    return row is not None
+
+
+async def event_visible(event_id: int) -> bool:
+    from src.services.feed_policy import visible_event_conditions
+    async with async_session() as session:
+        row = (await session.execute(
+            select(Event.id).where(Event.id == event_id, *visible_event_conditions(Event))
+        )).first()
+    return row is not None
+
+
+async def after_publication(client, admin, soltys, files) -> None:
+    print("\n1️⃣5️⃣  Po publikacji: prośba, korekta, odwołanie (E7)")
+    pid, aid = await publish_new(client, admin, soltys, files)
+    post = await reload(SolectwoPost, pid)
+    check("publikacja = wersja 1 w historii", post.version == 1)
+    event_id = await add_event(aid, "Zebranie wiejskie w Żabinach")
+    async with async_session() as session:
+        await session.execute(text(
+            "INSERT INTO document_embeddings (source_type, source_id, chunk_index, chunk_text) "
+            "VALUES ('article', :id, 0, 'stara treść')"), {"id": aid})
+        await session.execute(text("UPDATE articles SET embedded = true WHERE id = :id"), {"id": aid})
+        await session.commit()
+
+    # Edycja PATCH nadal nie rusza opublikowanego — od tego jest korekta
+    r = await client.patch(f"/api/solectwa/admin/posts/{pid}", headers=auth(admin), json={"title": "x"})
+    check("PATCH opublikowanego nadal 409", r.status_code == 409, r.status_code)
+
+    # Prośba sołtysa
+    sent_emails.clear()
+    r = await client.post(f"/api/solectwa/posts/{pid}/requests", headers=auth(soltys),
+                          json={"kind": "correction", "message": "Zebranie przeniesione na 22 października"})
+    check("sołtys składa prośbę o korektę", r.status_code == 201 and len(r.json()["open_requests"]) == 1, r.text[:200])
+    request_id = r.json()["open_requests"][0]["id"]
+    r = await client.post(f"/api/solectwa/posts/{pid}/requests", headers=auth(soltys),
+                          json={"kind": "correction", "message": "Jeszcze raz to samo"})
+    check("druga taka sama prośba → 409", r.status_code == 409, r.status_code)
+    stranger = await make_user(f"obcy{TEST_DOMAIN}")
+    r = await client.post(f"/api/solectwa/posts/{pid}/requests", headers=auth(stranger),
+                          json={"kind": "withdrawal", "message": "Odwołajcie to"})
+    check("cudze ogłoszenie → 404", r.status_code == 404, r.status_code)
+    r = await client.get("/api/solectwa/admin/posts", headers=auth(admin))
+    listed = next((p for p in r.json() if p["id"] == pid), None)
+    check("redakcja widzi prośbę przy ogłoszeniu", listed and listed["open_requests"][0]["kind"] == "correction")
+
+    # Korekta terminu
+    sent_emails.clear()
+    reembedded.clear()
+    r = await client.post(f"/api/solectwa/admin/posts/{pid}/correct", headers=auth(admin), json={
+        "reason": "Zmiana terminu zebrania",
+        "term_action": "set", "term": {"day": "2026-10-22", "start": "18:00"},
+        "summary": "Sołtys zaprasza na zebranie wiejskie 22 października o 18:00 w świetlicy.",
+        "request_id": request_id,
+    })
+    check("korekta przyjęta", r.status_code == 200 and r.json()["version"] == 2, r.text[:200])
+    check("prośba zamknięta", r.json().get("open_requests") == [])
+    post = await reload(SolectwoPost, pid)
+    article = await reload(Article, aid)
+    event = await reload(Event, event_id)
+    new_start = datetime(2026, 10, 22, 16, 0)  # 18:00 lokalnie = 16:00 UTC
+    check("ogłoszenie: nowy termin w UTC", post.event_at == new_start, post.event_at)
+    check("artykuł: nowy termin i podsumowanie",
+          article.event_at == new_start and "22 października" in (article.summary or ""))
+    check("artykuł: znacznik korekty terminu", article.term_corrected_at is not None)
+    check("kalendarz: wydarzenie przeniesione, godzina lokalna",
+          event.event_date == new_start and event.event_time == "18:00", (event.event_date, event.event_time))
+    check("kalendarz: opis z zatwierdzonego podsumowania", "22 października" in (event.description or ""))
+    check("RAG: stare chunki artykułu i wydarzenia skasowane",
+          await chunks("event", event_id) == 0 and event.embedded is False)
+    check("RAG: poprawiona treść osadzona od razu", reembedded == [aid], reembedded)
+    check("mail do sołtysa o korekcie z powodem", any(
+        m["to"] == soltys.email and "poprawiliśmy" in m["subject"].lower() and "Zmiana terminu" in m["html"]
+        for m in sent_emails), [m["subject"] for m in sent_emails])
+    from src.ai.summary_generator import _time_label
+    label = _time_label(article, datetime.utcnow())
+    check("briefing: etykieta „termin zaktualizowany” bez słowa o korekcie",
+          "TERMIN ZAKTUALIZOWANY" in label and "KOREKTA" not in label, label)
+    check("briefing: model ma nie pisać o zmianie", "NIE PISZ O ZMIANIE" in label, label)
+    later = _time_label(article, datetime.utcnow() + timedelta(days=3))
+    check("briefing: po dobie etykieta znika", "ZAKTUALIZOWANY" not in later, later)
+    from src.ai.summary_generator import SummaryGenerator
+    now = datetime.utcnow()
+    gen = SummaryGenerator.__new__(SummaryGenerator)
+    gen.logger = sol_logger()
+    async with async_session() as session:
+        material = await gen._fetch_articles(session, now - timedelta(hours=6), now, now=now)
+    check("briefing: korekta wraca do materiału mimo terminu za tydzień", any(a.id == aid for a in material))
+    r = await client.post(f"/api/solectwa/admin/posts/{pid}/correct", headers=auth(admin),
+                          json={"reason": "Bez zmian"})
+    check("korekta bez zmian → 400", r.status_code == 400, r.status_code)
+    r = await client.post(f"/api/solectwa/admin/posts/{pid}/correct", headers=auth(soltys),
+                          json={"reason": "Sam poprawię", "title": "x"})
+    check("sołtys nie poprawi sam (403)", r.status_code == 403, r.status_code)
+
+    pub = (await client.get(f"/api/solectwa/posts/{pid}")).json()
+    check("strona: nowa treść, BEZ jakiegokolwiek śladu korekty",
+          "22 października" in pub["summary"]
+          and not any(k in pub for k in ("changes", "corrected_at", "withdrawn_at", "withdraw_reason", "version")),
+          sorted(pub))
+    check("strona: powód korekty nie wycieka", "Zmiana terminu" not in str(pub), str(pub)[:120])
+
+    # Odwołanie — z powtórką z innego źródła wskazującą nasz wpis
+    duplicate_id = await add_event(aid, "Zebranie wiejskie Żabiny (FB)", canonical_id=event_id, source_article_id=None)
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM document_embeddings WHERE source_type='event' AND source_id=:i"),
+                              {"i": duplicate_id})
+        await session.commit()
+    check("przed odwołaniem: wpis widoczny w feedzie i kalendarzu", await visible(aid) and await event_visible(event_id))
+    r = await client.post(f"/api/solectwa/posts/{pid}/requests", headers=auth(soltys),
+                          json={"kind": "withdrawal", "message": "Zebranie odwołane przez gminę"})
+    withdraw_request = r.json()["open_requests"][0]["id"]
+    sent_emails.clear()
+    r = await client.post(f"/api/solectwa/admin/posts/{pid}/withdraw", headers=auth(admin),
+                          json={"reason": "Zebranie odwołane", "request_id": withdraw_request})
+    check("odwołane", r.status_code == 200 and r.json()["status"] == "withdrawn" and r.json()["version"] == 3, r.text[:200])
+    check("feed/briefing/newsletter/push: wpis poza bramką", not await visible(aid))
+    check("kalendarz: wydarzenie ukryte", not await event_visible(event_id))
+    dup = await reload(Event, duplicate_id)
+    check("powtórka z innego źródła przejmuje kalendarz",
+          dup.canonical_id is None and dup.embedded is False and await event_visible(duplicate_id))
+    check("RAG: chunki artykułu skasowane", await chunks("article", aid) == 0)
+    check("artykuł NIE skasowany (historia)", await reload(Article, aid) is not None)
+    check("mail do sołtysa o odwołaniu", any("Odwołaliśmy" in m["subject"] for m in sent_emails))
+    pub = (await client.get(f"/api/solectwa/posts/{pid}")).json()
+    check("strona: odwołane = samo „nieaktualne”, bez powodu, treści, terminu i tytułu",
+          pub["status"] == "withdrawn" and pub["transcript"] is None and pub["summary"] is None
+          and pub["event_at"] is None and "Zebranie" not in pub["title"]
+          and "withdraw_reason" not in pub and "Zebranie odwołane" not in str(pub), pub)
+    r = await client.post(f"/api/solectwa/admin/posts/{pid}/correct", headers=auth(admin),
+                          json={"reason": "Po odwołaniu", "title": "Nowy"})
+    check("korekta odwołanego → 409", r.status_code == 409, r.status_code)
+    r = await client.get(f"/api/solectwa/admin/posts/{pid}/versions", headers=auth(admin))
+    kinds = [v["kind"] for v in r.json()]
+    check("historia: publikacja → korekta → odwołanie", kinds == ["publication", "correction", "withdrawal"], kinds)
+    check("historia: pierwsza wersja ma STARY termin",
+          r.json()[0]["event_at"].startswith("2026-10-15T16:00"), r.json()[0]["event_at"])
+    r = await client.get(f"/api/solectwa/admin/posts/{pid}/versions", headers=auth(soltys))
+    check("historia z treścią tylko dla redakcji", r.status_code == 403, r.status_code)
+    r = await client.get("/api/solectwa/posts/mine", headers=auth(soltys))
+    mine = next(p for p in r.json() if p["id"] == pid)
+    check("sołtys widzi status „odwołane” i link", mine["status"] == "withdrawn" and mine["url"])
+
+    print("\n1️⃣6️⃣  Takedown wpisu sołectwa z wydarzeniem")
+    pid2, aid2 = await publish_new(client, admin, soltys, files)
+    ev2 = await add_event(aid2, "Festyn w Żabinach")
+    dup2 = await add_event(aid2, "Festyn (inne źródło)", canonical_id=ev2, source_article_id=None)
+    r = await client.delete(f"/api/articles/{aid2}", headers=auth(admin))
+    check("DELETE /api/articles nie pada (200)", r.status_code == 200, r.status_code)
+    post2 = await reload(SolectwoPost, pid2)
+    check("ogłoszenie zostaje jako odwołane, bez artykułu",
+          post2.status == "withdrawn" and post2.article_id is None, (post2.status, post2.article_id))
+    check("wydarzenie z artykułu usunięte", await reload(Event, ev2) is None)
+    check("powtórka odpięta, nie wskazuje skasowanego", (await reload(Event, dup2)).canonical_id is None)
+    async with async_session() as session:
+        await session.execute(text("DELETE FROM events WHERE id = ANY(:ids)"), {"ids": [duplicate_id, dup2]})
+        await session.commit()
+
+
+def sol_logger():
+    from src.utils.logger import setup_logger
+    return setup_logger("TestSolectwa")
 
 
 def letter_image() -> bytes:
@@ -455,8 +681,18 @@ async def cleanup() -> None:
             for name in post.image_files or []:
                 (PRIVATE_DIR / name).unlink(missing_ok=True)
         article_ids = [p.article_id for p in posts if p.article_id]
-        await session.execute(text("DELETE FROM solectwo_posts WHERE id = ANY(:ids)"), {"ids": [p.id for p in posts]})
+        post_ids = [p.id for p in posts]
+        await session.execute(text("DELETE FROM solectwo_post_requests WHERE post_id = ANY(:ids)"), {"ids": post_ids})
+        await session.execute(text("DELETE FROM solectwo_post_versions WHERE post_id = ANY(:ids)"), {"ids": post_ids})
+        await session.execute(text("DELETE FROM solectwo_posts WHERE id = ANY(:ids)"), {"ids": post_ids})
         if article_ids:
+            await session.execute(text(
+                "DELETE FROM document_embeddings WHERE source_type = 'event' AND source_id IN "
+                "(SELECT id FROM events WHERE source_article_id = ANY(:ids))"), {"ids": article_ids})
+            await session.execute(text("DELETE FROM events WHERE source_article_id = ANY(:ids)"), {"ids": article_ids})
+            await session.execute(text(
+                "DELETE FROM document_embeddings WHERE source_type = 'article' AND source_id = ANY(:ids)"),
+                {"ids": article_ids})
             await session.execute(text("DELETE FROM articles WHERE id = ANY(:ids)"), {"ids": article_ids})
         await session.execute(text("DELETE FROM role_invitations WHERE created_by LIKE :d"), {"d": f"%{TEST_DOMAIN}"})
         if ids:
@@ -465,6 +701,7 @@ async def cleanup() -> None:
             await session.execute(text("DELETE FROM site_events WHERE user_id = ANY(:ids)"), {"ids": ids})
             await session.execute(text("DELETE FROM newsletter_subscribers WHERE user_id = ANY(:ids) OR email LIKE :d"),
                                   {"ids": ids, "d": f"%{TEST_DOMAIN}"})
+            await session.execute(text("DELETE FROM solectwo_post_requests WHERE user_id = ANY(:ids)"), {"ids": ids})
             await session.execute(text("DELETE FROM users WHERE id = ANY(:ids)"), {"ids": ids})
         await session.commit()
 

@@ -5,12 +5,15 @@
  * albo galerię (bez `capture`, żeby telefon dał wybór), kolejne strony dokłada
  * tym samym przyciskiem. Resztę — odczyt, przedruk, podsumowanie — robimy my,
  * a redakcja sprawdza przed publikacją.
+ *
+ * Po publikacji sołtys nie edytuje sam: prosi o korektę albo odwołanie,
+ * a zmienia redakcja (E7) — ta sama bramka co przy pierwszej wersji.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, CheckCircle2, ExternalLink, ImagePlus, Send, X } from 'lucide-react';
+import { Camera, CheckCircle2, ExternalLink, ImagePlus, Loader2, PencilLine, Send, X } from 'lucide-react';
 import { Notice, Tag, TagTone } from './simple/tv';
 import {
-    MyPost, MyRole, STATUS_LABELS, createPost, fetchMyPosts, parseUtc,
+    ChangeKind, MyPost, MyRole, STATUS_LABELS, createPost, fetchMyPosts, parseUtc, requestChange,
 } from '../src/services/solectwaApi';
 
 // Te same limity co backend (`api/endpoints/solectwa.py`) — tu tylko po to,
@@ -36,6 +39,95 @@ const formatDate = (value: string | null) => {
     return d
         ? d.toLocaleString('pl-PL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
         : '';
+};
+
+const REQUEST_LABEL: Record<ChangeKind, string> = {
+    correction: 'Prośba o poprawkę',
+    withdrawal: 'Prośba o odwołanie',
+};
+
+/** Prośba o poprawkę albo odwołanie opublikowanego ogłoszenia. */
+const ChangeRequestForm: React.FC<{ post: MyPost; onSent: () => void }> = ({ post, onSent }) => {
+    const [open, setOpen] = useState(false);
+    const [kind, setKind] = useState<ChangeKind>('correction');
+    const [message, setMessage] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    if (post.open_requests.length > 0) {
+        return (
+            <div className="mt-2 space-y-1">
+                {post.open_requests.map((r) => (
+                    <p key={r.id} className="text-sm text-amber-300">
+                        {REQUEST_LABEL[r.kind]} czeka na redakcję: „{r.message}”
+                    </p>
+                ))}
+            </div>
+        );
+    }
+    if (!open) {
+        return (
+            <button onClick={() => setOpen(true)}
+                className="mt-1.5 ml-4 inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200">
+                <PencilLine className="w-3.5 h-3.5" /> Poprawka lub odwołanie
+            </button>
+        );
+    }
+
+    const send = async () => {
+        if (message.trim().length < 5) {
+            setError('Napisz w kilku słowach, co zmienić.');
+            return;
+        }
+        setBusy(true);
+        setError('');
+        try {
+            await requestChange(post.id, kind, message);
+            setOpen(false);
+            setMessage('');
+            onSent();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Nie udało się wysłać');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="mt-3 rounded-xl border border-gray-800 p-3 space-y-2">
+            <div className="flex gap-2">
+                {(['correction', 'withdrawal'] as const).map((k) => (
+                    <button key={k} onClick={() => setKind(k)}
+                        className={`rounded-full px-3 py-1 text-sm ${kind === k ? 'bg-blue-600 text-white' : 'bg-white/5 text-neutral-300'}`}>
+                        {k === 'correction' ? 'Popraw' : 'Odwołaj'}
+                    </button>
+                ))}
+            </div>
+            <textarea
+                className="w-full rounded-xl bg-gray-900 border border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                rows={3}
+                maxLength={1000}
+                placeholder={kind === 'correction'
+                    ? 'Co poprawić? Np. zebranie przeniesione na 22 października, godz. 18:00'
+                    : 'Dlaczego odwołać? Np. zebranie się nie odbędzie'}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+            />
+            <p className="text-xs text-neutral-500">
+                Zmianę wprowadza redakcja. Mieszkańcy nie zobaczą ani prośby, ani powodu — to zostaje między Tobą a redakcją.
+            </p>
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            <div className="flex gap-2">
+                <button onClick={send} disabled={busy}
+                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
+                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Wyślij prośbę
+                </button>
+                <button onClick={() => setOpen(false)} className="rounded-xl border border-gray-700 px-4 py-2 text-sm hover:bg-white/5">
+                    Anuluj
+                </button>
+            </div>
+        </div>
+    );
 };
 
 const SolectwoPanel: React.FC<Props> = ({ role }) => {
@@ -242,6 +334,12 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
                                     {post.status === 'rejected' && post.reject_reason && (
                                         <p className="mt-1 text-[15px] text-[#d7dbe8]">Powód: {post.reject_reason}</p>
                                     )}
+                                    {post.status === 'withdrawn' && post.withdraw_reason && (
+                                        <p className="text-sm text-neutral-400 mt-1">Odwołane: {post.withdraw_reason}</p>
+                                    )}
+                                    {post.status === 'published' && post.corrected_at && (
+                                        <p className="text-xs text-neutral-500 mt-1">Poprawione {formatDate(post.corrected_at)}</p>
+                                    )}
                                     {post.url && (
                                         <a
                                             href={post.url}
@@ -250,6 +348,7 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
                                             Zobacz na stronie <ExternalLink className="h-4 w-4" aria-hidden />
                                         </a>
                                     )}
+                                    {post.status === 'published' && <ChangeRequestForm post={post} onSent={loadPosts} />}
                                 </li>
                             );
                         })}

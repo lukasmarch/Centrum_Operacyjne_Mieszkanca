@@ -139,6 +139,10 @@ app.include_router(social_router)  # /api/social/* — propozycje postów dla n8
 from src.api.endpoints.analytics import router as analytics_router
 app.include_router(analytics_router)  # /api/events
 
+# Raporty naruszeń CSP (tryb raportowania, audyt E8) — publiczny zapis zagregowany
+from src.api.endpoints.csp import router as csp_router
+app.include_router(csp_router)  # /api/csp-report
+
 # Webhook Resend — jedyne źródło `newsletter_logs.opened_at` / `clicked_at`.
 from src.api.endpoints.newsletter_webhook import router as newsletter_webhook_router
 app.include_router(newsletter_webhook_router)  # /api/newsletter/webhook/resend
@@ -229,7 +233,7 @@ def _scope_of(article, source_name: Optional[str]) -> str:
         if locality >= MIN_ARTICLE_LOCALITY:
             return "gmina"
         return "okolice" if locality == 2 else "region"
-    label = article_scope(source_name, article.title, article.content)
+    label = article_scope(source_name, article.title, article.content)  # brak oceny — patrz wyżej
     return {"gmina Rybno": "gmina", "okolice": "okolice"}.get(label, "region")
 
 
@@ -421,6 +425,26 @@ async def takedown_article(
     await session.execute(sql_text(
         "DELETE FROM document_embeddings WHERE source_type = 'article' AND source_id = :aid"
     ), {"aid": article_id})
+    # Klucze obce bez ON DELETE: do 12.10.2026 takedown wpisu sołectwa albo
+    # wpisu, z którego powstało wydarzenie, kończył się błędem 500 — ścieżka
+    # awaryjna padała dokładnie wtedy, gdy była potrzebna. Ogłoszenie sołectwa
+    # zostaje jako ODWOŁANE (z historią), wydarzenia znikają z kalendarza.
+    await session.execute(sql_text(
+        "UPDATE solectwo_posts SET article_id = NULL, "
+        "status = CASE WHEN status = 'published' THEN 'withdrawn' ELSE status END, "
+        "withdrawn_at = coalesce(withdrawn_at, now() AT TIME ZONE 'utc'), "
+        "withdraw_reason = coalesce(withdraw_reason, 'Usunięte na żądanie (notice-and-takedown)') "
+        "WHERE article_id = :aid"
+    ), {"aid": article_id})
+    await session.execute(sql_text(
+        "DELETE FROM document_embeddings WHERE source_type = 'event' AND source_id IN "
+        "(SELECT id FROM events WHERE source_article_id = :aid)"
+    ), {"aid": article_id})
+    await session.execute(sql_text(
+        "UPDATE events SET canonical_id = NULL WHERE canonical_id IN "
+        "(SELECT id FROM events WHERE source_article_id = :aid)"
+    ), {"aid": article_id})
+    await session.execute(sql_text("DELETE FROM events WHERE source_article_id = :aid"), {"aid": article_id})
     await session.delete(article)
     await session.commit()
 
