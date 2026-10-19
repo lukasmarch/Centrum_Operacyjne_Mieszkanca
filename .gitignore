@@ -100,3 +100,6 @@ backend/uploads/
 # Zdjęcia pism od sołtysów — prywatne, poza publicznym /uploads
 backend/private_uploads/
 backend/data/council/*.mp3
+
+# Narzędzia projektowe Impeccable (mocki, critique, przeglądy) — tylko lokalnie, nie na produkcji
+.impeccable/
