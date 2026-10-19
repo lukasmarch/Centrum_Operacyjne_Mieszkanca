@@ -111,19 +111,19 @@ const VersionHistory: React.FC<{ postId: number }> = ({ postId }) => {
     useEffect(() => {
         fetchPostVersions(postId).then(setVersions).catch((e) => setError(e.message));
     }, [postId]);
-    if (error) return <p className="text-sm text-red-400">{error}</p>;
-    if (!versions) return <Loader2 className="w-4 h-4 animate-spin text-neutral-500" />;
+    if (error) return <p className={errorText}>{error}</p>;
+    if (!versions) return <Loader2 className="h-4 w-4 animate-spin text-tv-muted" aria-label="Wczytuję historię" />;
     return (
         <ol className="space-y-3">
             {versions.map((v) => (
-                <li key={v.version} className="rounded-xl border border-gray-800 p-3 text-sm">
-                    <p className="text-xs text-neutral-500">
+                <li key={v.version} className="border-l-2 border-tv-seam bg-tv-panel2 p-3 text-[15px] text-tv-paper">
+                    <p className="tabular text-[13px] text-tv-muted">
                         v{v.version} · {VERSION_KIND[v.kind]} · {dateLabel(v.created_at)} · {v.changed_by ?? '—'}
                     </p>
-                    {v.reason && <p className="text-amber-200 mt-1">Powód: {v.reason}</p>}
-                    <p className="font-semibold mt-1">{v.title}</p>
-                    <p className="text-neutral-400">termin: {v.event_at ? dateLabel(v.event_at) : 'brak'}</p>
-                    {v.summary && <p className="text-neutral-300 mt-1">{v.summary}</p>}
+                    {v.reason && <p className="mt-1 font-semibold text-tv-yellow">Powód: {v.reason}</p>}
+                    <p className="mt-1 font-semibold text-white">{v.title}</p>
+                    <p className="text-tv-muted">termin: {v.event_at ? dateLabel(v.event_at) : 'brak'}</p>
+                    {v.summary && <p className="mt-1 text-[#d7dbe8]">{v.summary}</p>}
                 </li>
             ))}
         </ol>
@@ -181,24 +181,25 @@ const PublishedActions: React.FC<{ post: AdminPost; draft: Draft; onChanged: () 
 
     const tab = (m: typeof mode, label: string, Icon: typeof PencilLine, tone = '') => (
         <button onClick={() => { setMode(mode === m ? 'none' : m); setError(''); }}
-            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm ${mode === m ? 'bg-white/10 border-gray-600' : 'border-gray-700 hover:bg-white/5'} ${tone}`}>
-            <Icon className="w-4 h-4" /> {label}
+            aria-pressed={mode === m}
+            className={`${btnLine} ${mode === m ? '!border-tv-paper bg-tv-panel2 !text-white' : ''} ${tone}`}>
+            <Icon className="h-4 w-4" aria-hidden /> {label}
         </button>
     );
 
     return (
         <div className="mt-5 space-y-3">
             {post.open_requests.map((r) => (
-                <div key={r.id} className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
-                    <p className="font-semibold text-amber-200">
+                <div key={r.id} className="border-l-4 border-tv-yellow bg-tv-panel2 p-3 text-[15px]">
+                    <p className="font-semibold text-tv-yellow">
                         Sołtys prosi o {r.kind === 'correction' ? 'korektę' : 'ODWOŁANIE'} · {dateLabel(r.created_at)}
                     </p>
-                    <p className="text-neutral-200 mt-1">„{r.message}”</p>
+                    <p className="mt-1 text-white">„{r.message}”</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                         <input className={`${input} sm:max-w-xs`} placeholder="Odpowiedź dla sołtysa (opcjonalnie)"
                             value={dismissReason} onChange={(e) => setDismissReason(e.target.value)} />
                         <button onClick={() => run(() => dismissRequest(r.id, dismissReason))} disabled={busy}
-                            className="rounded-xl border border-gray-700 px-3 py-1.5 text-sm hover:bg-white/5">
+                            className={btnLine}>
                             Zostaw bez zmian
                         </button>
                     </div>
@@ -206,50 +207,50 @@ const PublishedActions: React.FC<{ post: AdminPost; draft: Draft; onChanged: () 
             ))}
 
             {post.corrected_at && (
-                <p className="text-xs text-neutral-500">Ostatnia korekta: {dateLabel(post.corrected_at)} · wersja {post.version}</p>
+                <p className="tabular text-[13px] text-tv-muted">Ostatnia korekta: {dateLabel(post.corrected_at)} · wersja {post.version}</p>
             )}
 
             <div className="flex flex-wrap gap-2">
                 {tab('correct', 'Popraw', PencilLine)}
-                {tab('withdraw', 'Odwołaj', Ban, 'text-red-300')}
+                {tab('withdraw', 'Odwołaj', Ban)}
                 {tab('history', 'Historia', History)}
             </div>
 
             {mode === 'correct' && (
-                <div className="space-y-3 rounded-xl border border-gray-800 p-4">
-                    <p className="text-sm text-neutral-400">
+                <div className="space-y-3 border-2 border-tv-seam p-4">
+                    <p className="text-[15px] text-tv-muted">
                         Tytuł, podsumowanie i przedruk poprawiasz w polach powyżej
                         {(title !== (post.title ?? '') || summary !== (post.summary ?? '') || transcript !== (post.transcript ?? ''))
                             ? ' — są zmiany w tekście.' : '.'}
                     </p>
                     <div>
-                        <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">Termin</label>
-                        <div className="flex flex-wrap gap-3 text-sm mt-1">
+                        <label className={fieldLabel}>Termin</label>
+                        <div className="mt-1 flex flex-wrap gap-4 text-[15px] text-tv-paper">
                             {([['keep', 'bez zmian'], ['set', 'nowy termin'], ['clear', 'usuń termin']] as const).map(([value, label]) => (
-                                <label key={value} className="inline-flex items-center gap-1.5">
+                                <label key={value} className="inline-flex min-h-[44px] items-center gap-2">
                                     <input type="radio" checked={termAction === value} onChange={() => setTermAction(value)} /> {label}
                                 </label>
                             ))}
                         </div>
                         {termAction === 'set' && (
-                            <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[15px]">
                                 <input type="date" className={`${input} max-w-[11rem]`} value={day} onChange={(e) => setDay(e.target.value)} />
                                 <input type="time" className={`${input} max-w-[8rem]`} value={from} onChange={(e) => setFrom(e.target.value)} />
-                                <span className="text-neutral-500">–</span>
+                                <span className="text-tv-muted">–</span>
                                 <input type="time" className={`${input} max-w-[8rem]`} value={to} onChange={(e) => setTo(e.target.value)} />
-                                <span className="text-xs text-neutral-500">bez godziny = cały dzień</span>
+                                <span className="text-[13px] text-tv-muted">bez godziny = cały dzień</span>
                             </div>
                         )}
                         {termAction === 'set' && transcript === (post.transcript ?? '') && (
-                            <p className="text-xs text-amber-300 mt-2">
+                            <p className="mt-2 bg-tv-yellow px-3 py-2 text-[14px] font-semibold text-tv-ink">
                                 Przedruk powyżej może wciąż zawierać starą datę lub godzinę — mieszkaniec zobaczyłby dwa różne
                                 terminy. Popraw je w przedruku po cichu, bez adnotacji o korekcie (proces zostaje między redakcją a sołtysem).
                             </p>
                         )}
                         {termAction === 'clear' && (
-                            <p className="text-xs text-neutral-500 mt-1">Wydarzenie zniknie z kalendarza.</p>
+                            <p className="mt-1 text-[13px] text-tv-muted">Wydarzenie zniknie z kalendarza.</p>
                         )}
-                        <p className="text-xs text-neutral-500 mt-1">
+                        <p className="mt-1 text-[13px] text-tv-muted">
                             Teraz: {start ? (allDay ? `${start.toLocaleDateString('pl-PL')} (cały dzień)` : dateLabel(post.event_at)) : 'brak'}.
                             Zaktualizowany termin wróci do najbliższego briefingu — bez wzmianki o zmianie.
                         </p>
@@ -257,30 +258,30 @@ const PublishedActions: React.FC<{ post: AdminPost; draft: Draft; onChanged: () 
                     <input className={input} placeholder="Powód korekty (zobaczy go tylko sołtys)"
                         value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
                     <button onClick={submitCorrection} disabled={busy}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
-                        <Check className="w-4 h-4" /> Opublikuj korektę
+                        className={btnPrimary}>
+                        <Check className="h-4 w-4" aria-hidden /> Opublikuj korektę
                     </button>
                 </div>
             )}
 
             {mode === 'withdraw' && (
-                <div className="space-y-3 rounded-xl border border-red-500/30 p-4">
-                    <p className="text-sm text-neutral-300">
+                <div className="space-y-3 border-2 border-tv-red p-4">
+                    <p className="text-[15px] text-tv-paper">
                         Ogłoszenie zniknie z wiadomości, kalendarza, briefingu i odpowiedzi asystenta.
                         Pod jego adresem mieszkaniec zobaczy tylko „nieaktualne” — bez powodu.
                     </p>
                     <input className={input} placeholder="Powód odwołania (zobaczy go tylko sołtys)"
                         value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
                     <button onClick={submitWithdraw} disabled={busy}
-                        className="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
-                        <Ban className="w-4 h-4" /> Odwołaj ogłoszenie
+                        className="font-cond inline-flex min-h-[44px] items-center justify-center gap-2 bg-tv-red px-4 text-[16px] font-extrabold uppercase tracking-wide text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
+                        <Ban className="h-4 w-4" aria-hidden /> Odwołaj ogłoszenie
                     </button>
                 </div>
             )}
 
             {mode === 'history' && <VersionHistory postId={post.id} />}
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className={errorText} role="alert">{error}</p>}
         </div>
     );
 };
@@ -400,7 +401,7 @@ const PostModeration: React.FC<{ post: AdminPost; onChanged: () => void }> = ({ 
             {post.status === 'published' && <PublishedActions post={post} draft={{ title, summary, transcript }} onChanged={onChanged} />}
             {post.status === 'withdrawn' && (
                 <details className="mt-4">
-                    <summary className="text-sm text-neutral-400 cursor-pointer">Historia</summary>
+                    <summary className="min-h-[44px] cursor-pointer text-[15px] font-semibold text-tv-muted hover:text-white">Historia</summary>
                     <div className="mt-2"><VersionHistory postId={post.id} /></div>
                 </details>
             )}

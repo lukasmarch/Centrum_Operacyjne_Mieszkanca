@@ -58,7 +58,7 @@ const ChangeRequestForm: React.FC<{ post: MyPost; onSent: () => void }> = ({ pos
         return (
             <div className="mt-2 space-y-1">
                 {post.open_requests.map((r) => (
-                    <p key={r.id} className="text-sm text-amber-300">
+                    <p key={r.id} className="border-l-4 border-tv-yellow bg-tv-panel2 px-3 py-2 text-[15px] text-tv-paper">
                         {REQUEST_LABEL[r.kind]} czeka na redakcję: „{r.message}”
                     </p>
                 ))}
@@ -68,8 +68,8 @@ const ChangeRequestForm: React.FC<{ post: MyPost; onSent: () => void }> = ({ pos
     if (!open) {
         return (
             <button onClick={() => setOpen(true)}
-                className="mt-1.5 ml-4 inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200">
-                <PencilLine className="w-3.5 h-3.5" /> Poprawka lub odwołanie
+                className="mt-1.5 inline-flex min-h-[44px] items-center gap-1.5 text-[15px] font-semibold text-tv-muted underline-offset-4 hover:text-white hover:underline">
+                <PencilLine className="h-4 w-4" aria-hidden /> Poprawka lub odwołanie
             </button>
         );
     }
@@ -94,17 +94,18 @@ const ChangeRequestForm: React.FC<{ post: MyPost; onSent: () => void }> = ({ pos
     };
 
     return (
-        <div className="mt-3 rounded-xl border border-gray-800 p-3 space-y-2">
+        <div className="mt-3 space-y-3 border-2 border-tv-seam p-3">
             <div className="flex gap-2">
                 {(['correction', 'withdrawal'] as const).map((k) => (
                     <button key={k} onClick={() => setKind(k)}
-                        className={`rounded-full px-3 py-1 text-sm ${kind === k ? 'bg-blue-600 text-white' : 'bg-white/5 text-neutral-300'}`}>
+                        aria-pressed={kind === k}
+                        className={`font-cond min-h-[44px] px-4 text-[15px] font-extrabold uppercase tracking-wide ${kind === k ? 'bg-tv-blue text-white' : 'border-2 border-tv-seam text-tv-paper hover:border-tv-paper'}`}>
                         {k === 'correction' ? 'Popraw' : 'Odwołaj'}
                     </button>
                 ))}
             </div>
             <textarea
-                className="w-full rounded-xl bg-gray-900 border border-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full border-2 border-tv-seam bg-tv-ink px-3 py-2 text-[16px] text-white outline-none transition-colors placeholder:text-tv-muted focus:border-tv-paper"
                 rows={3}
                 maxLength={1000}
                 placeholder={kind === 'correction'
@@ -113,16 +114,16 @@ const ChangeRequestForm: React.FC<{ post: MyPost; onSent: () => void }> = ({ pos
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
             />
-            <p className="text-xs text-neutral-500">
+            <p className="text-[14px] text-tv-muted">
                 Zmianę wprowadza redakcja. Mieszkańcy nie zobaczą ani prośby, ani powodu — to zostaje między Tobą a redakcją.
             </p>
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <div className="flex gap-2">
+            {error && <p className="text-[15px] font-semibold text-tv-yellow" role="alert">{error}</p>}
+            <div className="flex flex-wrap gap-2">
                 <button onClick={send} disabled={busy}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 px-4 py-2 text-sm font-semibold text-white">
-                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Wyślij prośbę
+                    className="font-cond inline-flex min-h-[44px] items-center justify-center gap-2 bg-tv-blue px-4 text-[16px] font-extrabold uppercase tracking-wide text-white transition-colors hover:bg-[#3a63ff] disabled:cursor-not-allowed disabled:opacity-40">
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />} Wyślij prośbę
                 </button>
-                <button onClick={() => setOpen(false)} className="rounded-xl border border-gray-700 px-4 py-2 text-sm hover:bg-white/5">
+                <button onClick={() => setOpen(false)} className="inline-flex min-h-[44px] items-center border-2 border-tv-seam px-4 text-[15px] font-semibold text-tv-paper transition-colors hover:border-tv-paper hover:text-white">
                     Anuluj
                 </button>
             </div>
@@ -335,10 +336,10 @@ const SolectwoPanel: React.FC<Props> = ({ role }) => {
                                         <p className="mt-1 text-[15px] text-[#d7dbe8]">Powód: {post.reject_reason}</p>
                                     )}
                                     {post.status === 'withdrawn' && post.withdraw_reason && (
-                                        <p className="text-sm text-neutral-400 mt-1">Odwołane: {post.withdraw_reason}</p>
+                                        <p className="mt-1 text-[15px] text-[#d7dbe8]">Odwołane: {post.withdraw_reason}</p>
                                     )}
                                     {post.status === 'published' && post.corrected_at && (
-                                        <p className="text-xs text-neutral-500 mt-1">Poprawione {formatDate(post.corrected_at)}</p>
+                                        <p className="mt-1 text-[13px] text-tv-muted">Poprawione {formatDate(post.corrected_at)}</p>
                                     )}
                                     {post.url && (
                                         <a
