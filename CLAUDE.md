@@ -1246,6 +1246,37 @@ a awaryjne `DELETE /api/articles` padało na kluczach obcych (`solectwo_posts.ar
   lokalna baza — nie w CI)
 - ⚠️ Lokalnie `APP_URL` ma domyślnie `http://localhost:3000`, więc linki „Zobacz na stronie” prowadzą donikąd; na prodzie jest `rybnolive.pl`
 
+## Nowy wygląd „Pasek informacyjny” na produkcji (2026-10-19)
+**Front z gałęzi `pasek-informacyjny` wszedł na `main` (fast-forward, 10 commitów) i jest wdrożony** —
+`ccdec0f`, `deploy-frontend.sh` z czystego drzewa `main`. Backend NIE wymagał deployu: w pushu nie było
+zmian w `backend/`, więc workflow „Deploy Backend” (filtr `paths`) w ogóle nie ruszył. Zielony „Frontend check”
+to jedyny job. Migracji nie było.
+- **„Gmina w kadrze”** (dawniej „Rybno w kadrze”) to galeria: strzałki < >, kropki, przewijanie palcem
+  (`components/simple/KadrCard.tsx`, scroll-snap). Dane: `src/data/photoPosts.ts`, pliki w `public/simple/kadr/`
+- ⚠️ **Format zdjęć: 16:10, plik 1600×1000 px, JPEG ~72 (200–300 KB).** Logo RybnoLive nakłada się PO przycięciu:
+  250 px szerokości, margines 48 px od prawej i od dołu. Wzorzec: `_logo_RybnoLive.png` + Pillow
+  (`.venv` głównego repo). Zdjęcie 5:4 i `object-cover` ucina logo wbudowane w plik; `object-contain` zostawia
+  puste pasy po bokach — oba warianty były już próbowane i odrzucone
+- Panele sołectw (E7: korekta, odwołanie, historia, prośby) mają styl pulpitu (`tv-*`, 44 px, kąty proste);
+  logika bez zmian względem `main` z 13.10
+- **`.impeccable/` poza repozytorium** (`.gitignore`; pliki zostają lokalnie). ⚠️ Zostaje w HISTORII commitów
+  (`71725bb` i kolejne) — decyzja 19.10: bez przepisywania historii. `DESIGN.md` i `PRODUCT.md` są w repo
+- ⚠️ **Po wdrożeniu stary wygląd widać do pierwszego odświeżenia.** PWA ma service worker (`skipWaiting` +
+  `clientsClaim`), który trzyma poprzedni shell. W przeglądarce deweloperskiej to samo dotyczy portów, na których
+  kiedyś stał podgląd (np. `localhost:3002` pokazywał stary wygląd mimo świeżego buildu) — przeglądaj build
+  na innym porcie (`vite preview --port 5173`, CORS backendu go dopuszcza)
+- ⚠️ **Podgląd buildu: nie z `VITE_API_URL` produkcji** — beacon `POST /api/events` zapisałby ruch deweloperski
+  do `site_events`. Build do przeglądu bez zmiennej (fallback `localhost:8000/api`), do katalogu tymczasowego
+- **Poczta lokalnie**: `.env` ma klucz Resend z nadawcą `onboarding@resend.dev` — sandbox wysyła WYŁĄCZNIE na adres
+  właściciela konta (`biuro@lumargo.pl`). Mail powitalny sołtysa (`send_role_welcome`, w tle po `POST /api/auth/register`)
+  na inny adres kończy się w logu `Failed to send email … You can only send testing emails`; rejestracja i rola
+  przechodzą (błąd poczty jest łapany). Test: zarejestruj konto na `biuro@lumargo.pl`. Produkcja nadaje z
+  `newsletter@rybnolive.pl` (zweryfikowana domena)
+- `python -m scripts.test_solectwa` 19.10: 116/117 — czerwony punkt „przed terminem nic nie znika” to artefakt
+  lokalnej bazy (test przesuwa zegar o 29 dni i obejmuje też stare, rozstrzygnięte wpisy, których zdjęcia skasował)
+- **Do zrobienia**: mail powitalny dla zwykłych użytkowników (osobne zadanie) oraz komunikat na ekranie po
+  rejestracji, gdy poczta nie zadziałała — dziś awaria Resend wygląda dla człowieka jak cisza
+
 ## Kontrola dostępu po audycie (2026-10-11)
 **Audyt (`~/Desktop/moj-projekt-audyt/audit-output/40-final-report.md`) znalazł klasę, nie błąd:**
 każda trasa pilnowała dostępu sama albo wcale. Anonim czytał historię czatu WSZYSTKICH
@@ -1442,4 +1473,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-10-13*
+*Ostatnia aktualizacja: 2026-10-19*
