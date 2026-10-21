@@ -12,10 +12,11 @@ interface NewsMiniProps {
 /**
  * 2–3 nagłówki z feedu + link do wszystkich.
  *
- * Nagłówek prowadzi do feedu w serwisie, NIE do źródła. Wcześniej pierwsze
- * kliknięcie na stronie głównej wyrzucało gościa na Facebook albo do Radia 7
- * — czyli najczęstszy pierwszy gest nowego użytkownika kończył wizytę. Pełny
- * link do źródła stoi w feedzie i nikt go nie traci.
+ * Nagłówek prowadzi do ŹRÓDŁA wpisu (decyzja Łukasza 21.10.2026: kto widzi
+ * wiadomość i chce ją sprawdzić, nie ma lądować na ogólnej liście). Do 21.10
+ * prowadził do feedu, bo kliknięcie wyrzucające gościa na Facebook kończyło
+ * wizytę — dlatego źródło otwiera się w NOWEJ karcie, a serwis zostaje pod
+ * spodem. Bez adresu wpisu nagłówek wraca do feedu.
  *
  * ⚠️ Miniatura stoi OBOK nagłówka, nigdy pod nim. Stary kafel wiadomości kładł
  * pierwszy tytuł na zdjęciu artykułu i to była najgorzej czytelna rzecz na całej
@@ -44,7 +45,13 @@ const NewsMini: React.FC<NewsMiniProps> = ({ articles, loading = false, onShowAl
             <ul className="divide-y divide-tv-seam">
                 {articles.map(article => (
                     <li key={article.id}>
-                        <button onClick={onShowAll} className="group flex w-full items-start gap-3 py-3 text-left">
+                        <a
+                            href={article.url || undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={article.url ? undefined : e => { e.preventDefault(); onShowAll(); }}
+                            className="group flex w-full items-start gap-3 py-3 text-left"
+                        >
                             {/* 56 px: ikona kategorii czytelna, a nagłówkowi na telefonie
                                 zostaje ponad 240 px. Miniatura OBOK tytułu, nigdy pod nim */}
                             {/* Zdjęcie → tablica z terminem w kolorze stanu → piktogram kategorii
@@ -72,7 +79,7 @@ const NewsMini: React.FC<NewsMiniProps> = ({ articles, loading = false, onShowAl
                                     {article.title}
                                 </span>
                             </span>
-                        </button>
+                        </a>
                     </li>
                 ))}
             </ul>

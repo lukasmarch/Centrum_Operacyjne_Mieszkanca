@@ -75,6 +75,8 @@ type SlideAction =
     | { kind: 'outage' }
     | { kind: 'health' }
     | { kind: 'href'; href: string }
+    /** Źródło wpisu — nowa karta, strona zostaje otwarta */
+    | { kind: 'external'; href: string }
     | { kind: 'news' };
 
 interface Slide {
@@ -115,7 +117,8 @@ function buildSlides(
             tag: `${where} · ${item.ongoing ? 'trwa teraz' : dayWord(item.start ?? now, now)}`,
             text: village ? `${item.label}: ${when(item, now)}` : `${item.label} — ${placesOf(item)}: ${when(item, now)}`,
             cta: 'sprawdź',
-            action: { kind: 'outage' },
+            // Czytelnik, który widzi wypadek, chce sprawdzić TEN wpis, nie ogólną listę
+            action: item.url ? { kind: 'external', href: item.url } : { kind: 'outage' },
         });
     }
 
@@ -167,7 +170,7 @@ function buildSlides(
             tag: `${a.sourceLabel ?? 'Gmina Rybno'} · ${dayWord(ts(a.rawTimestamp), now)}`,
             text: a.title,
             cta: 'sprawdź',
-            action: { kind: 'news' },
+            action: a.url ? { kind: 'external', href: a.url } : { kind: 'news' },
         });
     }
 
@@ -304,6 +307,7 @@ const StatusBelt: React.FC<StatusBeltProps> = ({
             case 'health': return onOpenHealth();
             case 'news': return onOpenNews();
             case 'href': window.location.href = slide.action.href; return;
+            case 'external': window.open(slide.action.href, '_blank', 'noopener,noreferrer'); return;
         }
     };
 

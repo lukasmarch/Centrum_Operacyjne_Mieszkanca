@@ -13,6 +13,8 @@ export interface OutageItem {
     end: Date | null;
     ongoing: boolean;
     reportedAt: Date | null;
+    /** Wpis źródłowy — „sprawdź” na pasku prowadzi tu, nie na ogólną listę */
+    url: string | null;
     concernsVillage: boolean;
 }
 
@@ -64,6 +66,7 @@ export function useOutageOutlook(village: string | null): OutageOutlook | null |
                             end: toDate(raw.end),
                             ongoing: Boolean(raw.ongoing),
                             reportedAt: toDate(raw.reported_at),
+                            url: raw.url ?? null,
                             concernsVillage: Boolean(raw.concerns_village),
                         })),
                     });

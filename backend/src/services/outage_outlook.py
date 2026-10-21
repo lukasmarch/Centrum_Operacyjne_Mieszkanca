@@ -41,10 +41,14 @@ class OutlookItem:
     end: Optional[datetime]
     ongoing: bool
     reported_at: Optional[datetime]
+    url: Optional[str] = None
 
 
-def outlook_item(article, now: datetime) -> Optional[OutlookItem]:
+def outlook_item(article, now: datetime, source_name: Optional[str] = None) -> Optional[OutlookItem]:
     """Pozycja przeglądu albo `None`, gdy wpis nie jest naszą awarią w oknie."""
+    if source_name in feed_policy.RETROSPECTIVE_SOURCES:
+        return None  # relacja po fakcie: godzina wpisu ≠ godzina zdarzenia
+    url = getattr(article, "url", None)
     shown = getattr(article, "display_title", None) or article.title
     content = article.content
     category = article.category or ""
@@ -77,15 +81,19 @@ def outlook_item(article, now: datetime) -> Optional[OutlookItem]:
             return None  # po zdarzeniu
         if start - now > timedelta(days=OUTLOOK_DAYS):
             return None  # za daleko — wróci do przeglądu bliżej terminu
-        return OutlookItem(article.id, shown, kind, label, places, start, end, start <= now, None)
+        return OutlookItem(article.id, shown, kind, label, places, start, end, start <= now, None, url)
 
     reported = article.published_at or article.scraped_at
     if reported is None or now - reported > timedelta(hours=UNDATED_HOURS):
         return None
-    return OutlookItem(article.id, shown, kind, label, places, None, None, True, reported)
+    return OutlookItem(article.id, shown, kind, label, places, None, None, True, reported, url)
 
 
-def build_outlook(articles: Iterable, now: datetime) -> list[OutlookItem]:
+def build_outlook(
+    articles: Iterable,
+    now: datetime,
+    source_names: Optional[dict[int, str]] = None,
+) -> list[OutlookItem]:
     """
     Awarie w gminie: najpierw trwające, potem według terminu.
 
@@ -93,7 +101,8 @@ def build_outlook(articles: Iterable, now: datetime) -> list[OutlookItem]:
     `alert_policy.same_incident` — ta sama reguła, która pilnuje, żeby push
     nie zadzwonił dwa razy.
     """
-    items = [item for item in (outlook_item(a, now) for a in articles) if item]
+    names = source_names or {}
+    items = [item for item in (outlook_item(a, now, names.get(a.id)) for a in articles) if item]
     items.sort(key=lambda i: (not i.ongoing, i.start or i.reported_at or now))
 
     def sig(item: OutlookItem) -> Optional[tuple]:

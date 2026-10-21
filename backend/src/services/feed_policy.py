@@ -184,6 +184,16 @@ REGIONAL_MEDIA_SOURCES: frozenset[str] = frozenset({
     "Facebook - Panorama Regionu",
 })
 
+# Źródła, które opisują zdarzenia PO FAKCIE (policja, media): godzina wpisu to
+# godzina publikacji, nie zdarzenia. Pulpit nie pokazuje z nich „trwa teraz"
+# (21.10.2026: wtorkowa kolizja z RSS policji stała w środę rano jako „zgłoszono 8:50").
+RETROSPECTIVE_SOURCES: frozenset[str] = REGIONAL_MEDIA_SOURCES | {
+    "KPP Działdowo (RSS)",
+    "Powiat Działdowski (RSS)",
+    "Gazeta Olsztyńska (RSS)",
+    "Radio Olsztyn (RSS)",
+}
+
 # Źródła, których nazw NIE eksponujemy w interfejsie.
 # Prywatne profile FB pokazujemy jako neutralne „źródło ↗" z linkiem do oryginału:
 # atrybucja zostaje (link), ale nie reklamujemy cudzej marki nagłówkiem
@@ -404,7 +414,16 @@ def is_foreign_incident(
     shown = display_title or title
     if is_weather_alert(shown, content):
         return False
-    is_incident = bool(incident_of(shown, content)) or "awari" in (category or "").lower()
+    # Rodzaj z OBU tytułów: `display_title` z AI potrafi zgubić słowo, po którym
+    # rozpoznajemy zdarzenie („potrącenie rowerzysty" → „kolizja drogowa w Działdowie"),
+    # a pulpit (`outage_outlook`) czyta rodzaj z obu. Bramka miejsca, która
+    # sprawdza węższy tekst niż bramka rodzaju, przepuszcza cudze zdarzenie
+    # (art. 6819, 21.10.2026: kolizja w Działdowie na pasku jako „gmina Rybno")
+    is_incident = (
+        bool(incident_of(shown, content))
+        or bool(incident_of(title, content))
+        or "awari" in (category or "").lower()
+    )
     if not is_incident:
         return False
     if is_foreign_region(shown, content):

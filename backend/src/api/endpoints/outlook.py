@@ -13,7 +13,7 @@ from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from src.database import Article, get_session
+from src.database import Article, Source, get_session
 from src.services import outage_outlook
 from src.services.feed_policy import publishable_conditions
 
@@ -41,6 +41,7 @@ class OutlookEntry(BaseModel):
     end: Optional[str]
     ongoing: bool
     reported_at: Optional[str]
+    url: Optional[str] = None
     concerns_village: bool
 
 
@@ -66,15 +67,18 @@ async def get_outlook(
     now = datetime.utcnow()
     since = now - timedelta(days=CANDIDATE_DAYS)
     result = await session.execute(
-        select(Article)
+        select(Article, Source.name)
+        .join(Source, Article.source_id == Source.id)
         .where(*publishable_conditions(Article, now))
         .where(or_(Article.published_at >= since, Article.event_at >= now - timedelta(days=1)))
         .order_by(Article.published_at.desc())
         .limit(CANDIDATE_LIMIT)
     )
-    articles = result.scalars().all()
+    rows = result.all()
+    articles = [article for article, _ in rows]
+    source_names = {article.id: name for article, name in rows}
 
-    items = outage_outlook.build_outlook(articles, now)
+    items = outage_outlook.build_outlook(articles, now, source_names)
     return OutlookResponse(
         village=village,
         checked_at=_iso(now),
@@ -90,6 +94,7 @@ async def get_outlook(
                 end=_iso(item.end),
                 ongoing=item.ongoing,
                 reported_at=_iso(item.reported_at),
+                url=item.url,
                 concerns_village=outage_outlook.concerns_village(item, village),
             )
             for item in items

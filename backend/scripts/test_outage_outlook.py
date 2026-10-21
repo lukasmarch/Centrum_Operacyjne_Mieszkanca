@@ -32,6 +32,7 @@ class A:
     published_at: Optional[datetime] = None
     scraped_at: Optional[datetime] = None
     display_title: Optional[str] = None
+    url: Optional[str] = None
 
 
 FAILED = 0
@@ -92,6 +93,24 @@ def main() -> int:
     check("zgłoszenie bez terminu sprzed 30 h nie wchodzi", 6 not in ids(items))
     check("awaria spoza gminy nie wchodzi", 7 not in ids(items))
     check("festyn to nie awaria", 8 not in ids(items))
+
+    print("Relacja po fakcie i obce miejsce (art. 6819, 21.10.2026)")
+    kolizja = A(
+        10, "Kierująca bez uprawnień i potrącenie rowerzysty", "", "Bezpieczeństwo", 2,
+        published_at=NOW - timedelta(hours=1), display_title="Kolizja drogowa w Działdowie z udziałem rowerzysty",
+        url="https://dzialdowo.policja.gov.pl/x",
+    )
+    check("kolizja w Działdowie nie wchodzi nawet bez wiedzy o źródle",
+          outage_outlook.outlook_item(kolizja, NOW) is None)
+    zgloszenie = A(11, "Wypadek na drodze do Rybna", "", "Wypadki", 3, published_at=NOW - timedelta(hours=1))
+    check("wypadek z oceną gminy z bieżącego źródła wchodzi",
+          outage_outlook.outlook_item(zgloszenie, NOW, "Facebook - Rybno") is not None)
+    check("ten sam wypadek z policyjnego RSS nie wchodzi (relacja po fakcie)",
+          outage_outlook.outlook_item(zgloszenie, NOW, "KPP Działdowo (RSS)") is None)
+    withurl = A(12, "Brak wody w Tuczkach", "Awaria wodociągu w Tuczkach", "Awaria", 3,
+                published_at=NOW - timedelta(hours=1), url="https://fb.example/p/1")
+    check("pozycja niesie link do źródła",
+          outage_outlook.outlook_item(withurl, NOW, "Facebook - ZakladGospodarkiKomunalnej").url == "https://fb.example/p/1")
 
     print("Kolejność i przedruki")
     check("trwające przed zapowiedzianym", ids(items)[:1] == [5])
