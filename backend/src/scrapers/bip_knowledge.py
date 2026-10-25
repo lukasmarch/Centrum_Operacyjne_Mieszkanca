@@ -35,6 +35,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from src.scrapers.polite import BIP_HEADERS, HostBlocked, hooks as polite_hooks
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BipKnowledgeScraper")
@@ -46,19 +47,6 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 BIP_BASE_URL = "https://bip.gminarybno.pl"
 
-# Ten sam zestaw nagłówków co w bip_rybno — serwer BIP odrzuca botowe User-Agenty (403).
-BIP_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/121.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-}
 
 # Działy wiedzy stałej: (id działu, nazwa dla człowieka i dla nagłówka chunku).
 # Nazwy są tu wpisane, a nie brane ze strony, bo trafiają do promptu agenta —
@@ -126,7 +114,8 @@ class BipKnowledgeScraper:
 
     async def __aenter__(self):
         self.client = httpx.AsyncClient(
-            headers=BIP_HEADERS, timeout=self.timeout, follow_redirects=True
+            headers=BIP_HEADERS, timeout=self.timeout, follow_redirects=True,
+            event_hooks=polite_hooks(),
         )
         return self
 
@@ -150,6 +139,10 @@ class BipKnowledgeScraper:
                 response = await self.client.get(url)
                 response.raise_for_status()
                 return response.text
+            except HostBlocked:
+                # Host odmówił — ponawianie to dokładnie to, o co prosił dostawca
+                # BIP, żebyśmy nie robili. Przerywamy cały przebieg.
+                raise
             except Exception as e:
                 if attempt == attempts:
                     logger.warning(f"Nie udało się pobrać {url} ({attempts} prób): {e}")
@@ -334,6 +327,9 @@ class BipKnowledgeScraper:
                     docs = await self.scrape_section(section_id, section_name)
                     all_documents.extend(docs)
                     logger.info(f"[{section_id}] {section_name}: zebrano {len(docs)} dokumentów")
+                except HostBlocked as e:
+                    logger.error(f"BIP odmówił dostępu — przerywam przebieg: {e}")
+                    break
                 except Exception as e:
                     logger.error(f"Dział {section_id} ({section_name}) nie powiódł się: {e}")
                 await asyncio.sleep(self.delay)

@@ -8,6 +8,7 @@ from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
+from src.scrapers.polite import HostBlocked, hooks as polite_hooks
 from src.utils.logger import setup_logger
 from src.database.schema import Article, Source
 
@@ -35,7 +36,8 @@ class BaseScraper(ABC):
         self.client = httpx.AsyncClient(
             headers={'User-Agent': self.user_agent},
             timeout=self.timeout,
-            follow_redirects=True
+            follow_redirects=True,
+            event_hooks=polite_hooks(),
         )
         return self
 
@@ -59,6 +61,9 @@ class BaseScraper(ABC):
                 response.raise_for_status()
                 return response.text
 
+            except HostBlocked:
+                # Odmowa hosta nie jest błędem przejściowym — bez ponawiania.
+                raise
             except httpx.TimeoutException:
                 self.logger.error(f"Timeout on attempt {attempt + 1}")
                 if attempt < self.max_retries - 1:

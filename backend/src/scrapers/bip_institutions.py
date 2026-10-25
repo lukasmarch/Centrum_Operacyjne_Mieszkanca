@@ -38,7 +38,7 @@ from typing import Optional
 
 import httpx
 
-from src.scrapers.bip_knowledge import BIP_HEADERS
+from src.scrapers.polite import BIP_HEADERS, hooks as polite_hooks
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BipInstitutions")
@@ -208,7 +208,8 @@ class BipInstitutionsScraper:
 
     async def __aenter__(self):
         self.client = httpx.AsyncClient(
-            headers=BIP_HEADERS, timeout=self.timeout, follow_redirects=True
+            headers=BIP_HEADERS, timeout=self.timeout, follow_redirects=True,
+            event_hooks=polite_hooks(),
         )
         return self
 

@@ -48,6 +48,7 @@ import httpx
 import pdfplumber
 from bs4 import BeautifulSoup
 
+from src.scrapers.polite import BIP_HEADERS, HostBlocked, hooks as polite_hooks
 from src.utils.logger import setup_logger
 
 logger = setup_logger("LegalActsScraper")
@@ -68,19 +69,6 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 BIP_BASE = "https://bip.gminarybno.pl"
 ACTS_PATH = "/akty/14"
 
-# Ten sam zestaw co w `bip_knowledge` — serwer odrzuca botowe User-Agenty (403).
-BIP_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/121.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-}
 
 # Zakres decyzją Łukasza (22.08). Akt sprzed dekady odpowiada na pytania,
 # których nikt nie zadaje, a rozcieńcza wyniki wyszukiwarki.
@@ -156,7 +144,8 @@ class LegalActsScraper:
 
     async def __aenter__(self):
         self._client = httpx.AsyncClient(
-            headers=BIP_HEADERS, timeout=self.timeout, follow_redirects=True
+            headers=BIP_HEADERS, timeout=self.timeout, follow_redirects=True,
+            event_hooks=polite_hooks(),
         )
         return self
 
@@ -171,6 +160,8 @@ class LegalActsScraper:
                 logger.warning(f"{url} → HTTP {resp.status_code}")
                 return None
             return resp
+        except HostBlocked as e:
+            raise ScraperBlocked(str(e)) from e
         except Exception as e:
             logger.warning(f"{url} → {e}")
             return None

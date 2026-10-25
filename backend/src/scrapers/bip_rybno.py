@@ -23,6 +23,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.scrapers.base import BaseScraper
+from src.scrapers.polite import BIP_HEADERS, hooks as polite_hooks
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BipRybnoScraper")
@@ -30,19 +31,6 @@ logger = setup_logger("BipRybnoScraper")
 BIP_BASE_URL = "https://bip.gminarybno.pl"
 BIP_NEWS_URL = f"{BIP_BASE_URL}/112/"
 
-# BIP serwer blokuje botowe User-Agenty – używamy pełnych nagłówków przeglądarki
-BIP_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/121.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-}
 
 
 class BipRybnoScraper(BaseScraper):
@@ -67,11 +55,12 @@ class BipRybnoScraper(BaseScraper):
         self.cutoff_days = self.config.get("cutoff_days", 2)
 
     async def __aenter__(self):
-        """Nadpisuje base – używa pełnych nagłówków przeglądarki (BIP blokuje boty)."""
+        """Nadpisuje base – nagłówki i tempo z `polite` (uczciwy UA, ≥ 1,5 s między żądaniami)."""
         self.client = httpx.AsyncClient(
             headers=BIP_HEADERS,
             timeout=self.timeout,
             follow_redirects=True,
+            event_hooks=polite_hooks(),
         )
         return self
 
@@ -259,6 +248,22 @@ class BipRybnoScraper(BaseScraper):
 
     # ==================== Main Scraping Loop ====================
 
+    async def _known_stale_ids(self, session, external_ids: List[str], cutoff: datetime) -> set:
+        """external_id wpisów, które mamy w bazie i które wypadają poza okno świeżości."""
+        from sqlalchemy import select
+        from src.database.schema import Article
+
+        if not external_ids:
+            return set()
+        rows = await session.execute(
+            select(Article.external_id).where(
+                Article.source_id == self.source_id,
+                Article.external_id.in_(external_ids),
+                Article.published_at < cutoff,
+            )
+        )
+        return {r[0] for r in rows.all()}
+
     async def scrape_bip(self, session) -> List[int]:
         """
         Główna metoda scraping BIP.
@@ -304,11 +309,20 @@ class BipRybnoScraper(BaseScraper):
                         break
                     previous_page_ids = current_page_ids
 
+                    # Znane już wpisy starsze niż okno pomijamy BEZ pobierania: i tak
+                    # odpadłyby po filtrze daty (niżej), a każde pobranie to żądanie
+                    # do BIP. Do 25.10.2026 każdy przebieg ściągał szczegóły wszystkich
+                    # ~10 pozycji listy, 2× dziennie, żeby je potem odrzucić.
+                    stale_ids = await self._known_stale_ids(
+                        session, [a["external_id"] for a in articles], cutoff_date
+                    )
+
                     # Dla każdego artykułu: pobierz szczegóły (data + treść)
                     fresh_articles = []
                     for article in articles:
+                        if article["external_id"] in stale_ids:
+                            continue
                         detail = await self.scrape_detail(article["url"])
-                        await asyncio.sleep(0.5)  # respektuj rate limit
 
                         # Data publikacji z detail page
                         if detail.get("published_at"):

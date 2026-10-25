@@ -29,23 +29,14 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
+from src.scrapers.polite import BIP_HEADERS, hooks as polite_hooks
 from src.utils.logger import setup_logger
 
 logger = setup_logger("CouncilSessions")
 
 GALLERY_URL = "https://gminarybno.pl/nagrania_wideo.html"
 
-# Ten sam zestaw co w scraperach BIP — serwis gminy też odrzuca botowe User-Agenty.
-BROWSER_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/121.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
-    "Connection": "keep-alive",
-}
+BROWSER_HEADERS = BIP_HEADERS
 
 # Tytuł w galerii: „XXIII Sesja Rady Gminy Rybno z dnia 24.06.2026 r."
 # Data bywa też w slugu (`...z-dnia-24062026-r,7556.html`) — czytamy z tytułu,
@@ -160,7 +151,9 @@ async def fetch_recordings(limit: int = 12, sessions_only: bool = True) -> List[
     Galeria + adresy nagrań. Podstrony pobieramy tylko dla `limit` najnowszych
     pozycji — galeria ma kilkaset wpisów wstecz, a interesuje nas świeżość.
     """
-    async with httpx.AsyncClient(headers=BROWSER_HEADERS, timeout=30.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(
+        headers=BROWSER_HEADERS, timeout=30.0, follow_redirects=True, event_hooks=polite_hooks()
+    ) as client:
         response = await client.get(GALLERY_URL)
         response.raise_for_status()
         recordings = parse_gallery(response.text)
