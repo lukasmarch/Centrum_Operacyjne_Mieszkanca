@@ -89,6 +89,13 @@ UNREACHABLE_PAGES = 3
 # może być przypadkiem, dwie oznaczają, że zeszliśmy poniżej progu.
 EMPTY_PAGES_TO_STOP = 2
 
+# Przebieg przyrostowy (25.10.2026, prośba dostawcy BIP o oszczędny ruch):
+# nowe akty wchodzą na górę listy, więc dwie strony pod rząd bez ani jednego
+# nieznanego aktu kończą skan. Bez tego co tydzień szło ~45 stron listy,
+# żeby znaleźć 2–4 nowe akty. Pełny skan (odświeżenie STATUSU starszych aktów)
+# robi job raz w miesiącu.
+KNOWN_PAGES_TO_STOP = 2
+
 # Ile znaków treści zapisujemy. Uchwała budżetowa z załącznikami tabelarycznymi
 # potrafi mieć kilkadziesiąt stron; chunker i tak potnie to na kawałki.
 MAX_CONTENT_CHARS = 40_000
@@ -172,8 +179,13 @@ class LegalActsScraper:
             else f"{BIP_BASE}{ACTS_PATH}/{page}/typ/"
         )
 
-    async def list_acts(self, since: date = DEFAULT_SINCE) -> list[dict]:
+    async def list_acts(
+        self, since: date = DEFAULT_SINCE, known_ids: Optional[set] = None,
+    ) -> list[dict]:
         """Metadane aktów z listy, od najnowszego do progu `since`.
+
+        Z `known_ids` przebieg jest przyrostowy: kończy się po
+        `KNOWN_PAGES_TO_STOP` stronach, na których wszystkie akty są już znane.
 
         Nie wchodzi na strony szczegółowe i nie pobiera PDF-ów — to osobny,
         drogi krok, który robimy tylko dla aktów jeszcze nieznanych bazie.
@@ -181,6 +193,7 @@ class LegalActsScraper:
         found: list[dict] = []
         seen_ids: set[int] = set()
         empty_pages = 0
+        known_pages = 0
         failed_pages = 0
 
         for page in range(1, MAX_PAGES + 1):
@@ -231,6 +244,12 @@ class LegalActsScraper:
             if empty_pages >= EMPTY_PAGES_TO_STOP:
                 logger.info(f"Koniec zakresu — {empty_pages} strony pod rząd bez trafień")
                 break
+            if known_ids is not None:
+                unknown = sum(1 for r in rows if r["bip_id"] not in known_ids)
+                known_pages = 0 if unknown else known_pages + 1
+                if known_pages >= KNOWN_PAGES_TO_STOP:
+                    logger.info(f"Przyrostowo: {known_pages} strony pod rząd bez nowych aktów — koniec")
+                    break
             await asyncio.sleep(REQUEST_DELAY_S)
 
         return found

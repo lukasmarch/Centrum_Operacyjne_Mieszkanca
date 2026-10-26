@@ -5,7 +5,7 @@ Narzędzie do oglądania wyniku okiem — ten sam kod, który codziennie o 4:30
 uruchamia `scheduler/council_job.py`, tylko natychmiast i z plikami na dysku.
 Przydaje się przy nadrabianiu starszych sesji i przy pracy nad promptem.
 
-    # najnowsza sesja z galerii gminy
+    # najnowsza sesja z kanału YouTube gminy
     cd backend && python -m scripts.run_council_session --latest
 
     # to samo, ale skrót ląduje w kolejce do akceptacji (mail + strona)
@@ -188,7 +188,7 @@ async def main() -> int:
     parser = argparse.ArgumentParser(description="Pilot: skrót sesji Rady Gminy")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--url", help="Adres nagrania (YouTube)")
-    source.add_argument("--latest", action="store_true", help="Najnowsza sesja z galerii gminy")
+    source.add_argument("--latest", action="store_true", help="Najnowsza sesja z kanału YouTube gminy")
     source.add_argument("--transcript", type=Path, help="Gotowy transkrypt JSON (bez kosztu Whispera)")
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR, help="Katalog na audio i wyniki")
     parser.add_argument("--name", default=None, help="Nazwa plików wynikowych")
@@ -214,11 +214,11 @@ async def main() -> int:
         if args.latest:
             recordings = [r for r in await fetch_recordings(limit=6) if r.youtube_id]
             if not recordings:
-                print("Galeria gminy nie ma sesji z dostępnym nagraniem.", file=sys.stderr)
+                print("Kanał gminy nie ma sesji z dostępnym nagraniem.", file=sys.stderr)
                 return 1
             recording = recordings[0]
             url, title = recording.video_url, recording.title
-            name = args.name or f"sesja_{recording.page_id}"
+            name = args.name or f"sesja_{recording.youtube_id}"
         else:
             url = args.url
             name = args.name or "sesja"

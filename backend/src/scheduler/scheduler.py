@@ -446,12 +446,14 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # Wiedza stała z BIP — niedziela 4:00 (statut, procedury, podatki, programy).
-    # Tygodniowo wystarczy: te dokumenty zmieniają się kilka razy w roku,
-    # a `content_hash` i tak wycina ponowne osadzanie niezmienionej treści.
+    # Wiedza stała z BIP — PIERWSZA niedziela miesiąca, 4:00 (statut, procedury,
+    # podatki, programy). Do 25.10.2026 co tydzień, czyli ~150 żądań do BIP co
+    # niedzielę dla dokumentów, które zmieniają się kilka razy w roku — dostawca
+    # BIP prosi o oszczędny ruch. W APSchedulerze `day` i `day_of_week` łączą się
+    # warunkiem I (inaczej niż w crontabie), więc to dokładnie pierwsza niedziela.
     scheduler.add_job(
         func=run_bip_knowledge_job,
-        trigger=CronTrigger(day_of_week='sun', hour=4, minute=0),
+        trigger=CronTrigger(day='1-7', day_of_week='sun', hour=4, minute=0),
         id='bip_knowledge',
         name='Wiedza stała z BIP (statut, procedury, podatki)',
         replace_existing=True
@@ -462,6 +464,8 @@ def start_scheduler():
     # powodu, żeby robiły to jednocześnie. Tygodniowo wystarcza: sesja Rady jest
     # raz w miesiącu, a akt prawny raz podjęty nie zmienia treści — przebieg
     # dokłada nowe pozycje i odświeża STATUS (uchylona/zmieniona).
+    # Od 25.10.2026 przebieg tygodniowy jest przyrostowy (kilka stron listy),
+    # pełny skan statusów raz w miesiącu — `legal_acts_job.is_full_scan_day`.
     scheduler.add_job(
         func=run_legal_acts_job,
         trigger=CronTrigger(day_of_week='sun', hour=5, minute=0),
@@ -481,8 +485,11 @@ def start_scheduler():
     #
     # 14:00 bierze typowy przypadek (koniec ~11:30–13:00 + kwadrans, aż YouTube
     # domknie VOD), 20:00 jest dogrywką na obrady przeciągnięte i sesje
-    # nadzwyczajne popołudniowe. Przebieg bez nowego nagrania kosztuje jedno
-    # zapytanie do galerii, a `MAX_SESSIONS_PER_RUN` pilnuje rachunku za Whisper.
+    # nadzwyczajne popołudniowe. Od 26.10.2026 przebieg w dzień bez sesji
+    # w kalendarzu kończy się na zapytaniu do NASZEJ bazy
+    # (`council_job.session_window_open`); kanał YouTube gminy (jedno żądanie RSS)
+    # pytamy od dnia obrad do dwóch dni po nich + w poniedziałek o 14:00.
+    # `MAX_SESSIONS_PER_RUN` pilnuje rachunku za Whisper.
     # Skrót kończy w stanie `pending` — publikuje człowiek, patrz council_job.
     scheduler.add_job(
         func=run_council_job,

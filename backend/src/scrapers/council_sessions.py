@@ -1,22 +1,26 @@
 """
 Nagrania sesji Rady Gminy — wykrywanie, że jest co przepisać.
 
-Gmina wrzuca nagrania obrad do galerii `gminarybno.pl/nagrania_wideo.html`,
-a samo wideo trzyma na YouTube (iframe na podstronie). Ten scraper robi jedno:
-zwraca listę sesji z adresem nagrania, żeby `scheduler/council_job.py` wiedział,
-czy pojawiło się coś nowego. Transkrypcję i skrót robią osobne moduły.
+**Źródłem jest kanał YouTube gminy (RSS), od 26.10.2026.** Do 22.10 nagrania
+wisiały w galerii `gminarybno.pl/nagrania_wideo.html` (podstrona z iframe
+YouTube). Nowa strona gminy galerii nie ma — Rada Gminy odsyła już tylko do
+kanału `@gminarybno5603`. Kanał wystawia publiczny RSS
+(`/feeds/videos.xml?channel_id=…`, ~15 ostatnich filmów, odpowiada także
+z serwera, mimo że sam YouTube blokuje serwerowi pobieranie nagrań).
+Jedno żądanie zamiast galerii i sześciu podstron.
+
+Tożsamość nagrania niesie `youtube_id`. `page_id` ma postać `yt:{id}` — ten
+sam prefiks, którego używa `scripts/run_council_session` dla nagrań spoza
+galerii; sesje sprzed 26.10 mają w `external_id` numer podstrony galerii, więc
+job porównuje po `youtube_id`, nie po `external_id`.
 
 **Dlaczego YouTube, skoro gmina ma też kanał na transmisjaobrad.info.**
-Tamten serwis ma nagrań więcej (sesje nadzwyczajne z 15 i 25 czerwca 2026,
-których w galerii gminy nie ma) i numeruje je inaczej — ale odtwarza je przez
-własnego JS-owego playera bez publicznego adresu strumienia. YouTube da się
-pobrać `yt-dlp`, więc źródłem jest galeria gminy, ze świadomością, że kilka
-sesji nadzwyczajnych przez to ominiemy. Gdyby to zaczęło przeszkadzać,
-drugie źródło jest do dopisania tutaj, a nie w pipelinie.
+Tamten serwis ma nagrań więcej (sesje nadzwyczajne z 15 i 25 czerwca 2026)
+i numeruje je inaczej — ale odtwarza je przez własnego JS-owego playera bez
+publicznego adresu strumienia. YouTube da się pobrać `yt-dlp`.
 
-Rytm: ~1 sesja w miesiącu, z przerwą wakacyjną (ostatnia XXIII z 24.06.2026).
-Job może chodzić raz na dobę i przez większość dni nie znajdzie nic nowego —
-to normalny stan, nie awaria.
+Rytm: ~1 sesja w miesiącu, z przerwą wakacyjną. Kiedy job w ogóle pyta,
+rozstrzyga kalendarz (`scheduler/council_job.session_window_open`).
 
 Test: `cd backend && python -m scripts.test_council_sessions [--live]`
 """
@@ -24,19 +28,21 @@ import re
 from dataclasses import dataclass
 from datetime import date
 from typing import List, Optional
-from urllib.parse import urljoin
+from xml.etree import ElementTree
 
 import httpx
-from bs4 import BeautifulSoup
 
-from src.scrapers.polite import BIP_HEADERS, hooks as polite_hooks
+from src.scrapers.polite import BIP_HEADERS
 from src.utils.logger import setup_logger
 
 logger = setup_logger("CouncilSessions")
 
-GALLERY_URL = "https://gminarybno.pl/nagrania_wideo.html"
+# Kanał „Gmina Rybno” (@gminarybno5603) — identyfikator z 26.10.2026.
+CHANNEL_ID = "UCz9APkxyUnB6PNNi5IRtVlA"
+FEED_URL = f"https://www.youtube.com/feeds/videos.xml?channel_id={CHANNEL_ID}"
 
-BROWSER_HEADERS = BIP_HEADERS
+_ATOM = "{http://www.w3.org/2005/Atom}"
+_YT = "{http://www.youtube.com/xml/schemas/2015}"
 
 # Tytuł w galerii: „XXIII Sesja Rady Gminy Rybno z dnia 24.06.2026 r."
 # Data bywa też w slugu (`...z-dnia-24062026-r,7556.html`) — czytamy z tytułu,
@@ -45,26 +51,17 @@ _DATE_RE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
 
 # Numer sesji rzymski na początku tytułu. Sam w sobie nie identyfikuje nagrania
 # (numeracja gminy różni się od tej na transmisjaobrad.info), więc służy tylko
-# do etykiety — tożsamość niesie `page_id`.
+# do etykiety — tożsamość niesie `youtube_id`.
 _ROMAN_RE = re.compile(r"^([IVXLCDM]+)\s+[Ss]esja", re.UNICODE)
 
-# Identyfikator podstrony: `...,7556.html`. Stabilny i unikalny — to on trafia
-# do bazy jako `external_id`, nie URL (slug potrafi się zmienić przy korekcie
-# literówki w tytule).
-_PAGE_ID_RE = re.compile(r",(\d+)\.html")
-
-_YOUTUBE_RE = re.compile(
-    r"(?:youtube\.com/(?:embed/|watch\?v=)|youtu\.be/)([A-Za-z0-9_-]{11})"
-)
-
-# Galeria zawiera też nagrania niebędące obradami (spotkania konsultacyjne,
+# Kanał zawiera też nagrania niebędące obradami (spotkania konsultacyjne,
 # imprezy). Skrót obrad ma inny prompt i inną wartość, więc typ rozstrzygamy tu.
 _SESSION_RE = re.compile(r"sesja\s+rady\s+gminy", re.IGNORECASE)
 
 
 @dataclass
 class CouncilRecording:
-    """Jedno nagranie z galerii gminy."""
+    """Jedno nagranie z kanału gminy."""
 
     page_id: str
     title: str
@@ -103,81 +100,46 @@ def _parse_date(title: str) -> Optional[date]:
         return None
 
 
-def parse_gallery(html: str, base_url: str = GALLERY_URL) -> List[CouncilRecording]:
-    """Lista nagrań ze strony galerii. Bez sieci — testowalne na zapisanym HTML."""
-    soup = BeautifulSoup(html, "html.parser")
-    found: dict = {}
+def parse_feed(xml_text: str) -> List[CouncilRecording]:
+    """Nagrania z kanału RSS YouTube, od najnowszego. Bez sieci — testowalne."""
+    root = ElementTree.fromstring(xml_text)
+    recordings: List[CouncilRecording] = []
 
-    for anchor in soup.find_all("a", href=True):
-        href = anchor["href"]
-        if "nagrania_wideo/" not in href:
-            continue
-        page_match = _PAGE_ID_RE.search(href)
-        if not page_match:
-            continue
-        page_id = page_match.group(1)
-        # Ten sam wpis występuje dwa razy (miniatura + podpis); tytuł jest
-        # pełny w atrybucie `title`, tekst linku bywa ucięty.
-        title = (anchor.get("title") or anchor.get_text() or "").strip()
-        if page_id in found and len(title) <= len(found[page_id].title):
+    for entry in root.findall(f"{_ATOM}entry"):
+        video_id = (entry.findtext(f"{_YT}videoId") or "").strip()
+        title = re.sub(r"\s+", " ", (entry.findtext(f"{_ATOM}title") or "").strip())
+        if not video_id or not title:
             continue
         roman = _ROMAN_RE.match(title)
-        found[page_id] = CouncilRecording(
-            page_id=page_id,
-            title=re.sub(r"\s+", " ", title),
-            page_url=urljoin(base_url, href),
+        recordings.append(CouncilRecording(
+            page_id=f"yt:{video_id}",
+            title=title,
+            page_url=f"https://www.youtube.com/watch?v={video_id}",
+            youtube_id=video_id,
             session_date=_parse_date(title),
             session_number=roman.group(1) if roman else None,
-        )
+        ))
 
-    recordings = sorted(
-        found.values(),
-        key=lambda r: (r.session_date or date.min, int(r.page_id)),
-        reverse=True,
-    )
-    logger.info("Galeria: %d nagrań, w tym %d sesji rady",
+    # Kanał podaje kolejność publikacji; sesja nadrabiana później nie może
+    # wyprzedzić świeższych obrad.
+    recordings.sort(key=lambda r: r.session_date or date.min, reverse=True)
+    logger.info("Kanał YouTube: %d nagrań, w tym %d sesji rady",
                 len(recordings), sum(1 for r in recordings if r.is_session))
     return recordings
 
 
-def extract_youtube_id(html: str) -> Optional[str]:
-    """Identyfikator nagrania z podstrony (iframe YouTube)."""
-    match = _YOUTUBE_RE.search(html)
-    return match.group(1) if match else None
-
-
 async def fetch_recordings(limit: int = 12, sessions_only: bool = True) -> List[CouncilRecording]:
-    """
-    Galeria + adresy nagrań. Podstrony pobieramy tylko dla `limit` najnowszych
-    pozycji — galeria ma kilkaset wpisów wstecz, a interesuje nas świeżość.
-    """
-    async with httpx.AsyncClient(
-        headers=BROWSER_HEADERS, timeout=30.0, follow_redirects=True, event_hooks=polite_hooks()
-    ) as client:
-        response = await client.get(GALLERY_URL)
+    """Najnowsze nagrania z kanału gminy — jedno żądanie do RSS YouTube."""
+    async with httpx.AsyncClient(headers=BIP_HEADERS, timeout=30.0, follow_redirects=True) as client:
+        response = await client.get(FEED_URL)
         response.raise_for_status()
-        recordings = parse_gallery(response.text)
-
-        if sessions_only:
-            recordings = [r for r in recordings if r.is_session]
-        recordings = recordings[:limit]
-
-        for recording in recordings:
-            try:
-                page = await client.get(recording.page_url)
-                page.raise_for_status()
-                recording.youtube_id = extract_youtube_id(page.text)
-                if not recording.youtube_id:
-                    logger.warning("Nagranie bez iframe YouTube: %s", recording.page_url)
-            except httpx.HTTPError as exc:
-                logger.warning("Nie udało się otworzyć %s: %s", recording.page_url, exc)
-
-    return recordings
+    recordings = parse_feed(response.text)
+    if sessions_only:
+        recordings = [r for r in recordings if r.is_session]
+    return recordings[:limit]
 
 
 async def latest_session() -> Optional[CouncilRecording]:
     """Najnowsza sesja rady z dostępnym nagraniem."""
-    for recording in await fetch_recordings(limit=6):
-        if recording.youtube_id:
-            return recording
-    return None
+    recordings = await fetch_recordings(limit=1)
+    return recordings[0] if recordings else None

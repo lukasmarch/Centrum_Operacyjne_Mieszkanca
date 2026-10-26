@@ -90,6 +90,50 @@ check(EMPTY_PAGES_TO_STOP >= 2,
       "lista NIE jest sortowana po dacie podjęcia — jedna strona to za mało")
 
 
+print("\n== Przebieg przyrostowy (oszczędny ruch do BIP, 25.10.2026) ==")
+
+
+async def _skan(known_ids):
+    """Lista z 6 stron po 3 akty; nowy akt tylko na pierwszej. Zwraca pobrane strony."""
+    import types
+    from src.scrapers import legal_acts as la
+
+    pobrane = []
+    strony = {
+        n: [{"bip_id": 1000 - 10 * n - i, "adopted_at": date(2026, 6, 1)} for i in range(3)]
+        for n in range(1, 7)
+    }
+    scraper = la.LegalActsScraper()
+
+    async def fake_get(url):
+        n = 1 if url.endswith("/akty/14/typ/") else int(url.split("/akty/14/")[1].split("/")[0])
+        pobrane.append(n)
+        return types.SimpleNamespace(text=str(n))
+
+    scraper._get = fake_get
+    scraper._parse_list = lambda text: strony.get(int(text), [])
+    opoznienie, la.REQUEST_DELAY_S = la.REQUEST_DELAY_S, 0
+    try:
+        await scraper.list_acts(since=date(2024, 1, 1), known_ids=known_ids)
+    finally:
+        la.REQUEST_DELAY_S = opoznienie
+    return pobrane
+
+
+_znane = {1000 - 10 * n - i for n in range(1, 7) for i in range(3)} - {990}
+_przyrost = asyncio.run(_skan(_znane))
+check(_przyrost == [1, 2, 3], "przyrostowo: strona z nowym aktem + 2 strony samych znanych",
+      f"pobrano strony {_przyrost}")
+_pelny = asyncio.run(_skan(None))
+check(_pelny == [1, 2, 3, 4, 5, 6, 7], "pełny skan (statusy) przechodzi całą listę",
+      f"pobrano strony {_pelny}")
+
+from datetime import datetime as _dt  # noqa: E402
+from src.scheduler.legal_acts_job import is_full_scan_day  # noqa: E402
+check(is_full_scan_day(_dt(2026, 11, 1, 4)), "pierwsza niedziela miesiąca = pełny skan")
+check(not is_full_scan_day(_dt(2026, 11, 8, 4)), "druga niedziela = przyrostowo")
+
+
 # ------------------------------------------------------------------ baza
 async def run_db_tests():
     from sqlalchemy import func, select

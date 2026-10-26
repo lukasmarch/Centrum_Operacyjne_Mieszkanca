@@ -1,7 +1,16 @@
 """
 Job sesji Rady Gminy — 14:00 i 20:00 (2026-08-09, godziny zmienione 27.08)
 
-Sprawdza galerię nagrań gminy, a gdy pojawi się nowa sesja: pobiera audio,
+**Kiedy pyta — rozstrzyga kalendarz (od 26.10.2026).** Termin sesji znamy
+z wiadomości: ogłoszenie BIP, post gminy i Syli trafiają do `events` jako
+„XXV sesja Rady Gminy Rybno”, zwykle kilka dni przed obradami. Job sprawdza
+kanał tylko od dnia obrad do `SESSION_WINDOW_DAYS` po nich (nagranie trafia
+na kanał późnym wieczorem albo w nocy — XXIV o 01:31, XXV o 02:10 następnego
+dnia) i raz w tygodniu bez względu na kalendarz, na sesję nadzwyczajną ogłoszoną
+poza naszymi źródłami. Do 26.10 pytał dwa razy dziennie przez cały rok: galeria
+plus sześć podstron, 14 żądań na dobę dla sesji raz w miesiącu.
+
+Sprawdza kanał nagrań gminy, a gdy pojawi się nowa sesja: pobiera audio,
 przepisuje je Whisperem, robi skrót i **zostawia go w stanie `pending`**.
 Publikacji nie ma — jest wiadomość na Telegramie (zapasowo mail) z linkiem
 do strony akceptacji.
@@ -34,6 +43,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
@@ -42,6 +52,7 @@ from src.ai.council_summary import summarize_session
 from src.config import settings
 from src.database.schema import CouncilSession, CouncilSessionStatus
 from src.scrapers.council_sessions import CouncilRecording, fetch_recordings
+from src.services.time_span import to_local
 from src.services.council_store import apply_result, summary_dict
 from src.services.council_transcript import (
     TranscriptionError,
@@ -55,7 +66,7 @@ from src.utils.logger import setup_logger
 logger = setup_logger("CouncilJob")
 
 # Ile nagrań przepisujemy w jednym przebiegu. Jeden: transkrypcja to ~$0,52,
-# a galeria potrafi wypełnić się kilkoma sesjami naraz po przerwie wakacyjnej.
+# a kanał potrafi wypełnić się kilkoma sesjami naraz po przerwie wakacyjnej.
 MAX_SESSIONS_PER_RUN = 1
 
 # Ile razy wracamy do nagrania, które się nie udało. Powyżej tego wiersz zostaje
@@ -68,9 +79,16 @@ MAX_ATTEMPTS = 3
 # ograniczenie działa jak bezpiecznik rachunku, nie jak filtr treści.
 MAX_SESSION_MINUTES = 240
 
-# Ile nagrań z galerii oglądamy przy każdym przebiegu. Sesje wchodzą po jednej
+# Ile nagrań z kanału oglądamy przy każdym przebiegu. Sesje wchodzą po jednej
 # w miesiącu, więc sześć to zapas na kilka miesięcy przestoju joba.
-GALLERY_LIMIT = 6
+CHANNEL_LIMIT = 6
+
+# Okno po terminie sesji, w którym job pyta kanał: dzień obrad + dwa kolejne.
+SESSION_WINDOW_DAYS = 2
+
+# Kontrola bez względu na kalendarz: poniedziałkowy przebieg 14:00.
+WEEKLY_CHECK_WEEKDAY = 0
+WEEKLY_CHECK_BEFORE_HOUR = 17
 
 # Po ilu dniach sesja przestaje być wiadomością. Galeria trzyma nagrania lata
 # wstecz i przy pierwszym uruchomieniu job zobaczył sześć nieznanych sesji —
@@ -81,19 +99,62 @@ GALLERY_LIMIT = 6
 MAX_SESSION_AGE_DAYS = 45
 
 
-async def _sync_gallery(session: AsyncSession) -> int:
+def session_window_open(terms: List[datetime], now: datetime) -> bool:
+    """Czy dziś warto pytać kanał: sesja w kalendarzu albo kontrola tygodniowa.
+
+    `terms` i `now` to naiwny UTC, jak w bazie; porównujemy doby LOKALNE —
+    sesja „cały dzień” stoi w bazie jako 22:00 UTC dnia poprzedniego.
     """
-    Galeria → wiersze w stanie `new`. Nic nie pobiera i nic nie kosztuje;
-    zwraca liczbę nagrań, których wcześniej nie widzieliśmy.
+    now_local = to_local(now)
+    if (now_local.weekday() == WEEKLY_CHECK_WEEKDAY
+            and now_local.hour < WEEKLY_CHECK_BEFORE_HOUR):
+        return True
+    today = now_local.date()
+    return any(
+        0 <= (today - to_local(term).date()).days <= SESSION_WINDOW_DAYS
+        for term in terms
+    )
+
+
+async def _announced_session_terms(session: AsyncSession, now: datetime) -> List[datetime]:
+    """Terminy sesji Rady Gminy Rybno z kalendarza i z wiadomości, wokół `now`.
+
+    Dwa źródła, bo jedno potrafi nie mieć terminu: ekstrakcja wydarzeń bywa
+    odsiana, a wpis bez daty w tekście nie dostaje `event_at`. Szersze okno
+    zapytania niż `SESSION_WINDOW_DAYS` — o dobie rozstrzyga `session_window_open`.
     """
-    recordings: List[CouncilRecording] = await fetch_recordings(limit=GALLERY_LIMIT)
+    params = {"since": now - timedelta(days=SESSION_WINDOW_DAYS + 2), "until": now + timedelta(days=1)}
+    events = await session.execute(text("""
+        SELECT event_date FROM events
+        WHERE title ~* 'sesj\\w*\\s+rady\\s+gminy\\s+rybn'
+          AND withdrawn_at IS NULL
+          AND event_date BETWEEN :since AND :until
+    """), params)
+    articles = await session.execute(text("""
+        SELECT event_at FROM articles
+        WHERE title ~* 'sesj\\w*\\s+rady\\s+gminy'
+          AND (title ~* 'rybn' OR locality = 3)
+          AND withdrawn_at IS NULL
+          AND event_at BETWEEN :since AND :until
+    """), params)
+    return [r[0] for r in events.all()] + [r[0] for r in articles.all()]
+
+
+async def _sync_channel(session: AsyncSession) -> int:
+    """
+    Kanał YouTube gminy → wiersze w stanie `new`. Nic nie pobiera i nic nie
+    kosztuje; zwraca liczbę nagrań, których wcześniej nie widzieliśmy.
+    """
+    recordings: List[CouncilRecording] = await fetch_recordings(limit=CHANNEL_LIMIT)
+    # Po `youtube_id`, nie `external_id`: sesje sprzed 26.10 mają w nim numer
+    # podstrony dawnej galerii, nowe — `yt:{id}`. To samo nagranie, inny klucz.
     known = set(
-        (await session.execute(select(CouncilSession.external_id))).scalars().all()
+        (await session.execute(select(CouncilSession.youtube_id))).scalars().all()
     )
 
     added = 0
     for recording in recordings:
-        if recording.page_id in known or not recording.youtube_id:
+        if not recording.youtube_id or recording.youtube_id in known:
             continue
         session.add(CouncilSession(
             external_id=recording.page_id,
@@ -108,7 +169,7 @@ async def _sync_gallery(session: AsyncSession) -> int:
             status=CouncilSessionStatus.NEW.value,
         ))
         added += 1
-        logger.info("Nowa sesja w galerii: %s (%s)", recording.title, recording.page_id)
+        logger.info("Nowa sesja na kanale: %s (%s)", recording.title, recording.page_id)
 
     if added:
         await session.commit()
@@ -400,12 +461,17 @@ async def run_council_job_async() -> None:
 
     try:
         async with async_session() as session:
-            added = await _sync_gallery(session)
+            now = datetime.utcnow()
+            if not session_window_open(await _announced_session_terms(session, now), now):
+                # Normalny dzień: żadnej sesji w kalendarzu, kanału nie pytamy.
+                logger.info("Brak sesji w kalendarzu (dzień obrad +%d) — pomijam", SESSION_WINDOW_DAYS)
+                return
+            added = await _sync_channel(session)
             pending = await _next_to_process(session)
 
             if not pending:
                 # Sesja raz w miesiącu — brak nowego nagrania to normalny dzień.
-                logger.info("Brak nagrań do przepisania (nowych w galerii: %d)", added)
+                logger.info("Brak nagrań do przepisania (nowych na kanale: %d)", added)
                 return
 
             for row in pending:

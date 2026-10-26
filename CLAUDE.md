@@ -173,10 +173,10 @@ Co 4h → Air Quality (Airly)
 13:00–13:45 → Popołudniowy przebieg (scraping → AI → summary → embedding)
 8:00  → Cinema Repertoire
 Niedz 3:00 → CEIDG Sync
-Niedz 4:00 → Wiedza stała z BIP (statut, procedury, podatki, programy)
-Niedz 5:00 → Akty prawne z BIP (uchwały Rady, zarządzenia Wójta)
-14:00 i 20:00 → Skróty sesji Rady (do akceptacji; obrady startują 10:00,
-                20:00 to dogrywka — do 27.08 job chodził o 4:30)
+1. niedz. miesiąca 4:00 → Wiedza stała z BIP (statut, procedury, podatki, programy)
+Niedz 5:00 → Akty prawne z BIP (przyrostowo; pełny skan statusów w 1. niedz.)
+14:00 i 20:00 → Skróty sesji Rady (do akceptacji) — kanał YouTube pytany TYLKO
+                od dnia sesji z kalendarza do +2 dni oraz pon. 14:00
 Sob 10:00 → Newsletter Weekly
 Pn-Pt 7:15 → Newsletter Daily (Premium)
 1.01/04/07/10 → GUS Statistics
@@ -916,6 +916,30 @@ surowym `strftime` na UTC, a obok, w bloku SPORT, ten sam bieg miał poprawne
 - Testy: `test_timezone_guard`, `test_event_terms` sekcja 5 (16 sprawdzeń na
   prawdziwym rekordzie biegu), `test_summary_headline` 36 + 9 (okno vs klucz)
 
+## BIP i strona gminy: grzeczny ruch (2026-10-25/26)
+**E-LINE (dostawca BIP) zdjął blokadę IP 91.99.142.30 pod warunkiem ≥ 1 s między zapytaniami
+— po ~2 dniach blokada wróciła** (ostatnie udane pobranie 21.10 06:00). Kod łamał prośbę: pauzy
+0,4–0,5 s, 3 próby po każdym 403, User-Agent udający Chrome (w piśmie deklarowaliśmy RybnoLive/1.0).
+Pismo z wyjaśnieniem: `DESIGN/pisma/PISMO_E-LINE_WYJASNIENIE_PONOWNEJ_BLOKADY_2026-10-25.md`.
+- **`scrapers/polite.py`** — hak httpx dla `*.gminarybno.pl`: wspólny odstęp **1,5 s** (bezpieczny dla
+  wątków/pętli schedulera), UA `RybnoLive/1.0 (+https://rybnolive.pl; biuro@lumargo.pl)` podstawiany
+  w haku, **2× 403 pod rząd (albo 429) = host zamknięty na 12 h** (`HostBlocked`, bez ponawiania).
+  ⚠️ Nowy scraper tych domen MUSI dostać `event_hooks=polite_hooks()`. Test: `test_polite_http` (CI)
+- ⚠️ **BIP (176.119.35.31, Oktawave) i portal gminy (79.96.216.211, home.pl) to RÓŻNE serwery.**
+  Prośba E-LINE dotyczy tylko BIP; o portalu do E-LINE nie piszemy
+- Wolumen BIP: aktualności `/112/` pobierają szczegóły tylko NOWYCH wpisów (`_known_stale_ids`);
+  wiedza stała raz w miesiącu; akty prawne przyrostowo (`KNOWN_PAGES_TO_STOP`). ~55 → ~5 żądań/dobę
+- **Nowa strona gminarybno.pl od 22.10**: lista `/aktualnosci/` (`article.news-card`, data DD.MM.RRRR),
+  wpis `/artykul/{slug}` (`div.article-body`), `<base href="/">`. Stary `aktualnosci.html` → 404 —
+  scraper sam podmienia adres z `sources.url`. `external_id` = `gminarybno:{slug}`. Szczegóły tylko
+  z okna 2 dni. Doszedł `kalendarz-wydarzen/` (nieużywany). Test: `test_gmina_portal` (CI)
+- **Galeria `nagrania_wideo.html` zniknęła** → sesje z RSS kanału YouTube (`CHANNEL_ID` w
+  `council_sessions.py`, odpowiada też z serwera). Dedup po `youtube_id` (stare wiersze mają numer
+  podstrony galerii w `external_id`, nowe `yt:{id}`). Job pyta kanał tylko wokół terminu sesji
+  z `events`/`articles` (`session_window_open`) + pon. 14:00
+- ⚠️ Logi kontenera giną przy każdym deployu (odtworzenie kontenera) — `polite` loguje każde żądanie
+  do gminarybno.pl, ale wstecz sprzed deployu nic nie zostaje
+
 ## Stan źródeł: próba ≠ sukces (2026-10-11)
 **BIP od lipca odpowiada 403, a w bazie stał jako „zeskanowany dziś”** — scraper połykał
 błąd, zwracał pustą listę, a job zapisywał `last_scraped` (audyt, F-019).
@@ -1473,4 +1497,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-10-19*
+*Ostatnia aktualizacja: 2026-10-26*

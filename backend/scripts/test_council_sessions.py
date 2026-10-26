@@ -1,40 +1,43 @@
 """
-Test parsowania galerii nagrań gminy.
+Test wykrywania sesji: kanał RSS YouTube gminy i bramka kalendarza.
 
-    python -m scripts.test_council_sessions          # offline, na wklejonym HTML
-    python -m scripts.test_council_sessions --live   # + realne odpytanie gminarybno.pl
+    python -m scripts.test_council_sessions          # offline, na wklejonym XML
+    python -m scripts.test_council_sessions --live   # + realne odpytanie kanału
 
-Galeria miesza sesje rady z nagraniami spotkań i imprez, a każdy wpis występuje
-w HTML dwa razy (miniatura i podpis). Test pilnuje, żeby jedno nagranie dawało
-jeden rekord z pełnym tytułem — i żeby festyn nie trafił do kolejki transkrypcji.
+Od 26.10.2026 źródłem jest kanał YouTube gminy (galeria `nagrania_wideo.html`
+zniknęła z nowej strony gminy). Kanał miesza sesje rady ze spotkaniami
+konsultacyjnymi — test pilnuje, żeby spotkanie nie trafiło do kolejki
+transkrypcji, a job pytał kanał tylko wokół terminu sesji z kalendarza.
 """
 import argparse
 import asyncio
 import sys
-from datetime import date
+from datetime import date, datetime
 
-from src.scrapers.council_sessions import extract_youtube_id, parse_gallery
+from src.scrapers.council_sessions import parse_feed
 
 FAILURES: list = []
 
-# Fragment realnej galerii (6.08.2026), z zachowaną duplikacją linków.
-GALLERY_HTML = """
-<div class="gallery">
-<a href="nagrania_wideo/transmisja-spotkania-w-sprawie-planu-ogolnego,7574.html"><img src="x.jpg"></a>
-<a href="nagrania_wideo/transmisja-spotkania-w-sprawie-planu-ogolnego,7574.html"
-   title="Transmisja spotkania w sprawie Planu Ogólnego"> Transmisja spotkania w sprawie Planu </a>
-<a href="nagrania_wideo/xxiii-sesja-rady-gminy-rybno-z-dnia-24062026-r,7556.html"><img src="y.jpg"></a>
-<a href="nagrania_wideo/xxiii-sesja-rady-gminy-rybno-z-dnia-24062026-r,7556.html"
-   title="XXIII Sesja Rady Gminy Rybno z dnia 24.06.2026 r. "> XXIII Sesja Rady Gminy </a>
-<a href="nagrania_wideo/xxii-sesja-rady-gminy-rybno-z-dnia-27052026-r,7534.html"
-   title="XXII Sesja Rady Gminy Rybno z dnia 27.05.2026 r. "> XXII Sesja </a>
-<a href="https://gminarybno.pl/aktywny_wypoczynek/samochodem,69.html" title="Samochodem">Samochodem</a>
-</div>
-"""
-
-EMBED_HTML = """
-<div class="information"><iframe width="560" height="315"
- src="https://www.youtube.com/embed/6h9iKlveTcs?si=4PEXCVZF52AJd1Yo" title="YouTube"></iframe></div>
+# Fragment realnego kanału (26.10.2026), w kolejności publikacji.
+FEED_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns="http://www.w3.org/2005/Atom">
+ <title>Gmina Rybno</title>
+ <entry>
+  <yt:videoId>quyYDnXDBEY</yt:videoId>
+  <title>XXV Sesja Rady Gminy Rybno 30.09.2026 r.</title>
+  <published>2026-10-01T00:10:21+00:00</published>
+ </entry>
+ <entry>
+  <yt:videoId>RCZgLvTSnl4</yt:videoId>
+  <title>Spotkanie w ramach konsultacji społecznych dot. projektu planu ogólnego Gminy Rybno 23.07.2026 r.</title>
+  <published>2026-07-24T02:59:00+00:00</published>
+ </entry>
+ <entry>
+  <yt:videoId>ytBiBVzlduU</yt:videoId>
+  <title>XXIV  Sesja Rady Gminy Rybno 27.08.2026 r.</title>
+  <published>2026-08-27T23:31:00+00:00</published>
+ </entry>
+</feed>
 """
 
 
@@ -46,47 +49,47 @@ def check(label: str, got, expected) -> None:
 
 
 def test_parsowanie() -> None:
-    print("\n== Parsowanie galerii ==")
-    recordings = parse_gallery(GALLERY_HTML)
-
+    print("\n== Kanał RSS ==")
+    recordings = parse_feed(FEED_XML)
     check("każde nagranie raz", len(recordings), 3)
-    check("link spoza galerii pominięty",
-          all("nagrania_wideo" in r.page_url for r in recordings), True)
-
-    by_id = {r.page_id: r for r in recordings}
-    sesja = by_id["7556"]
-    check("pełny tytuł z atrybutu, nie ucięty tekst linku",
-          sesja.title, "XXIII Sesja Rady Gminy Rybno z dnia 24.06.2026 r.")
-    check("data z tytułu", sesja.session_date, date(2026, 6, 24))
-    check("numer sesji", sesja.session_number, "XXIII")
+    check("sortowanie od najnowszej sesji",
+          [r.youtube_id for r in recordings], ["quyYDnXDBEY", "ytBiBVzlduU", "RCZgLvTSnl4"])
+    sesja = recordings[0]
+    check("identyfikator yt: (ten sam co w run_council_session)", sesja.page_id, "yt:quyYDnXDBEY")
+    check("data z tytułu", sesja.session_date, date(2026, 9, 30))
+    check("numer sesji", sesja.session_number, "XXV")
     check("rozpoznana jako sesja", sesja.is_session, True)
-    check("adres bezwzględny", sesja.page_url.startswith("https://gminarybno.pl/"), True)
-
-    spotkanie = by_id["7574"]
+    check("podwójna spacja w tytule nie psuje numeru", recordings[1].session_number, "XXIV")
+    spotkanie = recordings[2]
     check("spotkanie konsultacyjne to NIE sesja", spotkanie.is_session, False)
-    check("spotkanie bez daty w tytule", spotkanie.session_date, None)
-
-    check("sortowanie od najnowszej", [r.page_id for r in recordings][:2], ["7556", "7534"])
-
-
-def test_youtube() -> None:
-    print("\n== Adres nagrania ==")
-    check("id z iframe", extract_youtube_id(EMBED_HTML), "6h9iKlveTcs")
-    check("brak iframe", extract_youtube_id("<div>bez wideo</div>"), None)
-
-    recordings = parse_gallery(GALLERY_HTML)
-    sesja = next(r for r in recordings if r.page_id == "7556")
-    sesja.youtube_id = "6h9iKlveTcs"
-    check("link do nagrania", sesja.video_url, "https://www.youtube.com/watch?v=6h9iKlveTcs")
+    check("link do nagrania", sesja.video_url, "https://www.youtube.com/watch?v=quyYDnXDBEY")
     check("link do minuty", sesja.watch_url_at(754.6),
-          "https://www.youtube.com/watch?v=6h9iKlveTcs&t=754s")
+          "https://www.youtube.com/watch?v=quyYDnXDBEY&t=754s")
+
+
+def test_bramka_kalendarza() -> None:
+    """Kanał pytamy wokół terminu sesji z kalendarza, nie codziennie."""
+    print("\n== Bramka kalendarza ==")
+    from src.scheduler.council_job import session_window_open
+
+    xxv = [datetime(2026, 9, 30, 8, 0)]           # 10:00 lokalnie
+    check("dzień obrad 14:00", session_window_open(xxv, datetime(2026, 9, 30, 12)), True)
+    check("nazajutrz (nagranie wchodzi w nocy)", session_window_open(xxv, datetime(2026, 10, 1, 12)), True)
+    check("drugi dzień po", session_window_open(xxv, datetime(2026, 10, 2, 18)), True)
+    check("trzeci dzień po — już nie", session_window_open(xxv, datetime(2026, 10, 3, 12)), False)
+    check("przed sesją — nie", session_window_open(xxv, datetime(2026, 9, 29, 12)), False)
+    całodniowa = [datetime(2026, 9, 29, 22, 0)]    # lokalna północ 30.09
+    check("termin bez godziny = właściwa doba", session_window_open(całodniowa, datetime(2026, 9, 30, 12)), True)
+    check("zwykły wtorek bez sesji", session_window_open([], datetime(2026, 10, 27, 12)), False)
+    check("poniedziałek 14:00 — kontrola tygodniowa", session_window_open([], datetime(2026, 10, 26, 13)), True)
+    check("poniedziałek 20:00 — bez drugiej kontroli", session_window_open([], datetime(2026, 10, 26, 19)), False)
 
 
 def test_bramka_transmisji() -> None:
     """
     Zapowiedziana transmisja to nie awaria nagrania.
 
-    26.08.2026 galeria gminy miała wpis o sesji XXIV z adresem YouTube, a sama
+    26.08.2026 galeria gminy (dziś kanał) miała wpis o sesji XXIV z adresem YouTube, a sama
     sesja zaczynała się dopiero nazajutrz o 10:00. Bez tej bramki `council_job`
     wpisywał wiersz w `error` i zjadał próbę za każdym razem, gdy zaglądał do
     zapowiedzi.
@@ -135,9 +138,7 @@ async def test_live() -> None:
     from src.scrapers.council_sessions import fetch_recordings
 
     recordings = await fetch_recordings(limit=5)
-    check("galeria coś zwróciła", len(recordings) > 0, True)
-    with_video = [r for r in recordings if r.youtube_id]
-    check("nagrania mają adresy YouTube", len(with_video) > 0, True)
+    check("kanał zwrócił sesje", len(recordings) > 0, True)
     for recording in recordings:
         print(f"    {recording.session_date} | {recording.session_number or '-':>6} "
               f"| {recording.youtube_id or 'BRAK':>11} | {recording.title[:48]}")
@@ -145,14 +146,14 @@ async def test_live() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--live", action="store_true", help="Odpytaj gminarybno.pl")
+    parser.add_argument("--live", action="store_true", help="Odpytaj kanał YouTube gminy")
     args = parser.parse_args()
 
     print("=" * 68)
-    print("GALERIA NAGRAŃ GMINY — wykrywanie sesji")
+    print("NAGRANIA SESJI RADY — kanał gminy i bramka kalendarza")
     print("=" * 68)
     test_parsowanie()
-    test_youtube()
+    test_bramka_kalendarza()
     test_bramka_transmisji()
     if args.live:
         asyncio.run(test_live())

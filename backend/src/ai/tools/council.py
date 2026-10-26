@@ -29,6 +29,7 @@ from sqlalchemy import func, select
 from src.services import provenance as prov
 from src.ai.tools import Tool, ToolContext, ToolResult, register
 from src.database.schema import CouncilSession, CouncilSessionStatus, LegalAct
+from src.services.council_store import watch_url
 from src.utils.logger import setup_logger
 
 logger = setup_logger("CouncilTools")
@@ -155,7 +156,8 @@ async def council_sessions(ctx: ToolContext, limit: int = DEFAULT_LIMIT) -> Tool
             "type": "council_session",
             "id": row.id,
             "title": f"Sesja {row.session_number or ''} Rady Gminy Rybno".strip(),
-            "url": row.page_url,
+            # Podstrony dawnej galerii gminy zniknęły 22.10.2026 — link do nagrania.
+            "url": watch_url(row) or row.page_url,
             "similarity": 1.0,
         })
 

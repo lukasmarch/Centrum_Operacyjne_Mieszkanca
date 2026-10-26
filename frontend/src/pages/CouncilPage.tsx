@@ -242,12 +242,12 @@ const CouncilPage: React.FC = () => {
                                             Skrót powstał z zapisu całego nagrania obrad.
                                             {' '}
                                             <a
-                                                href={session.page_url}
+                                                href={session.video_url ?? session.page_url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="font-bold text-tv-bluesoft underline underline-offset-4 hover:text-white"
                                             >
-                                                Nagranie w galerii Gminy Rybno
+                                                Nagranie na kanale YouTube Gminy Rybno
                                             </a>
                                             {' · '}
                                             Protokół z sesji publikuje Biuletyn Informacji Publicznej.

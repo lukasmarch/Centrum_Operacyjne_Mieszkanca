@@ -1,161 +1,149 @@
 from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 
 from src.scrapers.base import BaseScraper
 
 
 class GminaRybnoScraper(BaseScraper):
-    """Scraper dla gminarybno.pl - oficjalny portal Gminy Rybno"""
+    """Scraper dla gminarybno.pl - oficjalny portal Gminy Rybno
+
+    **Nowa strona od 22.10.2026.** Gmina przeniosła portal na nowy system:
+    lista to `/aktualnosci/` (kafle `article.news-card`, data `p.news-meta`
+    w formacie DD.MM.RRRR), wpis to `/artykul/{slug}` z treścią w
+    `div.article-body`. Strona ma `<base href="/">`, więc adresy względne
+    liczymy od korzenia. Stary układ (`aktualnosci.html`, `…,7605.html`)
+    odpowiada 404.
+
+    Na liście są też kafle z kalendarza gminy („Wydarzenie w kalendarzu”,
+    bez daty publikacji) — pomijamy je: to zapowiedzi, nie wiadomości.
+
+    **Szczegóły tylko z okna świeżości.** Job i tak odrzuca wpisy starsze niż
+    `MAX_AGE_DAYS` (`filter_recent_articles`), a stary scraper pobierał przy
+    każdym przebiegu stronę KAŻDEGO wpisu z listy — 13 żądań w ~5 s.
+    """
 
     BASE_URL = "https://gminarybno.pl"
+    LIST_URL = "https://gminarybno.pl/aktualnosci/"
+    # Adres listy zapisany w `sources.url` sprzed przebudowy strony — scraper
+    # sam go podmienia, żeby źródło nie wymagało ręcznej zmiany w bazie.
+    LEGACY_LIST_URLS = {"https://gminarybno.pl/aktualnosci.html"}
+    MAX_AGE_DAYS = 2
+
+    _DATE_RE = re.compile(r"(\d{2})\.(\d{2})\.(\d{4})")
+    _BG_IMAGE_RE = re.compile(r"url\(['\"]?([^'\")]+)")
+
+    async def fetch(self, url: str) -> str:
+        if url in self.LEGACY_LIST_URLS:
+            url = self.LIST_URL
+        return await super().fetch(url)
 
     def _build_url(self, href: str) -> str:
         if href.startswith('http'):
             return href
-        return f"{self.BASE_URL}{href}" if href.startswith('/') else f"{self.BASE_URL}/{href}"
+        return f"{self.BASE_URL}/{href.lstrip('/')}"
 
-    def _parse_date(self, container) -> Optional[datetime]:
-        """Pobiera datę z <p class="meta">Opublikowano YYYY-MM-DD HH:MM:SS.</p>"""
-        meta = container.find('p', class_='meta')
-        if not meta:
+    def _parse_date(self, text: str) -> Optional[datetime]:
+        m = self._DATE_RE.search(text or '')
+        if not m:
             return None
-        m = re.search(r'(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}:\d{2}', meta.get_text(strip=True))
-        if m:
-            try:
-                return datetime.strptime(m.group(1), '%Y-%m-%d')
-            except ValueError:
-                pass
-        return None
+        day, month, year = (int(g) for g in m.groups())
+        try:
+            return datetime(year, month, day)
+        except ValueError:
+            return None
 
-    def _parse_external_id(self, href: str, full_url: str) -> str:
-        # Format: /aktualnosci/slug,ID.html → wyciągnij ID po przecinku
-        m = re.search(r',(\d+)\.html$', href)
-        if m:
-            return m.group(1)
-        # Fallback: dowolny numer w URL
-        m = re.search(r'/(\d+)/', href)
-        if m:
-            return m.group(1)
-        return f"gminarybno_{hash(full_url) & 0x7FFFFFFF}"
+    @staticmethod
+    def _external_id(href: str) -> str:
+        # Slug kończy się identyfikatorem nadanym przez system („…-40”,
+        # „…-b99614”). Prefiks, bo `external_id` jest unikalny w całej tabeli,
+        # a stare wpisy tego źródła mają gołe liczby („7605”).
+        slug = href.rstrip('/').rsplit('/', 1)[-1]
+        return f"gminarybno:{slug}"[:255]
 
-    async def parse(self, html: str, url: str) -> List[Dict]:
-        articles = []
+    def parse_listing(self, html: str) -> List[Dict]:
+        """Wpisy z listy, bez sieci — testowalne na zapisanym HTML."""
         soup = BeautifulSoup(html, 'html.parser')
-        seen_urls = set()
+        articles = []
+        seen = set()
 
-        containers = soup.find_all(['article', 'div'], class_=re.compile(r'aktualn|news|post'))
-        if not containers:
-            containers = [
-                link.parent
-                for link in soup.find_all('a', href=re.compile(r'/aktualnosc|/news|/wiadomosc'))
-                if link.parent
-            ]
+        for card in soup.select('article.news-card'):
+            meta = card.find('p', class_='news-meta')
+            published_at = self._parse_date(meta.get_text(strip=True)) if meta else None
+            if not published_at:
+                continue  # kafel z kalendarza gminy — to nie jest wiadomość
 
-        for container in containers:
-            try:
-                # Data musi być na listingu — brak = artykuł stały z sidebaru, pomijamy
-                published_at = self._parse_date(container)
-                if not published_at:
-                    continue
+            link = card.select_one('h3 a[href], h2 a[href]')
+            if not link or 'artykul/' not in link['href']:
+                continue
+            url = self._build_url(link['href'])
+            if url in seen:
+                continue
+            seen.add(url)
 
-                link = container.find('a', href=re.compile(r'/aktualnosc|/news|/wiadomosc')) \
-                    or container.find('a', href=True)
-                if not link:
-                    continue
-
-                href = link.get('href', '')
-                if not href:
-                    continue
-
-                if any(x in href.lower() for x in ['facebook.', 'twitter.', 'instagram.',
-                                                     'javascript:', '#', 'mailto:']):
-                    continue
-
-                if href.startswith('http') and self.BASE_URL not in href:
-                    continue
-
-                full_url = self._build_url(href)
-                if full_url in seen_urls:
-                    continue
-                seen_urls.add(full_url)
-
-                # Tytuł
-                title = (
-                    link.get('title')
-                    or (h := link.find(['h1', 'h2', 'h3', 'h4'])) and h.get_text(strip=True)
-                    or (h := container.find(['h1', 'h2', 'h3', 'h4'])) and h.get_text(strip=True)
-                    or link.get_text(strip=True)
-                )
-                if not title or len(title) < 5:
-                    continue
-                if title.lower() in ['aktualności', 'aktualnosci', 'strona główna', 'home']:
-                    continue
-
-                # Obrazek z listingu
-                image_url = None
-                img = container.find('img')
-                if img:
-                    src = img.get('src') or img.get('data-src')
-                    if src:
-                        image_url = self._build_url(src)
-
-                article_data = {
-                    'title': title,
-                    'url': full_url,
-                    'image_url': image_url,
-                    'external_id': self._parse_external_id(href, full_url),
-                    'published_at': published_at,
-                }
-
-                # Deep scraping: content + lepszy obrazek ze strony detalu
-                try:
-                    self.logger.info(f"Fetching details for: {full_url}")
-                    detail_html = await self.fetch(full_url)
-                    article_data.update(self._parse_detail(detail_html, title))
-                    # Data pochodzi z listingu — nie nadpisujemy
-                    article_data['published_at'] = published_at
-                except Exception as e:
-                    self.logger.error(f"Error fetching details for {full_url}: {e}")
-
-                articles.append(article_data)
-
-            except Exception as e:
-                self.logger.warning(f"Parse error: {e}")
+            title = link.get_text(" ", strip=True)
+            if len(title) < 3:
                 continue
 
-        self.logger.info(f"Znaleziono {len(articles)} artykułów na gminarybno.pl")
+            image_url = None
+            cover = card.find('a', class_='news-image')
+            if cover and cover.get('style'):
+                m = self._BG_IMAGE_RE.search(cover['style'])
+                if m:
+                    image_url = self._build_url(m.group(1))
+
+            articles.append({
+                'title': title,
+                'url': url,
+                'image_url': image_url,
+                'external_id': self._external_id(link['href']),
+                'published_at': published_at,
+            })
         return articles
 
-    def _parse_detail(self, html: str, listing_title: str = '') -> Dict:
-        """Pobiera content, pełny tytuł i główny obrazek ze strony detalu."""
+    async def parse(self, html: str, url: str) -> List[Dict]:
+        articles = self.parse_listing(html)
+        cutoff = datetime.utcnow() - timedelta(days=self.MAX_AGE_DAYS)
+        fresh = [a for a in articles if a['published_at'] >= cutoff]
+
+        for article in fresh:
+            try:
+                self.logger.info(f"Fetching details for: {article['url']}")
+                detail_html = await self.fetch(article['url'])
+                detail = self._parse_detail(detail_html)
+                # Data pochodzi z listingu — nie nadpisujemy
+                detail.pop('published_at', None)
+                article.update(detail)
+            except Exception as e:
+                self.logger.error(f"Error fetching details for {article['url']}: {e}")
+
+        self.logger.info(
+            f"gminarybno.pl: {len(articles)} wpisów na liście, "
+            f"{len(fresh)} w oknie {self.MAX_AGE_DAYS} dni (pobrane szczegóły)"
+        )
+        return fresh
+
+    def _parse_detail(self, html: str) -> Dict:
+        """Tytuł, treść i pierwsze zdjęcie ze strony wpisu."""
         soup = BeautifulSoup(html, 'html.parser')
-        data = {}
+        data: Dict = {}
 
-        # Listing podaje tytuł ucięty do stałej długości („Ostrzeżenie
-        # meteorologiczne -…”), więc na kafelku widać wielokropek zamiast tego,
-        # o co chodzi. Pełna wersja siedzi w `og:title` strony szczegółowej
-        # (`<title>` i `<h1>` są bezużyteczne — oba brzmią „GminaRybno.pl”).
-        og_title = soup.find('meta', attrs={'property': 'og:title'})
-        full_title = (og_title.get('content') or '').strip() if og_title else ''
-        # Tylko gdy naprawdę jest pełniejszy. Na stronach bez własnego `og:title`
-        # trafia tam nazwa serwisu — podmiana dałaby feed samych „GminaRybno.pl”.
-        if len(full_title) > len(listing_title):
-            data['title'] = full_title
+        shell = soup.find('article', class_='article-layout') or soup
+        h1 = shell.find('h1')
+        if h1 and h1.get_text(strip=True):
+            data['title'] = h1.get_text(" ", strip=True)
 
-        content_div = soup.find('div', id='main') or soup.find('div', class_='entry-content')
-        if content_div:
-            for tag in content_div(['script', 'style']):
+        body = shell.find('div', class_='article-body')
+        if body:
+            for tag in body(['script', 'style']):
                 tag.decompose()
-            text = content_div.get_text(separator='\n', strip=True)
+            text = body.get_text(separator='\n', strip=True)
             if text:
                 data['content'] = text
 
-            img = content_div.find('img')
-            if img:
-                src = img.get('src') or img.get('data-src')
-                if src and not any(x in src for x in ['logo', 'icon', 'sprite', 'button']):
-                    data['image_url'] = self._build_url(src)
+        img = shell.select_one('.article-photo-grid img[src]')
+        if img:
+            data['image_url'] = self._build_url(img['src'])
 
         return data

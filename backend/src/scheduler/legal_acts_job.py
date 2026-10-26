@@ -20,6 +20,7 @@ do ponownego osadzenia, a bez porównania hashy płacilibyśmy za ten sam tekst.
 """
 import asyncio
 from datetime import date, datetime
+from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -34,6 +35,7 @@ from src.scrapers.legal_acts import (
     DEFAULT_SINCE, LegalActsScraper, ScraperBlocked, content_hash,
 )
 from src.utils.cost_tracker import log_api_cost
+from src.services.time_span import to_local
 from src.utils.logger import setup_logger
 
 logger = setup_logger("LegalActsJob")
@@ -161,9 +163,22 @@ async def _embed(session: AsyncSession) -> int:
     return done
 
 
-async def run_legal_acts_async(since: date = DEFAULT_SINCE, dry: bool = False) -> dict:
+def is_full_scan_day(now_utc: datetime) -> bool:
+    """Pełny skan listy w pierwszą niedzielę miesiąca, w pozostałe — przyrostowy.
+
+    Pełny skan jest potrzebny tylko po to, żeby odświeżyć STATUS starszych aktów
+    (uchylona/zmieniona). Raz w miesiącu wystarcza: sesja Rady jest raz w miesiącu.
+    """
+    return to_local(now_utc).day <= 7
+
+
+async def run_legal_acts_async(
+    since: date = DEFAULT_SINCE, dry: bool = False, full: Optional[bool] = None,
+) -> dict:
     started = datetime.utcnow()
-    logger.info(f"=== Akty prawne START (od {since}) ===")
+    if full is None:
+        full = is_full_scan_day(started)
+    logger.info(f"=== Akty prawne START (od {since}, {'pełny' if full else 'przyrostowy'}) ===")
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
     factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -173,7 +188,9 @@ async def run_legal_acts_async(since: date = DEFAULT_SINCE, dry: bool = False) -
 
         async with LegalActsScraper() as scraper:
             try:
-                listed = await scraper.list_acts(since=since)
+                listed = await scraper.list_acts(
+                    since=since, known_ids=None if full else known,
+                )
             except ScraperBlocked as e:
                 # Log na poziomie ERROR, nie WARNING: „0 nowych aktów" i „BIP
                 # nas nie wpuszcza" to dwie różne wiadomości, a tylko druga
