@@ -35,7 +35,7 @@ Użycie:
 import asyncio
 import io
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 
 backend_path = Path(__file__).parent.parent
@@ -52,6 +52,15 @@ from src.database.schema import (
     SolectwoPostVersion, User, UserRole, UserTier,
 )
 from src.newsletter.email_service import EmailService
+from src.services.time_span import to_local, to_utc
+
+# Nowy termin po korekcie: zawsze TYDZIEŃ od dziś. Do 26.10.2026 stała data
+# 22.10.2026 — po jej minięciu wpis słusznie znikał z feedu i briefingu, a test
+# czerwienił deploy (pułapka czasowa, ta sama co w `test_waste_reminder`).
+NEW_DAY = to_local(datetime.utcnow()).date() + timedelta(days=7)
+_MIESIACE = ("stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca",
+             "sierpnia", "września", "października", "listopada", "grudnia")
+NEW_DAY_TEXT = f"{NEW_DAY.day} {_MIESIACE[NEW_DAY.month - 1]}"
 
 # Własna domena: sprzątanie na końcu kasuje WSZYSTKO z tej domeny, więc wspólna
 # `@qa.rybnolive.pl` zabierała konta z ręcznego testu w przeglądarce (27.09)
@@ -481,7 +490,7 @@ async def after_publication(client, admin, soltys, files) -> None:
     # Prośba sołtysa
     sent_emails.clear()
     r = await client.post(f"/api/solectwa/posts/{pid}/requests", headers=auth(soltys),
-                          json={"kind": "correction", "message": "Zebranie przeniesione na 22 października"})
+                          json={"kind": "correction", "message": f"Zebranie przeniesione na {NEW_DAY_TEXT}"})
     check("sołtys składa prośbę o korektę", r.status_code == 201 and len(r.json()["open_requests"]) == 1, r.text[:200])
     request_id = r.json()["open_requests"][0]["id"]
     r = await client.post(f"/api/solectwa/posts/{pid}/requests", headers=auth(soltys),
@@ -500,8 +509,8 @@ async def after_publication(client, admin, soltys, files) -> None:
     reembedded.clear()
     r = await client.post(f"/api/solectwa/admin/posts/{pid}/correct", headers=auth(admin), json={
         "reason": "Zmiana terminu zebrania",
-        "term_action": "set", "term": {"day": "2026-10-22", "start": "18:00"},
-        "summary": "Sołtys zaprasza na zebranie wiejskie 22 października o 18:00 w świetlicy.",
+        "term_action": "set", "term": {"day": NEW_DAY.isoformat(), "start": "18:00"},
+        "summary": f"Sołtys zaprasza na zebranie wiejskie {NEW_DAY_TEXT} o 18:00 w świetlicy.",
         "request_id": request_id,
     })
     check("korekta przyjęta", r.status_code == 200 and r.json()["version"] == 2, r.text[:200])
@@ -509,14 +518,14 @@ async def after_publication(client, admin, soltys, files) -> None:
     post = await reload(SolectwoPost, pid)
     article = await reload(Article, aid)
     event = await reload(Event, event_id)
-    new_start = datetime(2026, 10, 22, 16, 0)  # 18:00 lokalnie = 16:00 UTC
+    new_start = to_utc(datetime.combine(NEW_DAY, time(18, 0)))  # 18:00 lokalnie
     check("ogłoszenie: nowy termin w UTC", post.event_at == new_start, post.event_at)
     check("artykuł: nowy termin i podsumowanie",
-          article.event_at == new_start and "22 października" in (article.summary or ""))
+          article.event_at == new_start and NEW_DAY_TEXT in (article.summary or ""))
     check("artykuł: znacznik korekty terminu", article.term_corrected_at is not None)
     check("kalendarz: wydarzenie przeniesione, godzina lokalna",
           event.event_date == new_start and event.event_time == "18:00", (event.event_date, event.event_time))
-    check("kalendarz: opis z zatwierdzonego podsumowania", "22 października" in (event.description or ""))
+    check("kalendarz: opis z zatwierdzonego podsumowania", NEW_DAY_TEXT in (event.description or ""))
     check("RAG: stare chunki artykułu i wydarzenia skasowane",
           await chunks("event", event_id) == 0 and event.embedded is False)
     check("RAG: poprawiona treść osadzona od razu", reembedded == [aid], reembedded)
@@ -546,7 +555,7 @@ async def after_publication(client, admin, soltys, files) -> None:
 
     pub = (await client.get(f"/api/solectwa/posts/{pid}")).json()
     check("strona: nowa treść, BEZ jakiegokolwiek śladu korekty",
-          "22 października" in pub["summary"]
+          NEW_DAY_TEXT in pub["summary"]
           and not any(k in pub for k in ("changes", "corrected_at", "withdrawn_at", "withdraw_reason", "version")),
           sorted(pub))
     check("strona: powód korekty nie wycieka", "Zmiana terminu" not in str(pub), str(pub)[:120])
