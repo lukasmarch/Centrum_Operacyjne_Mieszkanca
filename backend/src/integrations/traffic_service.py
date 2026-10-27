@@ -36,6 +36,7 @@ class TrafficService:
         from src.config import settings
         api_key = settings.GEMINI_API_KEY
         self.model = settings.GEMINI_MODEL
+        self.fallback_model = settings.GEMINI_FALLBACK_MODEL
         if not api_key:
             # Fallback to GOOGLE_API_KEY from settings or env if needed
             api_key = os.environ.get("GOOGLE_API_KEY") 
@@ -108,7 +109,7 @@ class TrafficService:
          drogi polnej we wsi NIE jest utrudnieniem na trasie przelotowej.
       2. CZAS. Utrudnienie musi obowiązywać DZIŚ ({date_str}). Podpisanie umowy, przetarg,
          plan inwestycyjny, "zaplanowano na 2026 rok" czy zapowiedź remontu bez potwierdzonej
-         daty rozpoczęcia to NIE jest utrudnienie. Jeśli źródło jest starsze niż 14 dni i nie
+         daty rozpoczęcia to NIE jest utrudnienie. Jeśli źródło jest starsze niż 7 dni i nie
          potwierdza, że prace nadal trwają — daj "Płynnie".
       3. MIEJSCE. Zdarzenie musi leżeć na trasie z Rybna w powiecie działdowskim
          (woj. warmińsko-mazurskie) do wskazanego celu. W Polsce jest kilka miejscowości Rybno —
@@ -153,18 +154,28 @@ class TrafficService:
             print("Fetching fresh traffic data from Gemini...")
             # 503 UNAVAILABLE ("high demand") potrafi trafić się kilka razy z rzędu.
             # Bez ponawiania pojedynczy skok obciążenia zamieniał cache w atrapę na 4 h.
+            # Po ostatniej próbie głównego modelu — jedna próba zapasowego. 503 to
+            # przeciążenie KONKRETNEGO modelu: 27.10.2026 trzy przebiegi z rzędu
+            # po trzy próby nie dostały odpowiedzi, a pasek stał na odczycie
+            # sprzed 14 godzin. Kredyty i limity (402/429) są wspólne dla konta,
+            # więc przy nich zapasowy model nic nie da — nadal przerywamy od razu.
+            plan = [self.model] * self.MAX_ATTEMPTS
+            if self.fallback_model and self.fallback_model != self.model:
+                plan.append(self.fallback_model)
             response = None
             last_error = None
-            for attempt in range(1, self.MAX_ATTEMPTS + 1):
+            for attempt, model in enumerate(plan, start=1):
                 try:
                     response = self.client.models.generate_content(
-                        model=self.model,
+                        model=model,
                         contents=prompt,
                         config=types.GenerateContentConfig(
                             tools=[types.Tool(google_search=types.GoogleSearch())],
                             response_modalities=["TEXT"],
                         )
                     )
+                    if model != self.model:
+                        print(f"Gemini: odpowiedź z modelu zapasowego {model}")
                     break
                 except Exception as api_error:
                     last_error = api_error
@@ -180,9 +191,11 @@ class TrafficService:
                         for marker in ("RESOURCE_EXHAUSTED", "429", "402", "credits are depleted")
                     ):
                         raise
-                    if attempt == self.MAX_ATTEMPTS:
+                    if attempt == len(plan):
                         raise
-                    print(f"Gemini attempt {attempt}/{self.MAX_ATTEMPTS} failed ({api_error}); retrying in {self.RETRY_DELAY_SECONDS}s")
+                    next_model = plan[attempt]
+                    print(f"Gemini attempt {attempt}/{len(plan)} ({model}) failed ({api_error}); "
+                          f"retrying with {next_model} in {self.RETRY_DELAY_SECONDS}s")
                     time.sleep(self.RETRY_DELAY_SECONDS)
 
             if response is None:

@@ -25,6 +25,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.services.road_context import (
     INCIDENT_DAYS,
+    WORKS_DAYS,
+    _is_local,
     _age_label,
     _is_fresh_enough,
     _is_road_related,
@@ -33,6 +35,7 @@ from src.services.road_context import (
 )
 
 TERAZ = datetime(2026, 9, 7, 7, 0)
+
 
 
 class FakeArticle:
@@ -56,6 +59,23 @@ REMONT = FakeArticle(
     "Trwa remont nawierzchni DW538 na odcinku Rybno – Działdowo. "
     "Wprowadzono tymczasową organizację ruchu.",
     datetime(2026, 8, 25, 9, 0),
+)
+
+# art. 6848 (wypis 300 zn. — bez terminu zakończenia)
+DW538_SYLA = FakeArticle(
+    "🚧 Trwają prace na DW 538 między Rybnem a Tuczkami!",
+    "Drogowcy remontują najbardziej zniszczony fragment drogi.",
+    datetime(2026, 10, 22, 10, 0, 33),
+)
+ZAKRES = FakeArticle(
+    "Remont nawierzchni DW538",
+    "Od 3 do 20 listopada remont nawierzchni na odcinku Rybno – Hartowiec, ruch wahadłowy.",
+    datetime(2026, 10, 28, 9, 0),
+)
+ZAPOWIEDZ = FakeArticle(
+    "Zamknięcie drogi w Żabinach",
+    "10 listopada zamknięcie drogi w Żabinach, objazd przez Rumian.",
+    datetime(2026, 10, 27, 9, 0),
 )
 
 
@@ -87,8 +107,39 @@ def run() -> int:
                    _is_fresh_enough(KONAR, datetime(2026, 9, 5, 21, 0)), True))
     checks.append((f"konar po {INCIDENT_DAYS} dniach wypada (stan z 7.09)",
                    _is_fresh_enough(KONAR, TERAZ), False))
-    checks.append(("remont sprzed 13 dni zostaje",
-                   _is_fresh_enough(REMONT, TERAZ), True))
+    checks.append(("remont sprzed 13 dni bez terminu wypada",
+                   _is_fresh_enough(REMONT, TERAZ), False))
+    checks.append(("remont sprzed 5 dni bez terminu zostaje",
+                   _is_fresh_enough(REMONT, REMONT.published_at + timedelta(days=5)), True))
+
+    # 2a. Roboty: termin z treści wygrywa z WORKS_DAYS (stan 27.10.2026:
+    #     post Syli z 22.10 bez terminu budził pasek przez dwa tygodnie).
+    checks.append((f"DW538 22.10 bez terminu: po {WORKS_DAYS} dniach wypada",
+                   _is_fresh_enough(DW538_SYLA, datetime(2026, 10, 30, 9, 0)), False))
+    checks.append(("DW538 22.10 bez terminu: 27.10 jeszcze jest",
+                   _is_fresh_enough(DW538_SYLA, datetime(2026, 10, 27, 9, 0)), True))
+    checks.append(("zakres „od 3 do 20 listopada” trzyma wpis do końca",
+                   _is_fresh_enough(ZAKRES, datetime(2026, 11, 19, 12, 0)), True))
+    checks.append(("… i zwalnia go po zakresie",
+                   _is_fresh_enough(ZAKRES, datetime(2026, 11, 21, 12, 0)), False))
+    checks.append(("zapowiedź zamknięcia z wyprzedzeniem nie wygasa przed startem",
+                   _is_fresh_enough(ZAPOWIEDZ, datetime(2026, 11, 12, 9, 0)), True))
+
+    # 2b. Słowa drogowe to CAŁE wyrazy (27.10: kondolencje weszły przez „drogiej").
+    checks.append(("„drogiej” to nie droga",
+                   _is_road_related("Piękna miłość", "Z głębi serca żegnamy naszą drogiej pamięci mamę"), False))
+    checks.append(("„drogowcy remontują” to droga",
+                   _is_road_related(DW538_SYLA.title, DW538_SYLA.content), True))
+    checks.append(("odmiana „zamknięcie drogi” łapie się",
+                   _is_road_related("Zamknięcie drogi w Hartowcu", None), True))
+
+    # 2c. Lokalność wpisu, nie tylko źródła.
+    checks.append(("locality 1 (Mława) odpada mimo lokalnego źródła",
+                   _is_local("Facebook - Syla", "Wypadek w Mławie", None, 1), False))
+    checks.append(("locality 3 zostaje",
+                   _is_local("Facebook - Syla", DW538_SYLA.title, DW538_SYLA.content, 3), True))
+    checks.append(("brak oceny (NULL) przechodzi po staremu",
+                   _is_local("Facebook - Syla", DW538_SYLA.title, None, None), True))
     checks.append(("wpis bez daty publikacji odpada",
                    _is_fresh_enough(FakeArticle("x", "droga", None), TERAZ), False))
 

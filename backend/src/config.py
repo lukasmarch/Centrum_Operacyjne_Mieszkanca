@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # (429 RESOURCE_EXHAUSTED przy każdym przebiegu) → tymczasowo 2.5-flash.
     # Po włączeniu płatności w Google wróć na "gemini-2.0-flash".
     GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Zapasowy model widgetu ruchu, gdy główny odpowiada 503 „high demand”.
+    # 27.10.2026 trzy przebiegi z rzędu (2:00, 6:00, 10:00) padły na 503,
+    # a pasek dróg stał na odczycie z poprzedniego wieczoru.
+    GEMINI_FALLBACK_MODEL: Optional[str] = "gemini-2.5-flash-lite"
     AIRLY_API_KEY: Optional[str] = None
     CEIDG_API_TOKEN: Optional[str] = None  # Token do API CEIDG v3
     REGON_API_KEY: Optional[str] = "b220c4e85a1b4e1da8b8"  # Klucz do API REGON (GUS)

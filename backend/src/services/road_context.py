@@ -11,6 +11,7 @@ Mamy lepsze dane niż wyszukiwarka: własny feed z gminarybno.pl, profilu gminy,
 Powiatu i KPP. Ta funkcja wybiera z niego wpisy o drogach i podaje modelowi
 jako materiał z DATAMI PUBLIKACJI, żeby nie musiał niczego rekonstruować.
 """
+import re
 from datetime import datetime, timedelta
 from typing import List, Optional, TypedDict
 
@@ -20,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.schema import Article, Source
 from src.services.alert_policy import _flat, places_in
 from src.services.feed_policy import is_local_source
-from src.services.time_span import to_local
+from src.services.time_span import parse_date_span, to_local
 
 # Źródła o zasięgu szerszym niż gmina: samo „to Powiat/KPP/Energa" nie znaczy
 # „to nasze", więc wpis musi jeszcze nazwać miejscowość z gminy Rybno.
@@ -34,14 +35,25 @@ WIDER_THAN_GMINA: frozenset[str] = frozenset({
 
 # Wpis liczy się jako drogowy, gdy pada któreś z tych słów. Lista celowo wąska —
 # „inwestycja" czy „przetarg" wpuszczały do materiału plany bez wpływu na przejazd.
+# Słowa CAŁE (granica wyrazu po obu stronach), rdzenie z dopiskiem `\w*`.
+# 27.10.2026 dopasowanie podłańcucha wpuściło do materiału kondolencje
+# („drogi" w „drogiej") — jako jeden z siedmiu wpisów „o drogach".
 ROAD_TERMS: tuple[str, ...] = (
-    "droga", "drogi", "drodze", "drogowe", "drogowych",
+    "droga", "drogi", "drodze", "drog", "droge", "drogowe", "drogowych", "drogowcy",
     "dw538", "dw 538", "dw541", "dw 541", "nr 538", "nr 541",
-    "objazd", "zamknięcie", "zamknięta", "zamknięty",
-    "remont", "przebudowa", "nawierzchni",
-    "utrudnieni", "organizacja ruchu", "przejazd",
-    "wypadek", "kolizja", "zderzenie",
+    r"objazd\w*", r"zamkniec\w*", "zamknieta", "zamkniety",
+    r"remont\w*", r"przebudow\w*", r"nawierzchn\w*",
+    r"utrudnie\w*", r"organizac\w* ruchu", r"przejazd\w*",
+    r"wypad(?:ek|ku)", r"kolizj\w*", r"zderzeni\w*",
 )
+_ROAD_RE = re.compile(r"\b(?:" + "|".join(ROAD_TERMS) + r")\b")
+
+# Ocena lokalności z kategoryzacji (`articles.locality`, 0–3). Próg jak dla
+# widoczności wydarzeń: gmina i sąsiednie gminy powiatu. Bez niego materiał
+# 27.10.2026 niósł wypadek w Mławie i naradę służb w Sierpcu — źródła
+# regionalne są „lokalne", a wpis już nie. Wpis bez oceny (NULL) przechodzi
+# po staremu: brak oceny to brak wiedzy, nie dowód obcości.
+MIN_ROAD_LOCALITY = 2
 
 # Zdarzenie chwilowe: konar na jezdni, kolizja, potrącenie. Trwa godziny, nie
 # tygodnie — a przez to, że materiał sięgał 21 dni wstecz, 7.09.2026 widget
@@ -69,6 +81,14 @@ INCIDENT_DAYS = 2
 # Skrócenie TEGO okna do dwóch dni cofnęłoby nas do stanu sprzed `road_context`,
 # czyli do zgadywania z wyszukiwarki (patrz nagłówek pliku).
 DEFAULT_DAYS = 21
+
+# Roboty BEZ terminu w treści liczą się najwyżej tyle dni od publikacji.
+# 27.10.2026 pasek ogłaszał „Prace remontowe na DW 538 między Rybnem
+# a Tuczkami (22.10.2026)" na podstawie jednego posta Syli — przy 21 dniach
+# okna i progu 14 dni w prompcie taki wpis budził pasek przez dwa tygodnie,
+# choć nikt nie ogłasza „prace skończone". Termin podany wprost w treści
+# („od 3 do 14 listopada") wygrywa: wpis żyje do jego końca.
+WORKS_DAYS = 7
 MAX_ITEMS = 12
 SNIPPET_CHARS = 400
 
@@ -84,8 +104,7 @@ class RoadItem(TypedDict):
 
 
 def _is_road_related(title: Optional[str], content: Optional[str]) -> bool:
-    haystack = f"{title or ''} {content or ''}".lower()
-    return any(term in haystack for term in ROAD_TERMS)
+    return bool(_ROAD_RE.search(_flat(f"{title or ''} {content or ''}")))
 
 
 def is_incident(title: Optional[str], content: Optional[str]) -> bool:
@@ -109,23 +128,37 @@ def _is_fresh_enough(
     Czy wpis wciąż opisuje stan drogi, czy już tylko historię.
 
     Dwa okna, bo to dwa różne rodzaje zdarzeń: zdarzenie chwilowe żyje
-    `INCIDENT_DAYS`, roboty — pełne `DEFAULT_DAYS`.
+    `INCIDENT_DAYS`, roboty — do terminu podanego w treści, a bez terminu
+    `WORKS_DAYS` od publikacji.
     """
     published = article.published_at
     if not published:
         return False
     if is_incident(article.title, article.content):
         return published >= now - timedelta(days=INCIDENT_DAYS)
-    return True
+
+    start, end = parse_date_span(f"{article.title or ''}\n{article.content or ''}", published)
+    if end:
+        # Zakres dni: koniec to lokalna północ PO ostatnim dniu
+        return now < end
+    if start and start > published:
+        # Zapowiedź na konkretny dzień („zamknięcie 3 listopada") — liczy się
+        # od tego dnia, nie od ogłoszenia: zapowiedź z wyprzedzeniem nie może
+        # wygasnąć, zanim prace ruszą
+        return now < start + timedelta(days=WORKS_DAYS)
+    return published >= now - timedelta(days=WORKS_DAYS)
 
 
 def _is_local(
     source_name: Optional[str],
     title: Optional[str],
     content: Optional[str],
+    locality: Optional[int] = None,
 ) -> bool:
     """Czy wpis dotyczy gminy Rybno i okolic — ta sama zasada co w feedzie."""
     if not is_local_source(source_name):
+        return False
+    if locality is not None and locality < MIN_ROAD_LOCALITY:
         return False
     if source_name in WIDER_THAN_GMINA:
         return bool(places_in(title, content))
@@ -160,7 +193,7 @@ async def fetch_road_context(
     for article, source_name in result.all():
         if not _is_road_related(article.title, article.content):
             continue
-        if not _is_local(source_name, article.title, article.content):
+        if not _is_local(source_name, article.title, article.content, article.locality):
             continue
         # Zdarzenie chwilowe po swoim oknie NIE trafia do materiału wcale.
         # Podanie go modelowi z adnotacją „stare" nie wystarczało: prompt miał
