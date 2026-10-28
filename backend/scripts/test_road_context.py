@@ -32,6 +32,7 @@ from src.services.road_context import (
     _is_road_related,
     format_road_context,
     is_incident,
+    note_is_outdated,
 )
 
 TERAZ = datetime(2026, 9, 7, 7, 0)
@@ -142,6 +143,33 @@ def run() -> int:
                    _is_local("Facebook - Syla", DW538_SYLA.title, None, None), True))
     checks.append(("wpis bez daty publikacji odpada",
                    _is_fresh_enough(FakeArticle("x", "droga", None), TERAZ), False))
+
+    # 2b. Odpowiedź modelu z minionym terminem (wyniki Google nie mają bramek
+    #     materiału). 28.10.2026: zamknięcie DW538 „do 31 grudnia 2025 roku”.
+    teraz_x = datetime(2026, 10, 28, 12, 0)
+    checks.append(("NOTE z terminem z 2025 r. jest nieaktualny",
+                   note_is_outdated(
+                       "Na drodze wojewódzkiej nr 538 w miejscowości Rybno od 2 czerwca "
+                       "2025 roku do 31 grudnia 2025 roku trwa całkowite zamknięcie odcinka "
+                       "drogi w związku z przebudową przepustu drogowego. Obowiązują objazdy.",
+                       teraz_x), True))
+    checks.append(("NOTE z zakresem zakończonym 14.10 jest nieaktualny",
+                   note_is_outdated("Od 3 do 14 października zamknięcie DW538 w Rybnie.",
+                                    teraz_x), True))
+    checks.append(("NOTE z trwającym zakresem zostaje",
+                   note_is_outdated("Od 20 października do 14 listopada zamknięcie DW538 w Rybnie.",
+                                    teraz_x), False))
+    checks.append(("NOTE z przyszłym zakresem zostaje",
+                   note_is_outdated("Od 3 do 14 listopada zamknięcie DW538 w Rybnie.",
+                                    teraz_x), False))
+    checks.append(("NOTE z rokiem bieżącym i przyszłym zostaje",
+                   note_is_outdated("Przebudowa DW538 w Rybnie, prace 2026–2027.",
+                                    teraz_x), False))
+    checks.append(("NOTE bez daty zostaje (decyduje reszta bramek)",
+                   note_is_outdated("Wahadło na DW538 w Tuczkach.", teraz_x), False))
+    checks.append(("grudniowe „od 15 stycznia” to przyszły rok",
+                   note_is_outdated("Od 15 stycznia do 30 stycznia zamknięcie DW538 w Rybnie.",
+                                    datetime(2026, 12, 20, 12, 0)), False))
 
     # 3. Etykieta wieku. Model gorzej liczy odległość dat, niż czyta słowo.
     checks.append(("dziś", _age_label(0), "DZIŚ"))

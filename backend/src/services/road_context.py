@@ -90,6 +90,8 @@ DEFAULT_DAYS = 21
 # („od 3 do 14 listopada") wygrywa: wpis żyje do jego końca.
 WORKS_DAYS = 7
 MAX_ITEMS = 12
+# Jak daleko wstecz `note_is_outdated` rozpoznaje zakończony zakres dni.
+NOTE_LOOKBACK_DAYS = 60
 SNIPPET_CHARS = 400
 
 
@@ -147,6 +149,39 @@ def _is_fresh_enough(
         # wygasnąć, zanim prace ruszą
         return now < start + timedelta(days=WORKS_DAYS)
     return published >= now - timedelta(days=WORKS_DAYS)
+
+
+_YEAR_RE = re.compile(r"\b(20\d\d)\b")
+
+
+def note_is_outdated(note: Optional[str], now: datetime) -> bool:
+    """
+    Czy opis utrudnienia z odpowiedzi modelu mówi o terminie, który już minął.
+
+    Materiał z naszego feedu filtruje `_is_fresh_enough`, ale model dokłada wyniki
+    Google — a te nie mają żadnej bramki. 28.10.2026 pasek ogłaszał „od 2 czerwca
+    2025 roku do 31 grudnia 2025 roku trwa całkowite zamknięcie" DW538 w Rybnie
+    (+20 min na trasie do Lubawy) — termin sprzed dziesięciu miesięcy. Prompt każe
+    sprawdzić, czy dziś mieści się w terminie; model napisał termin i go nie sprawdził.
+
+    Dwa sygnały, każdy wystarcza:
+    - wszystkie lata podane w opisie są wcześniejsze niż bieżący — `parse_date_span`
+      nie czyta formy „od 2 czerwca 2025 roku do …", więc rok liczymy osobno;
+    - rozpoznany zakres dni skończył się przed `now`.
+    `now` — naiwny UTC, jak wszędzie.
+
+    ⚠️ `parse_date_span` odrzuca daty sprzed punktu odniesienia, więc z odniesieniem
+    „teraz” nie zobaczyłby żadnego minionego zakresu. Odniesienie cofnięte
+    o `NOTE_LOOKBACK_DAYS`: „od 3 do 14 października” czytane 28.10 to październik
+    tego roku (minął), a „od 15 stycznia” w grudniu nadal przyszły styczeń.
+    """
+    if not note:
+        return False
+    years = {int(y) for y in _YEAR_RE.findall(note)}
+    if years and max(years) < to_local(now).year:
+        return True
+    _start, end = parse_date_span(note, now - timedelta(days=NOTE_LOOKBACK_DAYS))
+    return bool(end and end <= now)
 
 
 def _is_local(

@@ -3,7 +3,10 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime
 import json
+
+from src.services.road_context import note_is_outdated
 
 class RoadStatus(BaseModel):
     id: str
@@ -340,6 +343,18 @@ class TrafficService:
             if status != "Płynnie" and not self._names_place_on_route(note):
                 print(
                     f"WARNING: odrzucam utrudnienie bez miejsca na trasie "
+                    f"({name}): {note[:120]}"
+                )
+                status = "Płynnie"
+                delay = 0
+                note = "Ruch płynny, brak potwierdzonych utrudnień."
+
+            # Termin, który już minął. Wyniki Google nie przechodzą przez bramki
+            # `road_context` — 28.10.2026 pasek ogłosił zamknięcie DW538
+            # „do 31 grudnia 2025 roku" jako dzisiejsze utrudnienie.
+            if status != "Płynnie" and note_is_outdated(note, datetime.utcnow()):
+                print(
+                    f"WARNING: odrzucam utrudnienie z minionym terminem "
                     f"({name}): {note[:120]}"
                 )
                 status = "Płynnie"
