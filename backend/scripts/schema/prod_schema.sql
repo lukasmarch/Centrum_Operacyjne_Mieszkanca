@@ -1693,6 +1693,52 @@ ALTER SEQUENCE public.reports_id_seq OWNED BY public.reports.id;
 
 
 --
+-- Name: road_reports; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.road_reports (
+    id integer NOT NULL,
+    report_key character varying(200) NOT NULL,
+    route character varying(40) NOT NULL,
+    note text NOT NULL,
+    origin character varying(10) NOT NULL,
+    kind character varying(10) NOT NULL,
+    article_id integer,
+    source_name character varying(120),
+    source_published_at timestamp without time zone,
+    score double precision NOT NULL,
+    score_reason character varying(300),
+    status character varying(10) NOT NULL,
+    review_token character varying(64),
+    notified_at timestamp without time zone,
+    decided_at timestamp without time zone,
+    approved_until timestamp without time zone,
+    first_seen_at timestamp without time zone DEFAULT (now() AT TIME ZONE 'utc'::text) NOT NULL,
+    last_seen_at timestamp without time zone DEFAULT (now() AT TIME ZONE 'utc'::text) NOT NULL
+);
+
+
+--
+-- Name: road_reports_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.road_reports_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: road_reports_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.road_reports_id_seq OWNED BY public.road_reports.id;
+
+
+--
 -- Name: role_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2488,6 +2534,13 @@ ALTER TABLE ONLY public.reports ALTER COLUMN id SET DEFAULT nextval('public.repo
 
 
 --
+-- Name: road_reports id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.road_reports ALTER COLUMN id SET DEFAULT nextval('public.road_reports_id_seq'::regclass);
+
+
+--
 -- Name: role_invitations id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3020,6 +3073,22 @@ ALTER TABLE ONLY public.reports
 
 
 --
+-- Name: road_reports road_reports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.road_reports
+    ADD CONSTRAINT road_reports_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: road_reports road_reports_review_token_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.road_reports
+    ADD CONSTRAINT road_reports_review_token_key UNIQUE (review_token);
+
+
+--
 -- Name: role_invitations role_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3476,6 +3545,20 @@ CREATE INDEX idx_push_subscriptions_user_id ON public.push_subscriptions USING b
 --
 
 CREATE INDEX idx_referral_referrer ON public.referrals USING btree (referrer_id);
+
+
+--
+-- Name: idx_road_reports_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_road_reports_key ON public.road_reports USING btree (report_key);
+
+
+--
+-- Name: idx_road_reports_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_road_reports_status ON public.road_reports USING btree (status);
 
 
 --
@@ -4125,6 +4208,14 @@ ALTER TABLE ONLY public.report_upvotes
 
 ALTER TABLE ONLY public.reports
     ADD CONSTRAINT reports_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: road_reports road_reports_article_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.road_reports
+    ADD CONSTRAINT road_reports_article_id_fkey FOREIGN KEY (article_id) REFERENCES public.articles(id) ON DELETE SET NULL;
 
 
 --
