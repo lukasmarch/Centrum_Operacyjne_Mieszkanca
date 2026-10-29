@@ -148,7 +148,8 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
+          # Bez `script_stop` — appleboy/ssh-action@v1 go nie zna (ostrzeżenie
+          # „Unexpected input” przy każdym deployu). Przerwanie na błędzie daje `set -euo pipefail`.
           script: |
             set -euo pipefail
             cd /opt/centrum
