@@ -131,6 +131,13 @@ def run() -> int:
                    _is_road_related("Piękna miłość", "Z głębi serca żegnamy naszą drogiej pamięci mamę"), False))
     checks.append(("„drogowcy remontują” to droga",
                    _is_road_related(DW538_SYLA.title, DW538_SYLA.content), True))
+    checks.append(("ogłoszenie o posiedzeniu komisji to nie droga (29.10)",
+                   _is_road_related("Ogłoszenie o posiedzeniu Komisji Budżetu i Finansów Rady Gminy Rybno.",
+                                    "Porządek: 5. Podjęcie uchwały w sprawie przebudowy drogi gminnej."), False))
+    checks.append(("ogłoszenie o XXVI sesji Rady to nie droga",
+                   _is_road_related("Ogłoszenie o XXVI sesji Rady Gminy Rybno", "zmiana planu, drogi"), False))
+    checks.append(("„przebudowa drogi Ostrowy–Bryńsk” zostaje",
+                   _is_road_related("Ruszyła przebudowa drogi Ostrowy–Bryńsk", None), True))
     checks.append(("odmiana „zamknięcie drogi” łapie się",
                    _is_road_related("Zamknięcie drogi w Hartowcu", None), True))
 

@@ -48,6 +48,13 @@ ROAD_TERMS: tuple[str, ...] = (
 )
 _ROAD_RE = re.compile(r"\b(?:" + "|".join(ROAD_TERMS) + r")\b")
 
+# Ogłoszenia o posiedzeniach Rady i komisji. Porządek obrad wymienia uchwały
+# o drogach („przebudowa drogi…”), więc słowa drogowe padają, a o stanie drogi
+# nie ma ani słowa. 29.10.2026 zajęły 4 z 11 pozycji materiału.
+_COUNCIL_RE = re.compile(
+    r"\b(?:posiedzeni\w*|sesj\w*) (?:\w+ )?(?:rady|komisji)\b|\bporzadek obrad\b"
+)
+
 # Ocena lokalności z kategoryzacji (`articles.locality`, 0–3). Próg jak dla
 # widoczności wydarzeń: gmina i sąsiednie gminy powiatu. Bez niego materiał
 # 27.10.2026 niósł wypadek w Mławie i naradę służb w Sierpcu — źródła
@@ -112,6 +119,8 @@ class RoadItem(TypedDict, total=False):
 
 
 def _is_road_related(title: Optional[str], content: Optional[str]) -> bool:
+    if _COUNCIL_RE.search(_flat(title or "")):
+        return False
     return bool(_ROAD_RE.search(_flat(f"{title or ''} {content or ''}")))
 
 

@@ -38,6 +38,11 @@ class TrafficService:
     MAX_ATTEMPTS = 3           # ponowienia przy 503 UNAVAILABLE
     RETRY_DELAY_SECONDS = 20
 
+    _MONTHS = (
+        "styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec",
+        "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień",
+    )
+
     def __init__(self):
         from src.config import settings
         api_key = settings.GEMINI_API_KEY
@@ -68,6 +73,10 @@ class TrafficService:
 
         now = datetime.now()
         date_str = now.strftime("%d.%m.%Y %H:%M")
+        # Miesiąc i rok do zapytań — liczone, nie wpisane. Przykład „lipiec 2026”
+        # na sztywno kierował wyszukiwanie w miesiąc remontu DW538, a „ostatnie
+        # 14 dni” model przepisywał dosłownie do Google (29.10.2026), gdzie nic nie filtruje.
+        month_str = f"{self._MONTHS[now.month - 1]} {now.year}"
         road_context_block = road_context or "      (brak lokalnych wpisów o drogach z ostatnich tygodni)"
 
         prompt = f"""
@@ -87,7 +96,8 @@ class TrafficService:
       z niego, że prace się zakończyły — NIE zgłaszaj utrudnień.
 
       Następnie poszukaj w Google utrudnień, których w materiale nie ma — osobno dla
-      każdej trasy (np. „utrudnienia DW538 Rybno”, „zamknięcie drogi Lubawa”).
+      każdej trasy, z bieżącym miesiącem w zapytaniu (np. „utrudnienia DW538 Rybno {month_str}”,
+      „zamknięcie drogi Lubawa {month_str}”). Nie dopisuj do zapytań zwrotów typu „ostatnie dni”.
       Bierz WYŁĄCZNIE artykuły i komunikaty z ostatnich 14 dni; listy utrudnień
       zarządców dróg zawierają wpisy sprzed lat — sprawdź termin każdego wpisu.
 
