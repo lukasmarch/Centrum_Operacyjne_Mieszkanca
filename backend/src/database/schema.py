@@ -427,6 +427,37 @@ class TrafficCache(SQLModel, table=True):
     ttl_seconds: int = Field(default=14400)  # TTL: 4 hours
 
 
+class RoadReport(SQLModel, table=True):
+    """
+    Zgłoszenie utrudnienia na trasie z wynikiem wiarygodności (2026-10-29).
+
+    O tym, czy trafia na pasek, rozstrzyga `services/road_reports.py`, nie model:
+    `auto` — pasek od razu, `pending` — czeka na decyzję z Telegramu,
+    `approved`/`rejected` — decyzja redakcji, `expired` — model przestał je zgłaszać.
+    """
+    __tablename__ = "road_reports"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # Tożsamość zdarzenia między przebiegami: trasa + artykuł albo trasa + drogi i wsie z opisu
+    report_key: str = Field(max_length=200)
+    route: str = Field(max_length=40)
+    note: str
+    origin: str = Field(max_length=10)        # feed | search
+    kind: str = Field(max_length=10)          # works | incident
+    article_id: Optional[int] = Field(default=None, foreign_key="articles.id")
+    source_name: Optional[str] = Field(default=None, max_length=120)
+    source_published_at: Optional[datetime] = None
+    score: float
+    score_reason: Optional[str] = Field(default=None, max_length=300)
+    status: str = Field(max_length=10)
+    review_token: Optional[str] = Field(default=None, max_length=64, unique=True)
+    notified_at: Optional[datetime] = None
+    decided_at: Optional[datetime] = None
+    approved_until: Optional[datetime] = None
+    first_seen_at: datetime = Field(default_factory=datetime.utcnow)
+    last_seen_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # Legacy GUSStatistic model removed (2026-02-17)
 # Replaced by: GUSGminaStats, GUSNationalAverages, GUSDataRefreshLog
 # See: backend/src/api/endpoints/gus.py for new database-first architecture

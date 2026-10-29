@@ -15,6 +15,9 @@ class RoadStatus(BaseModel):
     delayMinutes: int
     travelTime: str
     description: Optional[str] = None
+    # Skąd model to wie: "M3" (pozycja materiału z feedu), "WWW" (sam Google), None.
+    # Po tym `road_reports` liczy wiarygodność — nie po opisie modelu.
+    ref: Optional[str] = None
 
 class GroundingSource(BaseModel):
     title: str
@@ -72,85 +75,64 @@ class TrafficService:
       Aktualna data i godzina: {date_str}.
       Twoim centrum jest miejscowość RYBNO.
 
-      MATERIAŁ ŹRÓDŁOWY — zweryfikowane wpisy lokalne z naszego serwisu
-      (data publikacji w nawiasie; to są fakty, nie domysły):
+      MATERIAŁ ŹRÓDŁOWY — wpisy lokalne z naszego serwisu, każdy z numerem [M1], [M2]…
+      (data publikacji i wiek w nawiasie):
 {road_context_block}
 
-      Materiał źródłowy ma PIERWSZEŃSTWO przed wynikami wyszukiwania. Jeśli wynika
-      z niego, że prace się zakończyły albo dobiegają końca — NIE zgłaszaj utrudnień.
-      Jeśli mówi o zamknięciu drogi w konkretnym terminie — sprawdź, czy {date_str}
-      mieści się w tym terminie, i dopiero wtedy zgłoś utrudnienie.
+      Twoje zadanie: wskazać utrudnienia na czterech trasach. NIE oceniasz, czy
+      informacja jest pewna — wiarygodność liczy nasz system na podstawie źródła
+      i wieku, a niepewne trafiają do redakcji. Ty masz poprawnie wskazać ŹRÓDŁO.
 
-      Następnie UZUPEŁNIJ obraz wyszukiwaniem w Google — osobno dla każdej trasy
-      (np. „utrudnienia DW538 Rybno Działdowo lipiec 2026", „wypadek droga wojewódzka
-      541 Lubawa"). Nie odpowiadaj z pamięci: Twoja wiedza jest nieaktualna,
-      a mieszkaniec podejmuje decyzję o wyjeździe na podstawie tych danych.
+      Materiał źródłowy ma PIERWSZEŃSTWO przed wynikami wyszukiwania. Jeśli wynika
+      z niego, że prace się zakończyły — NIE zgłaszaj utrudnień.
+
+      Następnie poszukaj w Google utrudnień, których w materiale nie ma — osobno dla
+      każdej trasy (np. „utrudnienia DW538 Rybno”, „zamknięcie drogi Lubawa”).
+      Bierz WYŁĄCZNIE artykuły i komunikaty z ostatnich 14 dni; listy utrudnień
+      zarządców dróg zawierają wpisy sprzed lat — sprawdź termin każdego wpisu.
 
       ZAKAZ ZMYŚLANIA DAT. W NOTE wolno podać wyłącznie datę, która pada
-      w materiale źródłowym lub w znalezionym artykule. Nie podstawiaj dzisiejszej
-      daty ani „ostatnich dni". Jeśli nie znasz daty zdarzenia — nie podawaj żadnej.
+      w materiale źródłowym lub w znalezionym artykule.
 
-      Sprawdź AKTUALNE warunki drogowe i czasy przejazdu dla tras:
+      Trasy:
       1. Rybno -> Działdowo (DW538)
       2. Rybno -> Lubawa (DW538/DW541)
       3. Rybno -> Iława (przez Hartowiec)
-      4. Rybno -> Olsztyn (najszybsza aktualna trasa)
+      4. Rybno -> Olsztyn
 
-      Zasady analizy:
-      - Podaj AKTUALNY CZAS PRZEJAZDU (TIME) jako liczbę minut, np. "25 min".
-      - Jeśli brak aktualnych danych o ruchu dla trasy, użyj typowego czasu przejazdu:
-        Rybno-Działdowo: 25 min, Rybno-Lubawa: 40 min, Rybno-Iława: 50 min, Rybno-Olsztyn: 90 min
-      - Opóźnienie (DELAY) to różnica między czasem aktualnym a optymalnym, domyślnie 0 min.
-      - W opisie (NOTE) opisz AKTUALNĄ sytuację. Jeśli brak utrudnień: "Ruch płynny, brak zgłoszonych utrudnień."
-      - Opis musi być jednym, treściwym zdaniem.
+      KIEDY WOLNO DAĆ STATUS "Utrudnienia" — wszystkie warunki naraz:
+      1. RODZAJ DROGI. Utrudnienie na drodze, którą faktycznie się jedzie tą trasą
+         (wojewódzka, krajowa lub powiatowa na przebiegu trasy). ZIGNORUJ drogi gminne,
+         dojazdowe, wewnętrzne, transportu rolnego, gruntowe, chodniki, parkingi.
+      2. CZAS. Utrudnienie obowiązuje DZIŚ ({date_str}). Umowa, przetarg, plan
+         inwestycyjny, zapowiedź bez daty rozpoczęcia — to NIE jest utrudnienie.
+      3. MIEJSCE. Na trasie z Rybna w powiecie działdowskim (woj. warmińsko-mazurskie).
+         W Polsce jest kilka miejscowości Rybno — ODRZUĆ Rybno Wielkie (gm. Kiszkowo),
+         Rybno k. Sochaczewa i inne.
+      4. KONKRETNY ODCINEK. Nazwana miejscowość, skrzyżowanie lub numer drogi.
+         Komunikaty wojewódzkie, krajowe, pogodowe, ćwiczenia wojskowe — NIE.
+      5. JEDNO ZDARZENIE = JEDNA TRASA. Jeśli to samo utrudnienie pasuje do więcej niż
+         jednej trasy, nie wiesz, na której leży — wpisz je przy JEDNEJ, najbardziej
+         prawdopodobnej, albo przy żadnej.
+      6. WIEK. Zdarzenie chwilowe (konar, kolizja, zablokowana droga) — tylko z etykietą "DZIŚ".
 
-      KIEDY WOLNO DAĆ STATUS INNY NIŻ "Płynnie" — wszystkie trzy warunki naraz:
-      1. RODZAJ DROGI. Utrudnienie musi dotyczyć drogi, którą faktycznie się jedzie tą trasą
-         (droga wojewódzka, krajowa lub powiatowa na przebiegu trasy — np. DW538, DW541).
-         ZIGNORUJ całkowicie: drogi gminne, dojazdowe, wewnętrzne, drogi transportu rolnego,
-         drogi gruntowe, chodniki, parkingi, remonty w obrębie posesji. Przebudowa 300-metrowej
-         drogi polnej we wsi NIE jest utrudnieniem na trasie przelotowej.
-      2. CZAS. Utrudnienie musi obowiązywać DZIŚ ({date_str}). Podpisanie umowy, przetarg,
-         plan inwestycyjny, "zaplanowano na 2026 rok" czy zapowiedź remontu bez potwierdzonej
-         daty rozpoczęcia to NIE jest utrudnienie. Jeśli źródło jest starsze niż 7 dni i nie
-         potwierdza, że prace nadal trwają — daj "Płynnie".
-      3. MIEJSCE. Zdarzenie musi leżeć na trasie z Rybna w powiecie działdowskim
-         (woj. warmińsko-mazurskie) do wskazanego celu. W Polsce jest kilka miejscowości Rybno —
-         ODRZUĆ wszystko, co dotyczy Rybna Wielkiego (gm. Kiszkowo, pow. gnieźnieński),
-         Rybna k. Sochaczewa i innych. Sprawdź powiat, zanim użyjesz źródła.
+      Jeśli którykolwiek warunek nie jest spełniony — STATUS: Płynnie.
 
-      4. KONKRETNY ODCINEK. Utrudnienie musi wskazywać nazwaną miejscowość, skrzyżowanie
-         lub numer drogi. Komunikaty o zasięgu wojewódzkim albo krajowym ("na drogach
-         województwa warmińsko-mazurskiego", "w całym kraju", ćwiczenia wojskowe,
-         ogólne apele o ostrożność, komunikaty pogodowe) NIE są utrudnieniem na trasie —
-         daj "Płynnie". Nie przypisuj jednego ogólnego komunikatu do wszystkich czterech
-         tras: jeśli coś dotyczy każdej z nich jednakowo, prawie zawsze znaczy to,
-         że nie dotyczy żadnej konkretnie.
+      REF — skąd wiesz:
+      - numer pozycji materiału, np. REF: M2 (gdy utrudnienie opiera się na materiale),
+      - REF: WWW (gdy wyłącznie na wyniku z Google; wtedy w NOTE podaj nazwę serwisu i datę artykułu),
+      - REF: - (przy STATUS: Płynnie).
 
-         JEDNO ZDARZENIE = JEDNA TRASA. Jeśli to samo utrudnienie chcesz wpisać przy
-         więcej niż jednej trasie, to znaczy, że nie wiesz, na której leży — wtedy
-         na WSZYSTKICH daj "Płynnie". 7.09.2026 blokada drogi lokalnej do Truszczyn
-         została zgłoszona naraz przy trasie do Lubawy i do Iławy; nie leżała na żadnej.
+      NOTE: jedno treściwe zdanie. Przy utrudnieniu MUSI paść miejsce i data zdarzenia
+      lub źródła, np. "Od 8 lipca zamknięty przejazd w Hartowcu, objazd przez Kostkowo."
+      Przy braku utrudnień: "Ruch płynny, brak zgłoszonych utrudnień."
 
-      5. WIEK WPISU. Każda pozycja materiału ma etykietę wieku ("DZIŚ", "wczoraj",
-         "sprzed 5 dni"). Nie licz tego z daty — czytaj etykietę. Zdarzenie chwilowe
-         (spadły konar, kolizja, zablokowana droga, "służby są w drodze") jest
-         utrudnieniem WYŁĄCZNIE z etykietą "DZIŚ": służby zjeżdżają w kilka godzin,
-         a komunikatu "już przejezdne" nikt nie publikuje.
+      Format odpowiedzi (każda trasa w osobnej linii, BEZ Markdown):
+      ROUTE: Rybno-Działdowo | STATUS: Płynnie | REF: - | NOTE: Ruch płynny, brak zgłoszonych utrudnień.
+      ROUTE: Rybno-Lubawa | STATUS: Utrudnienia | REF: M1 | NOTE: Od 3 listopada ruch wahadłowy na DW538 w Tuczkach.
 
-      Jeśli którykolwiek warunek nie jest spełniony — STATUS: Płynnie, DELAY: 0 min.
-      Nie zgaduj i nie wnioskuj "na wszelki wypadek": lepiej napisać, że jest płynnie,
-      niż ostrzec mieszkańca przed utrudnieniem, którego nie ma.
-
-      Gdy podajesz utrudnienie, w NOTE MUSI paść data zdarzenia lub źródła,
-      np. "Od 8 lipca zamknięty przejazd w Hartowcu, objazd przez Kostkowo."
-
-      Format odpowiedzi (każda trasa w osobnej linii, BEZ Markdown, BEZ pogrubień):
-      ROUTE: Rybno-Działdowo | TIME: 25 min | STATUS: Płynnie | DELAY: 0 min | NOTE: Ruch płynny, brak zgłoszonych utrudnień.
-      ROUTE: Rybno-Lubawa | TIME: 40 min | STATUS: Płynnie | DELAY: 0 min | NOTE: Ruch płynny, brak zgłoszonych utrudnień.
-
-      Status values: Płynnie, Utrudnienia, Korki
-      WAŻNE: TIME musi być zawsze liczbą minut (np. "25 min"), nigdy słowem "Brak". Odpowiedz TYLKO liniami ROUTE, bez dodatkowego tekstu.
+      Status values: Płynnie, Utrudnienia
+      Odpowiedz TYLKO liniami ROUTE, bez dodatkowego tekstu.
     """
 
         try:
@@ -252,14 +234,6 @@ class TrafficService:
                 return TrafficService._cache.model_copy(update={"is_fallback": True})
             return self._get_fallback_data()
 
-    # Domyślne czasy przejazdu gdy Gemini nie ma danych
-    _DEFAULT_TRAVEL_TIMES = {
-        "działdowo": "25 min",
-        "lubawa": "40 min",
-        "iława": "50 min",
-        "olsztyn": "90 min",
-    }
-
     # Bramka miejsca dla utrudnień — ta sama zasada co w alertach push.
     # Prośby w promkcie nie wystarczyły: model ogłosił "Utrudnienia" na WSZYSTKICH
     # czterech trasach na podstawie komunikatu o ćwiczeniach wojskowych "na drogach
@@ -294,48 +268,31 @@ class TrafficService:
         return any(place in flat for place in self._ROUTE_PLACES)
 
     def _parse_response(self, text: str) -> List[RoadStatus]:
-        roads = []
+        """
+        Linie „ROUTE: … | STATUS: … | REF: … | NOTE: …” — pola czytane po nazwie,
+        nie po pozycji: model bywa niekonsekwentny w kolejności, a do 29.10
+        odpowiadał jeszcze z TIME i DELAY (minuty usunięte — Google nie zna ruchu).
+        """
         import re
 
-        clean = re.sub(r'\*\*(\w+:)\*\*', r'\1', text)
+        clean = re.sub(r"\*\*(\w+:)\*\*", r"\1", text)
+        roads = []
+        for line in clean.splitlines():
+            line = line.strip().strip("[]")
+            if not line.upper().startswith("ROUTE:"):
+                continue
+            fields = {}
+            for part in line.split("|"):
+                key, sep, value = part.partition(":")
+                if sep:
+                    fields[key.strip().upper()] = value.strip()
+            name = fields.get("ROUTE", "")
+            note = fields.get("NOTE", "")
+            status_text = fields.get("STATUS", "")
+            ref = (fields.get("REF") or "").upper().replace(" ", "")
+            ref = ref if re.fullmatch(r"M\d+|WWW", ref) else None
 
-        # Try bracket format first: [ROUTE: ... | TIME: ... | STATUS: ... | DELAY: ... | NOTE: ...]
-        pattern = r"\[ROUTE: (.*?) \| TIME: (.*?) \| STATUS: (.*?) \| DELAY: (.*?) \| NOTE: (.*?)\]"
-        matches = list(re.finditer(pattern, clean))
-
-        # Fallback: plain pipe format without brackets
-        if not matches:
-            pattern = r"ROUTE:\s*(.*?)\s*\|\s*TIME:\s*(.*?)\s*\|\s*STATUS:\s*(.*?)\s*\|\s*DELAY:\s*(.*?)\s*\|\s*NOTE:\s*(.*?)(?:\n|$)"
-            matches = list(re.finditer(pattern, clean))
-
-        for i, match in enumerate(matches):
-            name = match.group(1).strip()
-            travel_time = match.group(2).strip()
-            status_text = match.group(3).strip()
-            delay_text = match.group(4).strip()
-            note = match.group(5).strip()
-
-            # Gdy Gemini nie zwraca cyfr w TIME — użyj domyślnego czasu dla danej trasy
-            if not any(c.isdigit() for c in travel_time):
-                name_lower = name.lower()
-                for key, default_time in self._DEFAULT_TRAVEL_TIMES.items():
-                    if key in name_lower:
-                        travel_time = default_time
-                        break
-                else:
-                    travel_time = "—"
-
-            status = "Płynnie"
-            s_lower = status_text.lower()
-            if 'utrud' in s_lower:
-                status = 'Utrudnienia'
-            elif 'kork' in s_lower:
-                status = 'Korki'
-
-            try:
-                delay = int(''.join(filter(str.isdigit, delay_text)))
-            except Exception:
-                delay = 0
+            status = "Utrudnienia" if re.search(r"utrud|kork", status_text.lower()) else "Płynnie"
 
             # Utrudnienie musi wskazać KONKRETNE miejsce na trasie. Komunikat
             # o zasięgu wojewódzkim ("na drogach województwa…") przechodził przez
@@ -345,9 +302,7 @@ class TrafficService:
                     f"WARNING: odrzucam utrudnienie bez miejsca na trasie "
                     f"({name}): {note[:120]}"
                 )
-                status = "Płynnie"
-                delay = 0
-                note = "Ruch płynny, brak potwierdzonych utrudnień."
+                status, note, ref = "Płynnie", "Ruch płynny, brak potwierdzonych utrudnień.", None
 
             # Termin, który już minął. Wyniki Google nie przechodzą przez bramki
             # `road_context` — 28.10.2026 pasek ogłosił zamknięcie DW538
@@ -357,17 +312,21 @@ class TrafficService:
                     f"WARNING: odrzucam utrudnienie z minionym terminem "
                     f"({name}): {note[:120]}"
                 )
-                status = "Płynnie"
-                delay = 0
-                note = "Ruch płynny, brak potwierdzonych utrudnień."
+                status, note, ref = "Płynnie", "Ruch płynny, brak potwierdzonych utrudnień.", None
+
+            # Utrudnienie bez wskazania źródła traktujemy jak wynik z Google —
+            # najniższe zaufanie, najwyżej do redakcji.
+            if status != "Płynnie" and ref is None:
+                ref = "WWW"
 
             roads.append(RoadStatus(
-                id=str(i),
+                id=str(len(roads)),
                 name=name,
                 status=status,
-                delayMinutes=delay,
-                travelTime=travel_time,
-                description=note if note and len(note) > 5 else None
+                delayMinutes=0,
+                travelTime="",
+                description=note if note and len(note) > 5 else None,
+                ref=ref if status != "Płynnie" else None,
             ))
 
         return roads
@@ -375,10 +334,10 @@ class TrafficService:
     def _get_fallback_data(self) -> TrafficData:
         return TrafficData(
             roads=[
-                RoadStatus(id='1', name='Rybno -> Działdowo', status='Płynnie', delayMinutes=0, travelTime='25 min', description='Brak aktualnych danych. Typowy czas przejazdu DW538.'),
-                RoadStatus(id='2', name='Rybno -> Lubawa', status='Płynnie', delayMinutes=0, travelTime='40 min', description='Brak aktualnych danych. Typowy czas przejazdu DW538/DW541.'),
-                RoadStatus(id='3', name='Rybno -> Iława', status='Płynnie', delayMinutes=0, travelTime='50 min', description='Brak aktualnych danych. Typowy czas przejazdu przez Hartowiec.'),
-                RoadStatus(id='4', name='Rybno -> Olsztyn', status='Płynnie', delayMinutes=0, travelTime='2h 30 min', description='Brak aktualnych danych. Typowy czas przejazdu przez Szczytno.')
+                RoadStatus(id='1', name='Rybno -> Działdowo', status='Płynnie', delayMinutes=0, travelTime='', description='Brak aktualnych danych.'),
+                RoadStatus(id='2', name='Rybno -> Lubawa', status='Płynnie', delayMinutes=0, travelTime='', description='Brak aktualnych danych.'),
+                RoadStatus(id='3', name='Rybno -> Iława', status='Płynnie', delayMinutes=0, travelTime='', description='Brak aktualnych danych.'),
+                RoadStatus(id='4', name='Rybno -> Olsztyn', status='Płynnie', delayMinutes=0, travelTime='', description='Brak aktualnych danych.')
             ],
             sources=[],
             is_fallback=True

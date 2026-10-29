@@ -1375,6 +1375,26 @@ nie duplikaty: `MIEJSCOWOSCI` 22 (nazwy w tekście, z odmianą), `SOLECTWA` 20 (
 - Zaliczenie: golden master **0 różnic** na 6120 wpisach, 35 testów CI zielonych, prompt ma te same nazwy w tej samej kolejności
 - Nowa miejscowość = wpis w `places.py` (+ `frontend/types.ts`, `wasteSchedule.ts`, współrzędne w `ReportsPage.tsx` — front nadal ma 3 kopie)
 
+## Pasek „Drogi”: wiarygodność liczy kod, Gemini szuka kandydatów (2026-10-29)
+**Pięć napraw od lipca dokładało bramki, żadna nie zmieniła tego, KTO decyduje** — o pasku decydował model.
+28.10 Google podał listę ZDW Olsztyn (nie jest sprzątana: „DW 538 Rybno 02.06–31.12.2025” wisi nadal),
+29.10 post Syli z 22.10 („trwają prace”, bez terminu; „zakończone” nie ogłosił nikt) stał żółty na DWÓCH
+trasach z „+10 min” bez źródła. Google był drugą furtką bez terminu ważności.
+- `services/road_reports.py`: wynik = zaufanie do źródła (urząd/powiat/KPP/ZGK 1,0 · profile lokalne 0,8 ·
+  media regionalne 0,6 · **sam Google 0,4**) × świeżość (termin w treści 1,0; roboty bez terminu: 2 dni 1,0,
+  do 4 dni 0,6, potem 0,35; zdarzenie chwilowe: doba 1,0, potem 0,5) + 0,3 za potwierdzenie z niezależnego
+  źródła na tej samej trasie. **≥ 0,8 pasek · ≥ 0,35 Telegram „Akceptuj/Usuń” · niżej nigdzie.** Bez decyzji NIE pokazujemy
+- Model wskazuje `REF: M3` (pozycja materiału) albo `WWW`; nadawcę, wiek i termin kod bierze z materiału, nie z opisu.
+  Utrudnienie bez REF = WWW. Jedno zdarzenie na ≥ 2 trasach → żadnej (`drop_multi_route`, wcześniej tylko prompt)
+- **Minut i czasów przejazdu NIE ma** (decyzja 29.10): Google Search nie zna ruchu, liczby były typowe albo zmyślone
+- `road_reports` (migracja `add_road_reports`): `auto`/`pending`/`approved` (72 h)/`rejected` (cisza 14 dni po kluczu)/`expired`.
+  Pasek w `traffic_cache` budowany z tabeli; decyzja przebudowuje go od razu (`refresh_current_cache`)
+- ⚠️ **Przyciski Telegramu to LINKI, nie `callback_data`** — bot jest wspólny z n8n (W2 odbiera kliknięcia webhookiem).
+  Link → `/api/roads/review/{token}?d=approve|reject` → strona → POST. GET niczego nie zmienia (wzorzec sesji Rady)
+- ⚠️ Model bywa niekonsekwentny między przebiegami: wpis `auto`, którego nie zgłosił, wygasa od razu (miganie paska
+  możliwe); zatwierdzony trwa do `approved_until` niezależnie od modelu
+- Test: `python -m scripts.test_road_reports` (CI, 33 sprawdzenia na przypadkach z 28 i 29.10)
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek

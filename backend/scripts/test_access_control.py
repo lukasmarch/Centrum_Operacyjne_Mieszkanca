@@ -66,6 +66,7 @@ PUBLIC_WRITE_ROUTES = {
     ("POST", "/api/cinema/ingest"): "Bearer z konfiguracji (n8n)",
     ("POST", "/api/social/media"): "X-Social-Token (n8n)",
     ("POST", "/api/council/review/{token}"): "jednorazowy token akceptacji",
+    ("POST", "/api/roads/review/{token}"): "jednorazowy token decyzji o utrudnieniu (Telegram)",
     ("DELETE", "/api/push/subscribe"): "wypis po endpoincie, który zna tylko przeglądarka",
     ("POST", "/api/business/{business_id}/view"): "licznik wyświetleń wizytówki",
     ("POST", "/api/voice/transcribe"): "mikrofon bez konta — limit per IP w kodzie",

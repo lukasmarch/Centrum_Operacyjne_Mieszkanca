@@ -95,7 +95,7 @@ NOTE_LOOKBACK_DAYS = 60
 SNIPPET_CHARS = 400
 
 
-class RoadItem(TypedDict):
+class RoadItem(TypedDict, total=False):
     date: str
     # Wiek wpisu w dniach. Sama data publikacji zmuszała model do rachunku
     # („czy 04.09 to dawno, skoro dziś 07.09?") — a on ten rachunek przegrywał.
@@ -103,6 +103,12 @@ class RoadItem(TypedDict):
     source: str
     title: str
     snippet: str
+    # Do wyniku wiarygodności (`road_reports`) — model wskazuje pozycję po numerze
+    # [M1], kod bierze z niej nadawcę, wiek i rodzaj, a nie z opisu modelu.
+    article_id: int
+    published_at: datetime
+    kind: str        # works | incident
+    has_term: bool   # termin podany wprost w treści
 
 
 def _is_road_related(title: Optional[str], content: Optional[str]) -> bool:
@@ -120,6 +126,14 @@ def is_incident(title: Optional[str], content: Optional[str]) -> bool:
     """
     haystack = _flat(f"{title or ''} {content or ''}")
     return any(term in haystack for term in INCIDENT_TERMS)
+
+
+def _term_in_text(article: Article) -> bool:
+    """Czy treść podaje termin: zakres dni albo zapowiedź na dzień po publikacji."""
+    if not article.published_at:
+        return False
+    start, end = parse_date_span(f"{article.title or ''}\n{article.content or ''}", article.published_at)
+    return bool(end or (start and start > article.published_at))
 
 
 def _is_fresh_enough(
@@ -245,6 +259,10 @@ async def fetch_road_context(
             source=source_name or "źródło lokalne",
             title=" ".join((article.title or "").split())[:120],
             snippet=text[:SNIPPET_CHARS],
+            article_id=article.id,
+            published_at=article.published_at,
+            kind="incident" if is_incident(article.title, article.content) else "works",
+            has_term=_term_in_text(article),
         ))
         if len(items) >= limit:
             break
@@ -256,10 +274,12 @@ def format_road_context(items: List[RoadItem]) -> str:
     """Materiał źródłowy w formie do wklejenia w prompt."""
     if not items:
         return "(brak lokalnych wpisów o drogach z ostatnich tygodni)"
+    # Numer pozycji to REF w odpowiedzi modelu — po nim kod wie, na czym model
+    # się oparł (nadawca, wiek, termin), zamiast zgadywać z opisu.
     return "\n".join(
-        f"- [{it['date']} — {_age_label(it['age_days'])}, {it['source']}] "
+        f"- [M{i}] [{it['date']} — {_age_label(it['age_days'])}, {it['source']}] "
         f"{it['title']}: {it['snippet']}"
-        for it in items
+        for i, it in enumerate(items, start=1)
     )
 
 

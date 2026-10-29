@@ -151,6 +151,8 @@ app.include_router(newsletter_webhook_router)  # /api/newsletter/webhook/resend
 # przez człowieka; `/review/{token}` to strona akceptacji otwierana z maila.
 from src.api.endpoints.council import router as council_router
 app.include_router(council_router)  # /api/council/*
+from src.api.endpoints.roads import router as roads_router
+app.include_router(roads_router)  # /api/roads/review — decyzja redakcji o utrudnieniu
 
 # Role z zakresem (sołtys) i ogłoszenia sołectw — zdjęcie pisma → moderacja → artykuł
 from src.api.endpoints.roles import router as roles_router

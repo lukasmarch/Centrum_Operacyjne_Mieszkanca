@@ -61,7 +61,7 @@ jobs:
             test_content_score test_council_sessions test_council_store test_council_summary \
             test_event_dedup test_event_gate test_event_phase test_event_terms test_feed_dedup test_feed_window \
             test_gmina_facts test_gmina_portal test_grounding test_job_runs test_legal_acts test_locality_gold test_migration_registry test_newsletter_tense test_outage_outlook test_password_reset test_places_guard \
-            test_polite_http test_provenance test_road_context test_schema_contract test_source_health test_storm_policy test_story_judge test_summary_context \
+            test_polite_http test_provenance test_road_context test_road_reports test_schema_contract test_source_health test_storm_policy test_story_judge test_summary_context \
             test_summary_headline test_text_clean test_timezone_guard
           do
             name="${t%%:*}"; args=""; [ "$name" != "$t" ] && args="${t#*:}"
