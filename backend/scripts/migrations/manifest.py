@@ -86,6 +86,7 @@ MANIFEST: list[Migration] = [
     Migration("add_article_story", SCHEMA, "2026-10-11"),
     Migration("add_solectwo_post_history", SCHEMA, "2026-10-12", "tabele i kolumny + wersja 1 dla już opublikowanych"),
     Migration("add_csp_violations", SCHEMA, "2026-10-13"),
+    Migration("add_road_reports", SCHEMA, "2026-10-29"),
 ]
 
 BY_NAME = {m.name: m for m in MANIFEST}
