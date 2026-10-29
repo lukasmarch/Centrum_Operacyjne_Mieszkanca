@@ -352,6 +352,17 @@ def source_label(source_name: Optional[str]) -> Optional[str]:
 # sprzed dwóch dni nie mówi już nic nikomu.
 ENDED_EVENT_GRACE_H = 24
 
+# Kto doby karencji NIE dostaje: OGŁOSZENIE, nie relacja. „Zapraszamy na zebranie
+# wiejskie 28.10 o 18:00" czytane 29.10 nie jest relacją, tylko nieaktualną
+# informacją — 29.10.2026 zebranie w Żabinach wisiało w feedzie dobę po fakcie
+# z szarym kafelkiem daty (decyzja Łukasza: sołectwa + urząd). Taki wpis znika
+# z końcem zdarzenia, jak awaria. Sołtysi publikują wyłącznie ogłoszenia;
+# kategoria „Urząd” to zebrania, sesje, komisje, konsultacje.
+NO_GRACE_SOURCES: frozenset[str] = frozenset({
+    "RybnoLive - Sołectwa",
+    "Facebook - Sołtys Żabiny",
+})
+
 
 # --- bramka SUBSTANCJI: wpis bez słów nie jest wiadomością ---------------------
 # 9.10.2026 briefing otworzył dzień nagłówkiem „Tajemniczy incydent w Rybnie —
@@ -452,6 +463,10 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
     gałąź „zapowiedź całodniowa" nie wykonała się ani razu (patrz `_event_end`).
     Wpisy bez terminu reguła nie dotyczy wcale: o nich rozstrzyga wiek
     publikacji.
+
+    Karencja jest dla RELACJI. Ogłoszenie (`NO_GRACE_SOURCES`, kategoria
+    „Urząd”) znika z końcem zdarzenia — od 29.10.2026, zebranie wiejskie
+    w Żabinach wisiało dobę po fakcie.
     """
     from sqlalchemy import select as sql_select
 
@@ -467,6 +482,7 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
     announcement_only = sql_select(Source.id).where(
         Source.name.in_(sorted(ANNOUNCEMENT_ONLY_SOURCES))
     )
+    no_grace = sql_select(Source.id).where(Source.name.in_(sorted(NO_GRACE_SOURCES)))
 
     # Bramka substancji: tytuł + treść bez naszej doklejki muszą zawierać
     # słowo. Ten sam warunek co `has_substance`, wyrażony w SQL.
@@ -494,7 +510,14 @@ def publishable_conditions(article_model, now: Optional[datetime] = None):
         ),
         or_(
             article_model.event_at.is_(None),
-            _event_end(article_model) >= ended_before,
+            _event_end(article_model) >= now,
+            and_(
+                _event_end(article_model) >= ended_before,
+                # coalesce: wpis bez kategorii to NIE ogłoszenie — porównanie
+                # z NULL dałoby NULL i odebrało karencję każdemu nieocenionemu
+                func.coalesce(article_model.category, "") != OFFICIAL_CATEGORY,
+                article_model.source_id.notin_(no_grace),
+            ),
         ),
     ]
 

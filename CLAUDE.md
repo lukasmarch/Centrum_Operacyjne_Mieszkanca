@@ -1395,6 +1395,16 @@ trasach z „+10 min” bez źródła. Google był drugą furtką bez terminu wa
   możliwe); zatwierdzony trwa do `approved_until` niezależnie od modelu
 - Test: `python -m scripts.test_road_reports` (CI, 33 sprawdzenia na przypadkach z 28 i 29.10)
 
+## Ogłoszenie znika z końcem zdarzenia (2026-10-29)
+**Zebranie wiejskie Żabin (28.10, 18:00) stało w feedzie dobę po fakcie** z szarym kafelkiem daty —
+systemowo, dla KAŻDEGO wpisu z terminem: `ENDED_EVENT_GRACE_H = 24` (z 3.09) jest pomyślane dla relacji
+(„wczorajsze dożynki”), a zaproszenie dzień po zebraniu jest nieprawdą.
+- `feed_policy.NO_GRACE_SOURCES` (sołectwa, profil sołtysa Żabin) + kategoria „Urząd” → bez karencji,
+  znika z końcem zdarzenia (start + 3 h bez `event_until`). Decyzja Łukasza: sołectwa + urząd
+- Reguła w SQL `publishable_conditions` → feed, briefing, newsletter, push i agenci naraz.
+  ⚠️ `coalesce(category, '')` — porównanie z NULL odebrałoby karencję każdemu nieocenionemu wpisowi
+- Test: `python -m scripts.test_announcement_grace` (`db-tests` w CI, 7 sprawdzeń, transakcja wycofywana)
+
 ## TODO (Kolejne priorytety)
 - [x] ~~Usunąć `idx_event_unique`~~ ✅ 3.09 `drop_event_text_unique` (prod). Był reliktem
       sprzed dedupu semantycznego i wywracał przebieg ekstrakcji. Pomiar: 521 powtórek
