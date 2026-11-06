@@ -47,6 +47,11 @@ class BaseScraper(ABC):
 
     async def fetch(self, url: str) -> str:
         """Fetch HTML with retry logic and exponential backoff"""
+        # Przyczyna idzie na POCZĄTEK komunikatu: `last_error` i alarm na Telegramie
+        # obcinają tekst. 6.11.2026 timeout i blokada 403 brzmiały tak samo
+        # („Failed to fetch … after 3 attempts”) i brak odpowiedzi serwera BIP
+        # wyglądał w alarmie jak kolejna blokada.
+        failure = "nieudane pobranie"
         for attempt in range(self.max_retries):
             try:
                 self.logger.info(f"Fetching {url} (attempt {attempt + 1})")
@@ -55,6 +60,7 @@ class BaseScraper(ABC):
                 if response.status_code == 429:
                     wait_time = 2 ** attempt
                     self.logger.warning(f"Rate limited. Waiting {wait_time}s")
+                    failure = "limit zapytań (HTTP 429)"
                     await asyncio.sleep(wait_time)
                     continue
 
@@ -66,6 +72,7 @@ class BaseScraper(ABC):
                 raise
             except httpx.TimeoutException:
                 self.logger.error(f"Timeout on attempt {attempt + 1}")
+                failure = f"brak odpowiedzi w {self.timeout} s (timeout)"
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(2 ** attempt)
             except Exception as e:
@@ -74,7 +81,7 @@ class BaseScraper(ABC):
                     raise
                 await asyncio.sleep(2 ** attempt)
 
-        raise Exception(f"Failed to fetch {url} after {self.max_retries} attempts")
+        raise Exception(f"{failure}, prób: {self.max_retries} — {url}")
 
     @abstractmethod
     async def parse(self, html: str, url: str) -> List[Dict]:

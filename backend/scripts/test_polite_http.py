@@ -7,7 +7,9 @@ Dostawca BIP zdjął blokadę IP pod warunkiem ≥ 1 s między zapytaniami. Bez 
   2. User-Agent to deklaracja RybnoLive, nawet gdy klient zbudowano z innym,
   3. dwie odmowy 403 pod rząd zamykają host — trzecie zapytanie NIE wychodzi,
   4. pojedyncze 403 (jeden PDF) hosta nie zamyka, a sukces zeruje licznik,
-  5. 429 zamyka od razu; inne domeny są nietknięte.
+  5. 429 zamyka od razu; inne domeny są nietknięte,
+  6. alarm odróżnia brak odpowiedzi od odmowy (6.11.2026 brzmiały tak samo),
+  7. wpis BIP z datą sprzed okna jest pobierany tylko raz.
 
     cd backend && python -m scripts.test_polite_http
 """
@@ -156,10 +158,127 @@ async def section_stop() -> None:
         polite.reset()
 
 
+def bip_scraper(handler, **config) -> "BipRybnoScraper":
+    """Scraper BIP na atrapie sieci i bez bazy: zapis tylko zbiera wpisy."""
+    from src.scrapers.bip_rybno import BipRybnoScraper
+
+    class Fake(BipRybnoScraper):
+        saved: list = []
+
+        async def __aenter__(self):
+            self.client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler),
+                timeout=self.timeout,
+                event_hooks=polite.hooks(),
+            )
+            return self
+
+        async def _known_stale_ids(self, session, external_ids, cutoff):
+            return set()
+
+        async def save_to_db(self, articles, session):
+            self.saved = self.saved + [a["external_id"] for a in articles]
+            return []
+
+    return Fake(source_id=1, config={"download_pdfs": False, **config})
+
+
+async def section_alarm() -> None:
+    print("\n6️⃣  Alarm podaje przyczynę")
+    from src.services import source_health
+
+    polite.reset()
+    original = polite.MIN_INTERVAL_S
+    polite.MIN_INTERVAL_S = 0.01
+    url = "https://bip.gminarybno.pl/112/"
+    try:
+        scraper = bip_scraper(lambda r: None)
+        check("BIP czeka 60 s", scraper.timeout == 60, scraper.timeout)
+        check("BIP ponawia raz", scraper.max_retries == 2, scraper.max_retries)
+
+        sent = {"n": 0}
+
+        def hang(request):
+            sent["n"] += 1
+            raise httpx.ReadTimeout("wisi", request=request)
+
+        scraper = bip_scraper(hang)
+        async with scraper:
+            try:
+                await scraper.fetch(url)
+                message = ""
+            except Exception as e:
+                message = str(e)
+        alert = source_health.alert_text([("BIP", source_health.FAILED, message)]) or ""
+        check("timeout: dwie próby", sent["n"] == 2, sent["n"])
+        check("timeout: alarm mówi o braku odpowiedzi", "brak odpowiedzi w 60 s" in alert, alert)
+        check("timeout: nie udaje blokady", "403" not in alert and "odmówił" not in alert)
+
+        polite.reset()
+        scraper = bip_scraper(lambda r: httpx.Response(403))
+        async with scraper:
+            try:
+                await scraper.fetch(url)
+                message = ""
+            except Exception as e:
+                message = str(e)
+        alert = source_health.alert_text([("BIP", source_health.FAILED, message)]) or ""
+        check("odmowa: alarm mówi o 403", "403" in alert, alert)
+        check("odmowa: nie udaje timeoutu", "brak odpowiedzi" not in alert)
+    finally:
+        polite.MIN_INTERVAL_S = original
+        polite.reset()
+
+
+async def section_too_old() -> None:
+    print("\n7️⃣  Wpis sprzed okna pobierany raz")
+    from datetime import datetime
+
+    from src.scrapers import bip_rybno
+
+    polite.reset()
+    bip_rybno._TOO_OLD_IDS.clear()
+    original = polite.MIN_INTERVAL_S
+    polite.MIN_INTERVAL_S = 0.01
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    listing = "".join(
+        f'<div class="information"><a href="/112/{i}/wpis/">Wpis numer {i}</a></div>'
+        for i in (3782, 3772)
+    )
+    dates = {"3782": today, "3772": "2026-10-01"}
+    hits: dict = {}
+
+    def handler(request):
+        path = request.url.path
+        hits[path] = hits.get(path, 0) + 1
+        if path == "/112/":
+            return httpx.Response(200, text=listing)
+        date = dates[path.split("/")[2]]
+        return httpx.Response(200, text=(
+            f'<div class="information-parameters">Informacja ogłoszona dnia {date} 11:17:43</div>'
+            '<div class="information">Treść wpisu dłuższa niż dwadzieścia znaków.</div>'
+        ))
+
+    try:
+        first = bip_scraper(handler)
+        await first.scrape_bip(None)
+        second = bip_scraper(handler)
+        await second.scrape_bip(None)
+        check("stary wpis pobrany raz przez dwa przebiegi", hits.get("/112/3772/wpis/") == 1, hits)
+        check("stary wpis nie idzie do zapisu", "bip_3772" not in first.saved + second.saved)
+        check("świeży wpis nadal idzie do zapisu", "bip_3782" in first.saved and "bip_3782" in second.saved)
+    finally:
+        polite.MIN_INTERVAL_S = original
+        polite.reset()
+        bip_rybno._TOO_OLD_IDS.clear()
+
+
 async def main() -> None:
     await section_tempo()
     await section_ua()
     await section_stop()
+    await section_alarm()
+    await section_too_old()
     ok = sum(results)
     print(f"\n{'✅' if ok == len(results) else '❌'} {ok}/{len(results)} sprawdzeń")
     sys.exit(0 if ok == len(results) else 1)

@@ -939,6 +939,11 @@ Pismo z wyjaśnieniem: `DESIGN/pisma/PISMO_E-LINE_WYJASNIENIE_PONOWNEJ_BLOKADY_2
   z `events`/`articles` (`session_window_open`) + pon. 14:00
 - ⚠️ Logi kontenera giną przy każdym deployu (odtworzenie kontenera) — `polite` loguje każde żądanie
   do gminarybno.pl, ale wstecz sprzed deployu nic nie zostaje
+- ⚠️ **Alarm o BIP ≠ blokada (6.11).** Od 29.10 w logu 486 zapytań i 0 × 403/429, a 6.11 serwer BIP nie odpowiadał
+  też z łącza domowego (jedna odpowiedź po 35,5 s, potem domyślne 403 Apache z dopiskiem o 503). Komunikat błędu
+  zaczyna się teraz od przyczyny (`brak odpowiedzi w 60 s` / `403`). Scraper aktualności: 60 s, 2 próby
+  (`BIP_TIMEOUT_S`, `BIP_MAX_RETRIES`). Wpis z datą sprzed okna nie trafia do bazy, więc pamięta go
+  `_TOO_OLD_IDS` (w procesie). Przed pismem do E-LINE sprawdź w logu: `PoliteHttp … → 403` czy `Timeout on attempt`
 
 ## Stan źródeł: próba ≠ sukces (2026-10-11)
 **BIP od lipca odpowiada 403, a w bazie stał jako „zeskanowany dziś”** — scraper połykał

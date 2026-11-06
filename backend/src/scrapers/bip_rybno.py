@@ -16,7 +16,7 @@ import asyncio
 import io
 import re
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 from urllib.parse import urljoin
 
 import httpx
@@ -30,6 +30,19 @@ logger = setup_logger("BipRybnoScraper")
 
 BIP_BASE_URL = "https://bip.gminarybno.pl"
 BIP_NEWS_URL = f"{BIP_BASE_URL}/112/"
+
+# 6.11.2026 BIP odpowiadał po ~35 s, a domyślne 30 s liczyło to jako awarię.
+# Mniej prób niż domyślne 3: wiszący serwer nie zyskuje na ponawianiu, a przebieg
+# stoi w kolejce przed resztą źródeł (przy 60 s × 3 każdy wpis to do 3 minut).
+BIP_TIMEOUT_S = 60
+BIP_MAX_RETRIES = 2
+
+# Wpisy z listy z datą sprzed okna świeżości. Nie trafiają do bazy, więc
+# `_known_stale_ids` ich nie widzi i bez tej pamięci każdy przebieg pobierał je
+# od nowa (3772 i 3769: 3 żądania zamiast 1, 2–5.11.2026). Data publikacji się
+# nie zmienia, więc wpis raz za stary zostaje za stary. Restart procesu kosztuje
+# jedno ponowne pobranie — nie ma tu czego utrwalać w bazie.
+_TOO_OLD_IDS: Set[str] = set()
 
 
 
@@ -47,6 +60,8 @@ class BipRybnoScraper(BaseScraper):
 
     def __init__(self, source_id: int, config: Optional[Dict] = None):
         super().__init__(source_id, config)
+        self.timeout = self.config.get("timeout", BIP_TIMEOUT_S)
+        self.max_retries = self.config.get("max_retries", BIP_MAX_RETRIES)
         self.news_url = self.config.get("news_url", BIP_NEWS_URL)
         self.download_pdfs = self.config.get("download_pdfs", True)
         self.pdf_extraction = self.config.get("pdf_extraction", "pdfplumber")
@@ -320,7 +335,7 @@ class BipRybnoScraper(BaseScraper):
                     # Dla każdego artykułu: pobierz szczegóły (data + treść)
                     fresh_articles = []
                     for article in articles:
-                        if article["external_id"] in stale_ids:
+                        if article["external_id"] in stale_ids or article["external_id"] in _TOO_OLD_IDS:
                             continue
                         detail = await self.scrape_detail(article["url"])
 
@@ -333,6 +348,7 @@ class BipRybnoScraper(BaseScraper):
                             self.logger.debug(
                                 f"Skipping old article ({article['published_at'].date()}): {article['title'][:60]}"
                             )
+                            _TOO_OLD_IDS.add(article["external_id"])
                             continue
 
                         # Treść z detail page (max 1000 znaków)
