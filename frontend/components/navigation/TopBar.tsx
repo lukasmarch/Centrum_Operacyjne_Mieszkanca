@@ -17,6 +17,19 @@ interface TopBarProps {
   activeSection?: AppSection;
 }
 
+/** Dni żałoby narodowej (data w Polsce, RRRR-MM-DD). Po ostatnim dniu znak
+ *  wraca sam — bez drugiego wdrożenia. */
+const MOURNING_DAYS = new Set(['2026-11-08', '2026-11-09']);
+
+function isNationalMourning(now: Date = new Date()): boolean {
+  try {
+    // 'sv-SE' formatuje jako RRRR-MM-DD
+    return MOURNING_DAYS.has(now.toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' }));
+  } catch {
+    return false;
+  }
+}
+
 const TIER_LABELS: Record<string, string> = {
   free: 'Free',
   premium: 'Premium',
@@ -110,10 +123,24 @@ const TopBar: React.FC<TopBarProps> = ({ user, isAuthenticated, onNavigate, navI
         {/* Znak: „Rybno” + plakietka „Live” — ta sama plakietka, co w belce
             i sekcjach pulpitu. Bez gradientu i poświaty (odświeżenie 10.2026).
             Czyta się dalej jako jedna nazwa: RybnoLive */}
-        <span className="font-cond flex items-center text-[22px] font-black leading-none text-white sm:text-[26px]">
-          Rybno
-          <span className="ml-0.5 bg-tv-blue px-1.5 py-1 text-[17px] uppercase tracking-wide text-white sm:text-[20px]">Live</span>
-        </span>
+        {isNationalMourning() ? (
+          /* Żałoba narodowa 8–9.11.2026 (zamach w Krakowie): „Live” czarne,
+             kir zawieszony na plakietce. Grafika gotowa od Łukasza
+             (`Marketing_social_media/rybnolive/zaloba-2026-11-08`), przycięta
+             do treści. Wysokość = wysokość zwykłego znaku (26 px „Rybno” → 33 px). */
+          <img
+            src="/brand/logo-zaloba.png"
+            alt=""
+            width={562}
+            height={132}
+            className="h-[28px] w-auto sm:h-[33px]"
+          />
+        ) : (
+          <span className="font-cond flex items-center text-[22px] font-black leading-none text-white sm:text-[26px]">
+            Rybno
+            <span className="ml-0.5 bg-tv-blue px-1.5 py-1 text-[17px] uppercase tracking-wide text-white sm:text-[20px]">Live</span>
+          </span>
+        )}
       </a>
 
       {/* Right: auth */}
