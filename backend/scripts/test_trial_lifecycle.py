@@ -26,7 +26,9 @@ Użycie:
     cd backend && python -m scripts.test_trial_lifecycle
 """
 import asyncio
+import re
 import sys
+from html import unescape
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -126,7 +128,12 @@ async def scenario_registration(session) -> bool:
     if sent_emails:
         html = sent_emails[0]["html"]
         ok &= check("mówi o okresie próbnym", "okres pr" in html.lower() or "okres&nbsp;pr" in html.lower())
-        ok &= check("podaje datę końca", "wrze" in html or "pa&#378;" in html or "październ" in html)
+        # Dowolny miesiąc w dopełniaczu, nie lista na sztywno: do 8.11.2026 test
+        # szukał „wrze”/„październ”, więc czerwieniał, gdy trial zaczął kończyć się
+        # w grudniu (pułapka czasowa, ten sam wzorzec co test_waste_reminder)
+        ok &= check("podaje datę końca", re.search(
+            r"\b\d{1,2}\s+(stycznia|lutego|marca|kwietnia|maja|czerwca|lipca|sierpnia"
+            r"|września|października|listopada|grudnia)\b", unescape(html)) is not None)
     return ok
 
 
