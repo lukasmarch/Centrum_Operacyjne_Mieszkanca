@@ -31,7 +31,10 @@ const pluralPL = (n: number, one: string, few: string, many: string): string => 
 
 interface Locality {
     name: string;
-    count: number;
+    count: number;              // aktywne — tyle kart pokaże filtr
+    active?: number;
+    suspended?: number;
+    partnership_only?: number;  // WYLACZNIE_W_FORMIE_SPOLKI
 }
 
 interface Stats {
@@ -138,6 +141,79 @@ const YearBarChart: React.FC<{
             </div>
         </div>
     );
+};
+
+/**
+ * Firmy wg miejscowości — STAN NA DZIŚ z CEIDG, bez osi czasu.
+ * Suma wszystkich wierszy = kafel „Firmy w rejestrze" (aktywne + zawieszone
+ * + tylko w spółce); każdy słupek ma pokrycie w rejestrze z dnia synchronizacji.
+ * Nazwa to miejscowość z adresu działalności, nie sołectwo.
+ */
+const LocalityBarChart: React.FC<{ data: Locality[] }> = ({ data }) => {
+    const rows = data
+        .map(l => {
+            const active = l.active ?? l.count;
+            const suspended = l.suspended ?? 0;
+            const partnership = l.partnership_only ?? 0;
+            return { name: l.name, active, suspended, partnership, total: active + suspended + partnership };
+        })
+        .filter(r => r.total > 0)
+        .sort((a, b) => b.total - a.total || b.active - a.active || a.name.localeCompare(b.name, 'pl'));
+    if (rows.length === 0) return null;
+    const max = Math.max(...rows.map(r => r.total));
+    const pct = (n: number) => `${(n / max) * 100}%`;
+    const hasPartnership = rows.some(r => r.partnership > 0);
+
+    return (
+        <div className="w-full">
+            <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+                <span className="flex items-center gap-1.5 text-tv-paper">
+                    <span className="inline-block h-2.5 w-3.5 bg-tv-blue" aria-hidden />
+                    Aktywne
+                </span>
+                <span className="flex items-center gap-1.5 text-tv-paper">
+                    <span className="inline-block h-2.5 w-3.5 bg-tv-yellow" aria-hidden />
+                    Zawieszone
+                </span>
+                {hasPartnership && (
+                    <span className="flex items-center gap-1.5 text-tv-paper">
+                        <span className="inline-block h-2.5 w-3.5 bg-tv-muted" aria-hidden />
+                        Tylko w spółce cywilnej
+                    </span>
+                )}
+            </div>
+            <ul className="space-y-1.5">
+                {rows.map(r => (
+                    <li
+                        key={r.name}
+                        className="grid grid-cols-[minmax(0,7.5rem)_1fr_auto] items-center gap-2.5 sm:grid-cols-[10rem_1fr_auto]"
+                        aria-label={`${r.name}: ${r.active} aktywnych, ${r.suspended} zawieszonych${r.partnership ? `, ${r.partnership} tylko w spółce cywilnej` : ''}`}
+                    >
+                        <span className="truncate text-[14px] text-tv-paper" aria-hidden>{r.name}</span>
+                        <span className="flex h-3.5 w-full" aria-hidden>
+                            {r.active > 0 && <span className="block h-full bg-tv-blue" style={{ width: pct(r.active) }} />}
+                            {r.suspended > 0 && <span className="block h-full bg-tv-yellow" style={{ width: pct(r.suspended) }} />}
+                            {r.partnership > 0 && <span className="block h-full bg-tv-muted" style={{ width: pct(r.partnership) }} />}
+                        </span>
+                        <span className="tabular whitespace-nowrap text-right text-[14px] font-bold text-white" aria-hidden>
+                            {r.active}
+                            <span className="font-normal text-tv-muted"> · </span>
+                            <span className="text-tv-yellow">{r.suspended}</span>
+                            {r.partnership > 0 && <span className="font-normal text-tv-muted"> · {r.partnership}</span>}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+/** Data synchronizacji z CEIDG po polsku („8 listopada 2026"). API zwraca naiwny UTC. */
+const syncDateLabel = (iso?: string | null): string | null => {
+    if (!iso) return null;
+    const d = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Warsaw' });
 };
 
 // ==================== Karta wizytówki (katalog) ====================
@@ -843,7 +919,7 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                         ? (catalog.length > 2
                             ? 'Sprawdzone lokalne firmy z Gminy Rybno — z kontaktem i godzinami otwarcia'
                             : 'Katalog firm z Gminy Rybno właśnie startuje — przejmij wizytówkę swojej firmy za darmo')
-                        : 'Rejestr CEIDG: statystyki, sołectwa, branże i trendy rejestracji firm'}
+                        : 'Rejestr CEIDG: firmy wg miejscowości, branże i rok założenia'}
                 />
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <div role="group" aria-label="Widok" className="flex gap-1.5">
@@ -981,24 +1057,41 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                 <StatPlate tag="Miejscowości" tone="seam" value={localities.length} />
             </div>
 
-            {/* Year chart */}
+            {/* Firmy wg miejscowości — stan na dziś */}
+            {localities.length > 0 && (
+                <section aria-label="Firmy wg miejscowości">
+                    <Tag as="h2">Firmy wg miejscowości</Tag>
+                    <div className="border-t-2 border-tv-blue bg-tv-panel p-4 lg:p-5">
+                        <p className="mb-3 text-[14px] text-tv-muted">
+                            Stan z rejestru CEIDG{syncDateLabel(stats?.last_sync) ? ` na ${syncDateLabel(stats?.last_sync)}` : ''}.
+                            Jednoosobowe działalności gospodarcze — spółek (KRS) rejestr nie obejmuje.
+                            Miejscowość z adresu działalności.
+                        </p>
+                        <LocalityBarChart data={localities} />
+                    </div>
+                </section>
+            )}
+
+            {/* Year chart — rok ROZPOCZĘCIA firm istniejących dziś (nie trend) */}
             {analytics && Object.keys(analytics.by_year).length > 0 && (
-                <section aria-label="Firmy w rejestrze wg roku założenia">
-                    <Tag as="h2">Firmy w rejestrze wg roku założenia</Tag>
+                <section aria-label="Rok rozpoczęcia działalności firm istniejących dziś">
+                    <Tag as="h2">Rok rozpoczęcia działalności</Tag>
                     <div className="border-t-2 border-tv-blue bg-tv-panel p-4 lg:p-5">
                         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                             <div>
                                 <p className="text-[14px] text-tv-muted">
-                                    Wpisy istniejące dziś (bez wykreślonych) — kliknij słupek, aby przefiltrować karty
+                                    Firmy, które są dziś w rejestrze, wg roku założenia. Firmy zamknięte nie są
+                                    ujęte, a żółty oznacza firmy zawieszone obecnie — nie zawieszenia w danym roku.
+                                    Kliknij słupek, aby zobaczyć aktywne firmy z tego roku.
                                 </p>
                                 <div className="mt-2 flex gap-4 text-[13px]">
                                     <span className="flex items-center gap-1.5 text-tv-paper">
                                         <span className="inline-block h-2.5 w-3.5 bg-tv-blue" aria-hidden />
-                                        W rejestrze
+                                        W rejestrze dziś
                                     </span>
                                     <span className="flex items-center gap-1.5 text-tv-paper">
                                         <span className="inline-block h-2.5 w-3.5 bg-tv-yellow" aria-hidden />
-                                        Zawieszone
+                                        W tym zawieszone obecnie
                                     </span>
                                 </div>
                             </div>
@@ -1012,11 +1105,11 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                                         </p>
                                         <p className="tabular mt-1 text-[15px] font-bold text-white">
                                             {analytics.by_year[String(selectedYear)] ?? 0}
-                                            <span className="ml-1 text-[13px] font-normal text-tv-muted">zarejestrowanych</span>
+                                            <span className="ml-1 text-[13px] font-normal text-tv-muted">w rejestrze dziś</span>
                                         </p>
                                         <p className="tabular text-[15px] font-bold text-tv-yellow">
                                             {(analytics.by_year_suspended ?? {})[String(selectedYear)] ?? 0}
-                                            <span className="ml-1 text-[13px] font-normal text-tv-muted">zawieszonych</span>
+                                            <span className="ml-1 text-[13px] font-normal text-tv-muted">w tym zawieszone</span>
                                         </p>
                                     </div>
                                     <button
@@ -1100,7 +1193,9 @@ const BusinessPage: React.FC<BusinessPageProps> = ({ onNavigate }) => {
                             <Chip active={selectedLocality === null} onClick={() => handleLocalitySelect(null)}>
                                 Wszystkie
                             </Chip>
-                            {localities.map(loc => (
+                            {/* Tylko z aktywną firmą — lista kart pokazuje aktywne,
+                                więc przycisk „0” prowadziłby do pustej strony */}
+                            {localities.filter(loc => loc.count > 0).map(loc => (
                                 <Chip
                                     key={loc.name}
                                     active={selectedLocality === loc.name}

@@ -604,17 +604,44 @@ async def get_sync_stats():
 @router.get("/localities", response_model=List[dict])
 async def get_localities():
     """
-    Pobierz listę miejscowości z liczbą firm
+    Miejscowości z liczbą firm wg statusu CEIDG.
+
+    `count` = aktywne — tyle kart pokaże lista po kliknięciu filtra (`/list`
+    ma domyślnie `status=AKTYWNY`), więc liczba na przycisku zgadza się z kartami.
+    `active` / `suspended` / `partnership_only` zasilają wykres miejscowości;
+    ich suma po wszystkich miejscowościach = kafel „Firmy w rejestrze".
+    Nazwa to miejscowość z adresu działalności w CEIDG, nie sołectwo.
     """
     async with async_session() as session:
         query = apply_public_visibility(
-            select(CEIDGBusiness.miasto, func.count(CEIDGBusiness.id))
+            select(CEIDGBusiness.miasto, CEIDGBusiness.status, func.count(CEIDGBusiness.id))
             .where(CEIDGBusiness.powiat == "działdowski")
-            .where(CEIDGBusiness.status == "AKTYWNY")
-        ).group_by(CEIDGBusiness.miasto).order_by(func.count(CEIDGBusiness.id).desc())
+        ).group_by(CEIDGBusiness.miasto, CEIDGBusiness.status)
         result = await session.execute(query)
-        localities = [{"name": row[0], "count": row[1]} for row in result.all()]
-        return localities
+
+        by_name: dict = {}
+        for miasto, status, n in result.all():
+            row = by_name.setdefault(
+                miasto, {"name": miasto, "count": 0, "active": 0, "suspended": 0, "partnership_only": 0}
+            )
+            if status == "AKTYWNY":
+                row["active"] += n
+            elif status == "ZAWIESZONY":
+                row["suspended"] += n
+            elif status == "WYLACZNIE_W_FORMIE_SPOLKI":
+                row["partnership_only"] += n
+            # Inne statusy (słownik CEIDG jest otwarty) nie trafiają na wykres
+            # ani do licznika — tak samo jak w kaflach liczonych z `by_status`.
+        for row in by_name.values():
+            row["count"] = row["active"]
+
+        # Także miejscowości bez aktywnej firmy (np. sama zawieszona) — wykres
+        # ma pokryć cały rejestr. Przyciski filtrów na froncie biorą tylko
+        # `count > 0`, bo lista kart pokazuje aktywne.
+        return sorted(
+            (r for r in by_name.values() if r["active"] > 0 or r["suspended"] > 0 or r["partnership_only"] > 0),
+            key=lambda r: (-r["active"], -r["suspended"], r["name"]),
+        )
 
 
 @router.post("/sync")
