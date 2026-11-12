@@ -447,7 +447,8 @@ def start_scheduler():
     )
 
     # Wiedza stała z BIP — co niedzielę 4:00, ale za każdym razem ĆWIERĆ działów
-    # (`bip_knowledge.sections_for_week`) i tylko to, co nowe albo zmienione.
+    # (`bip_knowledge.sections_for_week`) i wyłącznie NOWE dokumenty — tych z bazy
+    # nie pobieramy ponownie (ani stron, ani PDF-ów).
     # Do 12.11.2026 cała wiedza szła jedną serią w pierwszą niedzielę miesiąca
     # (razem z pełnym skanem aktów ~425 żądań) — po niej przyszła trzecia blokada
     # BIP. Typowy przebieg dziś: 4–5 stron działów.
@@ -464,8 +465,8 @@ def start_scheduler():
     # powodu, żeby robiły to jednocześnie. Tygodniowo wystarcza: sesja Rady jest
     # raz w miesiącu, a akt prawny raz podjęty nie zmienia treści — przebieg
     # dokłada nowe pozycje i odświeża STATUS (uchylona/zmieniona).
-    # Przyrostowo (kilka stron listy) + co tydzień 8 stron do odświeżenia statusów
-    # (`legal_acts.status_slice`) zamiast pełnego skanu raz w miesiącu (12.11.2026).
+    # Wyłącznie przyrostowo: 2–3 strony listy + szczegóły NOWYCH aktów. Pełny skan
+    # statusów raz w miesiącu usunięty 12.11.2026 — znanych aktów nie pobieramy.
     # 5:30, nie 5:00: limit godzinowy w `polite` jest kroczący, przebieg wiedzy
     # stałej z 4:00 musi z niego wypaść.
     scheduler.add_job(

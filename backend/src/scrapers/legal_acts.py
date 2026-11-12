@@ -95,18 +95,10 @@ EMPTY_PAGES_TO_STOP = 2
 # żeby znaleźć 2–4 nowe akty.
 KNOWN_PAGES_TO_STOP = 2
 
-# Odświeżanie STATUSU starszych aktów (uchylona/zmieniona). Do 12.11.2026 pełny
-# skan listy (~45 stron) szedł jedną serią w pierwszą niedzielę miesiąca, razem
-# z wiedzą stałą — ok. 425 żądań w dwie godziny. Teraz co tydzień kawałek:
-# `STATUS_SLICE_PAGES` stron, cała lista w `STATUS_CYCLE_WEEKS` tygodni.
-STATUS_SLICE_PAGES = 8
-STATUS_CYCLE_WEEKS = 6
-
-
-def status_slice(iso_week: int) -> range:
-    """Strony listy do odświeżenia statusów w danym tygodniu (1-8, 9-16, …, 41-48)."""
-    start = 1 + (iso_week % STATUS_CYCLE_WEEKS) * STATUS_SLICE_PAGES
-    return range(start, start + STATUS_SLICE_PAGES)
+# Statusów znanych aktów (uchylona/zmieniona) NIE odświeżamy przeglądem listy
+# (decyzja 12.11.2026, trzecia blokada BIP): pełny skan ~45 stron raz w miesiącu
+# był częścią serii ~425 żądań z 1.11. Rejestr rośnie wyłącznie o nowe akty;
+# uchylenie widać w treści NOWEJ uchwały uchylającej, która wchodzi jak każda.
 
 # Ile znaków treści zapisujemy. Uchwała budżetowa z załącznikami tabelarycznymi
 # potrafi mieć kilkadziesiąt stron; chunker i tak potnie to na kawałki.
@@ -193,15 +185,11 @@ class LegalActsScraper:
 
     async def list_acts(
         self, since: date = DEFAULT_SINCE, known_ids: Optional[set] = None,
-        pages: Optional[range] = None, skip_pages: Optional[set] = None,
     ) -> list[dict]:
         """Metadane aktów z listy, od najnowszego do progu `since`.
 
         Z `known_ids` przebieg jest przyrostowy: kończy się po
         `KNOWN_PAGES_TO_STOP` stronach, na których wszystkie akty są już znane.
-
-        Z `pages` czyta dokładnie te strony (odświeżanie statusów), pomijając
-        `skip_pages` — już pobrane w tym przebiegu.
 
         Nie wchodzi na strony szczegółowe i nie pobiera PDF-ów — to osobny,
         drogi krok, który robimy tylko dla aktów jeszcze nieznanych bazie.
@@ -211,12 +199,7 @@ class LegalActsScraper:
         empty_pages = 0
         known_pages = 0
         failed_pages = 0
-        self.fetched_pages = getattr(self, "fetched_pages", set())
-
-        for page in (pages if pages is not None else range(1, MAX_PAGES + 1)):
-            if skip_pages and page in skip_pages:
-                continue
-            self.fetched_pages.add(page)
+        for page in range(1, MAX_PAGES + 1):
             resp = await self._get(self._list_url(page))
             if resp is None:
                 # Pojedyncza strona potrafi nie odpowiedzieć; przerwanie całego
@@ -264,7 +247,7 @@ class LegalActsScraper:
             if empty_pages >= EMPTY_PAGES_TO_STOP:
                 logger.info(f"Koniec zakresu — {empty_pages} strony pod rząd bez trafień")
                 break
-            if pages is None and known_ids is not None:
+            if known_ids is not None:
                 unknown = sum(1 for r in rows if r["bip_id"] not in known_ids)
                 known_pages = 0 if unknown else known_pages + 1
                 if known_pages >= KNOWN_PAGES_TO_STOP:

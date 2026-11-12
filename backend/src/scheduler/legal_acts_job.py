@@ -32,7 +32,7 @@ from src.ai.embeddings import embedding_service
 from src.config import settings
 from src.database.schema import LegalAct
 from src.scrapers.legal_acts import (
-    DEFAULT_SINCE, LegalActsScraper, ScraperBlocked, content_hash, status_slice,
+    DEFAULT_SINCE, LegalActsScraper, ScraperBlocked, content_hash,
 )
 from src.scrapers.polite import HostHeld
 from src.utils.cost_tracker import log_api_cost
@@ -173,18 +173,13 @@ async def run_legal_acts_async(
     since: date = DEFAULT_SINCE, dry: bool = False, full: bool = False,
     now: Optional[datetime] = None,
 ) -> dict:
-    """Przebieg: przyrostowo nowe akty + wycinek listy do odświeżenia statusów.
+    """Przebieg przyrostowy: tylko NOWE akty (2–3 strony listy + szczegóły nowych).
 
-    `full=True` (tylko ręcznie, `run_legal_acts --full`): cała lista naraz —
-    ~45 żądań; NIE w schedulerze (12.11.2026, trzecia blokada BIP).
+    Znanych aktów nie pobieramy ponownie i nie odświeżamy ich statusów
+    (12.11.2026). `full=True` — wyłącznie ręcznie, cała lista (~45 żądań).
     """
     started = datetime.utcnow()
-    week = (now or started).isocalendar()[1]
-    slice_pages = status_slice(week)
-    logger.info(
-        f"=== Akty prawne START (od {since}, "
-        f"{'pełny' if full else f'przyrostowy + statusy ze stron {slice_pages.start}–{slice_pages.stop - 1}'}) ==="
-    )
+    logger.info(f"=== Akty prawne START (od {since}, {'pełny' if full else 'przyrostowy'}) ===")
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
     factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -195,14 +190,6 @@ async def run_legal_acts_async(
         async with LegalActsScraper() as scraper:
             try:
                 listed = await scraper.list_acts(since=since, known_ids=None if full else known)
-                if not full:
-                    seen = {a["bip_id"] for a in listed}
-                    for act in await scraper.list_acts(
-                        since=since, known_ids=known, pages=slice_pages,
-                        skip_pages=set(scraper.fetched_pages),
-                    ):
-                        if act["bip_id"] not in seen:
-                            listed.append(act)
             except ScraperBlocked as e:
                 await engine.dispose()
                 if isinstance(e.__cause__, HostHeld):
@@ -240,7 +227,8 @@ async def run_legal_acts_async(
                 if "pdf_url" in act:
                     detailed.append(act)
 
-            # Znane akty wchodzą do `_store` bez treści — odświeżamy im status.
+            # Znane akty z listy przy okazji odświeżają status (strona listy i tak
+            # była pobrana) — bez żadnego dodatkowego żądania.
             stats = await _store(session, detailed + [a for a in listed if a["bip_id"] in known])
 
         embedded = await _embed(session)

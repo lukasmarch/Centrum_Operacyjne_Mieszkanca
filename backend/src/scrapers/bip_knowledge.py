@@ -25,22 +25,21 @@ Struktura BIP (SYSTEMDOBIP.PL): dział `/{id}/Nazwa/` zawiera listę artykułów
 
 **Wolumen (12.11.2026, trzecia blokada BIP).** Do tej daty przebieg pobierał
 WSZYSTKO naraz w pierwszą niedzielę miesiąca: każdy dział (dwa razy — strona
-działu szła raz po listę, raz jako dokument), każdy dokument i każdy PDF,
-choć treść zmienia się kilka razy w roku. Teraz:
+działu szła raz po listę, raz jako dokument), każdy dokument i każdy PDF.
+Decyzja Łukasza 12.11: **bazę wiedzy BUDUJEMY NA BIEŻĄCO, nie pozyskujemy od
+nowa.** Dokument, który jest w `bip_documents`, NIE jest pobierany ponownie —
+ani strona, ani PDF. Przebieg:
   - działy rozłożone na `SECTION_GROUPS` niedziel (`sections_for_week`),
-  - strona działu pobierana RAZ,
-  - znany dokument odświeżany najwcześniej po `REFRESH_DAYS`, najwyżej
-    `MAX_REFRESH_PER_RUN` w przebiegu,
-  - PDF-y tylko dla nowego dokumentu albo gdy strona dokumentu się zmieniła
-    (`page_hash` = treść strony + lista załączników),
+  - strona działu pobierana RAZ (to lista — tylko z niej widać nowe dokumenty),
+  - strona i PDF-y wyłącznie dla dokumentów, których jeszcze nie mamy,
   - twardy sufit `MAX_REQUESTS_PER_RUN`; reszta czeka na kolejny przebieg.
 """
 import hashlib
 import io
 import logging
 import re
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional, Set
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -96,19 +95,12 @@ MIN_CONTENT_CHARS = 150
 
 # Rozłożenie ruchu (patrz docstring modułu).
 SECTION_GROUPS = 4            # dział odwiedzany co 4 tygodnie
-REFRESH_DAYS = 180            # znany dokument: ponowne pobranie strony najwcześniej po pół roku
-MAX_REFRESH_PER_RUN = 15
 MAX_REQUESTS_PER_RUN = 50
 
 
 def sections_for_week(sections, iso_week: int):
     """Działy na dany tydzień: co `SECTION_GROUPS`-ty, przesunięty o numer tygodnia."""
     return tuple(s for i, s in enumerate(sections) if i % SECTION_GROUPS == iso_week % SECTION_GROUPS)
-
-
-def page_hash(content: str, pdf_urls: List[str]) -> str:
-    """Odcisk STRONY dokumentu (bez PDF-ów): zmiana treści albo listy załączników."""
-    return hashlib.sha256((content + "\n" + "\n".join(pdf_urls)).encode("utf-8")).hexdigest()
 
 
 class RunBudgetSpent(Exception):
@@ -134,10 +126,10 @@ class BipKnowledgeScraper:
     def __init__(
         self,
         config: Optional[Dict] = None,
-        known: Optional[Dict[str, Tuple[Optional[str], Optional[datetime]]]] = None,
+        known: Optional[Set[str]] = None,
         now: Optional[datetime] = None,
     ):
-        """`known`: url → (page_hash, last_checked_at) z `bip_documents`.
+        """`known`: adresy dokumentów z `bip_documents` — tych NIE pobieramy.
         Bez `known` każdy dokument jest „nowy” (tryb ręczny / --dry)."""
         config = config or {}
         sections = config.get("sections")
@@ -148,10 +140,9 @@ class BipKnowledgeScraper:
             self.sections = DEFAULT_SECTIONS
         else:
             self.sections = sections_for_week(DEFAULT_SECTIONS, self.now.isocalendar()[1])
-        self.known = known or {}
+        self.known = set(known or ())
         self.max_requests = config.get("max_requests", MAX_REQUESTS_PER_RUN)
         self.requests = 0
-        self.refreshed = 0
         self.download_pdfs = config.get("download_pdfs", True)
         self.max_docs_per_section = config.get("max_docs_per_section", MAX_DOCS_PER_SECTION)
         self.timeout = config.get("timeout", 45)
@@ -311,25 +302,15 @@ class BipKnowledgeScraper:
     async def scrape_document(
         self, url: str, section_id: str, section_name: str, html: Optional[str] = None,
     ) -> Optional[Dict]:
-        """Jeden dokument: treść strony + tekst ze wszystkich załączników.
-
-        Zwraca pełny dokument, `{"url", "page_hash", "unchanged": True}` (strona
-        bez zmian — PDF-ów nie pobieramy) albo None.
-        """
+        """Jeden NOWY dokument: treść strony + tekst ze wszystkich załączników."""
+        if url in self.known:
+            return None  # mamy go — nie pobieramy ponownie ani strony, ani PDF-ów
         if html is None:
             html = await self._fetch(url)
         if not html:
             return None
 
         parsed = self._parse_document(html)
-        current_hash = page_hash(parsed["content"], parsed["pdf_urls"])
-        if url in self.known:
-            stored_hash = self.known[url][0]
-            # Brak odcisku = dokument sprzed 12.11.2026. Zapisujemy odcisk, PDF-ów
-            # nie pobieramy: inaczej pierwszy przebieg ściągnąłby wszystkie naraz.
-            if stored_hash is None or stored_hash == current_hash:
-                return {"url": url, "page_hash": current_hash, "unchanged": True}
-
         parts = [parsed["content"]] if parsed["content"] else []
 
         pdf_count = 0
@@ -354,25 +335,12 @@ class BipKnowledgeScraper:
             "title": (parsed["title"] or section_name)[:500],
             "content": content,
             "content_hash": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-            "page_hash": current_hash,
             "pdf_count": pdf_count,
             "document_date": parsed["document_date"],
         }
 
-    def _due(self, url: str) -> bool:
-        """Czy pobierać stronę dokumentu: nowy zawsze, znany po `REFRESH_DAYS`."""
-        if url not in self.known:
-            return True
-        checked = self.known[url][1]
-        if checked and self.now - checked < timedelta(days=REFRESH_DAYS):
-            return False
-        if self.refreshed >= MAX_REFRESH_PER_RUN:
-            return False
-        self.refreshed += 1
-        return True
-
     async def scrape_section(self, section_id: str, section_name: str) -> List[Dict]:
-        """Dział: własna treść strony działu + jego artykuły (nowe i do odświeżenia)."""
+        """Dział: własna treść strony działu (gdy jej nie mamy) + NOWE artykuły."""
         section_url = f"{BIP_BASE_URL}/{section_id}/"
         html = await self._fetch(section_url)
         if not html:
@@ -387,8 +355,8 @@ class BipKnowledgeScraper:
             documents.append(own)
 
         links = self._section_links(html, section_id)[: self.max_docs_per_section]
-        due = [link for link in links if self._due(link)]
-        logger.info(f"[{section_id}] {section_name}: {len(links)} artykułów, do pobrania {len(due)}")
+        due = [link for link in links if link not in self.known]
+        logger.info(f"[{section_id}] {section_name}: {len(links)} artykułów, nowych {len(due)}")
 
         for link in due:
             doc = await self.scrape_document(link, section_id, section_name)

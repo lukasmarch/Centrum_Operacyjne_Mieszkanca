@@ -6,8 +6,7 @@ Do tej pory `scrapers/polite.py` trzymał stan w pamięci procesu: deploy zerowa
 karencję po odmowie, a logi żądań ginęły z kontenerem — dwa razy nie umieliśmy
 pokazać dostawcy, co wysłaliśmy. Ta migracja daje:
   - `polite_hosts`    — wyłącznik (`hold`), przerwa (`blocked_until`), poziom eskalacji,
-  - `polite_requests` — każde WYSŁANE żądanie (limity + dowód), retencja 90 dni,
-  - `bip_documents.page_hash` — odcisk strony dokumentu; PDF-y tylko przy zmianie.
+  - `polite_requests` — każde WYSŁANE żądanie (limity + dowód), retencja 90 dni.
 
 **Wyłącznik dla bip.gminarybno.pl startuje WŁĄCZONY** — do odpowiedzi E-LINE
 serwer nie wysyła do BIP ani jednego żądania. Zdjęcie:
@@ -55,7 +54,6 @@ STATEMENTS = (
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_polite_requests_host_at ON polite_requests (host, at DESC)",
-    "ALTER TABLE bip_documents ADD COLUMN IF NOT EXISTS page_hash VARCHAR(64)",
     """
     INSERT INTO polite_hosts (host, hold, hold_reason, refusal_level, last_refusal_at, updated_at)
     VALUES ('bip.gminarybno.pl', TRUE,
@@ -68,7 +66,7 @@ STATEMENTS = (
 
 async def migrate():
     print("=" * 60)
-    print("Migration: polite_hosts, polite_requests, bip_documents.page_hash")
+    print("Migration: polite_hosts, polite_requests")
     print("=" * 60)
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
     async with engine.begin() as conn:
@@ -78,7 +76,7 @@ async def migrate():
             "SELECT hold, hold_reason FROM polite_hosts WHERE host = 'bip.gminarybno.pl'"
         ))).first()
     await engine.dispose()
-    print(f"✓ tabele + kolumna; bip.gminarybno.pl hold={row[0]} ({row[1]})")
+    print(f"✓ tabele; bip.gminarybno.pl hold={row[0]} ({row[1]})")
     print("\n✅ Migracja zakończona")
 
 

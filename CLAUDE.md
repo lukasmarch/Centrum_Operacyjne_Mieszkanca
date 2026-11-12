@@ -957,10 +957,12 @@ Logi 6–9.11 przepadły przy deployu — przyczyny nie udowodniono. Pismo: `DES
 - **Wyłącznik startuje WŁĄCZONY** (migracja `add_polite_http_state`). Zdjęcie TYLKO po zgodzie E-LINE:
   `docker exec -w /app centrum-backend-1 python -m scripts.bip_access --release --yes`. Stan bez wysyłania żądania:
   `--status`; wyciąg dla dostawcy: `--log --days 7`. ⚠️ **Nie sprawdzaj BIP ręcznym `curl` z serwera** — ruch poza dziennikiem
-- Wolumen: aktualności = 1 strona listy (bez `?start=`), wpis pobierany RAZ (znany = w bazie, bez względu na wiek);
-  wiedza stała co niedzielę ¼ działów (`sections_for_week`), strona działu raz, PDF tylko gdy zmienił się `page_hash`,
-  znany dokument po 180 dniach, ≤ 50 żądań/przebieg; akty 5:30 = przyrost + 8 stron statusów (`status_slice`, cykl 6 tyg.),
-  ≤ 20 nowych aktów/przebieg. Pełny skan miesięczny USUNIĘTY. Firecrawl dla BIP wyłączony na stałe (inne IP, poza limitami)
+- **Zasada (decyzja Łukasza 12.11): bazę BIP budujemy NA BIEŻĄCO, nie pozyskujemy od nowa.** Co jest w bazie
+  (wpis `/112/`, dokument `bip_documents`, akt `legal_acts`), tego NIE pobieramy ponownie — ani strony, ani PDF-a.
+  Pobieramy wyłącznie strony LIST (z nich widać nowe pozycje) i to, czego jeszcze nie mamy
+- Aktualności = 1 strona listy (bez `?start=`); wiedza stała co niedzielę ¼ działów (`sections_for_week`), strona
+  działu raz, ≤ 50 żądań/przebieg; akty 5:30 = 2–3 strony listy + szczegóły nowych (≤ 20/przebieg). Pełny skan
+  miesięczny i przegląd statusów USUNIĘTE. Firecrawl dla BIP wyłączony na stałe (inne IP, poza limitami)
 - Typowo: dzień 2–5 żądań, niedziela 15–20 (po sesji do ~55). Test: `test_polite_http` (CI, 50 sprawdzeń)
 
 ## Stan źródeł: próba ≠ sukces (2026-10-11)

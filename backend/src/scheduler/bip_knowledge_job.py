@@ -1,6 +1,10 @@
 """
 Job wiedzy stałej z BIP — co niedzielę 4:00, ćwierć działów na raz (od 12.11.2026)
 
+Od 12.11.2026 przebieg DOPISUJE nowe dokumenty; tych, które są w bazie, nie
+pobiera ponownie (ani stron, ani PDF-ów). Opis niżej o `content_hash` dotyczy
+już tylko ręcznego przebiegu bez listy znanych.
+
 Statut, procedury, podatki i programy środowiskowe zmieniają się kilka razy
 w roku, więc przebieg tygodniowy w martwej godzinie w zupełności wystarcza.
 Zadanie robi dwie rzeczy pod rząd, bo jedno bez drugiego jest bezużyteczne:
@@ -33,28 +37,17 @@ logger = setup_logger("BipKnowledgeJob")
 SOURCE_TYPE = "bip_static"
 
 
-async def _known_documents(session: AsyncSession) -> dict:
-    """url → (page_hash, last_checked_at). `page_hash` czytany surowym SQL-em:
-    kolumna z migracji `add_polite_http_state`, modelu nie ruszamy."""
-    rows = await session.execute(text("SELECT url, page_hash, last_checked_at FROM bip_documents"))
-    return {r[0]: (r[1], r[2]) for r in rows.all()}
+async def _known_documents(session: AsyncSession) -> set:
+    """Adresy dokumentów, które mamy — scraper ich NIE pobiera ponownie (12.11.2026)."""
+    rows = await session.execute(select(BipDocument.url))
+    return set(rows.scalars().all())
 
 
 async def _store_documents(session: AsyncSession, documents: list[dict]) -> dict:
     """Zapisuje dokumenty; oznacza do ponownego osadzenia tylko te zmienione."""
     stats = {"nowe": 0, "zmienione": 0, "bez_zmian": 0}
-    hashes = {d["url"]: d["page_hash"] for d in documents if d.get("page_hash")}
 
     for doc in documents:
-        if doc.get("unchanged"):
-            # Strona bez zmian — PDF-ów nie pobieraliśmy, treść zostaje.
-            await session.execute(
-                text("UPDATE bip_documents SET last_checked_at = :now WHERE url = :url"),
-                {"now": datetime.utcnow(), "url": doc["url"]},
-            )
-            stats["bez_zmian"] += 1
-            continue
-        doc = {k: v for k, v in doc.items() if k != "page_hash"}
 
         existing = (await session.execute(
             select(BipDocument).where(BipDocument.url == doc["url"])
@@ -80,11 +73,6 @@ async def _store_documents(session: AsyncSession, documents: list[dict]) -> dict
             stats["zmienione"] += 1
         session.add(existing)
 
-    await session.flush()
-    for url, h in hashes.items():
-        await session.execute(
-            text("UPDATE bip_documents SET page_hash = :h WHERE url = :url"), {"h": h, "url": url},
-        )
     await session.commit()
     return stats
 

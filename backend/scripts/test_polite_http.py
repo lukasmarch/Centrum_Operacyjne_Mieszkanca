@@ -11,8 +11,8 @@ Bez sieci (httpx.MockTransport) i bez bazy (`polite.MemoryStore`) — idzie do C
   6. limity godzinowy i dobowy,
   7. alarm odróżnia brak odpowiedzi od odmowy (6.11.2026 brzmiały tak samo),
   8. aktualności: znany wpis nie jest pobierany ponownie, stary — raz, bez paginacji,
-  9. wiedza stała: strona działu raz, PDF-y tylko przy zmianie strony,
- 10. akty prawne: wycinek statusów zamiast pełnego skanu.
+  9. wiedza stała: strona działu raz, dokumentów z bazy NIE pobieramy ponownie,
+ 10. akty prawne: tylko nowe, bez przeglądu statusów.
 
     cd backend && python -m scripts.test_polite_http
 """
@@ -426,12 +426,7 @@ async def section_knowledge() -> None:
         return httpx.Response(200, text=doc)
 
     now = datetime(2026, 11, 15, 4, 0)
-    known_hash = bk.page_hash(bk.BipKnowledgeScraper()._parse_document(section)["content"],
-                              bk.BipKnowledgeScraper()._parse_document(section)["pdf_urls"])
-    known = {
-        "https://bip.gminarybno.pl/125/": (known_hash, now - timedelta(days=30)),
-        "https://bip.gminarybno.pl/125/7/Zalacznik/": (None, now - timedelta(days=10)),
-    }
+    known = {"https://bip.gminarybno.pl/125/", "https://bip.gminarybno.pl/125/7/Zalacznik/"}
 
     class Fake(bk.BipKnowledgeScraper):
         async def __aenter__(self):
@@ -442,11 +437,10 @@ async def section_knowledge() -> None:
         scraper = Fake({"sections": [{"id": "125", "name": "Statut Gminy"}]}, known=known, now=now)
         docs = await scraper.scrape_all()
         check("strona działu pobrana RAZ", hits.get("/125/") == 1, hits)
-        check("znany, świeżo sprawdzony dokument NIE pobierany", "/125/7/Zalacznik/" not in hits, hits)
-        check("nowy dokument pobrany", hits.get("/125/8/Inny/") == 1, hits)
-        check("strona działu bez zmian → bez PDF-u działu", "/system/pobierz.php?plik=statut.pdf" not in hits, hits)
-        own = next((d for d in docs if d["url"].endswith("/125/")), {})
-        check("dział bez zmian zgłoszony jako unchanged", own.get("unchanged") is True, own)
+        check("dokument z bazy NIE pobierany ponownie", "/125/7/Zalacznik/" not in hits, hits)
+        check("nowy dokument pobrany (strona + PDF)", hits.get("/125/8/Inny/") == 1, hits)
+        check("PDF znanej treści działu NIE pobierany", "/system/pobierz.php?plik=statut.pdf" not in hits, hits)
+        check("znana treść działu nie wraca do zapisu", not any(d["url"].endswith("/125/") for d in docs), docs)
         check("licznik żądań przebiegu", scraper.requests == len([k for k in hits]) or scraper.requests == sum(hits.values()),
               (scraper.requests, hits))
         weeks = {w: [s[0] for s in bk.sections_for_week(bk.DEFAULT_SECTIONS, w)] for w in range(4)}
@@ -460,12 +454,14 @@ async def section_knowledge() -> None:
 
 
 def section_legal() -> None:
-    print("\n🔟  Akty prawne: wycinek statusów")
-    from src.scrapers.legal_acts import STATUS_CYCLE_WEEKS, STATUS_SLICE_PAGES, status_slice
+    print("\n🔟  Akty prawne: tylko nowe")
+    import inspect
 
-    pages = sorted(p for w in range(STATUS_CYCLE_WEEKS) for p in status_slice(w))
-    check("cykl obejmuje strony 1–48 bez dziur", pages == list(range(1, 49)), pages[:3])
-    check("tygodniowo najwyżej 8 stron statusów", STATUS_SLICE_PAGES <= 8)
+    from src.scheduler import legal_acts_job
+
+    src = inspect.getsource(legal_acts_job.run_legal_acts_async)
+    check("job nie ma przeglądu statusów (tylko przyrost)", "status_slice" not in src and "pages=" not in src)
+    check("limit nowych aktów na przebieg ≤ 20", legal_acts_job.MAX_NEW_ACTS_PER_RUN <= 20)
 
 
 async def main() -> None:
