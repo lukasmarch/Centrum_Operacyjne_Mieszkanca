@@ -446,29 +446,31 @@ def start_scheduler():
         replace_existing=True
     )
 
-    # Wiedza stała z BIP — PIERWSZA niedziela miesiąca, 4:00 (statut, procedury,
-    # podatki, programy). Do 25.10.2026 co tydzień, czyli ~150 żądań do BIP co
-    # niedzielę dla dokumentów, które zmieniają się kilka razy w roku — dostawca
-    # BIP prosi o oszczędny ruch. W APSchedulerze `day` i `day_of_week` łączą się
-    # warunkiem I (inaczej niż w crontabie), więc to dokładnie pierwsza niedziela.
+    # Wiedza stała z BIP — co niedzielę 4:00, ale za każdym razem ĆWIERĆ działów
+    # (`bip_knowledge.sections_for_week`) i tylko to, co nowe albo zmienione.
+    # Do 12.11.2026 cała wiedza szła jedną serią w pierwszą niedzielę miesiąca
+    # (razem z pełnym skanem aktów ~425 żądań) — po niej przyszła trzecia blokada
+    # BIP. Typowy przebieg dziś: 4–5 stron działów.
     scheduler.add_job(
         func=run_bip_knowledge_job,
-        trigger=CronTrigger(day='1-7', day_of_week='sun', hour=4, minute=0),
+        trigger=CronTrigger(day_of_week='sun', hour=4, minute=0),
         id='bip_knowledge',
         name='Wiedza stała z BIP (statut, procedury, podatki)',
         replace_existing=True
     )
 
-    # Akty prawne (uchwały Rady, zarządzenia Wójta) — niedziela 5:00.
+    # Akty prawne (uchwały Rady, zarządzenia Wójta) — niedziela 5:30.
     # Godzinę PO wiedzy stałej, bo oba biją w ten sam mały serwer gminy i nie ma
     # powodu, żeby robiły to jednocześnie. Tygodniowo wystarcza: sesja Rady jest
     # raz w miesiącu, a akt prawny raz podjęty nie zmienia treści — przebieg
     # dokłada nowe pozycje i odświeża STATUS (uchylona/zmieniona).
-    # Od 25.10.2026 przebieg tygodniowy jest przyrostowy (kilka stron listy),
-    # pełny skan statusów raz w miesiącu — `legal_acts_job.is_full_scan_day`.
+    # Przyrostowo (kilka stron listy) + co tydzień 8 stron do odświeżenia statusów
+    # (`legal_acts.status_slice`) zamiast pełnego skanu raz w miesiącu (12.11.2026).
+    # 5:30, nie 5:00: limit godzinowy w `polite` jest kroczący, przebieg wiedzy
+    # stałej z 4:00 musi z niego wypaść.
     scheduler.add_job(
         func=run_legal_acts_job,
-        trigger=CronTrigger(day_of_week='sun', hour=5, minute=0),
+        trigger=CronTrigger(day_of_week='sun', hour=5, minute=30),
         id='legal_acts',
         name='Akty prawne z BIP (uchwały Rady, zarządzenia Wójta)',
         replace_existing=True

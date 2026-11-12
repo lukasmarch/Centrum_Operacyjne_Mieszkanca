@@ -22,20 +22,31 @@ retrieval i utopiło odpowiedź w szumie.
 Struktura BIP (SYSTEMDOBIP.PL): dział `/{id}/Nazwa/` zawiera listę artykułów
 `/{id}/{nr}/Slug/`. Część działów ma też własną treść wprost na stronie działu
 (np. /125/ Statut, /147/ Jednostki pomocnicze) — bierzemy jedno i drugie.
+
+**Wolumen (12.11.2026, trzecia blokada BIP).** Do tej daty przebieg pobierał
+WSZYSTKO naraz w pierwszą niedzielę miesiąca: każdy dział (dwa razy — strona
+działu szła raz po listę, raz jako dokument), każdy dokument i każdy PDF,
+choć treść zmienia się kilka razy w roku. Teraz:
+  - działy rozłożone na `SECTION_GROUPS` niedziel (`sections_for_week`),
+  - strona działu pobierana RAZ,
+  - znany dokument odświeżany najwcześniej po `REFRESH_DAYS`, najwyżej
+    `MAX_REFRESH_PER_RUN` w przebiegu,
+  - PDF-y tylko dla nowego dokumentu albo gdy strona dokumentu się zmieniła
+    (`page_hash` = treść strony + lista załączników),
+  - twardy sufit `MAX_REQUESTS_PER_RUN`; reszta czeka na kolejny przebieg.
 """
-import asyncio
 import hashlib
 import io
 import logging
 import re
-from datetime import datetime
-from typing import Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
-from src.scrapers.polite import BIP_HEADERS, HostBlocked, hooks as polite_hooks
+from src.scrapers.polite import BIP_HEADERS, HostBlocked, transport as polite_transport
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BipKnowledgeScraper")
@@ -83,6 +94,26 @@ MAX_DOCS_PER_SECTION = 40
 # kilkanaście; w RAG konkurowałyby o miejsce z treścią, która coś mówi.
 MIN_CONTENT_CHARS = 150
 
+# Rozłożenie ruchu (patrz docstring modułu).
+SECTION_GROUPS = 4            # dział odwiedzany co 4 tygodnie
+REFRESH_DAYS = 180            # znany dokument: ponowne pobranie strony najwcześniej po pół roku
+MAX_REFRESH_PER_RUN = 15
+MAX_REQUESTS_PER_RUN = 50
+
+
+def sections_for_week(sections, iso_week: int):
+    """Działy na dany tydzień: co `SECTION_GROUPS`-ty, przesunięty o numer tygodnia."""
+    return tuple(s for i, s in enumerate(sections) if i % SECTION_GROUPS == iso_week % SECTION_GROUPS)
+
+
+def page_hash(content: str, pdf_urls: List[str]) -> str:
+    """Odcisk STRONY dokumentu (bez PDF-ów): zmiana treści albo listy załączników."""
+    return hashlib.sha256((content + "\n" + "\n".join(pdf_urls)).encode("utf-8")).hexdigest()
+
+
+class RunBudgetSpent(Exception):
+    """Przebieg wykorzystał `MAX_REQUESTS_PER_RUN` — reszta w następnym."""
+
 # Elementy nawigacji SYSTEMDOBIP obecne na każdej podstronie — w treści dokumentu
 # są czystym szumem, a trafiłyby do embeddingu i rozmyły podobieństwo.
 _BOILERPLATE = re.compile(
@@ -100,22 +131,37 @@ class BipKnowledgeScraper:
     """Pobiera stałe działy BIP. Nie dziedziczy po BaseScraper: nie zapisuje
     do `articles` i nie ma nic wspólnego z cyklem newsowym."""
 
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(
+        self,
+        config: Optional[Dict] = None,
+        known: Optional[Dict[str, Tuple[Optional[str], Optional[datetime]]]] = None,
+        now: Optional[datetime] = None,
+    ):
+        """`known`: url → (page_hash, last_checked_at) z `bip_documents`.
+        Bez `known` każdy dokument jest „nowy” (tryb ręczny / --dry)."""
         config = config or {}
         sections = config.get("sections")
-        self.sections: tuple[tuple[str, str], ...] = (
-            tuple((str(s["id"]), s["name"]) for s in sections) if sections else DEFAULT_SECTIONS
-        )
+        self.now = now or datetime.utcnow()
+        if sections:
+            self.sections: tuple[tuple[str, str], ...] = tuple((str(s["id"]), s["name"]) for s in sections)
+        elif config.get("all_sections"):
+            self.sections = DEFAULT_SECTIONS
+        else:
+            self.sections = sections_for_week(DEFAULT_SECTIONS, self.now.isocalendar()[1])
+        self.known = known or {}
+        self.max_requests = config.get("max_requests", MAX_REQUESTS_PER_RUN)
+        self.requests = 0
+        self.refreshed = 0
         self.download_pdfs = config.get("download_pdfs", True)
         self.max_docs_per_section = config.get("max_docs_per_section", MAX_DOCS_PER_SECTION)
         self.timeout = config.get("timeout", 45)
-        self.delay = config.get("delay", 0.4)
+        self.blocked: Optional[HostBlocked] = None
         self.client: Optional[httpx.AsyncClient] = None
 
     async def __aenter__(self):
         self.client = httpx.AsyncClient(
             headers=BIP_HEADERS, timeout=self.timeout, follow_redirects=True,
-            event_hooks=polite_hooks(),
+            transport=polite_transport(),
         )
         return self
 
@@ -125,30 +171,33 @@ class BipKnowledgeScraper:
 
     # ==================== Pobieranie ====================
 
-    async def _fetch(self, url: str, attempts: int = 3) -> Optional[str]:
-        """Pobiera stronę, ponawiając przy błędzie.
+    def _spend(self) -> None:
+        if self.requests >= self.max_requests:
+            raise RunBudgetSpent(f"wykorzystano {self.requests} żądań — reszta w następnym przebiegu")
+        self.requests += 1
 
-        Bez ponawiania jedno nieudane żądanie gubi CAŁY dział po cichu:
-        `scrape_section` dostaje None i zwraca pustą listę, a job melduje sukces.
-        Tak przepadły sołectwa w przebiegu 3.08.2026 — dział, który w izolacji
-        pobiera się bez problemu. BIP przy ~150 żądaniach pod rząd potrafi
-        zerwać połączenie.
+    async def _fetch(self, url: str) -> Optional[str]:
+        """Pobiera stronę. JEDNA próba (12.11.2026).
+
+        Do tej daty były trzy — po zerwaniu połączenia w przebiegu 3.08.2026
+        przepadł dział sołectw. Ale ponawianie przy setkach żądań to dokładnie
+        „nietypowa aktywność” dla zabezpieczeń BIP. Dziś przebieg jest mały,
+        a dział, który się nie pobrał, wraca za `SECTION_GROUPS` tygodni.
+        Brak odpowiedzi zamyka host w `polite` i kończy przebieg.
         """
-        for attempt in range(1, attempts + 1):
-            try:
-                response = await self.client.get(url)
-                response.raise_for_status()
-                return response.text
-            except HostBlocked:
-                # Host odmówił — ponawianie to dokładnie to, o co prosił dostawca
-                # BIP, żebyśmy nie robili. Przerywamy cały przebieg.
-                raise
-            except Exception as e:
-                if attempt == attempts:
-                    logger.warning(f"Nie udało się pobrać {url} ({attempts} prób): {e}")
-                    return None
-                await asyncio.sleep(self.delay * 2 * attempt)
-        return None
+        self._spend()
+        try:
+            response = await self.client.get(url)
+            response.raise_for_status()
+            return response.text
+        except HostBlocked:
+            raise
+        except httpx.TransportError as e:
+            # Serwer nie odpowiada — `polite` zamknął host; nie męczymy go dalej.
+            raise HostBlocked(f"BIP nie odpowiada ({type(e).__name__}) — koniec przebiegu") from e
+        except Exception as e:
+            logger.warning(f"Nie udało się pobrać {url}: {e}")
+            return None
 
     def _section_links(self, html: str, section_id: str) -> List[str]:
         """Linki do artykułów w obrębie działu: /{section_id}/{nr}/{slug}/."""
@@ -227,6 +276,7 @@ class BipKnowledgeScraper:
     async def _extract_pdf(self, pdf_url: str) -> Optional[str]:
         """Tekst z PDF-a przez pdfplumber. Skany bez warstwy tekstowej zwracają
         pustkę — nie robimy OCR, bo to osobny koszt i osobna decyzja."""
+        self._spend()
         try:
             import pdfplumber
 
@@ -243,6 +293,8 @@ class BipKnowledgeScraper:
                 logger.info(f"PDF bez warstwy tekstowej (skan?): {pdf_url}")
                 return None
             return "\n\n".join(parts)
+        except HostBlocked:
+            raise
         except Exception as e:
             logger.warning(f"Błąd odczytu PDF {pdf_url}: {e}")
             return None
@@ -256,20 +308,34 @@ class BipKnowledgeScraper:
             return match.group(1)
         return urlparse(pdf_url).path.rsplit("/", 1)[-1] or "załącznik.pdf"
 
-    async def scrape_document(self, url: str, section_id: str, section_name: str) -> Optional[Dict]:
-        """Jeden dokument: treść strony + tekst ze wszystkich załączników."""
-        html = await self._fetch(url)
+    async def scrape_document(
+        self, url: str, section_id: str, section_name: str, html: Optional[str] = None,
+    ) -> Optional[Dict]:
+        """Jeden dokument: treść strony + tekst ze wszystkich załączników.
+
+        Zwraca pełny dokument, `{"url", "page_hash", "unchanged": True}` (strona
+        bez zmian — PDF-ów nie pobieramy) albo None.
+        """
+        if html is None:
+            html = await self._fetch(url)
         if not html:
             return None
 
         parsed = self._parse_document(html)
+        current_hash = page_hash(parsed["content"], parsed["pdf_urls"])
+        if url in self.known:
+            stored_hash = self.known[url][0]
+            # Brak odcisku = dokument sprzed 12.11.2026. Zapisujemy odcisk, PDF-ów
+            # nie pobieramy: inaczej pierwszy przebieg ściągnąłby wszystkie naraz.
+            if stored_hash is None or stored_hash == current_hash:
+                return {"url": url, "page_hash": current_hash, "unchanged": True}
+
         parts = [parsed["content"]] if parsed["content"] else []
 
         pdf_count = 0
         if self.download_pdfs:
             for pdf_url in parsed["pdf_urls"]:
                 text = await self._extract_pdf(pdf_url)
-                await asyncio.sleep(self.delay)
                 if text:
                     # Załącznik NIE nadpisuje treści strony (tak robi scraper
                     # aktualności i gubi kontekst) — dokłada się do niej.
@@ -288,12 +354,25 @@ class BipKnowledgeScraper:
             "title": (parsed["title"] or section_name)[:500],
             "content": content,
             "content_hash": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            "page_hash": current_hash,
             "pdf_count": pdf_count,
             "document_date": parsed["document_date"],
         }
 
+    def _due(self, url: str) -> bool:
+        """Czy pobierać stronę dokumentu: nowy zawsze, znany po `REFRESH_DAYS`."""
+        if url not in self.known:
+            return True
+        checked = self.known[url][1]
+        if checked and self.now - checked < timedelta(days=REFRESH_DAYS):
+            return False
+        if self.refreshed >= MAX_REFRESH_PER_RUN:
+            return False
+        self.refreshed += 1
+        return True
+
     async def scrape_section(self, section_id: str, section_name: str) -> List[Dict]:
-        """Dział: własna treść strony działu + wszystkie jego artykuły."""
+        """Dział: własna treść strony działu + jego artykuły (nowe i do odświeżenia)."""
         section_url = f"{BIP_BASE_URL}/{section_id}/"
         html = await self._fetch(section_url)
         if not html:
@@ -301,17 +380,17 @@ class BipKnowledgeScraper:
 
         documents: list[Dict] = []
 
-        # Część działów trzyma treść wprost na swojej stronie (Statut, Sołectwa),
-        # inne są samą listą odnośników — sprawdzamy jedno i drugie.
-        own = await self.scrape_document(section_url, section_id, section_name)
+        # Część działów trzyma treść wprost na swojej stronie (Statut, Sołectwa).
+        # Ta sama strona co lista — do 12.11.2026 pobierana drugi raz.
+        own = await self.scrape_document(section_url, section_id, section_name, html=html)
         if own:
             documents.append(own)
 
         links = self._section_links(html, section_id)[: self.max_docs_per_section]
-        logger.info(f"[{section_id}] {section_name}: {len(links)} artykułów")
+        due = [link for link in links if self._due(link)]
+        logger.info(f"[{section_id}] {section_name}: {len(links)} artykułów, do pobrania {len(due)}")
 
-        for link in links:
-            await asyncio.sleep(self.delay)
+        for link in due:
             doc = await self.scrape_document(link, section_id, section_name)
             if doc:
                 documents.append(doc)
@@ -328,9 +407,13 @@ class BipKnowledgeScraper:
                     all_documents.extend(docs)
                     logger.info(f"[{section_id}] {section_name}: zebrano {len(docs)} dokumentów")
                 except HostBlocked as e:
-                    logger.error(f"BIP odmówił dostępu — przerywam przebieg: {e}")
+                    logger.error(f"BIP zamknięty — przerywam przebieg: {e}")
+                    self.blocked = e
+                    break
+                except RunBudgetSpent as e:
+                    logger.warning(f"Limit przebiegu: {e}")
                     break
                 except Exception as e:
                     logger.error(f"Dział {section_id} ({section_name}) nie powiódł się: {e}")
-                await asyncio.sleep(self.delay)
+        logger.info(f"Przebieg wiedzy stałej: {self.requests} żądań do BIP")
         return all_documents

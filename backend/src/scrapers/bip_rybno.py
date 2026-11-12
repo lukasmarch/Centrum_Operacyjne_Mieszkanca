@@ -23,7 +23,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.scrapers.base import BaseScraper
-from src.scrapers.polite import BIP_HEADERS, hooks as polite_hooks
+from src.scrapers.polite import BIP_HEADERS, HostBlocked, transport as polite_transport
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BipRybnoScraper")
@@ -32,13 +32,14 @@ BIP_BASE_URL = "https://bip.gminarybno.pl"
 BIP_NEWS_URL = f"{BIP_BASE_URL}/112/"
 
 # 6.11.2026 BIP odpowiadał po ~35 s, a domyślne 30 s liczyło to jako awarię.
-# Mniej prób niż domyślne 3: wiszący serwer nie zyskuje na ponawianiu, a przebieg
-# stoi w kolejce przed resztą źródeł (przy 60 s × 3 każdy wpis to do 3 minut).
+# JEDNA próba (12.11.2026, trzecia blokada): wiszący serwer nie zyskuje na
+# ponawianiu, a dla jego zabezpieczeń powtórka to „nietypowa aktywność”.
+# Brak odpowiedzi kończy przebieg — `polite` zamyka host na godzinę.
 BIP_TIMEOUT_S = 60
-BIP_MAX_RETRIES = 2
+BIP_MAX_RETRIES = 1
 
 # Wpisy z listy z datą sprzed okna świeżości. Nie trafiają do bazy, więc
-# `_known_stale_ids` ich nie widzi i bez tej pamięci każdy przebieg pobierał je
+# `_known_ids` ich nie widzi i bez tej pamięci każdy przebieg pobierał je
 # od nowa (3772 i 3769: 3 żądania zamiast 1, 2–5.11.2026). Data publikacji się
 # nie zmienia, więc wpis raz za stary zostaje za stary. Restart procesu kosztuje
 # jedno ponowne pobranie — nie ma tu czego utrwalać w bazie.
@@ -53,20 +54,20 @@ class BipRybnoScraper(BaseScraper):
     Config (Source.scraping_config):
         news_url: URL listy aktualności (domyślnie /112/)
         download_pdfs: bool – czy pobierać PDF i wyciągać tekst (domyślnie True)
-        pdf_extraction: "pdfplumber" | "firecrawl" (domyślnie pdfplumber)
-        firecrawl_fallback: bool – fallback do Firecrawl gdy pdfplumber zawiedzie
-        max_pages_per_run: int – maks. stron do pobrania w jednym runie (domyślnie 3)
+        (Firecrawl i paginacja usunięte 12.11.2026 — patrz `scrape_bip`.)
     """
 
     def __init__(self, source_id: int, config: Optional[Dict] = None):
         super().__init__(source_id, config)
         self.timeout = self.config.get("timeout", BIP_TIMEOUT_S)
-        self.max_retries = self.config.get("max_retries", BIP_MAX_RETRIES)
+        self.max_retries = BIP_MAX_RETRIES  # bez nadpisywania z configu źródła
         self.news_url = self.config.get("news_url", BIP_NEWS_URL)
         self.download_pdfs = self.config.get("download_pdfs", True)
-        self.pdf_extraction = self.config.get("pdf_extraction", "pdfplumber")
-        self.firecrawl_fallback = self.config.get("firecrawl_fallback", True)
-        self.max_pages_per_run = self.config.get("max_pages_per_run", 3)
+        self.pdf_extraction = "pdfplumber"  # jedyna droga: przez nasz transport
+        # Firecrawl pobiera plik z WŁASNYCH serwerów: inny adres IP, inny
+        # User-Agent, poza naszym tempem i limitami — dla dostawcy BIP to obcy
+        # bot. Wyłączone na stałe (12.11.2026); skan bez tekstu to skan bez tekstu.
+        self.firecrawl_fallback = False
         self.cutoff_days = self.config.get("cutoff_days", 2)
 
     async def __aenter__(self):
@@ -75,7 +76,7 @@ class BipRybnoScraper(BaseScraper):
             headers=BIP_HEADERS,
             timeout=self.timeout,
             follow_redirects=True,
-            event_hooks=polite_hooks(),
+            transport=polite_transport(),
         )
         return self
 
@@ -198,6 +199,9 @@ class BipRybnoScraper(BaseScraper):
                 "pdf_url": pdf_links[0] if pdf_links else None,
                 "all_pdf_urls": pdf_links,
             }
+        except HostBlocked:
+            # Host zamknięty — kolejne wpisy dostałyby to samo bez sieci; przerwij przebieg.
+            raise
         except Exception as e:
             self.logger.error(f"Error scraping detail {url}: {e}")
             return {"published_at": None, "content": None, "pdf_url": None, "all_pdf_urls": []}
@@ -263,8 +267,14 @@ class BipRybnoScraper(BaseScraper):
 
     # ==================== Main Scraping Loop ====================
 
-    async def _known_stale_ids(self, session, external_ids: List[str], cutoff: datetime) -> set:
-        """external_id wpisów, które mamy w bazie i które wypadają poza okno świeżości."""
+    async def _known_ids(self, session, external_ids: List[str]) -> set:
+        """external_id wpisów z listy, które JUŻ są w bazie — bez względu na wiek.
+
+        Do 12.11.2026 pomijane były tylko wpisy starsze niż okno świeżości, więc
+        wpis z dziś był pobierany (strona + PDF) przy każdym przebiegu przez dwie
+        doby — do 4 razy. Ogłoszenie BIP nie zmienia się po publikacji, a gdyby
+        urząd je poprawił, nowa wersja dostaje zwykle nowy wpis.
+        """
         from sqlalchemy import select
         from src.database.schema import Article
 
@@ -274,118 +284,67 @@ class BipRybnoScraper(BaseScraper):
             select(Article.external_id).where(
                 Article.source_id == self.source_id,
                 Article.external_id.in_(external_ids),
-                Article.published_at < cutoff,
             )
         )
         return {r[0] for r in rows.all()}
 
     async def scrape_bip(self, session) -> List[int]:
         """
-        Główna metoda scraping BIP.
-        Pobiera listingi (max_pages_per_run stron) + opcjonalnie PDF.
+        Jeden przebieg: JEDNA strona listy `/112/` + szczegóły (i PDF) wyłącznie
+        nowych wpisów z okna świeżości.
 
-        Zabezpieczenia:
-        - Detekcja duplikatów między stronami (BIP nie obsługuje ?start=N → ta sama strona)
-        - Filtr daty: artykuły starsze niż 2 dni są pomijane
-        - PDF extraction sterowane flagą download_pdfs w config źródła (DB)
+        Ile żądań: 1 (lista) + 2 na każdy nowy wpis. Typowo 1–3.
+        ⚠️ Bez paginacji: do 12.11.2026 kod po każdym nowym wpisie pytał też
+        o `?start=10`, który BIP ignoruje (zwraca tę samą stronę) — czyste
+        marnotrawstwo żądań. Przy dwóch przebiegach dziennie (6:00, 13:00)
+        dziesięć pozycji listy z naddatkiem pokrywa okno dwóch dni.
         """
-        all_saved_ids = []
-        page_num = 1
-        previous_page_ids: set = set()
         cutoff_date = datetime.utcnow() - timedelta(days=self.cutoff_days)
+        url = self.news_url
 
         async with self:
-            while page_num <= self.max_pages_per_run:
-                # BIP Rybno używa strony głównej /112/ – paginacja przez ?start=N
-                # UWAGA: BIP może nie obsługiwać ?start= → wykrywamy duplikaty
-                if page_num == 1:
-                    url = self.news_url
-                else:
-                    offset = (page_num - 1) * 10
-                    url = f"{self.news_url}?start={offset}"
+            self.logger.info(f"Scraping BIP: {url}")
+            # Błąd strony listy = źródło nie odpowiada; idzie wyżej (audyt F-019:
+            # pusty wynik nie może udawać „brak aktualności”).
+            html = await self.fetch(url)
+            articles = await self.parse(html, url)
+            if not articles:
+                self.logger.info("Lista BIP pusta — nic do zrobienia")
+                return []
 
-                self.logger.info(f"Scraping BIP page {page_num}: {url}")
+            known = await self._known_ids(session, [a["external_id"] for a in articles])
+            fresh_articles = []
+            for article in articles:
+                if article["external_id"] in known or article["external_id"] in _TOO_OLD_IDS:
+                    continue
+                detail = await self.scrape_detail(article["url"])
 
-                try:
-                    html = await self.fetch(url)
-                    articles = await self.parse(html, url)
+                if detail.get("published_at"):
+                    article["published_at"] = detail["published_at"]
 
-                    if not articles:
-                        self.logger.info(f"No articles found on page {page_num} – stopping")
-                        break
-
-                    # Detekcja duplikatów stron: jeśli ta sama strona co poprzednia → stop
-                    current_page_ids = {a["external_id"] for a in articles}
-                    if page_num > 1 and current_page_ids == previous_page_ids:
-                        self.logger.info(
-                            f"Page {page_num} identical to page {page_num - 1} "
-                            f"(BIP pagination ?start=N not supported) – stopping"
-                        )
-                        break
-                    previous_page_ids = current_page_ids
-
-                    # Znane już wpisy starsze niż okno pomijamy BEZ pobierania: i tak
-                    # odpadłyby po filtrze daty (niżej), a każde pobranie to żądanie
-                    # do BIP. Do 25.10.2026 każdy przebieg ściągał szczegóły wszystkich
-                    # ~10 pozycji listy, 2× dziennie, żeby je potem odrzucić.
-                    stale_ids = await self._known_stale_ids(
-                        session, [a["external_id"] for a in articles], cutoff_date
+                # Filtr daty: pomijaj artykuły starsze niż okno świeżości
+                if article.get("published_at") and article["published_at"] < cutoff_date:
+                    self.logger.debug(
+                        f"Skipping old article ({article['published_at'].date()}): {article['title'][:60]}"
                     )
+                    _TOO_OLD_IDS.add(article["external_id"])
+                    continue
 
-                    # Dla każdego artykułu: pobierz szczegóły (data + treść)
-                    fresh_articles = []
-                    for article in articles:
-                        if article["external_id"] in stale_ids or article["external_id"] in _TOO_OLD_IDS:
-                            continue
-                        detail = await self.scrape_detail(article["url"])
+                if detail.get("content"):
+                    article["content"] = detail["content"]
 
-                        # Data publikacji z detail page
-                        if detail.get("published_at"):
-                            article["published_at"] = detail["published_at"]
+                # PDF — pełna treść dokumentu dla RAG (flaga download_pdfs w config źródła)
+                if self.download_pdfs and detail.get("pdf_url"):
+                    pdf_text = await self.extract_pdf_text(detail["pdf_url"])
+                    if pdf_text:
+                        article["content"] = pdf_text
 
-                        # Filtr daty: pomijaj artykuły starsze niż 2 dni
-                        if article.get("published_at") and article["published_at"] < cutoff_date:
-                            self.logger.debug(
-                                f"Skipping old article ({article['published_at'].date()}): {article['title'][:60]}"
-                            )
-                            _TOO_OLD_IDS.add(article["external_id"])
-                            continue
+                fresh_articles.append(article)
 
-                        # Treść z detail page (max 1000 znaków)
-                        if detail.get("content"):
-                            article["content"] = detail["content"]
+            if not fresh_articles:
+                self.logger.info(f"Brak nowych wpisów BIP (znane: {len(known)})")
+                return []
 
-                        # PDF extraction — pełna treść dokumentu dla RAG
-                        # (sterowane flagą download_pdfs w config źródła w DB)
-                        if self.download_pdfs and detail.get("pdf_url"):
-                            pdf_text = await self.extract_pdf_text(detail["pdf_url"])
-                            if pdf_text:
-                                article["content"] = pdf_text
-
-                        fresh_articles.append(article)
-
-                    if not fresh_articles:
-                        self.logger.info(
-                            f"Page {page_num}: all articles older than {cutoff_date.date()} – stopping"
-                        )
-                        break
-
-                    saved_ids = await self.save_to_db(fresh_articles, session)
-                    all_saved_ids.extend(saved_ids)
-                    self.logger.info(f"Page {page_num}: saved {len(saved_ids)} articles ({len(articles) - len(fresh_articles)} skipped as old)")
-
-                    page_num += 1
-                    await asyncio.sleep(1.0)  # delay między stronami
-
-                except Exception as e:
-                    self.logger.error(f"Error scraping BIP page {page_num}: {e}")
-                    # Pierwsza strona to całe źródło: błąd = źródło nie odpowiada.
-                    # Do 11.10.2026 `break` zwracał pustą listę i job zapisywał
-                    # sukces — BIP od lipca odpowiada 403, a w bazie stał jako
-                    # „zeskanowany dziś” (audyt, F-019). Dalsze strony to tylko
-                    # głębokość: częściowy wynik jest wynikiem.
-                    if page_num == 1:
-                        raise
-                    break
-
-        return all_saved_ids
+            saved_ids = await self.save_to_db(fresh_articles, session)
+            self.logger.info(f"BIP: zapisano {len(saved_ids)} nowych wpisów")
+            return saved_ids

@@ -128,10 +128,30 @@ _pelny = asyncio.run(_skan(None))
 check(_pelny == [1, 2, 3, 4, 5, 6, 7], "pełny skan (statusy) przechodzi całą listę",
       f"pobrano strony {_pelny}")
 
-from datetime import datetime as _dt  # noqa: E402
-from src.scheduler.legal_acts_job import is_full_scan_day  # noqa: E402
-check(is_full_scan_day(_dt(2026, 11, 1, 4)), "pierwsza niedziela miesiąca = pełny skan")
-check(not is_full_scan_day(_dt(2026, 11, 8, 4)), "druga niedziela = przyrostowo")
+from src.scrapers.legal_acts import status_slice  # noqa: E402
+check(list(status_slice(0)) == list(range(1, 9)),
+      "statusy co tydzień wycinkiem 8 stron (pełny skan naraz usunięty 12.11.2026)")
+
+
+async def _wycinek():
+    import types
+    from src.scrapers import legal_acts as la
+    pobrane = []
+    scraper = la.LegalActsScraper()
+
+    async def fake_get(url):
+        n = 1 if url.endswith("/akty/14/typ/") else int(url.split("/akty/14/")[1].split("/")[0])
+        pobrane.append(n)
+        return types.SimpleNamespace(text=str(n))
+
+    scraper._get = fake_get
+    scraper._parse_list = lambda text: [{"bip_id": 5000 + int(text), "adopted_at": date(2026, 6, 1)}]
+    await scraper.list_acts(since=date(2024, 1, 1), known_ids=set(), pages=range(1, 6), skip_pages={1, 2})
+    return pobrane
+
+
+_w = asyncio.run(_wycinek())
+check(_w == [3, 4, 5], "wycinek statusów pomija strony pobrane już przyrostowo", f"pobrano {_w}")
 
 
 # ------------------------------------------------------------------ baza

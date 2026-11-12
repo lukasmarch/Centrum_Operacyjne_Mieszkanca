@@ -1,5 +1,5 @@
 """
-Job aktów prawnych — niedziela 5:00 (etap 4, 2026-08-24)
+Job aktów prawnych — niedziela 5:30 (etap 4, 2026-08-24; wolumen 12.11.2026)
 
 Uchwały Rady i zarządzenia Wójta z modułu BIP `/akty/14/`. Godzina po wiedzy
 stałej (4:00), bo oba zadania biją w ten sam mały serwer gminy i nie ma powodu,
@@ -32,10 +32,10 @@ from src.ai.embeddings import embedding_service
 from src.config import settings
 from src.database.schema import LegalAct
 from src.scrapers.legal_acts import (
-    DEFAULT_SINCE, LegalActsScraper, ScraperBlocked, content_hash,
+    DEFAULT_SINCE, LegalActsScraper, ScraperBlocked, content_hash, status_slice,
 )
+from src.scrapers.polite import HostHeld
 from src.utils.cost_tracker import log_api_cost
-from src.services.time_span import to_local
 from src.utils.logger import setup_logger
 
 logger = setup_logger("LegalActsJob")
@@ -163,22 +163,28 @@ async def _embed(session: AsyncSession) -> int:
     return done
 
 
-def is_full_scan_day(now_utc: datetime) -> bool:
-    """Pełny skan listy w pierwszą niedzielę miesiąca, w pozostałe — przyrostowy.
-
-    Pełny skan jest potrzebny tylko po to, żeby odświeżyć STATUS starszych aktów
-    (uchylona/zmieniona). Raz w miesiącu wystarcza: sesja Rady jest raz w miesiącu.
-    """
-    return to_local(now_utc).day <= 7
+# Ile NOWYCH aktów dostaje w jednym przebiegu stronę szczegółów i PDF (2 żądania
+# na akt). Sesja Rady to 10–20 uchwał; reszta czeka tydzień — nie trafia do bazy,
+# więc następny przebieg widzi ją znów jako nową.
+MAX_NEW_ACTS_PER_RUN = 20
 
 
 async def run_legal_acts_async(
-    since: date = DEFAULT_SINCE, dry: bool = False, full: Optional[bool] = None,
+    since: date = DEFAULT_SINCE, dry: bool = False, full: bool = False,
+    now: Optional[datetime] = None,
 ) -> dict:
+    """Przebieg: przyrostowo nowe akty + wycinek listy do odświeżenia statusów.
+
+    `full=True` (tylko ręcznie, `run_legal_acts --full`): cała lista naraz —
+    ~45 żądań; NIE w schedulerze (12.11.2026, trzecia blokada BIP).
+    """
     started = datetime.utcnow()
-    if full is None:
-        full = is_full_scan_day(started)
-    logger.info(f"=== Akty prawne START (od {since}, {'pełny' if full else 'przyrostowy'}) ===")
+    week = (now or started).isocalendar()[1]
+    slice_pages = status_slice(week)
+    logger.info(
+        f"=== Akty prawne START (od {since}, "
+        f"{'pełny' if full else f'przyrostowy + statusy ze stron {slice_pages.start}–{slice_pages.stop - 1}'}) ==="
+    )
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False, future=True)
     factory = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -188,16 +194,25 @@ async def run_legal_acts_async(
 
         async with LegalActsScraper() as scraper:
             try:
-                listed = await scraper.list_acts(
-                    since=since, known_ids=None if full else known,
-                )
+                listed = await scraper.list_acts(since=since, known_ids=None if full else known)
+                if not full:
+                    seen = {a["bip_id"] for a in listed}
+                    for act in await scraper.list_acts(
+                        since=since, known_ids=known, pages=slice_pages,
+                        skip_pages=set(scraper.fetched_pages),
+                    ):
+                        if act["bip_id"] not in seen:
+                            listed.append(act)
             except ScraperBlocked as e:
-                # Log na poziomie ERROR, nie WARNING: „0 nowych aktów" i „BIP
-                # nas nie wpuszcza" to dwie różne wiadomości, a tylko druga
-                # wymaga czyjejś reakcji.
-                logger.error(f"PRZEBIEG PRZERWANY — {e}")
                 await engine.dispose()
-                return {"blad": str(e), "nowe": 0, "embedded": 0}
+                if isinstance(e.__cause__, HostHeld):
+                    # Wyłącznik — stan zamierzony, żadne żądanie nie wyszło.
+                    logger.warning(f"Akty prawne pominięte: {e}")
+                    return {"wstrzymane": str(e), "nowe": 0, "embedded": 0}
+                # „0 nowych aktów” i „BIP nas nie wpuszcza” to dwie różne wiadomości;
+                # wyjątek trafia do job_runs jako `error` i na Telegram.
+                raise RuntimeError(f"PRZEBIEG PRZERWANY — {e}") from e
+
             fresh = [a for a in listed if a["bip_id"] not in known]
             logger.info(
                 f"Na liście {len(listed)} aktów, nowych {len(fresh)}, "
@@ -210,14 +225,23 @@ async def run_legal_acts_async(
                 return {"listed": len(listed), "fresh": len(fresh), "dry": True}
 
             # Szczegóły i PDF-y TYLKO dla nowych — patrz docstring modułu.
-            for i, act in enumerate(fresh, 1):
-                await scraper.fetch_details(act)
-                if i % 25 == 0:
-                    logger.info(f"  szczegóły: {i}/{len(fresh)}")
-                await asyncio.sleep(0.4)
+            # Akt bez pobranych szczegółów NIE trafia do bazy: inaczej zostałby
+            # „znany” bez treści na zawsze. Wróci w następnym przebiegu.
+            detailed: list[dict] = []
+            blocked: Optional[Exception] = None
+            if len(fresh) > MAX_NEW_ACTS_PER_RUN:
+                logger.info(f"Nowych {len(fresh)} — szczegóły dla {MAX_NEW_ACTS_PER_RUN}, reszta za tydzień")
+            for act in fresh[:MAX_NEW_ACTS_PER_RUN]:
+                try:
+                    await scraper.fetch_details(act)
+                except ScraperBlocked as e:
+                    blocked = e
+                    break
+                if "pdf_url" in act:
+                    detailed.append(act)
 
             # Znane akty wchodzą do `_store` bez treści — odświeżamy im status.
-            stats = await _store(session, fresh + [a for a in listed if a["bip_id"] in known])
+            stats = await _store(session, detailed + [a for a in listed if a["bip_id"] in known])
 
         embedded = await _embed(session)
 
@@ -227,6 +251,8 @@ async def run_legal_acts_async(
         f"=== Akty prawne KONIEC: nowe={stats['nowe']} status={stats['status']} "
         f"bez_zmian={stats['bez_zmian']} osadzone={embedded} ({took:.1f}s) ==="
     )
+    if blocked is not None:
+        raise RuntimeError(f"Przebieg przerwany w trakcie szczegółów — {blocked}") from blocked
     return {**stats, "embedded": embedded, "seconds": took}
 
 

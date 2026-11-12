@@ -945,6 +945,24 @@ Pismo z wyjaśnieniem: `DESIGN/pisma/PISMO_E-LINE_WYJASNIENIE_PONOWNEJ_BLOKADY_2
   (`BIP_TIMEOUT_S`, `BIP_MAX_RETRIES`). Wpis z datą sprzed okna nie trafia do bazy, więc pamięta go
   `_TOO_OLD_IDS` (w procesie). Przed pismem do E-LINE sprawdź w logu: `PoliteHttp … → 403` czy `Timeout on attempt`
 
+## BIP: trzecia blokada — stan w bazie, wyłącznik, limity (2026-11-12)
+**Od ok. 6–10.11 serwer dostaje 403 „wykrycie nietypowej aktywności” (automat E-LINE).** Najbardziej
+prawdopodobny powód: seria 1.11 (~425 żądań w 2 h — wiedza stała pobierała WSZYSTKO, strona działu 2×, każdy
+PDF, plus pełny skan aktów), potem ponawianie w czasie awarii BIP 6.11 i restarty kontenera zerujące karencję.
+Logi 6–9.11 przepadły przy deployu — przyczyny nie udowodniono. Pismo: `DESIGN/pisma/PISMO_E-LINE_TRZECIA_BLOKADA_2026-11-12.md`.
+- **`scrapers/polite.py` to TRANSPORT httpx** (`transport=polite.transport()`), nie haki — hak nie widzi timeoutu.
+  Stan w bazie: `polite_hosts` (wyłącznik `hold`, `blocked_until`, eskalacja 12 h → 3 doby → wyłącznik) i
+  `polite_requests` (każde WYSŁANE żądanie, 90 dni, `retention_job`). Limity 60/h i 150/dobę z dziennika.
+  Timeout/5xx = koniec przebiegu, host zamknięty 1 h, ZERO ponowień. Stan nieczytelny = żądanie nie wychodzi
+- **Wyłącznik startuje WŁĄCZONY** (migracja `add_polite_http_state`). Zdjęcie TYLKO po zgodzie E-LINE:
+  `docker exec -w /app centrum-backend-1 python -m scripts.bip_access --release --yes`. Stan bez wysyłania żądania:
+  `--status`; wyciąg dla dostawcy: `--log --days 7`. ⚠️ **Nie sprawdzaj BIP ręcznym `curl` z serwera** — ruch poza dziennikiem
+- Wolumen: aktualności = 1 strona listy (bez `?start=`), wpis pobierany RAZ (znany = w bazie, bez względu na wiek);
+  wiedza stała co niedzielę ¼ działów (`sections_for_week`), strona działu raz, PDF tylko gdy zmienił się `page_hash`,
+  znany dokument po 180 dniach, ≤ 50 żądań/przebieg; akty 5:30 = przyrost + 8 stron statusów (`status_slice`, cykl 6 tyg.),
+  ≤ 20 nowych aktów/przebieg. Pełny skan miesięczny USUNIĘTY. Firecrawl dla BIP wyłączony na stałe (inne IP, poza limitami)
+- Typowo: dzień 2–5 żądań, niedziela 15–20 (po sesji do ~55). Test: `test_polite_http` (CI, 50 sprawdzeń)
+
 ## Stan źródeł: próba ≠ sukces (2026-10-11)
 **BIP od lipca odpowiada 403, a w bazie stał jako „zeskanowany dziś”** — scraper połykał
 błąd, zwracał pustą listę, a job zapisywał `last_scraped` (audyt, F-019).
@@ -1532,4 +1550,4 @@ develop  # nieaktywna
 - Swagger: http://localhost:8000/docs
 
 ---
-*Ostatnia aktualizacja: 2026-10-26*
+*Ostatnia aktualizacja: 2026-11-12*

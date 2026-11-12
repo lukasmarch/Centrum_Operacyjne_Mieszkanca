@@ -8,7 +8,7 @@ from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
-from src.scrapers.polite import HostBlocked, hooks as polite_hooks
+from src.scrapers.polite import HostBlocked, polite_url as polite_host, transport as polite_transport
 from src.utils.logger import setup_logger
 from src.database.schema import Article, Source
 
@@ -37,7 +37,7 @@ class BaseScraper(ABC):
             headers={'User-Agent': self.user_agent},
             timeout=self.timeout,
             follow_redirects=True,
-            event_hooks=polite_hooks(),
+            transport=polite_transport(),
         )
         return self
 
@@ -73,11 +73,15 @@ class BaseScraper(ABC):
             except httpx.TimeoutException:
                 self.logger.error(f"Timeout on attempt {attempt + 1}")
                 failure = f"brak odpowiedzi w {self.timeout} s (timeout)"
+                if polite_host(url):
+                    # Serwer gminy nie odpowiada — druga próba tylko go dociąża
+                    # (6.11.2026). `polite` i tak zamknął host na godzinę.
+                    break
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(2 ** attempt)
             except Exception as e:
                 self.logger.error(f"Error fetching {url}: {e}")
-                if attempt == self.max_retries - 1:
+                if attempt == self.max_retries - 1 or polite_host(url):
                     raise
                 await asyncio.sleep(2 ** attempt)
 

@@ -9,9 +9,9 @@ Pierwsze uruchomienie po migracji `add_legal_acts` — potem robi to
     python -m scripts.run_legal_acts                # zakres 2024–2026
     python -m scripts.run_legal_acts --since 2026-01-01
 
-⚠️ Pełne napełnienie to ~440 aktów: tyle samo stron szczegółowych i PDF-ów
-z małego serwera gminy, około 20 minut z odstępami. Ponowne uruchomienie jest
-tanie — akty znane po `bip_id` nie są pobierane ponownie.
+⚠️ Od 12.11.2026 (trzecia blokada BIP) przebieg bierze szczegóły najwyżej
+20 nowych aktów, a `polite` pilnuje 60 żądań/h i 150/dobę dla BIP — pełne
+napełnienie rozkłada się na wiele przebiegów. Tak ma być.
 """
 import argparse
 import asyncio

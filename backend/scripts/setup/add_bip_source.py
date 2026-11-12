@@ -29,7 +29,7 @@ BIP_SOURCE = {
         "news_url": "https://bip.gminarybno.pl/112/",
         "download_pdfs": True,
         "pdf_extraction": "pdfplumber",
-        "firecrawl_fallback": True,
+        "firecrawl_fallback": False,  # ignorowane od 12.11.2026 — Firecrawl to obcy bot dla BIP
         "max_pages_per_run": 3,
     },
     "status": "active",

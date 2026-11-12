@@ -20,7 +20,7 @@ retencji w Polityce prywatności):
 import asyncio
 from datetime import datetime, timedelta, date
 
-from sqlalchemy import delete, update, or_, func
+from sqlalchemy import delete, update, or_, func, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import select
@@ -44,6 +44,7 @@ RETENTION_RESOLVED_REPORT_DAYS = 365
 # tylko tak długo, jak trwa jej użyteczność (art. 5 ust. 1 lit. e RODO).
 RETENTION_TOOL_CALL_QUESTION_DAYS = 30
 RETENTION_TOOL_CALL_DAYS = 180
+RETENTION_POLITE_REQUEST_DAYS = 90
 # Pomiar strony. `session_id` wiąże zdarzenia w jedną wizytę i tylko po to
 # istnieje — po kwartale odtwarzanie pojedynczej ścieżki nikomu już nie służy,
 # a zestawienia liczą się po `event`, `section` i `utm_campaign`.
@@ -220,6 +221,14 @@ async def run_retention_async():
         # 7c. Raporty CSP
         csp_removed = await purge_csp_violations(session, now)
         logger.info(f"csp_violations: usunięto {csp_removed} nieaktywnych wpisów (> {RETENTION_CSP_DAYS} dni)")
+
+        # 7d. Dziennik żądań do serwerów gminy (`scrapers/polite.py`) — dowód dla
+        # dostawcy BIP i podstawa limitów; dłużej niż kwartał nie jest potrzebny.
+        res = await session.execute(
+            text("DELETE FROM polite_requests WHERE at < :cut"),
+            {"cut": now - timedelta(days=RETENTION_POLITE_REQUEST_DAYS)},
+        )
+        logger.info(f"polite_requests: usunięto {res.rowcount} wpisów (> {RETENTION_POLITE_REQUEST_DAYS} dni)")
 
         # 8. Zdjęcia pism od sołtysów — oryginał jest materiałem roboczym
         # redakcji, publikacją jest przedruk. Znika IMAGE_RETENTION_DAYS po

@@ -1,5 +1,5 @@
 """
-Job wiedzy stałej z BIP — niedziela 4:00 (2026-08-03)
+Job wiedzy stałej z BIP — co niedzielę 4:00, ćwierć działów na raz (od 12.11.2026)
 
 Statut, procedury, podatki i programy środowiskowe zmieniają się kilka razy
 w roku, więc przebieg tygodniowy w martwej godzinie w zupełności wystarcza.
@@ -24,6 +24,7 @@ from src.ai.embeddings import embedding_service
 from src.config import settings
 from src.database.schema import BipDocument
 from src.scrapers.bip_knowledge import BipKnowledgeScraper
+from src.scrapers.polite import HostHeld
 from src.utils.cost_tracker import log_api_cost
 from src.utils.logger import setup_logger
 
@@ -32,11 +33,29 @@ logger = setup_logger("BipKnowledgeJob")
 SOURCE_TYPE = "bip_static"
 
 
+async def _known_documents(session: AsyncSession) -> dict:
+    """url → (page_hash, last_checked_at). `page_hash` czytany surowym SQL-em:
+    kolumna z migracji `add_polite_http_state`, modelu nie ruszamy."""
+    rows = await session.execute(text("SELECT url, page_hash, last_checked_at FROM bip_documents"))
+    return {r[0]: (r[1], r[2]) for r in rows.all()}
+
+
 async def _store_documents(session: AsyncSession, documents: list[dict]) -> dict:
     """Zapisuje dokumenty; oznacza do ponownego osadzenia tylko te zmienione."""
     stats = {"nowe": 0, "zmienione": 0, "bez_zmian": 0}
+    hashes = {d["url"]: d["page_hash"] for d in documents if d.get("page_hash")}
 
     for doc in documents:
+        if doc.get("unchanged"):
+            # Strona bez zmian — PDF-ów nie pobieraliśmy, treść zostaje.
+            await session.execute(
+                text("UPDATE bip_documents SET last_checked_at = :now WHERE url = :url"),
+                {"now": datetime.utcnow(), "url": doc["url"]},
+            )
+            stats["bez_zmian"] += 1
+            continue
+        doc = {k: v for k, v in doc.items() if k != "page_hash"}
+
         existing = (await session.execute(
             select(BipDocument).where(BipDocument.url == doc["url"])
         )).scalars().first()
@@ -61,6 +80,11 @@ async def _store_documents(session: AsyncSession, documents: list[dict]) -> dict
             stats["zmienione"] += 1
         session.add(existing)
 
+    await session.flush()
+    for url, h in hashes.items():
+        await session.execute(
+            text("UPDATE bip_documents SET page_hash = :h WHERE url = :url"), {"h": h, "url": url},
+        )
     await session.commit()
     return stats
 
@@ -140,25 +164,37 @@ async def run_bip_knowledge_job_async():
     logger.info("Start job: wiedza stała z BIP")
     start = datetime.utcnow()
 
-    scraper = BipKnowledgeScraper()
-    documents = await scraper.scrape_all()
-    logger.info(f"Pobrano {len(documents)} dokumentów z {len(scraper.sections)} działów")
-
-    if not documents:
-        # Pusty wynik przy działającym BIP oznacza zmianę struktury strony,
-        # a nie brak treści — nie ma czego zapisywać, jest co zgłosić.
-        # Druga, od 24.08.2026 równie prawdopodobna przyczyna: BIP odrzuca
-        # adres IP tej maszyny (403 na wszystko, także na goły curl).
-        logger.error(
-            "Scraper nie zwrócił żadnego dokumentu. Dwie przyczyny warte "
-            "sprawdzenia w tej kolejności: (1) dostęp — "
-            "`curl -s -o /dev/null -w '%{http_code}' https://bip.gminarybno.pl/112/` "
-            "z TEJ maszyny; 403 znaczy blokadę IP, (2) zmiana struktury strony."
-        )
-        return
-
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session() as session:
+        known = await _known_documents(session)
+
+    scraper = BipKnowledgeScraper(known=known)
+    documents = await scraper.scrape_all()
+    logger.info(
+        f"Działy: {', '.join(n for _, n in scraper.sections)} — "
+        f"{len(documents)} pozycji, {scraper.requests} żądań do BIP"
+    )
+
+    if scraper.blocked is not None and isinstance(scraper.blocked, HostHeld):
+        # Wyłącznik — stan zamierzony. Nic nie poszło do BIP, nie ma czego zgłaszać.
+        logger.warning(f"Wiedza stała pominięta: {scraper.blocked}")
+        await engine.dispose()
+        return
+
+    if not documents:
+        await engine.dispose()
+        if scraper.blocked is not None:
+            raise RuntimeError(f"BIP zamknięty — wiedza stała nie pobrana: {scraper.blocked}")
+        # ⚠️ NIE sprawdzaj dostępu ręcznym curl-em z serwera — każde żądanie
+        # poza `polite` jest niewidoczne w dzienniku i liczy się dostawcy BIP
+        # jako nasz ruch. Stan i dziennik: `python -m scripts.bip_access --status`.
+        logger.warning(
+            "Scraper nie zwrócił żadnego dokumentu mimo działającego dostępu — "
+            "prawdopodobnie zmiana struktury strony BIP. Dziennik żądań: "
+            "`python -m scripts.bip_access --log`."
+        )
+        return
 
     async with async_session() as session:
         stats = await _store_documents(session, documents)

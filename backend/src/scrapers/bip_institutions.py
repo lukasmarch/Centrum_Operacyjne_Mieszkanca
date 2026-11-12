@@ -29,7 +29,6 @@ adres e-mail byłby gorszy od żadnego.
 
 Użycie: `python -m scripts.run_bip_institutions [--dry]`
 """
-import asyncio
 import hashlib
 import html
 import re
@@ -38,7 +37,7 @@ from typing import Optional
 
 import httpx
 
-from src.scrapers.polite import BIP_HEADERS, hooks as polite_hooks
+from src.scrapers.polite import BIP_HEADERS, HostBlocked, transport as polite_transport
 from src.utils.logger import setup_logger
 
 logger = setup_logger("BipInstitutions")
@@ -209,7 +208,7 @@ class BipInstitutionsScraper:
     async def __aenter__(self):
         self.client = httpx.AsyncClient(
             headers=BIP_HEADERS, timeout=self.timeout, follow_redirects=True,
-            event_hooks=polite_hooks(),
+            transport=polite_transport(),
         )
         return self
 
@@ -241,10 +240,13 @@ class BipInstitutionsScraper:
                     heading = re.match(r">?\s*([^>]{10,180}?)\s+Akapit nr", text)
                     if heading:
                         data["name"] = heading.group(1).strip()
+                except HostBlocked:
+                    # Host zamknięty (wyłącznik, odmowa, brak odpowiedzi) — reszta
+                    # jednostek dostałaby to samo; przerywamy.
+                    raise
                 except Exception as e:
                     logger.error(f"{spec.slug}: nie pobrano ({e})")
                     data["_error"] = str(e)
-                await asyncio.sleep(self.delay)
 
             data["content_hash"] = content_hash(data)
             # Ręczne NA KOŃCU: to one rozstrzygają, bo opisują rzeczy, których
