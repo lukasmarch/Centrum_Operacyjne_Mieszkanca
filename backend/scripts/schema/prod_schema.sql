@@ -1533,6 +1533,57 @@ ALTER SEQUENCE public.pharmacy_duties_id_seq OWNED BY public.pharmacy_duties.id;
 
 
 --
+-- Name: polite_hosts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.polite_hosts (
+    host character varying(120) NOT NULL,
+    hold boolean DEFAULT false NOT NULL,
+    hold_reason character varying(300),
+    blocked_until timestamp without time zone,
+    block_reason character varying(300),
+    refusal_level integer DEFAULT 0 NOT NULL,
+    last_refusal_at timestamp without time zone,
+    updated_at timestamp without time zone
+);
+
+
+--
+-- Name: polite_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.polite_requests (
+    id bigint NOT NULL,
+    at timestamp without time zone NOT NULL,
+    host character varying(120) NOT NULL,
+    method character varying(8) NOT NULL,
+    path character varying(500) NOT NULL,
+    status smallint,
+    outcome character varying(20) NOT NULL,
+    duration_ms integer
+);
+
+
+--
+-- Name: polite_requests_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.polite_requests_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: polite_requests_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.polite_requests_id_seq OWNED BY public.polite_requests.id;
+
+
+--
 -- Name: push_subscriptions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2506,6 +2557,13 @@ ALTER TABLE ONLY public.pharmacy_duties ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
+-- Name: polite_requests id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.polite_requests ALTER COLUMN id SET DEFAULT nextval('public.polite_requests_id_seq'::regclass);
+
+
+--
 -- Name: push_subscriptions id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3025,6 +3083,22 @@ ALTER TABLE ONLY public.pharmacy_duties
 
 
 --
+-- Name: polite_hosts polite_hosts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.polite_hosts
+    ADD CONSTRAINT polite_hosts_pkey PRIMARY KEY (host);
+
+
+--
+-- Name: polite_requests polite_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.polite_requests
+    ADD CONSTRAINT polite_requests_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: push_subscriptions push_subscriptions_endpoint_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3517,6 +3591,13 @@ CREATE INDEX idx_pharmacy_name ON public.pharmacy_duties USING btree (pharmacy_n
 --
 
 CREATE INDEX idx_pharmacy_year ON public.pharmacy_duties USING btree (pharmacy_name, valid_year);
+
+
+--
+-- Name: idx_polite_requests_host_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_polite_requests_host_at ON public.polite_requests USING btree (host, at DESC);
 
 
 --
