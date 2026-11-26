@@ -576,3 +576,74 @@ def parse_date_span(
         end_local = datetime(last.year, last.month, last.day) + timedelta(days=1)
         return to_utc(start_local), to_utc(end_local)
     return None, None
+
+
+# --- „dziś” przy dacie, która nie jest dzisiaj ------------------------------
+# 26.11.2026 briefing otworzył się zdaniem „Dziś, 9 grudnia, Klub Honorowych
+# Dawców Krwi organizuje akcję poboru krwi” — trzynaście dni przed terminem.
+# Model połączył polecenie „to jest nagłówek dnia” z datą przepisaną z posta.
+# Słowo względne i data bezwzględna w jednym zdaniu dają się porównać KODEM,
+# więc nie zostawiamy tego modelowi: sprzeczność = odpowiedź do poprawki.
+
+_RELATIVE_WORDS = {"dzis": 0, "dzisiaj": 0, "jutro": 1, "jutrzejsz": 1, "pojutrze": 2}
+_RELATIVE_RE = re.compile(r"\b(dzisiaj|dzis|pojutrze|jutrzejsz\w*|jutro)\b")
+# Słowo względne i data muszą stać TUŻ obok siebie: „Dziś, 9 grudnia”,
+# „jutro (27 listopada)”, „9 grudnia — już dziś”. Szersze okno łapało
+# „Już dziś o 10:00 sesja; 9 grudnia pobór krwi” — dwa zdarzenia, oba poprawne.
+_RELATIVE_BEFORE = 12
+_RELATIVE_AFTER = 15
+
+
+def _nearest_date(day: int, month: int, year: Optional[int], today):
+    """Data z tekstu bez roku → wariant najbliższy dzisiejszemu dniu."""
+    years = [year] if year else [today.year - 1, today.year, today.year + 1]
+    best = None
+    for y in years:
+        try:
+            d = datetime(y, month, day).date()
+        except ValueError:
+            continue
+        if best is None or abs((d - today).days) < abs((best - today).days):
+            best = d
+    return best
+
+
+def relative_date_conflicts(text: Optional[str], now: Optional[datetime] = None) -> list[str]:
+    """
+    Fragmenty, w których „dziś/jutro/pojutrze” stoi przy dacie z INNEGO dnia.
+
+    `now` — naiwny UTC. Zwraca listę cytatów (tekst bez ogonków) do komunikatu
+    dla modelu; pusta lista = brak sprzeczności. Sama data bez słowa względnego
+    niczego nie narusza — „9 grudnia” w zapowiedzi jest poprawne.
+    """
+    if not text:
+        return []
+    text_flat = flat(text)
+    today = local_now(now).date()
+    conflicts = []
+    for match in _DATE_RE.finditer(text_flat):
+        if match.group(2):
+            day, month = int(match.group(1)), _MONTHS[match.group(2)]
+            year = int(match.group(3)) if match.group(3) else None
+        else:
+            day, month, year = int(match.group(4)), int(match.group(5)), int(match.group(6))
+        date = _nearest_date(day, month, year, today)
+        if date is None:
+            continue
+
+        before = text_flat[max(0, match.start() - _RELATIVE_BEFORE): match.start()]
+        after = text_flat[match.end(): match.end() + _RELATIVE_AFTER]
+        # Tylko w obrębie zdania: kropka ze spacją albo średnik odcina sąsiednie
+        before = re.split(r"[.!?;]\s?", before)[-1]
+        after = re.split(r"[.!?;]\s?", after)[0]
+
+        words = [m.group(1) for m in _RELATIVE_RE.finditer(before)]
+        words += [m.group(1) for m in _RELATIVE_RE.finditer(after)][:1]
+        for word in words:
+            key = next(k for k in _RELATIVE_WORDS if word.startswith(k))
+            offset = _RELATIVE_WORDS[key]
+            if (date - today).days != offset:
+                start = max(0, match.start() - len(before))
+                conflicts.append(text_flat[start: match.end() + len(after)].strip())
+                break
+    return conflicts

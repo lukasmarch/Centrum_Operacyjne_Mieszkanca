@@ -47,6 +47,7 @@ from src.services.time_span import (
     is_all_day,
     phase,
     local_day_bounds,
+    relative_date_conflicts,
     to_local,
     when_label,
 )
@@ -236,6 +237,8 @@ class SummaryRun:
     """Kontekst jednego przebiegu: co briefing MUSI i co WOLNO mu cytować."""
     required_headline_id: Optional[int] = None
     known_article_ids: frozenset = field(default_factory=frozenset)
+    # Chwila przebiegu (naiwny UTC) — względem niej sprawdzamy „dziś/jutro”
+    now: Optional[datetime] = None
 
 
 async def validate_summary(
@@ -280,6 +283,21 @@ async def validate_summary(
             f"Nie piszesz o tym, czego nie wiemy. Oprzyj nagłówek wyłącznie "
             f"na artykule z konkretną treścią; jeśli takiego nie ma, wybierz "
             f"inny artykuł z materiału."
+        )
+
+    # „Dziś” przy dacie z innego dnia (26.11.2026: „Dziś, 9 grudnia, … pobór
+    # krwi” — trzynaście dni przed terminem). Błędna data w nagłówku to dla
+    # mieszkańca dowód, że nikt tego nie sprawdza; sprawdzamy więc kodem
+    # każde pole, które trafia na stronę i do maila.
+    texts = [output.headline, output.highlights, *output.summary_by_category.values(),
+             *output.upcoming_events]
+    conflicts = [c for t in texts for c in relative_date_conflicts(t, ctx.deps.now)]
+    if conflicts:
+        raise ModelRetry(
+            f"Sprzeczna data: „{conflicts[0]}” — słowo „dziś/jutro/pojutrze” stoi "
+            f"przy dacie z innego dnia. Termin zdarzenia jest w etykiecie [ZDARZENIE …] "
+            f"przy artykule. Jeśli zdarzenie nie jest dziś, NIE pisz „dziś” — podaj "
+            f"datę i dzień tygodnia (np. „w środę, 9 grudnia”)."
         )
 
     match = _MEASUREMENT_RE.search(output.highlights)
@@ -475,6 +493,7 @@ class SummaryGenerator:
             run_deps = SummaryRun(
                 required_headline_id=top_article.id if top_article else None,
                 known_article_ids=frozenset(all_articles_map),
+                now=now,
             )
             self.logger.info(f"Calling AI to generate summary (articles: {len(articles)}, events: {len(events)})")
             result_a = await self.agent.run(input_data, deps=run_deps)
@@ -756,6 +775,16 @@ class SummaryGenerator:
     # otwierała briefing nazajutrz o 5:00, dwadzieścia godzin później.
     ONGOING_ALERT_H = 12
 
+    # Nagłówek dnia to sprawa dnia. Zdarzenie startujące dalej niż za tyle
+    # godzin idzie na koniec swojej grupy — tak jak „po terminie”. 26.11.2026
+    # zbiórka krwi za 13 dni (Zdrowie, priorytet 10) wygrała z sesją Rady TEGO
+    # dnia (Urząd, 30), bo kategoria stała w kluczu przed odległością w czasie.
+    # Punktacji kategorii nie ruszamy; data jest osią PRZED nią. Degradacja,
+    # nie wykluczenie: w pusty dzień daleka zapowiedź nadal może wygrać.
+    # 96 h, nie 48: zapowiedź dożynek za trzy doby ma wygrać z posiedzeniem,
+    # które zaczęło się półtorej godziny temu (przypadek z 26.08.2026).
+    HEADLINE_HORIZON_H = 96
+
     async def _recent_headline_topics(
         self,
         session: AsyncSession,
@@ -1005,6 +1034,14 @@ class SummaryGenerator:
             return False
         return (now - reference).total_seconds() / 3600 <= cls.ONGOING_ALERT_H
 
+    @classmethod
+    def _is_beyond_horizon(cls, article, now: datetime) -> bool:
+        """Czy zdarzenie zaczyna się dalej niż `HEADLINE_HORIZON_H` od teraz."""
+        start = getattr(article, "event_at", None)
+        if start is None:
+            return False
+        return (start - now).total_seconds() / 3600 > cls.HEADLINE_HORIZON_H
+
     def _select_top_article(
         self,
         articles_by_category: dict,
@@ -1015,7 +1052,9 @@ class SummaryGenerator:
 
         Kolejność rozstrzygania:
         1. lokalny przed regionalnym — regionalny wygrywa tylko przy braku lokalnych,
-        2. zdarzenie po terminie na końcu swojej grupy (`_event_is_over`),
+        2. zdarzenie zakończone na końcu swojej grupy,
+        2a. zdarzenie dalej niż `HEADLINE_HORIZON_H` — przed zakończonym,
+        2b. zdarzenie rozpoczęte bez znanego końca (`_event_is_over`) — przed dalekim,
         3. temat ostatnich briefingów na końcu swojej grupy,
         4. ważność kategorii (`_headline_priority`),
         5. bliskość w czasie.
@@ -1063,7 +1102,7 @@ class SummaryGenerator:
         grupy — nie znika, więc przy chudym dniu wciąż może wygrać.
         """
         best = None
-        best_key = (2, 2, 2, 999, float("inf"))
+        best_key = (2, 2, 2, 2, 2, 999, float("inf"))
 
         for category, arts in articles_by_category.items():
             for article in arts:
@@ -1089,8 +1128,18 @@ class SummaryGenerator:
                     not (alert_now and self._alert_still_running(article, now))
                     and self._repeats_recent_headline(article, recent_topics)
                 )
+                far = self._is_beyond_horizon(article, now)
+                # Trzy stopnie czasu: ZAKOŃCZONE → DALEKO (poza horyzontem) →
+                # ROZPOCZĘTE bez znanego końca. Sesja Rady trwająca od godziny
+                # jest sprawą dnia bardziej niż zbiórka krwi za dwa tygodnie;
+                # wczorajsze dożynki — mniej niż cokolwiek przed nami.
+                ended = over and not alert_now and phase(
+                    article.event_at, article.event_until, now
+                ) == "ended"
                 key = (
                     0 if self._is_local(article) else 1,
+                    1 if ended else 0,
+                    1 if far else 0,
                     1 if over else 0,
                     1 if repeats else 0,
                     priority,
@@ -1228,12 +1277,18 @@ class SummaryGenerator:
                 f"⚡ WYMAGANY ARTYKUŁ NAGŁÓWKA [ID:{top_article.id}]:",
                 f"   Tytuł: {_article_title(top_article)}",
                 f"   Kategoria: {top_article.category} | Źródło: [{locality}]",
+                # 26.11.2026 blok nagłówka nie miał terminu, a lista niżej
+                # miała — model wziął „nagłówek dnia” za „dzieje się dziś”
+                # i napisał „Dziś, 9 grudnia” o zbiórce krwi za 13 dni.
+                f"   Kiedy: {_time_label(top_article, now)}",
             ]
             body = _article_body(top_article)
             if body:
                 lines.append(f"   Treść: {body}")
             lines += [
                 f"   ZASADA: Headline MUSI być o tym artykule. cited_article_ids[0] MUSI = {top_article.id}.",
+                "   ZASADA: Słowa „dziś”/„jutro” WYŁĄCZNIE zgodnie z polem „Kiedy”. "
+                "Zdarzenie z innego dnia opisz datą i dniem tygodnia.",
                 "=" * 80,
                 "",
             ]

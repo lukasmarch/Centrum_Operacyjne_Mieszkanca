@@ -77,6 +77,26 @@ def article(
 # Pamięć jest po TEMACIE, nie po ID — kolejne odświeżenie tego samego
 # wyłączenia Energi dostaje nowy wiersz i nowe ID.
 CASES: List[Tuple[str, List[SimpleNamespace], List[str], int]] = [
+    # 26.11.2026: zbiórka krwi za 13 dni (Zdrowie) otworzyła briefing w dniu
+    # sesji Rady (Urząd), a model napisał „Dziś, 9 grudnia”. Kategoria nie
+    # może przebić daty: zdarzenie poza horyzontem idzie na koniec grupy.
+    (
+        "zbiórka krwi za 13 dni przegrywa z dzisiejszą sesją Rady",
+        [article(1, "Zdrowie", "Zostań Mikołajem — oddaj krew w Rybnie", SYLA, 17, 314, 317.5, locality=3),
+         article(2, "Urząd", "XXVII sesja Rady Gminy Rybno", published_h=140, event_h=-2, locality=3)],
+        [], 2,
+    ),
+    (
+        "zapowiedź za 13 dni wygrywa, gdy nic innego nie ma",
+        [article(1, "Zdrowie", "Zostań Mikołajem — oddaj krew w Rybnie", SYLA, 17, 314, 317.5, locality=3)],
+        [], 1,
+    ),
+    (
+        "jutrzejsze zdarzenie mieści się w horyzoncie i gra kategorią",
+        [article(1, "Zdrowie", "Pobór krwi w Rybnie", SYLA, 17, 30, 33, locality=3),
+         article(2, "Urząd", "Komisja Rady Gminy", published_h=140, event_h=40, locality=3)],
+        [], 1,
+    ),
     (
         "awaria dziś (za 4 h) bije lokalną kulturę",
         [article(1, "Awaria", "Wyłączenie planowane w Rybnie", ENERGA, 20, 4, 9),
@@ -690,8 +710,34 @@ async def run_story_repeat_db() -> None:
             print(f"  {'✓' if hit else '✗'} {label}: {cand_id} po {prev_id} → powtórka={hit}")
 
 
+def run_date_conflicts() -> int:
+    """„Dziś” przy dacie z innego dnia — reguła walidatora briefingu (26.11.2026)."""
+    from src.services.time_span import relative_date_conflicts
+
+    now = datetime(2026, 11, 26, 5, 0)   # 6:00 czasu lokalnego, czwartek
+    checks = [
+        ("Dziś, 9 grudnia, Klub HDK organizuje pobór krwi.", True),
+        ("9 grudnia — już dziś pobór krwi.", True),
+        ("Jutro (28 listopada) bal.", True),
+        ("Dziś, 26 listopada, sesja Rady.", False),
+        ("Jutro, 27 listopada, Bal Andrzejkowy.", False),
+        ("W środę, 9 grudnia, pobór krwi.", False),
+        ("Już dziś o 10:00 sesja; 9 grudnia pobór krwi.", False),
+        ("Dziś sesja, a 9 grudnia pobór krwi.", False),
+    ]
+    print("\n" + "=" * 78 + "\nSprzeczna data w tekście briefingu\n" + "=" * 78)
+    failed = 0
+    for text, expected in checks:
+        got = bool(relative_date_conflicts(text, now))
+        ok = got == expected
+        failed += not ok
+        print(f"{'✓' if ok else '✗'} {text:.<62} {'błąd' if got else 'OK'}")
+    print("-" * 78 + f"\n{len(checks) - failed}/{len(checks)} zgodnych z oczekiwaniem")
+    return failed
+
+
 if __name__ == "__main__":
-    failed = run_cases() + run_window() + run_fallback() + run_story_repeat()
+    failed = run_cases() + run_window() + run_fallback() + run_story_repeat() + run_date_conflicts()
     if "--db" in sys.argv:
         async def _db() -> None:
             # Jedna pętla: pula połączeń `async_session` jest przywiązana do pętli,
