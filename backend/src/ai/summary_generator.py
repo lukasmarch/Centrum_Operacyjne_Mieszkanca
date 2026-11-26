@@ -546,7 +546,11 @@ class SummaryGenerator:
                 "headline": summary_data.headline,
                 "highlights": summary_data.highlights,
                 "summary_by_category": summary_data.summary_by_category,
-                "upcoming_events": summary_data.upcoming_events,
+                # Z KALENDARZA, nie od modelu (26.11.2026: „Bieszczady Gorce
+                # zagrają o Puchar Starosty” zamiast „SiS Rybno…”, a dwie
+                # komisje Rady pominięte). Lista to przepisanie danych —
+                # zadanie dla kodu, jak nagłówek i daty.
+                "upcoming_events": self._upcoming_lines(events, now),
                 "air_quality_summary": summary_data.air_quality_summary,
                 "cited_articles": cited_articles,
                 "stats": {
@@ -1033,6 +1037,23 @@ class SummaryGenerator:
         if reference is None:
             return False
         return (now - reference).total_seconds() / 3600 <= cls.ONGOING_ALERT_H
+
+    # Ile pozycji ma lista „Nadchodzące wydarzenia” briefingu
+    UPCOMING_LIMIT = 6
+
+    @classmethod
+    def _upcoming_lines(cls, events: list, now: datetime) -> list[str]:
+        """„Tytuł (jutro 15:00, Rybno)” dla wydarzeń, które się jeszcze nie skończyły."""
+        lines = []
+        for event in events:
+            if phase(event.event_date, event.end_date, now) == "ended":
+                continue
+            when = when_label(event.event_date, event.end_date, now)
+            where = f", {event.location}" if event.location else ""
+            lines.append(f"{event.title} ({when}{where})")
+            if len(lines) >= cls.UPCOMING_LIMIT:
+                break
+        return lines
 
     @classmethod
     def _is_beyond_horizon(cls, article, now: datetime) -> bool:

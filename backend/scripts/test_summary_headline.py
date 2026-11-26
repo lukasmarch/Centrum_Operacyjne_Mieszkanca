@@ -736,8 +736,31 @@ def run_date_conflicts() -> int:
     return failed
 
 
+def run_upcoming() -> int:
+    """Lista „Nadchodzące” składana z kalendarza (26.11.2026: model zmyślił nazwę drużyny)."""
+    now = datetime(2026, 11, 26, 8, 30)
+    ev = lambda t, s, e=None, loc="Rybno": SimpleNamespace(title=t, event_date=s, end_date=e, location=loc)
+    events = [
+        ev("Zakończone rano", datetime(2026, 11, 26, 6, 0), datetime(2026, 11, 26, 7, 0)),
+        ev("XXVII sesja Rady Gminy Rybno", datetime(2026, 11, 26, 9, 0)),
+        ev("Komisja Skarg", datetime(2026, 11, 27, 14, 0)),
+        ev("SiS Rybno zagra o Puchar Starosty", datetime(2026, 11, 27, 23, 0), loc="Działdowo"),
+    ]
+    got = SummaryGenerator._upcoming_lines(events, now)
+    expected = [
+        "XXVII sesja Rady Gminy Rybno (dziś 10:00, Rybno)",
+        "Komisja Skarg (jutro 15:00, Rybno)",
+        "SiS Rybno zagra o Puchar Starosty (pojutrze (cały dzień), Działdowo)",
+    ]
+    ok = got == expected
+    print("\n" + "=" * 78 + "\nNadchodzące wydarzenia z kalendarza\n" + "=" * 78)
+    print(f"{'✓' if ok else '✗'} {got}")
+    return 0 if ok else 1
+
+
 if __name__ == "__main__":
-    failed = run_cases() + run_window() + run_fallback() + run_story_repeat() + run_date_conflicts()
+    failed = (run_cases() + run_window() + run_fallback() + run_story_repeat()
+              + run_date_conflicts() + run_upcoming())
     if "--db" in sys.argv:
         async def _db() -> None:
             # Jedna pętla: pula połączeń `async_session` jest przywiązana do pętli,
