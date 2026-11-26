@@ -117,7 +117,11 @@ _INCIDENTS: tuple[tuple[str, str, str], ...] = (
         "Pożar",
         # `(?!n)` odcina „straż pożarna" — inaczej każdy post OSP o zawodach,
         # nowym wozie czy Dniu Strażaka byłby alertem pożarowym.
-        r"pozar(?!n)|plon\w*\s+(dom|budynek|stodol|las|poddasz)|zapalil\w*\s+sie|splonel",
+        # `(?!zad)` odcina „organizacje POZARządowe” — bez ogonków słowo zaczyna
+        # się od „pozar”. 26.11.2026 ogłoszenie XXVII sesji (program współpracy
+        # z NGO) poszło do 7 telefonów jako „Pożar — Rybno”. `\b` — żeby
+        # „przeciwpożarowy” nie był pożarem.
+        r"\bpozar(?!n|zad)|plon\w*\s+(dom|budynek|stodol|las|poddasz)|zapalil\w*\s+sie|splonel",
     ),
     (
         "wypadek",

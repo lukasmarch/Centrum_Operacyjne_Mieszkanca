@@ -175,6 +175,19 @@ CASES: List[Tuple[str, str, str, Optional[datetime], Optional[datetime], Optiona
         None, None, None,
     ),
     (
+        "ogłoszenie sesji z programem dla NGO — „pozarządowe” to nie pożar",
+        "Ogłoszenie o XXVII sesji Rady Gminy Rybno",
+        "Podjęcie uchwały w sprawie Rocznego programu współpracy Gminy Rybno "
+        "z organizacjami pozarządowymi na 2027 rok.",
+        None, None, None,
+    ),
+    (
+        "kontrola przeciwpożarowa — nie jest zgłoszeniem pożaru",
+        "Przegląd instalacji w świetlicy w Rybnie",
+        "Odbyła się kontrola przeciwpożarowa budynku.",
+        None, None, None,
+    ),
+    (
         "profilaktyka — 'Bezpieczna woda, bezpieczne wakacje'",
         "Bezpieczna woda - Bezpieczne wakacje",
         "Policjanci z Rybna przypominają o zasadach bezpieczeństwa nad wodą.",
