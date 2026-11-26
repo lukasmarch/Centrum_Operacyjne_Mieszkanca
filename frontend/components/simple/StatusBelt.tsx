@@ -39,6 +39,15 @@ const SOLTYS_FRESH_H = 120;
 /** Wiadomość z gminy jest migawką przez 36 h */
 const NEWS_FRESH_H = 36;
 const SOLECTWA_SOURCE = 'RybnoLive - Sołectwa';
+/**
+ * Prywatny profil informacyjny — w pasku idzie ZA kanałami gminy i jednostek.
+ * 26.11.2026 pierwszą migawką w dniu sesji Rady był jego komentarz o wójcie
+ * (Nidzica), a ogłoszenia sesji nie było wcale: liczył się wyłącznie wiek posta.
+ * Nie wycinamy go — pasek ma pokazać najpierw to, co podaje sama gmina.
+ */
+const PRIVATE_PROFILE_SOURCES = new Set(['Facebook - Syla']);
+/** Zdarzenie bez znanego końca trwa tyle (backend: `time_span.DEFAULT_EVENT_DURATION_H`) */
+const DEFAULT_EVENT_H = 3;
 
 const isUrgent = (item: OutageItem, now: Date) =>
     item.ongoing || (item.start !== null && item.start.getTime() - now.getTime() <= URGENT_H * 3_600_000);
@@ -70,6 +79,25 @@ const announcementPath = (url: string): string => {
 
 const ts = (iso: string): Date => parseUtc(iso) ?? new Date(0);
 const hoursAgo = (iso: string, now: Date) => (now.getTime() - ts(iso).getTime()) / 3_600_000;
+
+/** Zapowiedź bez godziny stoi w bazie jako lokalna północ (jak `utils/eventTime.isAllDay`). */
+const isAllDay = (at: Date) => at.getHours() === 0 && at.getMinutes() === 0;
+
+/** Koniec zdarzenia: znany, koniec doby dla całodniowego albo start + 3 h. */
+const eventEnd = (a: Article): Date | null => {
+    if (!a.eventAt) return null;
+    const start = ts(a.eventAt);
+    if (a.eventUntil) return ts(a.eventUntil);
+    return isAllDay(start)
+        ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1)
+        : new Date(start.getTime() + DEFAULT_EVENT_H * 3_600_000);
+};
+
+/** Zdarzenie dzisiejsze, które się jeszcze nie skończyło. */
+const isToday = (a: Article, now: Date): boolean => {
+    const end = eventEnd(a);
+    return !!end && ts(a.eventAt!).toDateString() === now.toDateString() && end.getTime() > now.getTime();
+};
 
 type SlideAction =
     | { kind: 'outage' }
@@ -153,21 +181,44 @@ function buildSlides(
         });
     }
 
-    // 4. Świeże wiadomości z gminy — bez awarii (mają pas niżej) i bez sołtysów (wyżej)
-    const news = articles
-        .filter(a =>
-            a.scope === 'gmina'
-            && a.source !== SOLECTWA_SOURCE
-            && !a.isPinnedAlert
-            && a.category !== 'Awaria'
-            && hoursAgo(a.rawTimestamp, now) <= NEWS_FRESH_H,
-        )
-        .slice(0, 2);
+    // 4. Wiadomości z gminy — bez awarii (mają pas niżej) i bez sołtysów (wyżej).
+    //    Najpierw to, co dzieje się DZIŚ (termin zdarzenia, nie wiek ogłoszenia:
+    //    sesję Rady ogłasza się tydzień wcześniej), potem świeże wpisy.
+    //    W obu grupach kanały gminy przed prywatnym profilem.
+    const pool = articles.filter(a =>
+        a.scope === 'gmina'
+        && a.source !== SOLECTWA_SOURCE
+        && !a.isPinnedAlert
+        && a.category !== 'Awaria',
+    );
+    const official = (a: Article) => (PRIVATE_PROFILE_SOURCES.has(a.source) ? 1 : 0);
+    const today = pool
+        .filter(a => isToday(a, now))
+        .sort((a, b) => official(a) - official(b) || ts(a.eventAt!).getTime() - ts(b.eventAt!).getTime());
+    const fresh = pool
+        .filter(a => hoursAgo(a.rawTimestamp, now) <= NEWS_FRESH_H
+            && !isToday(a, now)
+            && (eventEnd(a)?.getTime() ?? Infinity) > now.getTime())   // zapowiedź po terminie — nie
+        .sort((a, b) => official(a) - official(b));   // stabilne: w grupie kolejność feedu
+    const news: Article[] = [];
+    // Jedna sprawa dnia raz: ogłoszenie sesji z BIP i post o tej samej sesji
+    // mają tę samą kategorię i ten sam dzień — druga migawka niczego nie dodaje
+    const seen = new Set<string>();
+    for (const a of [...today, ...fresh]) {
+        if (news.length >= 2) break;
+        const key = a.eventAt ? `${a.category}|${ts(a.eventAt).toDateString()}` : `id|${a.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        news.push(a);
+    }
     for (const a of news) {
+        const at = a.eventAt ? ts(a.eventAt) : null;
         slides.push({
             key: `news-${a.id}`,
             tone: 'blue',
-            tag: `${a.sourceLabel ?? 'Gmina Rybno'} · ${dayWord(ts(a.rawTimestamp), now)}`,
+            tag: at
+                ? `${a.sourceLabel ?? 'Gmina Rybno'} · ${dayWord(at, now)}${isAllDay(at) ? '' : ` ${hm(at)}`}`
+                : `${a.sourceLabel ?? 'Gmina Rybno'} · ${dayWord(ts(a.rawTimestamp), now)}`,
             text: a.title,
             cta: 'sprawdź',
             action: a.url ? { kind: 'external', href: a.url } : { kind: 'news' },
